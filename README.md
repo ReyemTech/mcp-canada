@@ -5,6 +5,8 @@
   </p>
   <p align="center">
     <a href="https://pypi.org/project/mcp-canada/"><img src="https://img.shields.io/pypi/v/mcp-canada?color=blue&label=PyPI" alt="PyPI"></a>
+    <a href="https://github.com/ReyemTech/mcp-canada/actions/workflows/ci.yml"><img src="https://github.com/ReyemTech/mcp-canada/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+    <a href="https://github.com/ReyemTech/mcp-canada/actions/workflows/integration.yml"><img src="https://github.com/ReyemTech/mcp-canada/actions/workflows/integration.yml/badge.svg" alt="Integration Tests"></a>
     <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue" alt="Python 3.12+"></a>
     <a href="https://github.com/reyemtech/mcp-canada/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
     <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-compatible-purple" alt="MCP Compatible"></a>

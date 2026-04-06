@@ -74,7 +74,7 @@ version_variables = ["src/mcp_canada/__init__.py:__version__"]
 commit_parser = "conventional"
 branch = "main"
 major_on_zero = false
-build_command = "uv build"
+build_command = "pip install build && python -m build"
 upload_to_vcs_release = true
 allow_zero_version = true
 

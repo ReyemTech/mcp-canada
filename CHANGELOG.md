@@ -2,6 +2,19 @@
 
 <!-- CHANGELOG -->
 
+## v0.1.1 (2026-04-06)
+
+### Bug Fixes
+
+- **dist**: Exclude __tests__/ from PyPI wheel
+  ([`196aedd`](https://github.com/ReyemTech/mcp-canada/commit/196aedddaf0d982b6bedf3cb726f6a605d88373f))
+
+### Chores
+
+- Regenerate uv.lock after version bump
+  ([`54c849d`](https://github.com/ReyemTech/mcp-canada/commit/54c849d2aca7d92acdd3cf35c9d49c420d7b033e))
+
+
 ## v0.1.0 (2026-04-06)
 
 - Initial Release

@@ -2,6 +2,14 @@
 
 <!-- CHANGELOG -->
 
+## v0.1.2 (2026-04-06)
+
+### Bug Fixes
+
+- **ci**: Sync uv.lock after semantic release version bump
+  ([`61ede70`](https://github.com/ReyemTech/mcp-canada/commit/61ede70770b98e391c38d68e6bb07771b77daa9f))
+
+
 ## v0.1.1 (2026-04-06)
 
 ### Bug Fixes

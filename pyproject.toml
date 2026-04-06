@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcp-canada"
-version = "0.0.1"
+version = "0.1.0"
 description = "MCP server for Canadian federal government data — bilingual, multi-source, AI-ready."
 readme = "README.md"
 license = "MIT"

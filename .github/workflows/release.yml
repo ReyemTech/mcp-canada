@@ -30,13 +30,23 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --locked --dev
+        run: uv sync --dev
 
       - name: Run semantic release
         id: release
         uses: python-semantic-release/python-semantic-release@v10.5.3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sync lockfile after version bump
+        if: steps.release.outputs.released == 'true'
+        run: |
+          uv lock
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add uv.lock
+          git diff --cached --quiet || git commit -m "chore: sync uv.lock after release"
+          git push
 
       - name: Publish to PyPI
         if: steps.release.outputs.released == 'true'

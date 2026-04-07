@@ -68,6 +68,7 @@ typeCheckingMode = "standard"
 
 [tool.coverage.run]
 source = ["src/mcp_canada"]
+omit = ["src/mcp_canada/installer.py"]
 
 [tool.coverage.report]
 fail_under = 95

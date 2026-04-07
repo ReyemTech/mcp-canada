@@ -67,6 +67,10 @@ uv run mcp-canada
 
 Environment variable: `MCP_CANADA_MODULES=bank_of_canada,recalls`
 
+## Examples
+
+See **[EXAMPLES.md](EXAMPLES.md)** for 19 cross-API intelligence scenarios — from tracing prairie drought to the Canadian dollar, to building pharmaceutical safety audits, to assembling MP accountability briefs. Each example includes the exact prompt and tool chain you can run today.
+
 ## How Discovery Works
 
 With 81 tools, listing all of them would consume half an agent's context window. Instead, **BM25 search** lets agents find exactly what they need:

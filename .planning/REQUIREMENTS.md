@@ -18,9 +18,9 @@
 
 ### StatCan Discovery
 
-- [ ] **SC-01**: Agent can search Statistics Canada tables by keyword (client-side search on cached cube list)
-- [ ] **SC-02**: Agent can retrieve detailed metadata for a specific table by productId (dimensions, members, footnotes)
-- [ ] **SC-03**: Agent can decode numeric codes used in StatCan responses (frequency, units, scalar factor, status)
+- [x] **SC-01**: Agent can search Statistics Canada tables by keyword (client-side search on cached cube list)
+- [x] **SC-02**: Agent can retrieve detailed metadata for a specific table by productId (dimensions, members, footnotes)
+- [x] **SC-03**: Agent can decode numeric codes used in StatCan responses (frequency, units, scalar factor, status)
 
 ### StatCan Series Info
 
@@ -52,8 +52,8 @@
 ### Infrastructure
 
 - [x] **INF-01**: StatCan SSL certificate handling attempts proper cert resolution before falling back to scoped verify=False
-- [ ] **INF-02**: StatCan API calls are rate-limited to 20 req/s via the shared TokenBucket rate limiter
-- [ ] **INF-03**: StatCan responses are cached with tiered TTLs (cube list 1hr, metadata 24hr, code sets 7d, observations 1hr)
+- [x] **INF-02**: StatCan API calls are rate-limited to 20 req/s via the shared TokenBucket rate limiter
+- [x] **INF-03**: StatCan responses are cached with tiered TTLs (cube list 1hr, metadata 24hr, code sets 7d, observations 1hr)
 - [ ] **INF-04**: All StatCan and datastore tools support bilingual responses (lang: en/fr)
 - [ ] **INF-05**: All tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Keywords/Use-for docstrings)
 - [ ] **INF-06**: Unit tests achieve 95%+ coverage for all new code
@@ -98,9 +98,9 @@
 | DS-06 | Phase 7 | Complete |
 | DS-07 | Phase 7 | Complete |
 | DS-08 | Phase 7 | Complete |
-| SC-01 | Phase 8 | Pending |
-| SC-02 | Phase 8 | Pending |
-| SC-03 | Phase 8 | Pending |
+| SC-01 | Phase 8 | Complete |
+| SC-02 | Phase 8 | Complete |
+| SC-03 | Phase 8 | Complete |
 | SC-04 | Phase 8 | Pending |
 | SC-05 | Phase 8 | Pending |
 | SC-06 | Phase 8 | Pending |
@@ -114,8 +114,8 @@
 | SC-14 | Phase 8 | Pending |
 | SC-15 | Phase 9 | Pending |
 | INF-01 | Phase 7 | Complete |
-| INF-02 | Phase 8 | Pending |
-| INF-03 | Phase 8 | Pending |
+| INF-02 | Phase 8 | Complete |
+| INF-03 | Phase 8 | Complete |
 | INF-04 | Phase 8 | Pending |
 | INF-05 | Phase 8 | Pending |
 | INF-06 | Phase 10 | Pending |

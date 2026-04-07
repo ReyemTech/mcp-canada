@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Phase 8 context gathered
-last_updated: "2026-04-07T18:32:21.460Z"
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-04-07T18:56:28.113Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 6
+  completed_plans: 4
   percent: 0
 ---
 
@@ -53,6 +53,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 07-datastore-ssl P03 | 15 | 1 tasks | 7 files |
 | Phase 07-datastore-ssl P01 | 3 | 1 tasks | 9 files |
 | Phase 07-datastore-ssl P02 | 5min | 2 tasks | 4 files |
+| Phase 08-statcan-wds P01 | 4min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,8 @@ Recent decisions affecting current work:
 - [Phase 07-datastore-ssl]: Keywords in tool docstrings must be on a single line — multi-line Keywords wrap causes test_quality.py parser to undercount
 - [Phase 07-datastore-ssl]: ds_get_schema returns NOT_FOUND for nonexistent tables (empty PRAGMA result = user input error, not system error)
 - [Phase 07-datastore-ssl]: Datastore integration test isolation: autouse fixture patches client._db with in-memory connection per test
+- [Phase 08-statcan-wds]: _limiter_acquire() is a module-level function to allow patch.object in tests without re-importing
+- [Phase 08-statcan-wds]: BM25 index stored as (cubes, avg_dl, df) tuple in cache — single cache entry, statistics computed once
 
 ### Pending Todos
 
@@ -84,6 +87,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-07T18:32:21.457Z
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-statcan-wds/08-CONTEXT.md
+Last session: 2026-04-07T18:56:28.111Z
+Stopped at: Completed 08-01-PLAN.md
+Resume file: None

@@ -51,7 +51,12 @@ Plans:
   3. Agent can fetch the latest N observations for a vector (by vectorId or productId+coordinate), retrieve historical data by date range, and fetch multiple vectors simultaneously
   4. Agent can list series and cubes that changed on a specific date, enabling change-monitoring workflows
   5. All StatCan tools respect the 20 req/s rate limit, apply tiered TTL caching (cube list 1hr, metadata 24hr, code sets 7d, observations 1hr), and return bilingual responses
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Constants, schemas, BM25 search, getCubeMetadata, getCodeSets client functions + tests
+- [ ] 08-02-PLAN.md — Series info, data retrieval, and change monitoring client functions + tests
+- [ ] 08-03-PLAN.md — All 11 sc_ tool functions + integration tests through MCP Client
 
 ### Phase 9: SDMX + Composite
 **Goal**: Agents can apply server-side dimension filters via SDMX for large tables and store multi-series fetches directly to the shared datastore in a single tool call
@@ -81,6 +86,6 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 7. Datastore + SSL | 3/3 | Complete   | 2026-04-07 | - |
-| 8. StatCan WDS | v1.1 | 0/TBD | Not started | - |
+| 8. StatCan WDS | v1.1 | 0/3 | Planning complete | - |
 | 9. SDMX + Composite | v1.1 | 0/TBD | Not started | - |
 | 10. Tests + Docs | v1.1 | 0/TBD | Not started | - |

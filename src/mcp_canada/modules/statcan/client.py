@@ -108,7 +108,11 @@ def _unwrap(raw: Any) -> Any:
     envelope = raw[0] if isinstance(raw, list) else raw
     status = envelope.get("status", "")
     if status != "SUCCESS":
-        raise ValueError(str(envelope.get("object", "WDS request failed")))
+        # responseStatusCode 2 means "no data for this coordinate" — not a real error
+        obj = envelope.get("object", {})
+        if isinstance(obj, dict) and obj.get("responseStatusCode") == 2:
+            return obj
+        raise ValueError(str(obj or "WDS request failed"))
     return envelope["object"]
 
 

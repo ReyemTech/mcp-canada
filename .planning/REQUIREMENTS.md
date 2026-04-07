@@ -90,44 +90,44 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DS-01 | — | Pending |
-| DS-02 | — | Pending |
-| DS-03 | — | Pending |
-| DS-04 | — | Pending |
-| DS-05 | — | Pending |
-| DS-06 | — | Pending |
-| DS-07 | — | Pending |
-| DS-08 | — | Pending |
-| SC-01 | — | Pending |
-| SC-02 | — | Pending |
-| SC-03 | — | Pending |
-| SC-04 | — | Pending |
-| SC-05 | — | Pending |
-| SC-06 | — | Pending |
-| SC-07 | — | Pending |
-| SC-08 | — | Pending |
-| SC-09 | — | Pending |
-| SC-10 | — | Pending |
-| SC-11 | — | Pending |
-| SC-12 | — | Pending |
-| SC-13 | — | Pending |
-| SC-14 | — | Pending |
-| SC-15 | — | Pending |
-| INF-01 | — | Pending |
-| INF-02 | — | Pending |
-| INF-03 | — | Pending |
-| INF-04 | — | Pending |
-| INF-05 | — | Pending |
-| INF-06 | — | Pending |
-| INF-07 | — | Pending |
-| INF-08 | — | Pending |
-| INF-09 | — | Pending |
+| DS-01 | Phase 7 | Pending |
+| DS-02 | Phase 7 | Pending |
+| DS-03 | Phase 7 | Pending |
+| DS-04 | Phase 7 | Pending |
+| DS-05 | Phase 7 | Pending |
+| DS-06 | Phase 7 | Pending |
+| DS-07 | Phase 7 | Pending |
+| DS-08 | Phase 7 | Pending |
+| SC-01 | Phase 8 | Pending |
+| SC-02 | Phase 8 | Pending |
+| SC-03 | Phase 8 | Pending |
+| SC-04 | Phase 8 | Pending |
+| SC-05 | Phase 8 | Pending |
+| SC-06 | Phase 8 | Pending |
+| SC-07 | Phase 8 | Pending |
+| SC-08 | Phase 8 | Pending |
+| SC-09 | Phase 8 | Pending |
+| SC-10 | Phase 9 | Pending |
+| SC-11 | Phase 9 | Pending |
+| SC-12 | Phase 9 | Pending |
+| SC-13 | Phase 8 | Pending |
+| SC-14 | Phase 8 | Pending |
+| SC-15 | Phase 9 | Pending |
+| INF-01 | Phase 7 | Pending |
+| INF-02 | Phase 8 | Pending |
+| INF-03 | Phase 8 | Pending |
+| INF-04 | Phase 8 | Pending |
+| INF-05 | Phase 8 | Pending |
+| INF-06 | Phase 10 | Pending |
+| INF-07 | Phase 10 | Pending |
+| INF-08 | Phase 10 | Pending |
+| INF-09 | Phase 10 | Pending |
 
 **Coverage:**
 - v1 requirements: 32 total
-- Mapped to phases: 0
-- Unmapped: 32
+- Mapped to phases: 32
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-07*
-*Last updated: 2026-04-07 after initial definition*
+*Last updated: 2026-04-07 after roadmap creation*

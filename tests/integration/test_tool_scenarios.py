@@ -6,6 +6,7 @@ Tests hit live APIs through the full MCP stack, not client functions directly.
 Run: uv run pytest tests/integration/test_tool_scenarios.py -v -m integration --timeout=120
 """
 
+import aiosqlite
 import pytest
 from tests.integration.conftest import call_tool, call_direct_tool, discover
 
@@ -628,3 +629,125 @@ class TestMetaToolScenarios:
             assert any("boc_" in n for n in boc_names), (
                 f"No BOC tools found in selective server. Got: {boc_names}"
             )
+
+
+# ─── Datastore scenarios ──────────────────────────────────────────────────────
+
+
+class TestDatastoreScenarios:
+    """Datastore integration tests through the MCP Client layer.
+
+    Each test patches client._db with an in-memory aiosqlite connection to
+    avoid touching the real ~/.mcp-canada/datastore.db file.
+    """
+
+    @pytest.fixture(autouse=True)
+    async def in_memory_db(self):
+        """Patch datastore client._db with an in-memory connection for each test."""
+        from mcp_canada.modules.datastore import client as datastore_client
+
+        conn = await aiosqlite.connect(":memory:")
+        conn.row_factory = aiosqlite.Row
+        await conn.execute("PRAGMA journal_mode=WAL")
+        await conn.execute("PRAGMA foreign_keys=ON")
+
+        original = datastore_client._db
+        datastore_client._db = conn
+        yield conn
+        datastore_client._db = original
+        await conn.close()
+
+    @pytest.mark.asyncio
+    async def test_create_table_and_query(self, mcp_server):
+        """'Create a table called test_prices with columns date TEXT and price REAL, then query it.'"""
+        result = await call_tool(mcp_server, "ds_create_table", {
+            "table_name": "test_prices",
+            "columns": [{"name": "date", "type": "TEXT"}, {"name": "price", "type": "REAL"}],
+        })
+        assert "_meta" in result
+        assert result["data"]["table"] == "test_prices"
+        assert result["data"]["columns"] == 2
+
+        query_result = await call_tool(mcp_server, "ds_query", {"sql": "SELECT * FROM test_prices"})
+        assert "_meta" in query_result
+        assert query_result["data"]["row_count"] == 0
+        assert query_result["data"]["truncated"] is False
+
+    @pytest.mark.asyncio
+    async def test_insert_and_retrieve(self, mcp_server):
+        """'Store some exchange rates and get them back.'"""
+        await call_tool(mcp_server, "ds_create_table", {
+            "table_name": "exchange_rates",
+            "columns": [{"name": "date", "type": "TEXT"}, {"name": "rate", "type": "REAL"}],
+        })
+
+        insert_result = await call_tool(mcp_server, "ds_insert_data", {
+            "table_name": "exchange_rates",
+            "rows": [
+                {"date": "2026-04-01", "rate": 1.38},
+                {"date": "2026-04-02", "rate": 1.39},
+                {"date": "2026-04-03", "rate": 1.37},
+            ],
+        })
+        assert insert_result["data"]["inserted"] == 3
+
+        query_result = await call_tool(mcp_server, "ds_query", {"sql": "SELECT * FROM exchange_rates"})
+        assert query_result["data"]["row_count"] == 3
+        assert len(query_result["data"]["rows"]) == 3
+
+    @pytest.mark.asyncio
+    async def test_list_and_schema(self, mcp_server):
+        """'What tables are in the datastore and what is their structure?'"""
+        await call_tool(mcp_server, "ds_create_table", {
+            "table_name": "rates_a",
+            "columns": [{"name": "date", "type": "TEXT"}, {"name": "value", "type": "REAL"}],
+        })
+        await call_tool(mcp_server, "ds_create_table", {
+            "table_name": "rates_b",
+            "columns": [{"name": "id", "type": "INTEGER"}],
+        })
+
+        list_result = await call_tool(mcp_server, "ds_list_tables")
+        assert "_meta" in list_result
+        assert "rates_a" in list_result["data"]["tables"]
+        assert "rates_b" in list_result["data"]["tables"]
+
+        schema_result = await call_tool(mcp_server, "ds_get_schema", {"table_name": "rates_a"})
+        assert "_meta" in schema_result
+        col_names = [c["name"] for c in schema_result["data"]["columns"]]
+        assert "date" in col_names
+        assert "value" in col_names
+
+    @pytest.mark.asyncio
+    async def test_drop_table(self, mcp_server):
+        """'Delete the test_prices table.'"""
+        await call_tool(mcp_server, "ds_create_table", {
+            "table_name": "to_drop",
+            "columns": [{"name": "id", "type": "INTEGER"}],
+        })
+
+        drop_result = await call_tool(mcp_server, "ds_drop_table", {"table_name": "to_drop"})
+        assert "_meta" in drop_result
+        assert drop_result["data"]["dropped"] == "to_drop"
+
+        list_result = await call_tool(mcp_server, "ds_list_tables")
+        assert "to_drop" not in list_result["data"]["tables"]
+
+    @pytest.mark.asyncio
+    async def test_discover_datastore_tools(self, mcp_server):
+        """'I need to store some data.'"""
+        results = await discover(mcp_server, "store data sqlite table")
+        names = [r["name"] for r in results]
+        assert any(n.startswith("ds_") for n in names), (
+            f"No datastore tools found for 'store data sqlite table'. Got: {names}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_invalid_table_name(self, mcp_server):
+        """'Create a table called drop;--' (SQL injection attempt)."""
+        result = await call_tool(mcp_server, "ds_create_table", {
+            "table_name": "drop;--",
+            "columns": [{"name": "id", "type": "INTEGER"}],
+        })
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_INPUT"

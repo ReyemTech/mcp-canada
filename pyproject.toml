@@ -29,6 +29,7 @@ dependencies = [
     "aiocache>=0.12.0",
     "tenacity>=8.0.0",
     "InquirerPy>=0.3.4",
+    "aiosqlite>=0.22.0",
 ]
 
 [project.urls]

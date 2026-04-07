@@ -116,6 +116,12 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable DEBUG-level logging",
     )
+    parser.add_argument(
+        "--ephemeral",
+        action="store_true",
+        default=False,
+        help="Use in-memory SQLite datastore (no persistence)",
+    )
     subparsers = parser.add_subparsers(dest="command")
     install_parser = subparsers.add_parser(
         "install",

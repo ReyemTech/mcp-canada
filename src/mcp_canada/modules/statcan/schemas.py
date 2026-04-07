@@ -10,17 +10,17 @@ class CubeLite(BaseModel):
     """Lightweight cube descriptor from getAllCubesListLite."""
 
     product_id: int
-    cansim_id: str
-    title_en: str
-    title_fr: str
-    start_date: str
-    end_date: str
-    release_time: str
-    archived: bool
-    frequency_code: int
-    frequency: str
-    subject_codes: list[str]
-    survey_codes: list[str]
+    cansim_id: str | None = None
+    title_en: str = ""
+    title_fr: str = ""
+    start_date: str = ""
+    end_date: str = ""
+    release_time: str = ""
+    archived: bool = False
+    frequency_code: int = 0
+    frequency: str = "Unknown"
+    subject_codes: list[str] = []
+    survey_codes: list[str] = []
 
 
 class DimensionMember(BaseModel):

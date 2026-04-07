@@ -346,7 +346,10 @@ async def sc_get_bulk_vector_data(
     Keywords: statcan, statistics canada, bulk, multiple, vectors, release date, observations, batch, parallel, time series, data, efficient
     """
     try:
-        data, was_cached = await get_bulk_vector_data(vector_ids, start_release, end_release)
+        # WDS requires datetime format (e.g. "2024-01-01T00:00"); auto-append if plain date
+        sr = start_release if "T" in start_release else start_release + "T00:00"
+        er = end_release if "T" in end_release else end_release + "T23:59"
+        data, was_cached = await get_bulk_vector_data(vector_ids, sr, er)
         # Convert int keys to str for JSON serialization, serialize ObservationRow lists
         serialized = {
             str(vid): [row.model_dump() for row in rows]

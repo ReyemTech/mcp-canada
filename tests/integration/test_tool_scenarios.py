@@ -740,6 +740,131 @@ class TestStatcanWdsScenarios:
             assert data["error"]["code"] in ("UPSTREAM_ERROR", "UPSTREAM_UNAVAILABLE")
 
 
+# ─── SDMX scenarios ───────────────────────────────────────────────────────────
+
+
+class TestSdmxScenarios:
+    """SDMX integration tests through the MCP Client layer.
+
+    Tests assert on envelope shape, not specific values (data changes daily).
+    test_fetch_vectors_to_store uses an in-memory DB to avoid persisting data.
+    All tests marked @pytest.mark.integration — live API required.
+    """
+
+    @pytest.fixture(autouse=False)
+    async def in_memory_db(self):
+        """Patch datastore client._db with in-memory connection for store tests."""
+        from mcp_canada.modules.datastore import client as datastore_client
+
+        conn = await aiosqlite.connect(":memory:")
+        conn.row_factory = aiosqlite.Row
+        await conn.execute("PRAGMA journal_mode=WAL")
+        await conn.execute("PRAGMA foreign_keys=ON")
+
+        original = datastore_client._db
+        datastore_client._db = conn
+        yield conn
+        datastore_client._db = original
+        await conn.close()
+
+    @pytest.mark.asyncio
+    async def test_sdmx_structure_for_cpi_table(self, mcp_server):
+        """'Get the SDMX dimension codelists for the CPI table (18100004)'"""
+        data = await call_tool(mcp_server, "sc_get_sdmx_structure", {"product_id": 18100004})
+        assert "_meta" in data
+        assert data["_meta"]["source"]["api"] == "statcan-sdmx"
+        assert "dimensions" in data["data"]
+        assert isinstance(data["data"]["dimensions"], list)
+        assert len(data["data"]["dimensions"]) >= 1
+        assert "suggested_key" in data["data"]
+        assert isinstance(data["data"]["suggested_key"], str)
+        assert len(data["data"]["suggested_key"]) > 0
+        # Each dimension must have position, id, codes
+        for dim in data["data"]["dimensions"]:
+            assert "position" in dim
+            assert "id" in dim
+            assert "codes" in dim
+            assert isinstance(dim["codes"], list)
+
+    @pytest.mark.asyncio
+    async def test_sdmx_data_last_n(self, mcp_server):
+        """'Get the 5 most recent CPI observations for Canada all-items via SDMX'"""
+        data = await call_tool(mcp_server, "sc_get_sdmx_data", {
+            "product_id": 18100004,
+            "key": "1.1",
+            "last_n": 5,
+        })
+        assert "_meta" in data
+        assert data["_meta"]["source"]["api"] == "statcan-sdmx"
+        assert isinstance(data["data"], list)
+        # Each observation must have period, value, dimensions
+        for obs in data["data"]:
+            assert "period" in obs
+            assert "value" in obs
+            assert "dimensions" in obs
+
+    @pytest.mark.asyncio
+    async def test_sdmx_data_mutual_exclusion(self, mcp_server):
+        """'Get CPI data with both last_n and start_period — should error'"""
+        data = await call_tool(mcp_server, "sc_get_sdmx_data", {
+            "product_id": 18100004,
+            "key": "1.1",
+            "last_n": 5,
+            "start_period": "2024-01",
+        })
+        assert "error" in data
+        assert data["error"]["code"] == "INVALID_INPUT"
+
+    @pytest.mark.asyncio
+    async def test_sdmx_vector_data(self, mcp_server):
+        """'Get CPI all-items vector observations via SDMX for 2023'"""
+        data = await call_tool(mcp_server, "sc_get_sdmx_vector_data", {
+            "vector_id": 41690973,
+            "start_period": "2023-01",
+            "end_period": "2023-12",
+        })
+        assert "_meta" in data
+        assert data["_meta"]["source"]["api"] == "statcan-sdmx"
+        assert isinstance(data["data"], list)
+        # Accept empty list if no data in range — just assert shape
+        for obs in data["data"]:
+            assert "period" in obs
+            assert "value" in obs
+
+    @pytest.mark.asyncio
+    async def test_discover_sdmx_tools(self, mcp_server):
+        """'Find tools for SDMX structure codelist server filter'"""
+        results = await discover(mcp_server, "SDMX structure codelist server filter")
+        names = [r["name"] for r in results]
+        sdmx_tools = [n for n in names if "sdmx" in n.lower()]
+        assert len(sdmx_tools) >= 1, (
+            f"No SDMX tools found for 'SDMX structure codelist server filter'. Got: {names}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_fetch_vectors_to_store(self, mcp_server, in_memory_db):
+        """'Fetch CPI vectors and store them to the datastore for SQL queries'"""
+        result = await call_tool(mcp_server, "sc_fetch_vectors_to_store", {
+            "vector_ids": [41690973, 74804],
+            "start_release": "2024-01-01",
+            "end_release": "2024-03-31",
+            "table_name": "test_sdmx_integration",
+        })
+        assert "_meta" in result
+        assert result["data"]["stored"] > 0
+        assert result["data"]["table"] == "test_sdmx_integration"
+        assert isinstance(result["data"]["vectors"], list)
+
+        # Verify data is queryable via ds_query
+        query_result = await call_tool(mcp_server, "ds_query", {
+            "sql": "SELECT COUNT(*) as cnt FROM test_sdmx_integration"
+        })
+        assert "_meta" in query_result
+        assert query_result["data"]["row_count"] >= 1
+        row = query_result["data"]["rows"][0]
+        assert row["cnt"] > 0
+
+
 # ─── Datastore scenarios ──────────────────────────────────────────────────────
 
 

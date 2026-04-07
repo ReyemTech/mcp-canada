@@ -588,9 +588,180 @@ async def get_latest_n_by_coord(
             resp.raise_for_status()
             return resp.json()
 
-    raw, was_cached = await cached_fetch(cache_key, CACHE_TTL_OBS, _fetcher)
-    obj = _unwrap(raw)
-    data_points: list[dict] = obj.get("vectorDataPoint") or []
-    rows = [_flatten_observation(dp) for dp in data_points]
-    rows.sort(key=lambda r: r.ref_per, reverse=True)
-    return rows, was_cached
+    raw_coord, was_cached_coord = await cached_fetch(cache_key, CACHE_TTL_OBS, _fetcher)
+    obj_coord = _unwrap(raw_coord)
+    dp_coord: list[dict] = obj_coord.get("vectorDataPoint") or []
+    rows_coord = [_flatten_observation(dp) for dp in dp_coord]
+    rows_coord.sort(key=lambda r: r.ref_per, reverse=True)
+    return rows_coord, was_cached_coord
+
+
+async def get_data_by_ref_period(
+    vector_id: int, start_date: str, end_date: str
+) -> tuple[list[ObservationRow], bool]:
+    """Fetch observations for a vector within a reference period date range.
+
+    Uses getDataFromVectorByReferencePeriodRange WDS GET endpoint.
+    Observations are sorted newest-first. Result cached for 1 hour.
+
+    Args:
+        vector_id: The WDS vectorId (e.g. 32164132).
+        start_date: Start reference period (e.g. "2020-01-01").
+        end_date: End reference period (e.g. "2023-01-01").
+
+    Returns:
+        (list[ObservationRow], was_cached) sorted newest-first by ref_per.
+
+    Raises:
+        ValueError: If WDS returns a FAILED envelope.
+        httpx.HTTPStatusError: On HTTP 4xx/5xx responses.
+    """
+    cache_key = f"statcan_wds:getDataFromVectorByReferencePeriodRange:{vector_id}:{start_date}:{end_date}"
+
+    async def _fetcher() -> list:
+        await _limiter_acquire()
+        async with _make_statcan_client() as http:
+            url = (
+                BASE_URL
+                + "getDataFromVectorByReferencePeriodRange"
+                f"?vectorIds={vector_id}&startRefPeriod={start_date}&endReferencePeriod={end_date}"
+            )
+            resp = await http.get(url)
+            resp.raise_for_status()
+            return resp.json()
+
+    raw2, was_cached2 = await cached_fetch(cache_key, CACHE_TTL_OBS, _fetcher)
+    obj2 = _unwrap(raw2)
+    data_points2: list[dict] = obj2.get("vectorDataPoint") or []
+    rows2 = [_flatten_observation(dp) for dp in data_points2]
+    rows2.sort(key=lambda r: r.ref_per, reverse=True)
+    return rows2, was_cached2
+
+
+async def get_bulk_vector_data(
+    vector_ids: list[int], start_release: str, end_release: str
+) -> tuple[dict[int, list[ObservationRow]], bool]:
+    """Fetch observations for multiple vectors within a release date range.
+
+    Uses getBulkVectorDataByRange WDS POST endpoint. vectorIds are passed
+    as strings per the WDS specification. Partial failures are handled
+    gracefully — failed vectors are omitted from the result dict.
+    Result cached for 1 hour.
+
+    Args:
+        vector_ids: List of WDS vectorIds (e.g. [74804, 32164132]).
+        start_release: Start release datetime (e.g. "2023-01-01T08:30").
+        end_release: End release datetime (e.g. "2024-01-01T08:30").
+
+    Returns:
+        (dict[int, list[ObservationRow]], was_cached) — keyed by vectorId for
+        successful vectors only. Check if any expected vectorIds are missing.
+
+    Raises:
+        httpx.HTTPStatusError: On HTTP 4xx/5xx responses.
+    """
+    sorted_ids = sorted(vector_ids)
+    cache_key = f"statcan_wds:getBulkVectorDataByRange:{sorted_ids}:{start_release}:{end_release}"
+
+    async def _fetcher() -> list:
+        await _limiter_acquire()
+        async with _make_statcan_client() as http:
+            resp = await http.post(
+                BASE_URL + "getBulkVectorDataByRange",
+                json={
+                    "vectorIds": [str(v) for v in vector_ids],
+                    "startDataPointReleaseDate": start_release,
+                    "endDataPointReleaseDate": end_release,
+                },
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+    raw3, was_cached3 = await cached_fetch(cache_key, CACHE_TTL_OBS, _fetcher)
+    # raw3 is a list of per-vector envelopes — each has status + object
+    result: dict[int, list[ObservationRow]] = {}
+    for item in (raw3 if isinstance(raw3, list) else [raw3]):
+        if item.get("status") != "SUCCESS":
+            # FAILED item — skip (caller sees missing key in result)
+            continue
+        obj3 = item["object"]
+        vid: int = obj3.get("vectorId", 0)
+        data_points3: list[dict] = obj3.get("vectorDataPoint") or []
+        rows3 = [_flatten_observation(dp) for dp in data_points3]
+        rows3.sort(key=lambda r: r.ref_per, reverse=True)
+        result[vid] = rows3
+    return result, was_cached3
+
+
+async def get_changed_series() -> tuple[list[dict], bool]:
+    """Fetch the list of series (vectors) that changed today.
+
+    Uses getChangedSeriesList WDS GET endpoint. Returns lightweight dicts
+    with vectorId, productId, coordinate, releaseTime for each changed series.
+    Result cached for 1 hour.
+
+    Returns:
+        (list[dict], was_cached) — each dict has keys: vectorId, productId,
+        coordinate, releaseTime.
+
+    Raises:
+        httpx.HTTPStatusError: On HTTP 4xx/5xx responses.
+    """
+    cache_key = "statcan_wds:getChangedSeriesList"
+
+    async def _fetcher() -> dict:
+        await _limiter_acquire()
+        async with _make_statcan_client() as http:
+            resp = await http.get(BASE_URL + "getChangedSeriesList")
+            resp.raise_for_status()
+            return resp.json()
+
+    raw4, was_cached4 = await cached_fetch(cache_key, CACHE_TTL_OBS, _fetcher)
+    items4: list[dict] = _unwrap(raw4)
+    result4 = [
+        {
+            "vectorId": item.get("vectorId"),
+            "productId": item.get("productId"),
+            "coordinate": item.get("coordinate"),
+            "releaseTime": item.get("releaseTime"),
+        }
+        for item in (items4 if isinstance(items4, list) else [])
+    ]
+    return result4, was_cached4
+
+
+async def get_changed_cubes(date: str) -> tuple[list[dict], bool]:
+    """Fetch the list of cubes that changed on a specific date.
+
+    Uses getChangedCubeList/{date} WDS GET endpoint. Returns lightweight
+    dicts with productId, releaseTime for each changed cube.
+    Result cached for 1 hour.
+
+    Args:
+        date: Date in YYYY-MM-DD format (e.g. "2024-01-15").
+
+    Returns:
+        (list[dict], was_cached) — each dict has keys: productId, releaseTime.
+
+    Raises:
+        httpx.HTTPStatusError: On HTTP 4xx/5xx responses.
+    """
+    cache_key = f"statcan_wds:getChangedCubeList:{date}"
+
+    async def _fetcher() -> dict:
+        await _limiter_acquire()
+        async with _make_statcan_client() as http:
+            resp = await http.get(BASE_URL + f"getChangedCubeList/{date}")
+            resp.raise_for_status()
+            return resp.json()
+
+    raw5, was_cached5 = await cached_fetch(cache_key, CACHE_TTL_OBS, _fetcher)
+    items5: list[dict] = _unwrap(raw5)
+    result5 = [
+        {
+            "productId": item.get("productId"),
+            "releaseTime": item.get("releaseTime"),
+        }
+        for item in (items5 if isinstance(items5, list) else [])
+    ]
+    return result5, was_cached5

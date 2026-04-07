@@ -948,3 +948,336 @@ class TestGetLatestNByCoord:
                 await statcan_client.get_latest_n_by_coord(35100003, "1.12", 5)
 
         acquire_mock.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Plan 02 Task 2: get_data_by_ref_period tests
+# ---------------------------------------------------------------------------
+
+
+class TestGetDataByRefPeriod:
+    @pytest.mark.asyncio
+    async def test_returns_observation_list_sorted_newest_first(self, ref_period_response):
+        """get_data_by_ref_period returns (list[ObservationRow], was_cached) sorted newest-first."""
+        from mcp_canada.modules.statcan import client as statcan_client
+        from mcp_canada.modules.statcan.schemas import ObservationRow
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = ref_period_response
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=AsyncMock()):
+                result, was_cached = await statcan_client.get_data_by_ref_period(
+                    32164132, "2020-01-01", "2023-01-01"
+                )
+
+        assert isinstance(result, list)
+        assert all(isinstance(r, ObservationRow) for r in result)
+        assert was_cached is False
+        ref_periods = [r.ref_per for r in result]
+        assert ref_periods == sorted(ref_periods, reverse=True)
+
+    @pytest.mark.asyncio
+    async def test_uses_obs_ttl(self, ref_period_response):
+        """get_data_by_ref_period uses CACHE_TTL_OBS."""
+        from mcp_canada.modules.statcan import client as statcan_client
+        from mcp_canada.modules.statcan.constants import CACHE_TTL_OBS
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = ref_period_response
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=AsyncMock()):
+                with patch("mcp_canada.modules.statcan.client.cached_fetch", wraps=statcan_client.cached_fetch) as mock_cf:
+                    await statcan_client.get_data_by_ref_period(32164132, "2020-01-01", "2023-01-01")
+                    call_args = mock_cf.call_args
+                    assert call_args[0][1] == CACHE_TTL_OBS
+
+    @pytest.mark.asyncio
+    async def test_calls_rate_limiter(self, ref_period_response):
+        """get_data_by_ref_period calls limiter.acquire() before HTTP."""
+        from mcp_canada.modules.statcan import client as statcan_client
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = ref_period_response
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+
+        acquire_mock = AsyncMock()
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=acquire_mock):
+                await statcan_client.get_data_by_ref_period(32164132, "2020-01-01", "2023-01-01")
+
+        acquire_mock.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Plan 02 Task 2: get_bulk_vector_data tests
+# ---------------------------------------------------------------------------
+
+
+class TestGetBulkVectorData:
+    @pytest.mark.asyncio
+    async def test_returns_dict_keyed_by_vector_id(self, bulk_vector_response):
+        """get_bulk_vector_data returns (dict[int, list[ObservationRow]], was_cached)."""
+        from mcp_canada.modules.statcan import client as statcan_client
+        from mcp_canada.modules.statcan.schemas import ObservationRow
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = bulk_vector_response
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.post = AsyncMock(return_value=mock_response)
+
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=AsyncMock()):
+                result, was_cached = await statcan_client.get_bulk_vector_data(
+                    [74804, 32164132], "2023-01-01T08:30", "2024-01-01T08:30"
+                )
+
+        assert isinstance(result, dict)
+        # Only vectorId 74804 succeeded in the fixture; 32164132 FAILED
+        assert 74804 in result
+        assert 32164132 not in result
+        assert all(isinstance(r, ObservationRow) for r in result[74804])
+        assert was_cached is False
+
+    @pytest.mark.asyncio
+    async def test_passes_vector_ids_as_strings(self, bulk_vector_response):
+        """get_bulk_vector_data passes vectorIds as strings in request body."""
+        from mcp_canada.modules.statcan import client as statcan_client
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = bulk_vector_response
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.post = AsyncMock(return_value=mock_response)
+
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=AsyncMock()):
+                await statcan_client.get_bulk_vector_data(
+                    [74804, 32164132], "2023-01-01T08:30", "2024-01-01T08:30"
+                )
+
+        call_kwargs = mock_http.post.call_args
+        body = call_kwargs[1]["json"] if "json" in call_kwargs[1] else call_kwargs.kwargs["json"]
+        assert all(isinstance(vid, str) for vid in body["vectorIds"])
+
+    @pytest.mark.asyncio
+    async def test_handles_partial_failures(self, bulk_vector_response):
+        """get_bulk_vector_data returns data for succeeded, omits failed vectors."""
+        from mcp_canada.modules.statcan import client as statcan_client
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = bulk_vector_response
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.post = AsyncMock(return_value=mock_response)
+
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=AsyncMock()):
+                result, _ = await statcan_client.get_bulk_vector_data(
+                    [74804, 32164132], "2023-01-01T08:30", "2024-01-01T08:30"
+                )
+
+        # One success, one failure — result has only the succeeded vector
+        assert len(result) == 1
+        assert 74804 in result
+
+    @pytest.mark.asyncio
+    async def test_calls_rate_limiter(self, bulk_vector_response):
+        """get_bulk_vector_data calls limiter.acquire() before HTTP."""
+        from mcp_canada.modules.statcan import client as statcan_client
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = bulk_vector_response
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.post = AsyncMock(return_value=mock_response)
+
+        acquire_mock = AsyncMock()
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=acquire_mock):
+                await statcan_client.get_bulk_vector_data(
+                    [74804, 32164132], "2023-01-01T08:30", "2024-01-01T08:30"
+                )
+
+        acquire_mock.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Plan 02 Task 2: get_changed_series tests
+# ---------------------------------------------------------------------------
+
+
+class TestGetChangedSeries:
+    @pytest.mark.asyncio
+    async def test_returns_list_of_dicts_with_expected_keys(self, changed_series_response):
+        """get_changed_series() returns (list[dict], was_cached) with expected keys per item."""
+        from mcp_canada.modules.statcan import client as statcan_client
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = changed_series_response
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=AsyncMock()):
+                result, was_cached = await statcan_client.get_changed_series()
+
+        assert isinstance(result, list)
+        assert was_cached is False
+        for item in result:
+            assert "vectorId" in item
+            assert "productId" in item
+            assert "coordinate" in item
+            assert "releaseTime" in item
+
+    @pytest.mark.asyncio
+    async def test_uses_obs_ttl(self, changed_series_response):
+        """get_changed_series uses CACHE_TTL_OBS."""
+        from mcp_canada.modules.statcan import client as statcan_client
+        from mcp_canada.modules.statcan.constants import CACHE_TTL_OBS
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = changed_series_response
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=AsyncMock()):
+                with patch("mcp_canada.modules.statcan.client.cached_fetch", wraps=statcan_client.cached_fetch) as mock_cf:
+                    await statcan_client.get_changed_series()
+                    call_args = mock_cf.call_args
+                    assert call_args[0][1] == CACHE_TTL_OBS
+
+    @pytest.mark.asyncio
+    async def test_calls_rate_limiter(self, changed_series_response):
+        """get_changed_series calls limiter.acquire() before HTTP."""
+        from mcp_canada.modules.statcan import client as statcan_client
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = changed_series_response
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+
+        acquire_mock = AsyncMock()
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=acquire_mock):
+                await statcan_client.get_changed_series()
+
+        acquire_mock.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Plan 02 Task 2: get_changed_cubes tests
+# ---------------------------------------------------------------------------
+
+
+class TestGetChangedCubes:
+    @pytest.mark.asyncio
+    async def test_returns_list_of_dicts_with_expected_keys(self, changed_cubes_response):
+        """get_changed_cubes returns (list[dict], was_cached) with productId, releaseTime."""
+        from mcp_canada.modules.statcan import client as statcan_client
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = changed_cubes_response
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=AsyncMock()):
+                result, was_cached = await statcan_client.get_changed_cubes("2024-01-15")
+
+        assert isinstance(result, list)
+        assert was_cached is False
+        for item in result:
+            assert "productId" in item
+            assert "releaseTime" in item
+
+    @pytest.mark.asyncio
+    async def test_uses_obs_ttl(self, changed_cubes_response):
+        """get_changed_cubes uses CACHE_TTL_OBS."""
+        from mcp_canada.modules.statcan import client as statcan_client
+        from mcp_canada.modules.statcan.constants import CACHE_TTL_OBS
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = changed_cubes_response
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=AsyncMock()):
+                with patch("mcp_canada.modules.statcan.client.cached_fetch", wraps=statcan_client.cached_fetch) as mock_cf:
+                    await statcan_client.get_changed_cubes("2024-01-15")
+                    call_args = mock_cf.call_args
+                    assert call_args[0][1] == CACHE_TTL_OBS
+
+    @pytest.mark.asyncio
+    async def test_calls_rate_limiter(self, changed_cubes_response):
+        """get_changed_cubes calls limiter.acquire() before HTTP."""
+        from mcp_canada.modules.statcan import client as statcan_client
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = changed_cubes_response
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+
+        acquire_mock = AsyncMock()
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=acquire_mock):
+                await statcan_client.get_changed_cubes("2024-01-15")
+
+        acquire_mock.assert_called_once()

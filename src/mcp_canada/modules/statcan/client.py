@@ -56,10 +56,49 @@ def _make_statcan_client(timeout: float = 30.0) -> httpx.AsyncClient:
     )
 
 
+async def _statcan_fetch(
+    method: str, url: str, *, json: Any = None, timeout: float = 30.0
+) -> Any:
+    """Fetch from StatCan WDS with rate limiting and retry on transient failures.
+
+    Retries up to 3 times on timeout, connection error, or empty response body
+    (StatCan WDS occasionally returns HTTP 200 with empty body).
+    """
+    @_statcan_retry
+    async def _do_fetch() -> Any:
+        await _limiter_acquire()
+        async with _make_statcan_client(timeout=timeout) as http:
+            if method == "GET":
+                resp = await http.get(url)
+            else:
+                resp = await http.post(url, json=json)
+            resp.raise_for_status()
+            if not resp.content:
+                raise ValueError("StatCan returned empty response body")
+            return resp.json()
+
+    return await _do_fetch()
+
+
 async def _limiter_acquire() -> None:
     """Acquire one token from the StatCan rate limiter."""
     limiter = get_limiter(RATE_GROUP, rate=RATE_LIMIT)
     await limiter.acquire()
+
+
+# Shared retry decorator for all StatCan API fetchers.
+# StatCan WDS occasionally returns empty bodies (JSON decode error)
+# and transient timeouts on large payloads.
+_statcan_retry = retry(
+    retry=retry_if_exception_type((
+        httpx.TimeoutException,
+        httpx.ConnectError,
+        ValueError,  # catches JSONDecodeError (subclass of ValueError)
+    )),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    reraise=True,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -632,16 +671,12 @@ async def get_data_by_ref_period(
     cache_key = f"statcan_wds:getDataFromVectorByReferencePeriodRange:{vector_id}:{start_date}:{end_date}"
 
     async def _fetcher() -> list:
-        await _limiter_acquire()
-        async with _make_statcan_client() as http:
-            url = (
-                BASE_URL
-                + "getDataFromVectorByReferencePeriodRange"
-                f"?vectorIds={vector_id}&startRefPeriod={start_date}&endReferencePeriod={end_date}"
-            )
-            resp = await http.get(url)
-            resp.raise_for_status()
-            return resp.json()
+        url = (
+            BASE_URL
+            + "getDataFromVectorByReferencePeriodRange"
+            f"?vectorIds={vector_id}&startRefPeriod={start_date}&endReferencePeriod={end_date}"
+        )
+        return await _statcan_fetch("GET", url)
 
     raw2, was_cached2 = await cached_fetch(cache_key, CACHE_TTL_OBS, _fetcher)
     obj2 = _unwrap(raw2)

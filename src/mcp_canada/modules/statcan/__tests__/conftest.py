@@ -236,6 +236,204 @@ def observation_response():
     return OBSERVATION_RESPONSE
 
 
+SERIES_INFO_BY_COORD_RESPONSE = [
+    {
+        "status": "SUCCESS",
+        "object": {
+            "productId": 35100003,
+            "coordinate": "1.12.0.0.0.0.0.0.0.0",
+            "vectorId": 32164132,
+            "frequencyCode": 9,
+            "scalarFactorCode": 6,
+            "decimals": 2,
+            "terminated": 0,
+            "SeriesTitleEn": "GDP at basic prices; Canada; Agriculture",
+            "SeriesTitleFr": "PIB aux prix de base; Canada; Agriculture",
+            "memberUomCode": 301,
+        },
+    }
+]
+
+LATEST_N_BY_COORD_RESPONSE = [
+    {
+        "status": "SUCCESS",
+        "object": {
+            "responseStatusCode": 0,
+            "vectorId": 32164132,
+            "vectorDataPoint": [
+                {
+                    "refPer": "2023-01",
+                    "refPerRaw": "2023-01",
+                    "refYear": 2023,
+                    "refMonth": 1,
+                    "value": 99.5,
+                    "decimals": 1,
+                    "scalarFactorCode": 0,
+                    "frequencyCode": 9,
+                    "statusCode": 0,
+                    "symbolCode": 0,
+                    "releaseTime": "2023-03-01 08:30",
+                    "securityLevelCode": 0,
+                },
+                {
+                    "refPer": "2022-01",
+                    "refPerRaw": "2022-01",
+                    "refYear": 2022,
+                    "refMonth": 1,
+                    "value": 95.2,
+                    "decimals": 1,
+                    "scalarFactorCode": 0,
+                    "frequencyCode": 9,
+                    "statusCode": 0,
+                    "symbolCode": 0,
+                    "releaseTime": "2022-03-01 08:30",
+                    "securityLevelCode": 0,
+                },
+            ],
+        },
+    }
+]
+
+# For Task 2 fixtures
+REF_PERIOD_RESPONSE = [
+    {
+        "status": "SUCCESS",
+        "object": {
+            "responseStatusCode": 0,
+            "vectorId": 32164132,
+            "vectorDataPoint": [
+                {
+                    "refPer": "2023-01",
+                    "refPerRaw": "2023-01",
+                    "refYear": 2023,
+                    "refMonth": 1,
+                    "value": 99.5,
+                    "decimals": 1,
+                    "scalarFactorCode": 0,
+                    "frequencyCode": 9,
+                    "statusCode": 0,
+                    "symbolCode": 0,
+                    "releaseTime": "2023-03-01 08:30",
+                    "securityLevelCode": 0,
+                },
+                {
+                    "refPer": "2022-01",
+                    "refPerRaw": "2022-01",
+                    "refYear": 2022,
+                    "refMonth": 1,
+                    "value": 95.2,
+                    "decimals": 1,
+                    "scalarFactorCode": 0,
+                    "frequencyCode": 9,
+                    "statusCode": 0,
+                    "symbolCode": 0,
+                    "releaseTime": "2022-03-01 08:30",
+                    "securityLevelCode": 0,
+                },
+            ],
+        },
+    }
+]
+
+BULK_VECTOR_RESPONSE = [
+    {
+        "status": "SUCCESS",
+        "object": {
+            "responseStatusCode": 0,
+            "vectorId": 74804,
+            "vectorDataPoint": [
+                {
+                    "refPer": "2024-01",
+                    "refPerRaw": "2024-01",
+                    "refYear": 2024,
+                    "refMonth": 1,
+                    "value": 150.2,
+                    "decimals": 1,
+                    "scalarFactorCode": 0,
+                    "frequencyCode": 5,
+                    "statusCode": 0,
+                    "symbolCode": 0,
+                    "releaseTime": "2024-02-15 08:30",
+                    "securityLevelCode": 0,
+                },
+            ],
+        },
+    },
+    {
+        "status": "FAILED",
+        "object": "Vector 32164132 not found in release range",
+    },
+]
+
+CHANGED_SERIES_RESPONSE = {
+    "status": "SUCCESS",
+    "object": [
+        {
+            "vectorId": 41690973,
+            "productId": 18100004,
+            "coordinate": "1.1",
+            "releaseTime": "2026-04-07 08:30",
+        },
+        {
+            "vectorId": 32164132,
+            "productId": 35100003,
+            "coordinate": "1.12",
+            "releaseTime": "2026-04-07 08:30",
+        },
+    ],
+}
+
+CHANGED_CUBES_RESPONSE = {
+    "status": "SUCCESS",
+    "object": [
+        {
+            "productId": 18100004,
+            "releaseTime": "2026-04-07 08:30",
+        },
+        {
+            "productId": 35100003,
+            "releaseTime": "2026-04-07 08:30",
+        },
+    ],
+}
+
+
+@pytest.fixture
+def series_info_by_coord_response():
+    """WDS envelope list with SUCCESS + series info from coord lookup."""
+    return SERIES_INFO_BY_COORD_RESPONSE
+
+
+@pytest.fixture
+def latest_n_by_coord_response():
+    """WDS envelope list with SUCCESS + 2 observation data points."""
+    return LATEST_N_BY_COORD_RESPONSE
+
+
+@pytest.fixture
+def ref_period_response():
+    """WDS envelope list for getDataFromVectorByReferencePeriodRange."""
+    return REF_PERIOD_RESPONSE
+
+
+@pytest.fixture
+def bulk_vector_response():
+    """WDS response list with 2 vectors: one SUCCESS, one FAILED."""
+    return BULK_VECTOR_RESPONSE
+
+
+@pytest.fixture
+def changed_series_response():
+    """WDS envelope with list of changed series."""
+    return CHANGED_SERIES_RESPONSE
+
+
+@pytest.fixture
+def changed_cubes_response():
+    """WDS envelope with list of changed cubes."""
+    return CHANGED_CUBES_RESPONSE
+
+
 @pytest.fixture(autouse=True)
 async def reset_cache():
     """Clear aiocache between tests to avoid cross-test contamination."""

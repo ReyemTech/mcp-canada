@@ -19,9 +19,11 @@ from mcp_canada.modules.statcan.constants import (
     CACHE_TTL_CODESETS,
     CACHE_TTL_CUBES,
     CACHE_TTL_META,
+    CACHE_TTL_OBS,
     FREQUENCY_CODES,
     RATE_GROUP,
     RATE_LIMIT,
+    SCALAR_FACTOR_CODES,
     STATCAN_VERIFY,
 )
 from mcp_canada.modules.statcan.schemas import (
@@ -31,6 +33,8 @@ from mcp_canada.modules.statcan.schemas import (
     CubeMetadata,
     Dimension,
     DimensionMember,
+    ObservationRow,
+    SeriesInfo,
 )
 from mcp_canada.shared.cache import cached_fetch
 from mcp_canada.shared.rate_limiter import get_limiter
@@ -363,6 +367,55 @@ async def get_code_sets() -> tuple[CodeSets, bool]:
     return _flatten_code_sets(obj), was_cached
 
 
+def _flatten_series_info(obj: dict) -> SeriesInfo:
+    """Flatten a raw series info object to a SeriesInfo schema instance."""
+    freq_code: int = obj.get("frequencyCode", 0)
+    scalar_code: int = obj.get("scalarFactorCode", 0)
+    return SeriesInfo(
+        product_id=obj["productId"],
+        coordinate=obj.get("coordinate", ""),
+        vector_id=obj["vectorId"],
+        frequency_code=freq_code,
+        frequency=FREQUENCY_CODES.get(freq_code, "Unknown"),
+        scalar_factor_code=scalar_code,
+        scalar_factor=SCALAR_FACTOR_CODES.get(scalar_code, "Unknown"),
+        decimals=obj.get("decimals", 0),
+        terminated=bool(obj.get("terminated", 0)),
+        title_en=obj.get("SeriesTitleEn", ""),
+        title_fr=obj.get("SeriesTitleFr", ""),
+        uom_code=obj.get("memberUomCode", 0),
+    )
+
+
+def _flatten_observation(raw_point: dict) -> ObservationRow:
+    """Flatten a raw vectorDataPoint dict to an ObservationRow.
+
+    Decodes scalarFactorCode and frequencyCode using constants dicts.
+    Converts value to float | None (handles empty string or null).
+    """
+    freq_code: int = raw_point.get("frequencyCode", 0)
+    scalar_code: int = raw_point.get("scalarFactorCode", 0)
+    raw_value = raw_point.get("value")
+    value: float | None
+    if raw_value is None or raw_value == "":
+        value = None
+    else:
+        value = float(raw_value)
+    return ObservationRow(
+        ref_per=raw_point.get("refPer", ""),
+        ref_per_raw=raw_point.get("refPerRaw", ""),
+        value=value,
+        decimals=raw_point.get("decimals", 0),
+        scalar_factor_code=scalar_code,
+        scalar_factor=SCALAR_FACTOR_CODES.get(scalar_code, "Unknown"),
+        frequency_code=freq_code,
+        frequency=FREQUENCY_CODES.get(freq_code, "Unknown"),
+        status_code=raw_point.get("statusCode", 0),
+        symbol_code=raw_point.get("symbolCode", 0),
+        release_time=raw_point.get("releaseTime", ""),
+    )
+
+
 def _flatten_code_sets(obj: dict) -> CodeSets:
     """Flatten raw getCodeSets object to a CodeSets schema instance."""
 
@@ -392,3 +445,152 @@ def _flatten_code_sets(obj: dict) -> CodeSets:
             obj.get("uom") or [], "uomCode", "uomDescEn", "uomDescFr"
         ),
     )
+
+
+async def get_series_info_by_vector(vector_id: int) -> tuple[SeriesInfo, bool]:
+    """Fetch series metadata by vectorId.
+
+    Uses getSeriesInfoFromVector WDS endpoint. Result cached for 24 hours.
+
+    Args:
+        vector_id: The WDS vectorId (e.g. 32164132).
+
+    Returns:
+        (SeriesInfo, was_cached) with decoded frequency and scalar_factor labels.
+
+    Raises:
+        ValueError: If WDS returns a FAILED envelope.
+        httpx.HTTPStatusError: On HTTP 4xx/5xx responses.
+    """
+    cache_key = f"statcan_wds:getSeriesInfoFromVector:{vector_id}"
+
+    async def _fetcher() -> list:
+        await _limiter_acquire()
+        async with _make_statcan_client() as http:
+            resp = await http.post(
+                BASE_URL + "getSeriesInfoFromVector",
+                json=[{"vectorId": vector_id}],
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+    raw, was_cached = await cached_fetch(cache_key, CACHE_TTL_META, _fetcher)
+    obj = _unwrap(raw)
+    return _flatten_series_info(obj), was_cached
+
+
+async def get_series_info_by_coord(
+    product_id: int, coordinate: str
+) -> tuple[SeriesInfo, bool]:
+    """Fetch series metadata by productId + coordinate with auto-padding.
+
+    Uses getSeriesInfoFromCubePidCoord WDS endpoint. Coordinate is
+    auto-padded to 10 parts before the request. Result cached for 24 hours.
+
+    Args:
+        product_id: The WDS productId (e.g. 35100003).
+        coordinate: Dot-separated coordinate string (e.g. "1.12").
+
+    Returns:
+        (SeriesInfo, was_cached) with decoded frequency and scalar_factor labels.
+
+    Raises:
+        ValueError: If WDS returns a FAILED envelope.
+        httpx.HTTPStatusError: On HTTP 4xx/5xx responses.
+    """
+    padded = pad_coordinate(coordinate)
+    cache_key = f"statcan_wds:getSeriesInfoFromCubePidCoord:{product_id}:{padded}"
+
+    async def _fetcher() -> list:
+        await _limiter_acquire()
+        async with _make_statcan_client() as http:
+            resp = await http.post(
+                BASE_URL + "getSeriesInfoFromCubePidCoord",
+                json=[{"productId": product_id, "coordinate": padded}],
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+    raw, was_cached = await cached_fetch(cache_key, CACHE_TTL_META, _fetcher)
+    obj = _unwrap(raw)
+    return _flatten_series_info(obj), was_cached
+
+
+async def get_latest_n_by_vector(
+    vector_id: int, n: int = 10
+) -> tuple[list[ObservationRow], bool]:
+    """Fetch latest N observations for a vector.
+
+    Uses getDataFromVectorsAndLatestNPeriods WDS endpoint.
+    Observations are sorted newest-first. Result cached for 1 hour.
+
+    Args:
+        vector_id: The WDS vectorId (e.g. 32164132).
+        n: Number of most recent periods to return (default 10).
+
+    Returns:
+        (list[ObservationRow], was_cached) sorted newest-first by ref_per.
+
+    Raises:
+        ValueError: If WDS returns a FAILED envelope.
+        httpx.HTTPStatusError: On HTTP 4xx/5xx responses.
+    """
+    cache_key = f"statcan_wds:getDataFromVectorsAndLatestNPeriods:{vector_id}:{n}"
+
+    async def _fetcher() -> list:
+        await _limiter_acquire()
+        async with _make_statcan_client() as http:
+            resp = await http.post(
+                BASE_URL + "getDataFromVectorsAndLatestNPeriods",
+                json=[{"vectorId": vector_id, "latestN": n}],
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+    raw, was_cached = await cached_fetch(cache_key, CACHE_TTL_OBS, _fetcher)
+    obj = _unwrap(raw)
+    data_points: list[dict] = obj.get("vectorDataPoint") or []
+    rows = [_flatten_observation(dp) for dp in data_points]
+    rows.sort(key=lambda r: r.ref_per, reverse=True)
+    return rows, was_cached
+
+
+async def get_latest_n_by_coord(
+    product_id: int, coordinate: str, n: int = 10
+) -> tuple[list[ObservationRow], bool]:
+    """Fetch latest N observations by productId + coordinate with auto-padding.
+
+    Uses getDataFromCubePidCoordAndLatestNPeriods WDS endpoint. Coordinate
+    is auto-padded to 10 parts before the request. Result cached for 1 hour.
+
+    Args:
+        product_id: The WDS productId (e.g. 35100003).
+        coordinate: Dot-separated coordinate string (e.g. "1.12").
+        n: Number of most recent periods to return (default 10).
+
+    Returns:
+        (list[ObservationRow], was_cached) sorted newest-first by ref_per.
+
+    Raises:
+        ValueError: If WDS returns a FAILED envelope.
+        httpx.HTTPStatusError: On HTTP 4xx/5xx responses.
+    """
+    padded = pad_coordinate(coordinate)
+    cache_key = f"statcan_wds:getDataFromCubePidCoordAndLatestNPeriods:{product_id}:{padded}:{n}"
+
+    async def _fetcher() -> list:
+        await _limiter_acquire()
+        async with _make_statcan_client() as http:
+            resp = await http.post(
+                BASE_URL + "getDataFromCubePidCoordAndLatestNPeriods",
+                json=[{"productId": product_id, "coordinate": padded, "latestN": n}],
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+    raw, was_cached = await cached_fetch(cache_key, CACHE_TTL_OBS, _fetcher)
+    obj = _unwrap(raw)
+    data_points: list[dict] = obj.get("vectorDataPoint") or []
+    rows = [_flatten_observation(dp) for dp in data_points]
+    rows.sort(key=lambda r: r.ref_per, reverse=True)
+    return rows, was_cached

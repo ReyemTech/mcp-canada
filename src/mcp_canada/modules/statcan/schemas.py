@@ -110,3 +110,41 @@ class CodeSets(BaseModel):
     symbol: list[CodeSetEntry]
     security_level: list[CodeSetEntry]
     uom: list[CodeSetEntry]
+
+
+# ---------------------------------------------------------------------------
+# SDMX schemas (Phase 9)
+# ---------------------------------------------------------------------------
+
+
+class SDMXCodeValue(BaseModel):
+    """A single code within an SDMX codelist (e.g. a geography value)."""
+
+    id: str
+    name_en: str
+    name_fr: str
+
+
+class SDMXDimension(BaseModel):
+    """An SDMX dimension with its associated codelist."""
+
+    position: int
+    id: str
+    codelist_id: str
+    codes: list[SDMXCodeValue]
+
+
+class SDMXStructure(BaseModel):
+    """Parsed SDMX structure for a StatCan table (productId)."""
+
+    product_id: int
+    dimensions: list[SDMXDimension]
+    suggested_key: str = ""
+
+
+class SDMXObservationRow(BaseModel):
+    """A single flattened observation row from SDMX-JSON data response."""
+
+    period: str
+    value: float | None
+    dimensions: dict[str, str]

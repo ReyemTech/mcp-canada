@@ -40,6 +40,28 @@ FREQUENCY_CODES: dict[int, str] = {
     13: "Every 2 years",
 }
 
+# ---------------------------------------------------------------------------
+# SDMX REST API constants (Phase 9)
+# ---------------------------------------------------------------------------
+
+# SDMX REST base URL — separate from WDS REST API
+SDMX_BASE_URL = "https://www150.statcan.gc.ca/t1/wds/sdmx/statcan/rest/"
+
+# API name for SDMX envelope responses
+_SDMX_API_NAME = "statcan-sdmx"
+
+# XML namespaces for SDMX 2.1 structure messages
+# Must be passed to every ElementTree find/findall call (Pitfall 3)
+SDMX_XML_NAMESPACES: dict[str, str] = {
+    "mes": "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/message",
+    "str": "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/structure",
+    "com": "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common",
+}
+
+# ---------------------------------------------------------------------------
+# Scalar factor codes (WDS scalarFactorCode → human-readable label)
+# ---------------------------------------------------------------------------
+
 # Scalar factor codes (WDS scalarFactorCode → human-readable label)
 SCALAR_FACTOR_CODES: dict[int, str] = {
     0: "units",

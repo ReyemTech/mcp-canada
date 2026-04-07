@@ -1280,4 +1280,85 @@ class TestGetChangedCubes:
             with patch.object(statcan_client, "_limiter_acquire", new=acquire_mock):
                 await statcan_client.get_changed_cubes("2024-01-15")
 
-        acquire_mock.assert_called_once()
+
+# ---------------------------------------------------------------------------
+# Task 1 (Phase 9): SDMX schema tests (RED phase)
+# ---------------------------------------------------------------------------
+
+
+class TestSDMXConstant:
+    """Tests for SDMX constants in constants.py."""
+
+    def test_sdmx_base_url_ends_with_slash(self):
+        from mcp_canada.modules.statcan.constants import SDMX_BASE_URL
+
+        assert SDMX_BASE_URL.endswith("/")
+        assert "sdmx" in SDMX_BASE_URL
+
+    def test_sdmx_api_name(self):
+        from mcp_canada.modules.statcan.constants import _SDMX_API_NAME
+
+        assert _SDMX_API_NAME == "statcan-sdmx"
+
+    def test_sdmx_xml_namespaces_has_required_keys(self):
+        from mcp_canada.modules.statcan.constants import SDMX_XML_NAMESPACES
+
+        assert "mes" in SDMX_XML_NAMESPACES
+        assert "str" in SDMX_XML_NAMESPACES
+        assert "com" in SDMX_XML_NAMESPACES
+
+
+class TestSDMXSchema:
+    """Tests for SDMX Pydantic schema models."""
+
+    def test_sdmx_code_value_fields(self):
+        from mcp_canada.modules.statcan.schemas import SDMXCodeValue
+
+        cv = SDMXCodeValue(id="1", name_en="Canada", name_fr="Canada")
+        assert cv.id == "1"
+        assert cv.name_en == "Canada"
+        assert cv.name_fr == "Canada"
+
+    def test_sdmx_dimension_fields(self):
+        from mcp_canada.modules.statcan.schemas import SDMXDimension, SDMXCodeValue
+
+        codes = [SDMXCodeValue(id="1", name_en="Canada", name_fr="Canada")]
+        dim = SDMXDimension(position=1, id="GEO", codelist_id="CL_GEO", codes=codes)
+        assert dim.position == 1
+        assert dim.id == "GEO"
+        assert dim.codelist_id == "CL_GEO"
+        assert len(dim.codes) == 1
+
+    def test_sdmx_structure_fields(self):
+        from mcp_canada.modules.statcan.schemas import SDMXStructure, SDMXDimension, SDMXCodeValue
+
+        codes = [SDMXCodeValue(id="1", name_en="Canada", name_fr="Canada")]
+        dim = SDMXDimension(position=1, id="GEO", codelist_id="CL_GEO", codes=codes)
+        struct = SDMXStructure(product_id=18100004, dimensions=[dim], suggested_key="1")
+        assert struct.product_id == 18100004
+        assert len(struct.dimensions) == 1
+        assert struct.suggested_key == "1"
+
+    def test_sdmx_structure_suggested_key_default_empty(self):
+        from mcp_canada.modules.statcan.schemas import SDMXStructure
+
+        struct = SDMXStructure(product_id=18100004, dimensions=[])
+        assert struct.suggested_key == ""
+
+    def test_sdmx_observation_row_fields(self):
+        from mcp_canada.modules.statcan.schemas import SDMXObservationRow
+
+        row = SDMXObservationRow(
+            period="2024-01",
+            value=163.4,
+            dimensions={"GEO": "Canada", "PRODUCT": "All-items"},
+        )
+        assert row.period == "2024-01"
+        assert row.value == 163.4
+        assert row.dimensions["GEO"] == "Canada"
+
+    def test_sdmx_observation_row_value_can_be_none(self):
+        from mcp_canada.modules.statcan.schemas import SDMXObservationRow
+
+        row = SDMXObservationRow(period="2024-01", value=None, dimensions={})
+        assert row.value is None

@@ -441,3 +441,191 @@ async def reset_cache():
     await _cache.clear()
     yield
     await _cache.clear()
+
+
+# ---------------------------------------------------------------------------
+# Phase 9: SDMX fixtures
+# ---------------------------------------------------------------------------
+
+# Valid SDMX 2.1 XML structure for CPI table 18100004
+# Two dimensions: Geography (position 1) and Products (position 2)
+SDMX_STRUCTURE_XML = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<mes:Structure
+    xmlns:mes="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/message"
+    xmlns:str="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/structure"
+    xmlns:com="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <mes:Structures>
+    <str:Codelists>
+      <str:Codelist id="CL_GEO" agencyID="StatCan" version="1.0">
+        <com:Name xml:lang="en">Geography</com:Name>
+        <com:Name xml:lang="fr">Géographie</com:Name>
+        <str:Code id="1">
+          <com:Name xml:lang="en">Canada</com:Name>
+          <com:Name xml:lang="fr">Canada</com:Name>
+        </str:Code>
+        <str:Code id="2">
+          <com:Name xml:lang="en">Ontario</com:Name>
+          <com:Name xml:lang="fr">Ontario</com:Name>
+        </str:Code>
+      </str:Codelist>
+      <str:Codelist id="CL_PRODUCT" agencyID="StatCan" version="1.0">
+        <com:Name xml:lang="en">Products and product groups</com:Name>
+        <com:Name xml:lang="fr">Produits et groupes de produits</com:Name>
+        <str:Code id="1">
+          <com:Name xml:lang="en">All-items</com:Name>
+          <com:Name xml:lang="fr">Ensemble</com:Name>
+        </str:Code>
+        <str:Code id="2">
+          <com:Name xml:lang="en">Food</com:Name>
+          <com:Name xml:lang="fr">Aliments</com:Name>
+        </str:Code>
+      </str:Codelist>
+    </str:Codelists>
+    <str:DataStructures>
+      <str:DataStructure id="Data_Structure_18100004" agencyID="StatCan" version="1.0">
+        <str:DataStructureComponents>
+          <str:DimensionList id="DimensionDescriptor">
+            <str:Dimension id="GEO" position="1">
+              <str:LocalRepresentation>
+                <str:Enumeration>
+                  <Ref id="CL_GEO" agencyID="StatCan" version="1.0" package="codelist" class="Codelist"/>
+                </str:Enumeration>
+              </str:LocalRepresentation>
+            </str:Dimension>
+            <str:Dimension id="PRODUCT" position="2">
+              <str:LocalRepresentation>
+                <str:Enumeration>
+                  <Ref id="CL_PRODUCT" agencyID="StatCan" version="1.0" package="codelist" class="Codelist"/>
+                </str:Enumeration>
+              </str:LocalRepresentation>
+            </str:Dimension>
+          </str:DimensionList>
+        </str:DataStructureComponents>
+      </str:DataStructure>
+    </str:DataStructures>
+  </mes:Structures>
+</mes:Structure>
+"""
+
+# Valid SDMX-JSON compact format with 2 series (colon-delimited keys), 3 observations each
+SDMX_DATA_JSON = {
+    "meta": {"id": "test", "prepared": "2024-01-01"},
+    "data": {
+        "structures": [
+            {
+                "dimensions": {
+                    "series": [
+                        {
+                            "id": "GEO",
+                            "keyPosition": 0,
+                            "values": [
+                                {"id": "1", "name": "Canada"},
+                                {"id": "2", "name": "Ontario"},
+                            ],
+                        },
+                        {
+                            "id": "PRODUCT",
+                            "keyPosition": 1,
+                            "values": [
+                                {"id": "1", "name": "All-items"},
+                            ],
+                        },
+                    ],
+                    "observation": [
+                        {
+                            "id": "TIME_PERIOD",
+                            "values": [
+                                {"id": "2024-01"},
+                                {"id": "2024-02"},
+                                {"id": "2024-03"},
+                            ],
+                        }
+                    ],
+                }
+            }
+        ],
+        "dataSets": [
+            {
+                "series": {
+                    "0:0": {
+                        "observations": {
+                            "0": [163.4],
+                            "1": [164.1],
+                            "2": [None],
+                        }
+                    },
+                    "1:0": {
+                        "observations": {
+                            "0": [158.2],
+                            "1": [159.0],
+                            "2": [159.5],
+                        }
+                    },
+                }
+            }
+        ],
+    },
+}
+
+# Same SDMX-JSON shape but for a single vector endpoint response
+SDMX_VECTOR_JSON = {
+    "meta": {"id": "vector-test", "prepared": "2024-01-01"},
+    "data": {
+        "structures": [
+            {
+                "dimensions": {
+                    "series": [
+                        {
+                            "id": "GEO",
+                            "keyPosition": 0,
+                            "values": [
+                                {"id": "1", "name": "Canada"},
+                            ],
+                        },
+                    ],
+                    "observation": [
+                        {
+                            "id": "TIME_PERIOD",
+                            "values": [
+                                {"id": "2024-01"},
+                                {"id": "2024-02"},
+                            ],
+                        }
+                    ],
+                }
+            }
+        ],
+        "dataSets": [
+            {
+                "series": {
+                    "0": {
+                        "observations": {
+                            "0": [41690973.0],
+                            "1": [41700000.0],
+                        }
+                    },
+                }
+            }
+        ],
+    },
+}
+
+
+@pytest.fixture
+def sdmx_structure_xml():
+    """Valid SDMX 2.1 XML string for CPI table (2 dimensions, 2 codes each)."""
+    return SDMX_STRUCTURE_XML
+
+
+@pytest.fixture
+def sdmx_data_json():
+    """SDMX-JSON compact format dict with 2 series, 3 observations each."""
+    return SDMX_DATA_JSON
+
+
+@pytest.fixture
+def sdmx_vector_json():
+    """SDMX-JSON compact format dict for a single vector endpoint response."""
+    return SDMX_VECTOR_JSON

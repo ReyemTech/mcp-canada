@@ -14,6 +14,8 @@ from typing import Any
 import httpx
 
 from mcp_canada import __version__
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
 from mcp_canada.modules.statcan.constants import (
     BASE_URL,
     CACHE_TTL_CODESETS,
@@ -25,6 +27,7 @@ from mcp_canada.modules.statcan.constants import (
     RATE_LIMIT,
     SCALAR_FACTOR_CODES,
     STATCAN_VERIFY,
+    TIMEOUT_LARGE,
 )
 from mcp_canada.modules.statcan.schemas import (
     CodeSetEntry,
@@ -40,7 +43,7 @@ from mcp_canada.shared.cache import cached_fetch
 from mcp_canada.shared.rate_limiter import get_limiter
 
 
-def _make_statcan_client() -> httpx.AsyncClient:
+def _make_statcan_client(timeout: float = 30.0) -> httpx.AsyncClient:
     """Create an httpx client scoped to StatCan with correct SSL setting.
 
     verify=True uses certifi (httpx default).
@@ -48,7 +51,7 @@ def _make_statcan_client() -> httpx.AsyncClient:
     """
     return httpx.AsyncClient(
         verify=STATCAN_VERIFY,
-        timeout=httpx.Timeout(30.0),
+        timeout=httpx.Timeout(timeout),
         headers={"User-Agent": f"mcp-canada/{__version__}"},
     )
 
@@ -220,9 +223,15 @@ async def search_cubes(
         (list[CubeLite], was_cached) — results ranked by BM25 score descending.
     """
 
+    @retry(
+        retry=retry_if_exception_type((httpx.TimeoutException, httpx.ConnectError)),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        reraise=True,
+    )
     async def _fetch_and_index() -> tuple[list[dict], float, dict[str, int]]:
         await _limiter_acquire()
-        async with _make_statcan_client() as http:
+        async with _make_statcan_client(timeout=TIMEOUT_LARGE) as http:
             resp = await http.get(BASE_URL + "getAllCubesListLite")
             resp.raise_for_status()
             cubes: list[dict] = resp.json()

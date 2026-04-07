@@ -12,6 +12,9 @@ PROBE_URL = "https://www150.statcan.gc.ca/t1/wds/rest/getAllCubesListLite"
 RATE_GROUP = "statcan"
 RATE_LIMIT = 20.0  # requests per second — WDS documented limit is 25 req/s, conservative
 
+# Timeout for large payloads (getAllCubesListLite is ~5MB)
+TIMEOUT_LARGE = 90.0  # seconds — generous for slow connections
+
 # Cache TTLs (seconds)
 CACHE_TTL_CUBES = 3600       # 1 hour — cube list changes infrequently
 CACHE_TTL_META = 86400       # 24 hours — cube metadata is stable

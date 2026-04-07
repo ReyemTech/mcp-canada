@@ -610,11 +610,12 @@ class TestMetaToolScenarios:
             call_tool_name="call_tool",
         ))
 
+        from tests.integration.conftest import _extract_text
+
         async with Client(selective_mcp) as client:
             # Weather tools should NOT appear
             result = await client.call_tool("discover_tools", {"query": "weather forecast"})
-            text = result.content[0].text if result.content else "[]"
-            weather_results = json.loads(text) if text else []
+            weather_results = json.loads(_extract_text(result))
             weather_names = [r["name"] for r in weather_results] if isinstance(weather_results, list) else []
             assert not any("wx_" in n for n in weather_names), (
                 f"Weather tools found in selective (bank_of_canada only) server: {weather_names}"
@@ -622,8 +623,7 @@ class TestMetaToolScenarios:
 
             # BOC tools SHOULD appear
             result2 = await client.call_tool("discover_tools", {"query": "exchange rates"})
-            text2 = result2.content[0].text if result2.content else "[]"
-            boc_results = json.loads(text2) if text2 else []
+            boc_results = json.loads(_extract_text(result2))
             boc_names = [r["name"] for r in boc_results] if isinstance(boc_results, list) else []
             assert any("boc_" in n for n in boc_names), (
                 f"No BOC tools found in selective server. Got: {boc_names}"

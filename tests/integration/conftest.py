@@ -1,10 +1,21 @@
 """Shared fixtures for integration tests."""
 
 import json
+from typing import Any
+
 import pytest
 from fastmcp import Client
 
 _server_initialized = False
+
+
+def _extract_text(result: Any) -> str:
+    """Extract text from MCP CallToolResult, handling content type union."""
+    if result.content:
+        item = result.content[0]
+        if hasattr(item, "text"):
+            return item.text  # type: ignore[no-any-return]
+    return "[]"
 
 
 @pytest.fixture(scope="session")
@@ -37,22 +48,21 @@ def mcp_server():
     return mcp
 
 
-async def call_tool(mcp_server, tool_name: str, arguments: dict | None = None) -> dict:
+async def call_tool(mcp_server: Any, tool_name: str, arguments: dict | None = None) -> dict:
     """Call a tool through the MCP Client layer and return parsed JSON."""
     async with Client(mcp_server) as client:
         result = await client.call_tool('call_tool', {
             'name': tool_name,
             'arguments': arguments or {},
         })
-        return json.loads(result.content[0].text)
+        return json.loads(_extract_text(result))  # type: ignore[no-any-return]
 
 
-async def discover(mcp_server, query: str) -> list[dict]:
+async def discover(mcp_server: Any, query: str) -> list[dict]:
     """Search for tools via BM25 discover_tools and return parsed results."""
     async with Client(mcp_server) as client:
         result = await client.call_tool('discover_tools', {'query': query})
-        # discover_tools may return results in different formats
-        text = result.content[0].text if result.content else "[]"
+        text = _extract_text(result)
         try:
             parsed = json.loads(text)
             return parsed if isinstance(parsed, list) else []
@@ -60,8 +70,8 @@ async def discover(mcp_server, query: str) -> list[dict]:
             return []
 
 
-async def call_direct_tool(mcp_server, tool_name: str, arguments: dict | None = None) -> dict:
+async def call_direct_tool(mcp_server: Any, tool_name: str, arguments: dict | None = None) -> dict:
     """Call an always-visible tool directly (not through call_tool proxy)."""
     async with Client(mcp_server) as client:
         result = await client.call_tool(tool_name, arguments or {})
-        return json.loads(result.content[0].text)
+        return json.loads(_extract_text(result))  # type: ignore[no-any-return]

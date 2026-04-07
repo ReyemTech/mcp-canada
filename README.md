@@ -334,9 +334,9 @@ Real-time weather, climate, air quality, hydrology, and more from [MSC GeoMet OG
 
 ---
 
-### 📊 Statistics Canada WDS — 11 tools
+### 📊 Statistics Canada WDS + SDMX — 15 tools
 
-Time series data, cube metadata, and catalog search from the [Statistics Canada Web Data Service](https://www.statcan.gc.ca/en/developers/wds).
+Time series data, cube metadata, catalog search, and SDMX server-side filtering from the [Statistics Canada Web Data Service](https://www.statcan.gc.ca/en/developers/wds).
 
 <!-- CATALOG:statcan:start -->
 | Tool | Description | Key Parameters |
@@ -352,6 +352,10 @@ Time series data, cube metadata, and catalog search from the [Statistics Canada 
 | `sc_get_bulk_vector_data` | Get observations for multiple Statistics Canada series within a release date range. | `vector_ids`, `start_release`, `end_release` |
 | `sc_get_changed_series` | Get the list of Statistics Canada series (vectors) that changed today. | — |
 | `sc_get_changed_cubes` | Get the list of Statistics Canada tables (cubes) that changed on a specific date. | `date` |
+| `sc_get_sdmx_structure` | Get SDMX dimension codelists for a Statistics Canada table. | `product_id` |
+| `sc_get_sdmx_data` | Get server-side filtered StatCan observations using SDMX key syntax. | `product_id`, `key`, `last_n`, `start_period`, `end_period`, `dimensions` |
+| `sc_get_sdmx_vector_data` | Get observations for a single StatCan vector via SDMX with date range filtering. | `vector_id`, `start_period`, `end_period` |
+| `sc_fetch_vectors_to_store` | Fetch multiple StatCan vectors and store them to the shared datastore for SQL queries. | `vector_ids`, `start_release`, `end_release`, `table_name` |
 <!-- CATALOG:statcan:end -->
 
 ---

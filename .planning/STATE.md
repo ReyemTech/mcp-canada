@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 09-01-PLAN.md (SDMX client layer)
-last_updated: "2026-04-07T22:26:53.447Z"
+stopped_at: Completed 09-02-PLAN.md (SDMX tool layer + composite)
+last_updated: "2026-04-07T22:51:18.217Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
-  completed_plans: 7
+  completed_plans: 8
   percent: 0
 ---
 
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 08-statcan-wds P02 | 12min | 2 tasks | 3 files |
 | Phase 08-statcan-wds P03 | 7min | 2 tasks | 8 files |
 | Phase 09-sdmx-composite P01 | 4min | 2 tasks | 5 files |
+| Phase 09-sdmx-composite P02 | 18min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,9 @@ Recent decisions affecting current work:
 - [Phase 09-sdmx-composite]: Cache structure XML text (str) not SDMXStructure object - avoids Pydantic serialization in aiocache
 - [Phase 09-sdmx-composite]: SDMX Ref element has no namespace prefix in real XML - use bare Ref fallback after str:Enumeration/Ref search
 - [Phase 09-sdmx-composite]: Series key delimiter: try colon first (SDMX-JSON spec) then dot fallback (StatCan observed behavior)
+- [Phase 09-sdmx-composite]: sc_get_sdmx_data mutual exclusion enforced at tool layer: lastN + date range check before any network call
+- [Phase 09-sdmx-composite]: sc_fetch_vectors_to_store validates table_name via IDENTIFIER_RE before any network call — fail-fast pattern
+- [Phase 09-sdmx-composite]: key wins over dimensions in sc_get_sdmx_data to avoid unnecessary structure fetch when raw key provided
 
 ### Pending Todos
 
@@ -99,6 +103,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-07T22:26:53.444Z
-Stopped at: Completed 09-01-PLAN.md (SDMX client layer)
+Last session: 2026-04-07T22:51:18.215Z
+Stopped at: Completed 09-02-PLAN.md (SDMX tool layer + composite)
 Resume file: None

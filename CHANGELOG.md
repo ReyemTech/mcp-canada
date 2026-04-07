@@ -2,6 +2,38 @@
 
 <!-- CHANGELOG -->
 
+## v0.2.0 (2026-04-07)
+
+### Bug Fixes
+
+- Move installer tests to tests/ and exclude installer.py from coverage
+  ([`b0a903b`](https://github.com/ReyemTech/mcp-canada/commit/b0a903beeb867339390e7154577aec40631541aa))
+
+### Chores
+
+- Add InquirerPy dependency for install subcommand TUI
+  ([`e89b217`](https://github.com/ReyemTech/mcp-canada/commit/e89b2170abe053e8a07af43e11594d1b2820d6d1))
+
+- Sync uv.lock after release
+  ([`826bf39`](https://github.com/ReyemTech/mcp-canada/commit/826bf39c2c40f5a8a5153630cb6ccd60a3434a8a))
+
+### Documentation
+
+- Add cross-API examples showcasing multi-module intelligence
+  ([`a941946`](https://github.com/ReyemTech/mcp-canada/commit/a94194621ee565abf38107075454881bc8536fb5))
+
+- Add install subcommand to README
+  ([`0cdaf34`](https://github.com/ReyemTech/mcp-canada/commit/0cdaf341434658d6f5697525bce9dc36f7bf03d8))
+
+### Features
+
+- Add install subcommand to CLI with backward-compatible argparse
+  ([`957018b`](https://github.com/ReyemTech/mcp-canada/commit/957018b8d9867f642065d71200c799b396530879))
+
+- Add installer module with platform registry, config generation, and merge logic
+  ([`baf6b98`](https://github.com/ReyemTech/mcp-canada/commit/baf6b98d6f7e48548b80487bc787d6f791fb444a))
+
+
 ## v0.1.3 (2026-04-07)
 
 ### Bug Fixes

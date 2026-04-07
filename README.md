@@ -67,6 +67,23 @@ uv run mcp-canada
 
 Environment variable: `MCP_CANADA_MODULES=bank_of_canada,recalls`
 
+### Install on Your Platform
+
+Configure mcp-canada on any supported MCP client with one command:
+
+```bash
+# Interactive — select platforms from a list
+uvx mcp-canada install
+
+# Direct — name the platforms
+uvx mcp-canada install claude-desktop cursor vscode
+
+# With module filtering
+uvx mcp-canada install --modules bank_of_canada,weather
+```
+
+Supported platforms: Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Zed, Codex CLI, Gemini CLI, Amazon Q, OpenCode, Cline, Roo Code, Goose CLI, Junie CLI.
+
 ## Examples
 
 See **[EXAMPLES.md](EXAMPLES.md)** for 19 cross-API intelligence scenarios — from tracing prairie drought to the Canadian dollar, to building pharmaceutical safety audits, to assembling MP accountability briefs. Each example includes the exact prompt and tool chain you can run today.

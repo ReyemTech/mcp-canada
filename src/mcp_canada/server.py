@@ -116,6 +116,22 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable DEBUG-level logging",
     )
+    subparsers = parser.add_subparsers(dest="command")
+    install_parser = subparsers.add_parser(
+        "install",
+        help="Configure mcp-canada on MCP client platforms",
+    )
+    install_parser.add_argument(
+        "platforms",
+        nargs="*",
+        default=[],
+        help="Platform names to configure (omit for interactive selection)",
+    )
+    install_parser.add_argument(
+        "--modules",
+        default="",
+        help="Modules to include in generated config (e.g. bank_of_canada,weather)",
+    )
     return parser
 
 
@@ -123,6 +139,12 @@ def main() -> None:
     """CLI entry point for mcp-canada."""
     parser = _build_parser()
     args = parser.parse_args()
+
+    # Handle install subcommand
+    if args.command == "install":
+        from mcp_canada.installer import run_install
+        run_install(args)
+        return
 
     # Configure logging
     if args.debug:

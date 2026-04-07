@@ -16,7 +16,7 @@
 
 ---
 
-**83 tools** across **7 no-auth federal APIs** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, and real-time weather. All bilingual (English/French).
+**89 tools** across **7 federal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, and persistent local storage. All bilingual (English/French).
 
 > **Complementary to [mcp-statcan](https://github.com/reyemtech/mcp-statcan)** — which covers Statistics Canada. Together they form a complete Canadian government data toolkit.
 
@@ -334,6 +334,25 @@ Real-time weather, climate, air quality, hydrology, and more from [MSC GeoMet OG
 
 ---
 
+### 🗄️ Local Datastore — 6 tools
+
+Local SQLite persistence layer for storing agent-generated data, fetched API results, or any structured data. Tables persist across sessions at `~/.mcp-canada/datastore.db`.
+
+<!-- CATALOG:datastore:start -->
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `ds_create_table` | Create a named table in the local SQLite datastore. | `table_name`, `columns`, `data` |
+| `ds_insert_data` | Insert rows of data into an existing table in the local SQLite datastore. | `table_name`, `rows` |
+| `ds_query` | Run a read-only SQL query against the local SQLite datastore. | `sql` |
+| `ds_list_tables` | List all tables in the local SQLite datastore. | — |
+| `ds_get_schema` | Get the column schema for a table in the local SQLite datastore. | `table_name` |
+| `ds_drop_table` | Drop (delete) a table from the local SQLite datastore. | `table_name` |
+<!-- CATALOG:datastore:end -->
+
+> **Note:** `ds_query` supports SELECT, PRAGMA, EXPLAIN, and CREATE INDEX only — no mutations via query. Use `ds_insert_data` to write data. Table and column names are validated against an allowlist regex to prevent SQL injection.
+
+---
+
 ## Response Format
 
 All tools return a consistent envelope:
@@ -382,6 +401,7 @@ src/mcp_canada/
     ├── drug_database/     # 8 tools — Health Canada DPD
     ├── ckan/              # 7 tools — Open Data Portal
     ├── nutrient_file/     # 8 tools — Canadian Nutrient File
+    ├── datastore/         # 6 tools — local SQLite persistence
     └── weather/           # 34 tools — MSC GeoMet OGC API
         ├── current/       # 5 tools — realtime conditions, forecast, alerts
         ├── climate/       # 7 tools — daily/monthly/normals/trends

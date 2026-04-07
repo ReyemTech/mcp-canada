@@ -24,15 +24,15 @@
 
 ### StatCan Series Info
 
-- [ ] **SC-04**: Agent can look up series metadata by vectorId (table, coordinate, frequency, units)
-- [ ] **SC-05**: Agent can look up series metadata by productId + coordinate (resolves to vectorId)
+- [x] **SC-04**: Agent can look up series metadata by vectorId (table, coordinate, frequency, units)
+- [x] **SC-05**: Agent can look up series metadata by productId + coordinate (resolves to vectorId)
 
 ### StatCan WDS Data Retrieval
 
-- [ ] **SC-06**: Agent can retrieve the latest N observations for a given vectorId
-- [ ] **SC-07**: Agent can retrieve the latest N observations by productId + coordinate
-- [ ] **SC-08**: Agent can retrieve data for a vector within a specific reference period date range
-- [ ] **SC-09**: Agent can retrieve data for multiple vectors simultaneously within a release date range
+- [x] **SC-06**: Agent can retrieve the latest N observations for a given vectorId
+- [x] **SC-07**: Agent can retrieve the latest N observations by productId + coordinate
+- [x] **SC-08**: Agent can retrieve data for a vector within a specific reference period date range
+- [x] **SC-09**: Agent can retrieve data for multiple vectors simultaneously within a release date range
 
 ### StatCan SDMX
 
@@ -42,8 +42,8 @@
 
 ### StatCan Monitoring
 
-- [ ] **SC-13**: Agent can list series that changed today
-- [ ] **SC-14**: Agent can list cubes that changed on a specific date
+- [x] **SC-13**: Agent can list series that changed today
+- [x] **SC-14**: Agent can list cubes that changed on a specific date
 
 ### StatCan Composite
 
@@ -101,17 +101,17 @@
 | SC-01 | Phase 8 | Complete |
 | SC-02 | Phase 8 | Complete |
 | SC-03 | Phase 8 | Complete |
-| SC-04 | Phase 8 | Pending |
-| SC-05 | Phase 8 | Pending |
-| SC-06 | Phase 8 | Pending |
-| SC-07 | Phase 8 | Pending |
-| SC-08 | Phase 8 | Pending |
-| SC-09 | Phase 8 | Pending |
+| SC-04 | Phase 8 | Complete |
+| SC-05 | Phase 8 | Complete |
+| SC-06 | Phase 8 | Complete |
+| SC-07 | Phase 8 | Complete |
+| SC-08 | Phase 8 | Complete |
+| SC-09 | Phase 8 | Complete |
 | SC-10 | Phase 9 | Pending |
 | SC-11 | Phase 9 | Pending |
 | SC-12 | Phase 9 | Pending |
-| SC-13 | Phase 8 | Pending |
-| SC-14 | Phase 8 | Pending |
+| SC-13 | Phase 8 | Complete |
+| SC-14 | Phase 8 | Complete |
 | SC-15 | Phase 9 | Pending |
 | INF-01 | Phase 7 | Complete |
 | INF-02 | Phase 8 | Complete |

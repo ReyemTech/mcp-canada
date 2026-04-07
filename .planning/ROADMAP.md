@@ -34,7 +34,7 @@ Phases 1-6 delivered 7 federal API modules (Bank of Canada, Open Parliament, Rec
   2. Agent-supplied table and column names containing SQL metacharacters are rejected with a structured error before any SQL executes
   3. StatCan HTTP client uses either truststore-based cert resolution or a scoped verify=False limited strictly to the statcan module — never the shared lifespan client
   4. `aiosqlite` is listed in pyproject.toml; existing `uvx mcp-canada` invocation still works with no new mandatory configuration
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
 - [ ] 07-01-PLAN.md — Datastore module infrastructure: constants, schemas, async SQLite client, identifier validation, --ephemeral flag
@@ -80,7 +80,7 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 7. Datastore + SSL | v1.1 | 0/3 | Planning | - |
+| 7. Datastore + SSL | 1/3 | In Progress|  | - |
 | 8. StatCan WDS | v1.1 | 0/TBD | Not started | - |
 | 9. SDMX + Composite | v1.1 | 0/TBD | Not started | - |
 | 10. Tests + Docs | v1.1 | 0/TBD | Not started | - |

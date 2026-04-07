@@ -51,7 +51,7 @@
 
 ### Infrastructure
 
-- [ ] **INF-01**: StatCan SSL certificate handling attempts proper cert resolution before falling back to scoped verify=False
+- [x] **INF-01**: StatCan SSL certificate handling attempts proper cert resolution before falling back to scoped verify=False
 - [ ] **INF-02**: StatCan API calls are rate-limited to 20 req/s via the shared TokenBucket rate limiter
 - [ ] **INF-03**: StatCan responses are cached with tiered TTLs (cube list 1hr, metadata 24hr, code sets 7d, observations 1hr)
 - [ ] **INF-04**: All StatCan and datastore tools support bilingual responses (lang: en/fr)
@@ -113,7 +113,7 @@
 | SC-13 | Phase 8 | Pending |
 | SC-14 | Phase 8 | Pending |
 | SC-15 | Phase 9 | Pending |
-| INF-01 | Phase 7 | Pending |
+| INF-01 | Phase 7 | Complete |
 | INF-02 | Phase 8 | Pending |
 | INF-03 | Phase 8 | Pending |
 | INF-04 | Phase 8 | Pending |

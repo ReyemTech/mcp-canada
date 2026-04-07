@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Phase 7 context gathered
-last_updated: "2026-04-07T15:19:55.927Z"
+stopped_at: Completed 07-03-PLAN.md — StatCan SSL probe + module stub
+last_updated: "2026-04-07T15:45:27.901Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 3
+  completed_plans: 1
   percent: 0
 ---
 
@@ -50,6 +50,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 07-datastore-ssl P03 | 15 | 1 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -61,6 +62,8 @@ Recent decisions affecting current work:
 - [Pre-Phase 7]: Use `aiosqlite==0.22.1` for async SQLite — cleaner than asyncio.to_thread; zero transitive deps
 - [Pre-Phase 7]: SQL injection prevention via regex allowlist `^[a-zA-Z_][a-zA-Z0-9_]{0,63}$` must be in place from first commit
 - [Pre-Phase 7]: SSL — attempt `truststore` first; fall back to scoped `verify=False` on statcan client only; never touch shared http.py
+- [Phase 07-datastore-ssl]: STATCAN_VERIFY=True — certifi validates statcan.gc.ca, no truststore or verify=False needed
+- [Phase 07-datastore-ssl]: Scoped client pattern: _make_statcan_client() owns its verify= setting, shared http.py never touched
 
 ### Pending Todos
 
@@ -74,6 +77,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-07T15:19:55.925Z
-Stopped at: Phase 7 context gathered
-Resume file: .planning/phases/07-datastore-ssl/07-CONTEXT.md
+Last session: 2026-04-07T15:45:27.899Z
+Stopped at: Completed 07-03-PLAN.md — StatCan SSL probe + module stub
+Resume file: None

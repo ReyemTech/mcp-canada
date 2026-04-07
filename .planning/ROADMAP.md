@@ -19,7 +19,7 @@ Phases 1-6 delivered 7 federal API modules (Bank of Canada, Open Parliament, Rec
 **Milestone Goal:** An agent can combine data from any Canadian government source in a single SQL query — turning 7 isolated APIs into one queryable data platform.
 
 - [x] **Phase 7: Datastore + SSL** - SQLite persistence layer and StatCan SSL strategy resolved (completed 2026-04-07)
-- [ ] **Phase 8: StatCan WDS** - All WDS discovery, series, data, and monitoring tools live
+- [x] **Phase 8: StatCan WDS** - All WDS discovery, series, data, and monitoring tools live (completed 2026-04-07)
 - [ ] **Phase 9: SDMX + Composite** - Server-side filtered queries and fetch-and-store bridge complete
 - [ ] **Phase 10: Tests + Docs** - Integration test coverage and README updated
 
@@ -51,7 +51,7 @@ Plans:
   3. Agent can fetch the latest N observations for a vector (by vectorId or productId+coordinate), retrieve historical data by date range, and fetch multiple vectors simultaneously
   4. Agent can list series and cubes that changed on a specific date, enabling change-monitoring workflows
   5. All StatCan tools respect the 20 req/s rate limit, apply tiered TTL caching (cube list 1hr, metadata 24hr, code sets 7d, observations 1hr), and return bilingual responses
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [ ] 08-01-PLAN.md — Constants, schemas, BM25 search, getCubeMetadata, getCodeSets client functions + tests
@@ -86,6 +86,6 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 7. Datastore + SSL | 3/3 | Complete   | 2026-04-07 | - |
-| 8. StatCan WDS | 2/3 | In Progress|  | - |
+| 8. StatCan WDS | 3/3 | Complete   | 2026-04-07 | - |
 | 9. SDMX + Composite | v1.1 | 0/TBD | Not started | - |
 | 10. Tests + Docs | v1.1 | 0/TBD | Not started | - |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-04-07T19:06:29.060Z"
+stopped_at: Completed 08-03-PLAN.md
+last_updated: "2026-04-07T19:15:38.619Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -55,6 +55,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 07-datastore-ssl P02 | 5min | 2 tasks | 4 files |
 | Phase 08-statcan-wds P01 | 4min | 2 tasks | 5 files |
 | Phase 08-statcan-wds P02 | 12min | 2 tasks | 3 files |
+| Phase 08-statcan-wds P03 | 7min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,9 @@ Recent decisions affecting current work:
 - [Phase 08-statcan-wds]: _flatten_observation shared helper: 4 data functions share identical observation-flattening logic; extracted to private helper to avoid duplication
 - [Phase 08-statcan-wds]: get_bulk_vector_data iterates raw list directly without _unwrap: bulk endpoint per-element status envelopes, not outer SUCCESS wrapper
 - [Phase 08-statcan-wds]: changed series/cubes return list[dict] not Pydantic models: monitoring endpoints where full schema validation adds cost without benefit
+- [Phase 08-statcan-wds]: UPSTREAM_UNAVAILABLE (not UPSTREAM_ERROR) on HTTP 409 — maintenance window is predictable, agents should retry after 08:30 EST
+- [Phase 08-statcan-wds]: DimensionMember.parent_member_id: int | None (top-level members have null parentMemberId in real WDS)
+- [Phase 08-statcan-wds]: CodeSetEntry.desc_en/desc_fr: str | None (uomCode=0 has null descriptions in real WDS)
 
 ### Pending Todos
 
@@ -91,6 +95,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-07T19:06:29.058Z
-Stopped at: Completed 08-02-PLAN.md
+Last session: 2026-04-07T19:15:38.617Z
+Stopped at: Completed 08-03-PLAN.md
 Resume file: None

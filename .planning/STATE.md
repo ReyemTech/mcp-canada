@@ -4,7 +4,7 @@ milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
 stopped_at: Completed 08-03-PLAN.md
-last_updated: "2026-04-07T19:15:38.619Z"
+last_updated: "2026-04-07T19:20:14.290Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 4

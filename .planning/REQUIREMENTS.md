@@ -54,8 +54,8 @@
 - [x] **INF-01**: StatCan SSL certificate handling attempts proper cert resolution before falling back to scoped verify=False
 - [x] **INF-02**: StatCan API calls are rate-limited to 20 req/s via the shared TokenBucket rate limiter
 - [x] **INF-03**: StatCan responses are cached with tiered TTLs (cube list 1hr, metadata 24hr, code sets 7d, observations 1hr)
-- [ ] **INF-04**: All StatCan and datastore tools support bilingual responses (lang: en/fr)
-- [ ] **INF-05**: All tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Keywords/Use-for docstrings)
+- [x] **INF-04**: All StatCan and datastore tools support bilingual responses (lang: en/fr)
+- [x] **INF-05**: All tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Keywords/Use-for docstrings)
 - [ ] **INF-06**: Unit tests achieve 95%+ coverage for all new code
 - [ ] **INF-07**: Integration tests verify live StatCan API calls through the MCP Client layer
 - [ ] **INF-08**: README updated with StatCan module and datastore documentation
@@ -116,8 +116,8 @@
 | INF-01 | Phase 7 | Complete |
 | INF-02 | Phase 8 | Complete |
 | INF-03 | Phase 8 | Complete |
-| INF-04 | Phase 8 | Pending |
-| INF-05 | Phase 8 | Pending |
+| INF-04 | Phase 8 | Complete |
+| INF-05 | Phase 8 | Complete |
 | INF-06 | Phase 10 | Pending |
 | INF-07 | Phase 10 | Pending |
 | INF-08 | Phase 10 | Pending |

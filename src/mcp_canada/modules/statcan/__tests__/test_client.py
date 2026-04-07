@@ -1362,3 +1362,413 @@ class TestSDMXSchema:
 
         row = SDMXObservationRow(period="2024-01", value=None, dimensions={})
         assert row.value is None
+
+
+# ---------------------------------------------------------------------------
+# Task 2 (Phase 9): SDMX client function tests (RED phase)
+# ---------------------------------------------------------------------------
+
+
+class TestParseStructureXml:
+    """Tests for _parse_structure_xml helper."""
+
+    def test_returns_sdmx_structure_with_two_dimensions(self, sdmx_structure_xml):
+        from mcp_canada.modules.statcan.client import _parse_structure_xml
+
+        struct = _parse_structure_xml(sdmx_structure_xml, 18100004)
+        assert struct.product_id == 18100004
+        assert len(struct.dimensions) == 2
+
+    def test_dimensions_sorted_by_position(self, sdmx_structure_xml):
+        from mcp_canada.modules.statcan.client import _parse_structure_xml
+
+        struct = _parse_structure_xml(sdmx_structure_xml, 18100004)
+        positions = [d.position for d in struct.dimensions]
+        assert positions == sorted(positions)
+
+    def test_dimensions_have_correct_ids(self, sdmx_structure_xml):
+        from mcp_canada.modules.statcan.client import _parse_structure_xml
+
+        struct = _parse_structure_xml(sdmx_structure_xml, 18100004)
+        ids = [d.id for d in struct.dimensions]
+        assert "GEO" in ids
+        assert "PRODUCT" in ids
+
+    def test_codes_populated_for_each_dimension(self, sdmx_structure_xml):
+        from mcp_canada.modules.statcan.client import _parse_structure_xml
+
+        struct = _parse_structure_xml(sdmx_structure_xml, 18100004)
+        for dim in struct.dimensions:
+            assert len(dim.codes) >= 2
+
+    def test_codes_have_english_and_french_names(self, sdmx_structure_xml):
+        from mcp_canada.modules.statcan.client import _parse_structure_xml
+
+        struct = _parse_structure_xml(sdmx_structure_xml, 18100004)
+        geo_dim = next(d for d in struct.dimensions if d.id == "GEO")
+        canada = next(c for c in geo_dim.codes if c.id == "1")
+        assert canada.name_en == "Canada"
+        assert canada.name_fr == "Canada"
+
+    def test_suggested_key_is_populated(self, sdmx_structure_xml):
+        from mcp_canada.modules.statcan.client import _parse_structure_xml
+
+        struct = _parse_structure_xml(sdmx_structure_xml, 18100004)
+        # suggested_key should be dot-joined first code of each dimension
+        assert "." in struct.suggested_key or len(struct.dimensions) == 1
+
+
+class TestMakeSuggestedKey:
+    """Tests for _make_suggested_key helper."""
+
+    def test_returns_dot_joined_first_code_ids(self):
+        from mcp_canada.modules.statcan.client import _make_suggested_key
+        from mcp_canada.modules.statcan.schemas import SDMXStructure, SDMXDimension, SDMXCodeValue
+
+        dims = [
+            SDMXDimension(
+                position=1, id="GEO", codelist_id="CL_GEO",
+                codes=[SDMXCodeValue(id="1", name_en="Canada", name_fr="Canada"),
+                       SDMXCodeValue(id="2", name_en="Ontario", name_fr="Ontario")]
+            ),
+            SDMXDimension(
+                position=2, id="PRODUCT", codelist_id="CL_PRODUCT",
+                codes=[SDMXCodeValue(id="1", name_en="All-items", name_fr="Ensemble")]
+            ),
+        ]
+        struct = SDMXStructure(product_id=18100004, dimensions=dims)
+        key = _make_suggested_key(struct)
+        assert key == "1.1"
+
+    def test_empty_dimension_codes_produces_empty_part(self):
+        from mcp_canada.modules.statcan.client import _make_suggested_key
+        from mcp_canada.modules.statcan.schemas import SDMXStructure, SDMXDimension
+
+        dims = [
+            SDMXDimension(position=1, id="GEO", codelist_id="CL_GEO", codes=[]),
+        ]
+        struct = SDMXStructure(product_id=18100004, dimensions=dims)
+        key = _make_suggested_key(struct)
+        assert key == ""
+
+
+class TestBuildSdmxKey:
+    """Tests for _build_sdmx_key helper."""
+
+    def _make_structure(self):
+        from mcp_canada.modules.statcan.schemas import SDMXStructure, SDMXDimension, SDMXCodeValue
+
+        return SDMXStructure(
+            product_id=18100004,
+            dimensions=[
+                SDMXDimension(
+                    position=1, id="GEO", codelist_id="CL_GEO",
+                    codes=[SDMXCodeValue(id="1", name_en="Canada", name_fr="Canada")]
+                ),
+                SDMXDimension(
+                    position=2, id="PRODUCT", codelist_id="CL_PRODUCT",
+                    codes=[SDMXCodeValue(id="1", name_en="All-items", name_fr="Ensemble")]
+                ),
+            ],
+        )
+
+    def test_full_dict_produces_correct_key(self):
+        from mcp_canada.modules.statcan.client import _build_sdmx_key
+
+        struct = self._make_structure()
+        key = _build_sdmx_key({"GEO": "1", "PRODUCT": "1"}, struct)
+        assert key == "1.1"
+
+    def test_partial_dict_wildcards_missing_dims(self):
+        from mcp_canada.modules.statcan.client import _build_sdmx_key
+
+        struct = self._make_structure()
+        key = _build_sdmx_key({"GEO": "1"}, struct)
+        assert key == "1."
+
+    def test_all_value_produces_wildcard(self):
+        from mcp_canada.modules.statcan.client import _build_sdmx_key
+
+        struct = self._make_structure()
+        key = _build_sdmx_key({"GEO": "all", "PRODUCT": "1"}, struct)
+        assert key == ".1"
+
+    def test_list_values_joined_with_plus(self):
+        from mcp_canada.modules.statcan.client import _build_sdmx_key
+
+        struct = self._make_structure()
+        key = _build_sdmx_key({"GEO": ["1", "2"], "PRODUCT": "1"}, struct)
+        assert key == "1+2.1"
+
+    def test_unknown_dim_name_silently_wildcards(self):
+        from mcp_canada.modules.statcan.client import _build_sdmx_key
+
+        struct = self._make_structure()
+        key = _build_sdmx_key({"UNKNOWN": "99", "PRODUCT": "1"}, struct)
+        # GEO position is wildcard (unknown dim name)
+        assert key == ".1"
+
+    def test_case_insensitive_dim_name_matching(self):
+        from mcp_canada.modules.statcan.client import _build_sdmx_key
+
+        struct = self._make_structure()
+        key = _build_sdmx_key({"geo": "1", "product": "1"}, struct)
+        assert key == "1.1"
+
+    def test_empty_string_value_produces_wildcard(self):
+        from mcp_canada.modules.statcan.client import _build_sdmx_key
+
+        struct = self._make_structure()
+        key = _build_sdmx_key({"GEO": "", "PRODUCT": "1"}, struct)
+        assert key == ".1"
+
+
+class TestFlattenSdmxJson:
+    """Tests for _flatten_sdmx_json helper."""
+
+    def test_returns_correct_row_count(self, sdmx_data_json):
+        from mcp_canada.modules.statcan.client import _flatten_sdmx_json
+
+        rows = _flatten_sdmx_json(sdmx_data_json)
+        # 2 series * 3 observations = 6 rows
+        assert len(rows) == 6
+
+    def test_periods_resolved_correctly(self, sdmx_data_json):
+        from mcp_canada.modules.statcan.client import _flatten_sdmx_json
+
+        rows = _flatten_sdmx_json(sdmx_data_json)
+        periods = {r.period for r in rows}
+        assert "2024-01" in periods
+        assert "2024-02" in periods
+        assert "2024-03" in periods
+
+    def test_dimension_names_resolved_not_indices(self, sdmx_data_json):
+        from mcp_canada.modules.statcan.client import _flatten_sdmx_json
+
+        rows = _flatten_sdmx_json(sdmx_data_json)
+        # All rows should have resolved dimension names, not numeric strings
+        geo_values = {r.dimensions.get("GEO") for r in rows}
+        assert "Canada" in geo_values or "Ontario" in geo_values
+
+    def test_none_value_handled(self, sdmx_data_json):
+        from mcp_canada.modules.statcan.client import _flatten_sdmx_json
+
+        rows = _flatten_sdmx_json(sdmx_data_json)
+        none_rows = [r for r in rows if r.value is None]
+        assert len(none_rows) == 1  # One None observation in fixture
+
+    def test_handles_dot_delimited_series_keys(self):
+        from mcp_canada.modules.statcan.client import _flatten_sdmx_json
+
+        # Same fixture but using "." as delimiter instead of ":"
+        dot_payload = {
+            "data": {
+                "structures": [
+                    {
+                        "dimensions": {
+                            "series": [
+                                {
+                                    "id": "GEO",
+                                    "keyPosition": 0,
+                                    "values": [{"id": "1", "name": "Canada"}],
+                                }
+                            ],
+                            "observation": [
+                                {
+                                    "id": "TIME_PERIOD",
+                                    "values": [{"id": "2024-01"}],
+                                }
+                            ],
+                        }
+                    }
+                ],
+                "dataSets": [
+                    {
+                        "series": {
+                            "0": {  # single dimension — no delimiter needed
+                                "observations": {"0": [163.4]}
+                            }
+                        }
+                    }
+                ],
+            }
+        }
+        rows = _flatten_sdmx_json(dot_payload)
+        assert len(rows) == 1
+        assert rows[0].period == "2024-01"
+        assert rows[0].value == 163.4
+
+
+class TestGetSdmxStructure:
+    """Tests for get_sdmx_structure public function."""
+
+    @pytest.mark.asyncio
+    async def test_fetches_and_parses_structure(self, sdmx_structure_xml):
+        import mcp_canada.modules.statcan.client as statcan_client
+        from mcp_canada.modules.statcan.client import get_sdmx_structure
+
+        mock_response = MagicMock()
+        mock_response.text = sdmx_structure_xml
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+
+        acquire_mock = AsyncMock()
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=acquire_mock):
+                struct, was_cached = await get_sdmx_structure(18100004)
+
+        assert struct.product_id == 18100004
+        assert len(struct.dimensions) == 2
+        acquire_mock.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_uses_statcan_sdmx_cache_key(self, sdmx_structure_xml):
+        """Cache key must be prefixed with statcan_sdmx: not statcan_wds:"""
+        import mcp_canada.modules.statcan.client as statcan_client
+        from mcp_canada.modules.statcan.client import get_sdmx_structure
+
+        mock_response = MagicMock()
+        mock_response.text = sdmx_structure_xml
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+
+        acquire_mock = AsyncMock()
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=acquire_mock):
+                # Call twice — second call should be cached
+                struct1, cached1 = await get_sdmx_structure(18100004)
+                struct2, cached2 = await get_sdmx_structure(18100004)
+
+        # First call: not cached; second: cached
+        assert not cached1
+        assert cached2
+        # HTTP called only once
+        assert mock_http.get.call_count == 1
+
+
+class TestGetSdmxData:
+    """Tests for get_sdmx_data public function."""
+
+    @pytest.mark.asyncio
+    async def test_raises_value_error_when_last_n_and_date_range_combined(self):
+        from mcp_canada.modules.statcan.client import get_sdmx_data
+
+        with pytest.raises(ValueError, match="Cannot use both lastN"):
+            await get_sdmx_data(18100004, "1.1", start_period="2024-01", last_n=5)
+
+    @pytest.mark.asyncio
+    async def test_raises_value_error_with_end_period_and_last_n(self):
+        from mcp_canada.modules.statcan.client import get_sdmx_data
+
+        with pytest.raises(ValueError, match="Cannot use both lastN"):
+            await get_sdmx_data(18100004, "1.1", end_period="2024-12", last_n=5)
+
+    @pytest.mark.asyncio
+    async def test_happy_path_with_last_n(self, sdmx_data_json):
+        import mcp_canada.modules.statcan.client as statcan_client
+        from mcp_canada.modules.statcan.client import get_sdmx_data
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = sdmx_data_json
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+
+        acquire_mock = AsyncMock()
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=acquire_mock):
+                rows, was_cached = await get_sdmx_data(18100004, "1.1", last_n=3)
+
+        assert len(rows) == 6  # 2 series * 3 obs
+        assert was_cached is False
+        acquire_mock.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_happy_path_with_date_range(self, sdmx_data_json):
+        import mcp_canada.modules.statcan.client as statcan_client
+        from mcp_canada.modules.statcan.client import get_sdmx_data
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = sdmx_data_json
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+
+        acquire_mock = AsyncMock()
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=acquire_mock):
+                rows, was_cached = await get_sdmx_data(
+                    18100004, "1.1",
+                    start_period="2024-01", end_period="2024-03"
+                )
+
+        assert len(rows) > 0
+        assert was_cached is False
+
+
+class TestGetSdmxVectorData:
+    """Tests for get_sdmx_vector_data public function."""
+
+    @pytest.mark.asyncio
+    async def test_happy_path_returns_flattened_rows(self, sdmx_vector_json):
+        import mcp_canada.modules.statcan.client as statcan_client
+        from mcp_canada.modules.statcan.client import get_sdmx_vector_data
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = sdmx_vector_json
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+
+        acquire_mock = AsyncMock()
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=acquire_mock):
+                rows, was_cached = await get_sdmx_vector_data(
+                    41690973,
+                    start_period="2024-01",
+                    end_period="2024-02"
+                )
+
+        assert len(rows) == 2  # 1 series * 2 obs
+        assert was_cached is False
+        acquire_mock.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_url_includes_vector_id(self, sdmx_vector_json):
+        import mcp_canada.modules.statcan.client as statcan_client
+        from mcp_canada.modules.statcan.client import get_sdmx_vector_data
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = sdmx_vector_json
+        mock_response.raise_for_status = MagicMock()
+
+        mock_http = AsyncMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+
+        acquire_mock = AsyncMock()
+        with patch("mcp_canada.modules.statcan.client._make_statcan_client", return_value=mock_http):
+            with patch.object(statcan_client, "_limiter_acquire", new=acquire_mock):
+                await get_sdmx_vector_data(41690973)
+
+        call_args = mock_http.get.call_args
+        called_url = call_args[0][0]
+        assert "v41690973" in called_url

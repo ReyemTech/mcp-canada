@@ -9,6 +9,7 @@ subjectCode + surveyCode fields from getAllCubesListLite.
 
 import collections
 import math
+import xml.etree.ElementTree as ET
 from typing import Any
 
 import httpx
@@ -26,6 +27,8 @@ from mcp_canada.modules.statcan.constants import (
     RATE_GROUP,
     RATE_LIMIT,
     SCALAR_FACTOR_CODES,
+    SDMX_BASE_URL,
+    SDMX_XML_NAMESPACES,
     STATCAN_VERIFY,
     TIMEOUT_LARGE,
 )
@@ -37,6 +40,10 @@ from mcp_canada.modules.statcan.schemas import (
     Dimension,
     DimensionMember,
     ObservationRow,
+    SDMXCodeValue,
+    SDMXDimension,
+    SDMXObservationRow,
+    SDMXStructure,
     SeriesInfo,
 )
 from mcp_canada.shared.cache import cached_fetch
@@ -813,3 +820,326 @@ async def get_changed_cubes(date: str) -> tuple[list[dict], bool]:
         for item in (items5 if isinstance(items5, list) else [])
     ]
     return result5, was_cached5
+
+
+# ---------------------------------------------------------------------------
+# SDMX client helpers and public functions (Phase 9)
+# ---------------------------------------------------------------------------
+
+
+def _parse_structure_xml(xml_text: str, product_id: int) -> SDMXStructure:
+    """Parse SDMX 2.1 XML structure response into an SDMXStructure.
+
+    Extracts codelists and dimension definitions from the XML.
+    Namespaces are passed to every find/findall call to avoid silent empty results.
+
+    Args:
+        xml_text: Raw SDMX 2.1 XML string from the structure endpoint.
+        product_id: The StatCan productId (e.g. 18100004).
+
+    Returns:
+        SDMXStructure with sorted dimensions and populated code lists.
+    """
+    ns = SDMX_XML_NAMESPACES
+    root = ET.fromstring(xml_text)
+
+    # Build codelist lookup: codelist_id -> list of SDMXCodeValue
+    codelists: dict[str, list[SDMXCodeValue]] = {}
+    for cl in root.findall(".//str:Codelist", ns):
+        cl_id = cl.get("id", "")
+        codes: list[SDMXCodeValue] = []
+        for code in cl.findall("str:Code", ns):
+            code_id = code.get("id", "")
+            names: dict[str, str] = {}
+            for name_el in code.findall("com:Name", ns):
+                lang = name_el.get("{http://www.w3.org/XML/1998/namespace}lang", "en")
+                names[lang] = name_el.text or ""
+            codes.append(
+                SDMXCodeValue(
+                    id=code_id,
+                    name_en=names.get("en", ""),
+                    name_fr=names.get("fr", ""),
+                )
+            )
+        codelists[cl_id] = codes
+
+    # Extract dimensions from DataStructure DimensionList
+    dimensions: list[SDMXDimension] = []
+    for dim_list in root.findall(".//str:DimensionList", ns):
+        for dim in dim_list.findall("str:Dimension", ns):
+            pos = int(dim.get("position", 0))
+            dim_id = dim.get("id", "")
+            # Resolve codelist reference (Ref element has no namespace)
+            cl_ref = dim.find(".//str:Enumeration/Ref", ns)
+            if cl_ref is None:
+                # Fallback: search without str: namespace (Ref has no prefix in XML)
+                cl_ref = dim.find(".//Ref")
+            cl_id = cl_ref.get("id", "") if cl_ref is not None else ""
+            codes = codelists.get(cl_id, [])
+            dimensions.append(
+                SDMXDimension(
+                    position=pos,
+                    id=dim_id,
+                    codelist_id=cl_id,
+                    codes=codes,
+                )
+            )
+
+    dimensions.sort(key=lambda d: d.position)
+    structure = SDMXStructure(product_id=product_id, dimensions=dimensions)
+    structure.suggested_key = _make_suggested_key(structure)
+    return structure
+
+
+def _make_suggested_key(structure: SDMXStructure) -> str:
+    """Build a suggested SDMX key using the first code ID of each dimension.
+
+    Args:
+        structure: Parsed SDMXStructure with dimensions sorted by position.
+
+    Returns:
+        Dot-joined string of first code IDs (e.g. "1.1" for 2-dimension table).
+        Empty string for dimensions with no codes.
+    """
+    parts: list[str] = []
+    for dim in sorted(structure.dimensions, key=lambda d: d.position):
+        first_code_id = dim.codes[0].id if dim.codes else ""
+        parts.append(first_code_id)
+    return ".".join(parts)
+
+
+def _build_sdmx_key(
+    dim_dict: dict[str, str | list[str]], structure: SDMXStructure
+) -> str:
+    """Translate a named dimension dict into a dot-separated SDMX key string.
+
+    Args:
+        dim_dict: Maps dimension id (case-insensitive) to a value or list of values.
+                  "all", empty string, or empty list produces a wildcard (empty position).
+                  List values are joined with "+" for OR-key syntax.
+        structure: SDMXStructure with dimensions sorted by position.
+
+    Returns:
+        Dot-separated SDMX key string (e.g. "1.1+2.").
+    """
+    num_dims = len(structure.dimensions)
+    key_parts: list[str] = [""] * num_dims
+
+    # Build case-insensitive dim id -> 0-based position index
+    name_to_idx: dict[str, int] = {
+        d.id.lower(): d.position - 1 for d in structure.dimensions
+    }
+
+    for dim_name, value in dim_dict.items():
+        idx = name_to_idx.get(dim_name.lower())
+        if idx is None or idx < 0 or idx >= num_dims:
+            continue  # Unknown dimension — wildcard that position
+        if value == "all" or value == "" or value == []:
+            key_parts[idx] = ""  # wildcard
+        elif isinstance(value, list):
+            key_parts[idx] = "+".join(str(v) for v in value)
+        else:
+            key_parts[idx] = str(value)
+
+    return ".".join(key_parts)
+
+
+def _flatten_sdmx_json(payload: dict) -> list[SDMXObservationRow]:
+    """Flatten SDMX-JSON compact format into a list of SDMXObservationRow.
+
+    SDMX-JSON uses positional indices throughout to minimise payload size.
+    Series keys use ":" as delimiter per spec; "." is also supported as fallback
+    (some StatCan responses use "." as delimiter).
+
+    Args:
+        payload: Parsed SDMX-JSON dict from the data or vector endpoint.
+
+    Returns:
+        List of SDMXObservationRow with resolved dimension names and period values.
+    """
+    rows: list[SDMXObservationRow] = []
+
+    data_section = payload.get("data", {})
+    structures = data_section.get("structures", [{}])
+    structure = structures[0] if structures else {}
+
+    # Build series dimension lookups: keyPosition -> [name0, name1, ...]
+    series_dims = [
+        d for d in structure.get("dimensions", {}).get("series", [])
+        if "keyPosition" in d
+    ]
+    series_dims.sort(key=lambda d: d["keyPosition"])
+    dim_lookups: list[list[str]] = []
+    dim_ids: list[str] = []
+    for dim in series_dims:
+        dim_ids.append(dim.get("id", ""))
+        dim_lookups.append(
+            [v.get("name", v.get("id", "")) for v in dim.get("values", [])]
+        )
+
+    # Build time period list from observation-level TIME_PERIOD dimension
+    obs_dims = structure.get("dimensions", {}).get("observation", [])
+    time_periods: list[str] = []
+    for od in obs_dims:
+        if od.get("id") == "TIME_PERIOD":
+            time_periods = [v.get("id", "") for v in od.get("values", [])]
+            break
+
+    for dataset in data_section.get("dataSets", []):
+        for series_key_str, series_data in dataset.get("series", {}).items():
+            # Try ":" delimiter first (SDMX-JSON spec), fall back to "."
+            if ":" in series_key_str:
+                parts = series_key_str.split(":")
+            elif "." in series_key_str:
+                parts = series_key_str.split(".")
+            else:
+                # Single dimension — no delimiter
+                parts = [series_key_str]
+
+            indices = [int(p) for p in parts]
+            dim_values: list[str] = []
+            for pos, idx in enumerate(indices):
+                if pos < len(dim_lookups) and idx < len(dim_lookups[pos]):
+                    dim_values.append(dim_lookups[pos][idx])
+                else:
+                    dim_values.append(str(idx))
+
+            dim_map = dict(zip(dim_ids, dim_values))
+
+            for obs_key_str, obs_vals in series_data.get("observations", {}).items():
+                t_idx = int(obs_key_str)
+                period = time_periods[t_idx] if t_idx < len(time_periods) else obs_key_str
+                raw_value = obs_vals[0] if obs_vals else None
+                value: float | None
+                if raw_value is None:
+                    value = None
+                else:
+                    value = float(raw_value)
+                rows.append(
+                    SDMXObservationRow(
+                        period=period,
+                        value=value,
+                        dimensions=dim_map,
+                    )
+                )
+
+    return rows
+
+
+async def get_sdmx_structure(product_id: int) -> tuple[SDMXStructure, bool]:
+    """Fetch and parse the SDMX dimension structure for a StatCan table.
+
+    Uses the SDMX REST structure endpoint which returns SDMX 2.1 XML.
+    Result is cached for 24 hours (CACHE_TTL_META) with the key prefix
+    "statcan_sdmx:" to avoid collision with WDS cache keys.
+
+    Args:
+        product_id: The StatCan productId (e.g. 18100004 for CPI).
+
+    Returns:
+        (SDMXStructure, was_cached) — structure with sorted dimensions,
+        code lists, and a suggested_key example string.
+
+    Raises:
+        httpx.HTTPStatusError: On HTTP 4xx/5xx responses.
+    """
+    cache_key = f"statcan_sdmx:structure:{product_id}"
+
+    async def _fetcher() -> str:
+        await _limiter_acquire()
+        async with _make_statcan_client() as http:
+            url = SDMX_BASE_URL + f"structure/Data_Structure_{product_id}"
+            resp = await http.get(url)
+            resp.raise_for_status()
+            return resp.text
+
+    xml_text, was_cached = await cached_fetch(cache_key, CACHE_TTL_META, _fetcher)
+    return _parse_structure_xml(xml_text, product_id), was_cached
+
+
+async def get_sdmx_data(
+    product_id: int,
+    key: str,
+    *,
+    start_period: str | None = None,
+    end_period: str | None = None,
+    last_n: int | None = None,
+) -> tuple[list[SDMXObservationRow], bool]:
+    """Fetch server-side filtered SDMX observations for a StatCan table.
+
+    Uses the SDMX REST data endpoint with Accept: application/json.
+    Observations are NOT cached (data changes frequently).
+
+    Args:
+        product_id: The StatCan productId (e.g. 18100004).
+        key: SDMX key string (e.g. "1.1" or "1.1+2."). Use "." as wildcard.
+        start_period: Start period filter (e.g. "2020-01"). Cannot be combined with last_n.
+        end_period: End period filter (e.g. "2024-01"). Cannot be combined with last_n.
+        last_n: Return only the N most recent observations. Cannot be combined with date range.
+
+    Returns:
+        (list[SDMXObservationRow], was_cached) — was_cached is always False.
+
+    Raises:
+        ValueError: If both last_n and a date range parameter are provided.
+        httpx.HTTPStatusError: On HTTP 4xx/5xx responses.
+    """
+    if last_n is not None and (start_period or end_period):
+        raise ValueError(
+            "Cannot use both lastN and date range (startPeriod/endPeriod) simultaneously"
+        )
+
+    params: dict[str, Any] = {}
+    if start_period:
+        params["startPeriod"] = start_period
+    if end_period:
+        params["endPeriod"] = end_period
+    if last_n is not None:
+        params["lastNObservations"] = last_n
+
+    await _limiter_acquire()
+    async with _make_statcan_client() as http:
+        url = SDMX_BASE_URL + f"data/DF_{product_id}/{key}"
+        resp = await http.get(url, params=params, headers={"Accept": "application/json"})
+        resp.raise_for_status()
+        payload = resp.json()
+
+    return _flatten_sdmx_json(payload), False
+
+
+async def get_sdmx_vector_data(
+    vector_id: int,
+    *,
+    start_period: str | None = None,
+    end_period: str | None = None,
+) -> tuple[list[SDMXObservationRow], bool]:
+    """Fetch SDMX observations for a single StatCan vector by date range.
+
+    Uses the SDMX REST vector endpoint with Accept: application/json.
+    Observations are NOT cached (data changes frequently).
+
+    Args:
+        vector_id: The StatCan vectorId (e.g. 41690973).
+        start_period: Start period filter (e.g. "2020-01").
+        end_period: End period filter (e.g. "2024-01").
+
+    Returns:
+        (list[SDMXObservationRow], was_cached) — was_cached is always False.
+
+    Raises:
+        httpx.HTTPStatusError: On HTTP 4xx/5xx responses.
+    """
+    params: dict[str, Any] = {}
+    if start_period:
+        params["startPeriod"] = start_period
+    if end_period:
+        params["endPeriod"] = end_period
+
+    await _limiter_acquire()
+    async with _make_statcan_client() as http:
+        url = SDMX_BASE_URL + f"vector/v{vector_id}"
+        resp = await http.get(url, params=params, headers={"Accept": "application/json"})
+        resp.raise_for_status()
+        payload = resp.json()
+
+    return _flatten_sdmx_json(payload), False

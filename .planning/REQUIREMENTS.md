@@ -47,7 +47,7 @@
 
 ### StatCan Composite
 
-- [ ] **SC-15**: Agent can fetch multiple vectors for a date range and store results directly to the shared datastore in one tool call
+- [x] **SC-15**: Agent can fetch multiple vectors for a date range and store results directly to the shared datastore in one tool call
 
 ### Infrastructure
 
@@ -112,7 +112,7 @@
 | SC-12 | Phase 9 | Complete |
 | SC-13 | Phase 8 | Complete |
 | SC-14 | Phase 8 | Complete |
-| SC-15 | Phase 9 | Pending |
+| SC-15 | Phase 9 | Complete |
 | INF-01 | Phase 7 | Complete |
 | INF-02 | Phase 8 | Complete |
 | INF-03 | Phase 8 | Complete |

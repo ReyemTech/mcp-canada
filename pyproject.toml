@@ -28,6 +28,7 @@ dependencies = [
     "pydantic>=2.0.0",
     "aiocache>=0.12.0",
     "tenacity>=8.0.0",
+    "InquirerPy>=0.3.4",
 ]
 
 [project.urls]

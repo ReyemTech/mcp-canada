@@ -66,7 +66,7 @@ Plans:
   1. Agent can retrieve the dimension structure (codelists) for any StatCan table via SDMX
   2. Agent can retrieve server-side filtered observations using SDMX key syntax with date range or lastN support — but not both simultaneously (mutual exclusion enforced)
   3. Agent can fetch multiple vectors for a date range and have results written to the shared datastore in one tool call, enabling subsequent cross-module SQL queries
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 09-01-PLAN.md — SDMX client layer: constants, schemas, 3 async client functions (structure/data/vector), unit tests
@@ -91,5 +91,5 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 7. Datastore + SSL | 3/3 | Complete   | 2026-04-07 | - |
 | 8. StatCan WDS | 3/3 | Complete   | 2026-04-07 | - |
-| 9. SDMX + Composite | v1.1 | 0/2 | Planning complete | - |
+| 9. SDMX + Composite | 1/2 | In Progress|  | - |
 | 10. Tests + Docs | v1.1 | 0/TBD | Not started | - |

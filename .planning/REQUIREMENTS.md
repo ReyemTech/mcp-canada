@@ -36,9 +36,9 @@
 
 ### StatCan SDMX
 
-- [ ] **SC-10**: Agent can fetch the dimension structure (codelists) for a table via SDMX
-- [ ] **SC-11**: Agent can retrieve server-side filtered observations using SDMX key syntax with date range and lastN support
-- [ ] **SC-12**: Agent can retrieve observations for a single vector via SDMX with date range filtering
+- [x] **SC-10**: Agent can fetch the dimension structure (codelists) for a table via SDMX
+- [x] **SC-11**: Agent can retrieve server-side filtered observations using SDMX key syntax with date range and lastN support
+- [x] **SC-12**: Agent can retrieve observations for a single vector via SDMX with date range filtering
 
 ### StatCan Monitoring
 
@@ -107,9 +107,9 @@
 | SC-07 | Phase 8 | Complete |
 | SC-08 | Phase 8 | Complete |
 | SC-09 | Phase 8 | Complete |
-| SC-10 | Phase 9 | Pending |
-| SC-11 | Phase 9 | Pending |
-| SC-12 | Phase 9 | Pending |
+| SC-10 | Phase 9 | Complete |
+| SC-11 | Phase 9 | Complete |
+| SC-12 | Phase 9 | Complete |
 | SC-13 | Phase 8 | Complete |
 | SC-14 | Phase 8 | Complete |
 | SC-15 | Phase 9 | Pending |

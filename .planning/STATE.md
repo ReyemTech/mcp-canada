@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Phase 9 context gathered
-last_updated: "2026-04-07T20:57:52.570Z"
+stopped_at: Completed 09-01-PLAN.md (SDMX client layer)
+last_updated: "2026-04-07T22:26:53.447Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 8
+  completed_plans: 7
   percent: 0
 ---
 
@@ -56,6 +56,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 08-statcan-wds P01 | 4min | 2 tasks | 5 files |
 | Phase 08-statcan-wds P02 | 12min | 2 tasks | 3 files |
 | Phase 08-statcan-wds P03 | 7min | 2 tasks | 8 files |
+| Phase 09-sdmx-composite P01 | 4min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,9 @@ Recent decisions affecting current work:
 - [Phase 08-statcan-wds]: UPSTREAM_UNAVAILABLE (not UPSTREAM_ERROR) on HTTP 409 — maintenance window is predictable, agents should retry after 08:30 EST
 - [Phase 08-statcan-wds]: DimensionMember.parent_member_id: int | None (top-level members have null parentMemberId in real WDS)
 - [Phase 08-statcan-wds]: CodeSetEntry.desc_en/desc_fr: str | None (uomCode=0 has null descriptions in real WDS)
+- [Phase 09-sdmx-composite]: Cache structure XML text (str) not SDMXStructure object - avoids Pydantic serialization in aiocache
+- [Phase 09-sdmx-composite]: SDMX Ref element has no namespace prefix in real XML - use bare Ref fallback after str:Enumeration/Ref search
+- [Phase 09-sdmx-composite]: Series key delimiter: try colon first (SDMX-JSON spec) then dot fallback (StatCan observed behavior)
 
 ### Pending Todos
 
@@ -95,6 +99,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-07T20:57:52.562Z
-Stopped at: Phase 9 context gathered
-Resume file: .planning/phases/09-sdmx-composite/09-CONTEXT.md
+Last session: 2026-04-07T22:26:53.444Z
+Stopped at: Completed 09-01-PLAN.md (SDMX client layer)
+Resume file: None

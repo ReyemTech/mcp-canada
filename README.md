@@ -16,7 +16,7 @@
 
 ---
 
-**89 tools** across **7 federal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, and persistent local storage. All bilingual (English/French).
+**100 tools** across **8 federal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, and persistent local storage. All bilingual (English/French).
 
 > **Complementary to [mcp-statcan](https://github.com/reyemtech/mcp-statcan)** — which covers Statistics Canada. Together they form a complete Canadian government data toolkit.
 
@@ -331,6 +331,28 @@ Real-time weather, climate, air quality, hydrology, and more from [MSC GeoMet OG
 | `wx_get_growing_season` | Get growing season dates and frost-free period for a climate station based on 30-year normals. | `station_id` |
 | `wx_get_heating_cooling_days` | Get cumulative heating and cooling degree days for energy analysis at a climate station. | `station_id`, `start_date`, `end_date` |
 <!-- CATALOG:weather:end -->
+
+---
+
+### 📊 Statistics Canada WDS — 11 tools
+
+Time series data, cube metadata, and catalog search from the [Statistics Canada Web Data Service](https://www.statcan.gc.ca/en/developers/wds).
+
+<!-- CATALOG:statcan:start -->
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `sc_search_cubes` | Search Statistics Canada tables (cubes) by keyword using BM25 ranking. | `query`, `limit` |
+| `sc_get_cube_metadata` | Get full metadata and dimension structure for a Statistics Canada table. | `product_id` |
+| `sc_get_code_sets` | Get all WDS code sets for decoding numeric codes in StatCan responses. | — |
+| `sc_get_series_info_by_vector` | Get series metadata by vectorId (title, frequency, scalar factor, units). | `vector_id` |
+| `sc_get_series_info_by_coord` | Get series metadata by productId + coordinate (dot-separated dimension members). | `product_id`, `coordinate` |
+| `sc_get_data_by_vector` | Get the latest N observations for a Statistics Canada series by vectorId. | `vector_id`, `n` |
+| `sc_get_data_by_coord` | Get the latest N observations for a Statistics Canada series by productId + coordinate. | `product_id`, `coordinate`, `n` |
+| `sc_get_data_by_date_range` | Get Statistics Canada observations within a reference period date range. | `vector_id`, `start_date`, `end_date` |
+| `sc_get_bulk_vector_data` | Get observations for multiple Statistics Canada series within a release date range. | `vector_ids`, `start_release`, `end_release` |
+| `sc_get_changed_series` | Get the list of Statistics Canada series (vectors) that changed today. | — |
+| `sc_get_changed_cubes` | Get the list of Statistics Canada tables (cubes) that changed on a specific date. | `date` |
+<!-- CATALOG:statcan:end -->
 
 ---
 

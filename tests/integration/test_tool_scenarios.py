@@ -634,6 +634,115 @@ class TestMetaToolScenarios:
 # ─── Datastore scenarios ──────────────────────────────────────────────────────
 
 
+# ─── Statistics Canada WDS scenarios ─────────────────────────────────────────
+
+
+class TestStatcanWdsScenarios:
+    """StatCan WDS integration tests through the MCP Client layer.
+
+    Tests assert on envelope shape, not specific values (data changes daily).
+    All tests marked @pytest.mark.integration — live API required.
+    """
+
+    @pytest.mark.asyncio
+    async def test_discover_statcan_tools_tables(self, mcp_server):
+        """'Find tools for statistics canada tables'"""
+        results = await discover(mcp_server, "statistics canada tables")
+        names = [r["name"] for r in results]
+        assert any(n.startswith("sc_") for n in names), (
+            f"No sc_ tools found for 'statistics canada tables'. Got: {names}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_discover_statcan_tools_time_series(self, mcp_server):
+        """'Find tools for statcan time series data'"""
+        results = await discover(mcp_server, "statcan time series data")
+        names = [r["name"] for r in results]
+        assert any(n.startswith("sc_") for n in names), (
+            f"No sc_ tools found for 'statcan time series data'. Got: {names}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_search_cubes_consumer_price_index(self, mcp_server):
+        """'Search for Statistics Canada tables about consumer price index'"""
+        data = await call_tool(mcp_server, "sc_search_cubes", {"query": "consumer price index"})
+        assert "_meta" in data
+        assert data["_meta"]["source"]["api"] == "statcan-wds"
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) >= 1
+
+    @pytest.mark.asyncio
+    async def test_get_cube_metadata_cpi_table(self, mcp_server):
+        """'Get dimensions for the CPI table (18100004)'"""
+        data = await call_tool(mcp_server, "sc_get_cube_metadata", {"product_id": 18100004})
+        assert "_meta" in data
+        assert "product_id" in data["data"]
+        assert data["data"]["product_id"] == 18100004
+        assert "dimensions" in data["data"]
+        assert isinstance(data["data"]["dimensions"], list)
+
+    @pytest.mark.asyncio
+    async def test_get_code_sets(self, mcp_server):
+        """'Get all WDS code set references'"""
+        data = await call_tool(mcp_server, "sc_get_code_sets")
+        assert "_meta" in data
+        assert "frequency" in data["data"]
+        assert "scalar" in data["data"]
+        assert isinstance(data["data"]["frequency"], list)
+        assert len(data["data"]["frequency"]) >= 1
+
+    @pytest.mark.asyncio
+    async def test_get_series_info_by_vector(self, mcp_server):
+        """'Get series info for vector 41690973 (CPI Canada all-items)'"""
+        data = await call_tool(mcp_server, "sc_get_series_info_by_vector", {"vector_id": 41690973})
+        assert "_meta" in data
+        assert "product_id" in data["data"]
+        assert "vector_id" in data["data"]
+        assert "frequency" in data["data"]
+
+    @pytest.mark.asyncio
+    async def test_get_data_by_vector(self, mcp_server):
+        """'Get the latest 3 observations for CPI all-items vector'"""
+        data = await call_tool(mcp_server, "sc_get_data_by_vector", {"vector_id": 41690973, "n": 3})
+        assert "_meta" in data
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) >= 1
+        row = data["data"][0]
+        assert "ref_per" in row
+        assert "value" in row
+
+    @pytest.mark.asyncio
+    async def test_get_changed_cubes_today(self, mcp_server):
+        """'What tables changed today?'"""
+        import datetime
+        today = datetime.date.today().isoformat()
+        data = await call_tool(mcp_server, "sc_get_changed_cubes", {"date": today})
+        # Shape assertion only — may be empty list before 08:30 EST
+        assert "_meta" in data
+        assert isinstance(data["data"], list)
+
+    @pytest.mark.asyncio
+    async def test_get_changed_series(self, mcp_server):
+        """'Which series changed today?'"""
+        data = await call_tool(mcp_server, "sc_get_changed_series")
+        # Shape assertion only — may be empty list before 08:30 EST
+        assert "_meta" in data
+        assert isinstance(data["data"], list)
+
+    @pytest.mark.asyncio
+    async def test_error_handling_invalid_product_id(self, mcp_server):
+        """'Get metadata for a nonexistent table ID'"""
+        data = await call_tool(mcp_server, "sc_get_cube_metadata", {"product_id": 999999999})
+        # Should return structured error, not raise exception
+        assert "error" in data or "_meta" in data
+        if "error" in data:
+            assert "code" in data["error"]
+            assert data["error"]["code"] in ("UPSTREAM_ERROR", "UPSTREAM_UNAVAILABLE")
+
+
+# ─── Datastore scenarios ──────────────────────────────────────────────────────
+
+
 class TestDatastoreScenarios:
     """Datastore integration tests through the MCP Client layer.
 

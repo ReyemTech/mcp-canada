@@ -27,7 +27,7 @@ class DimensionMember(BaseModel):
     """A single member within a cube dimension."""
 
     member_id: int
-    parent_member_id: int
+    parent_member_id: int | None = None
     name_en: str
     name_fr: str
     classification_code: str | None = None
@@ -97,8 +97,8 @@ class CodeSetEntry(BaseModel):
     """A single entry in a WDS code set."""
 
     code: int
-    desc_en: str
-    desc_fr: str
+    desc_en: str | None = None
+    desc_fr: str | None = None
 
 
 class CodeSets(BaseModel):

@@ -442,7 +442,7 @@ def _flatten_code_sets(obj: dict) -> CodeSets:
             obj.get("securityLevel") or [], "securityLevelCode", "securityLevelDescEn", "securityLevelDescFr"
         ),
         uom=_entries(
-            obj.get("uom") or [], "uomCode", "uomDescEn", "uomDescFr"
+            obj.get("uom") or [], "memberUomCode", "memberUomEn", "memberUomFr"
         ),
     )
 

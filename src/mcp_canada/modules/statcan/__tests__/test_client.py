@@ -137,7 +137,7 @@ class TestCodeSetsSchema:
                 for e in obj["securityLevel"]
             ],
             uom=[
-                CodeSetEntry(code=e["uomCode"], desc_en=e["uomDescEn"], desc_fr=e["uomDescFr"])
+                CodeSetEntry(code=e["memberUomCode"], desc_en=e["memberUomEn"], desc_fr=e["memberUomFr"])
                 for e in obj["uom"]
             ],
         )

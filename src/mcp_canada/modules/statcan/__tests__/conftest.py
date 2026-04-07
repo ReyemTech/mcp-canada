@@ -120,7 +120,7 @@ CODE_SETS_RESPONSE = {
             {"securityLevelCode": 0, "securityLevelDescEn": "Public", "securityLevelDescFr": "Public"},
         ],
         "uom": [
-            {"uomCode": 239, "uomDescEn": "2002=100", "uomDescFr": "2002=100"},
+            {"memberUomCode": 239, "memberUomEn": "2002=100", "memberUomFr": "2002=100"},
         ],
     },
 }

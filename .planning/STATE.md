@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 07-03-PLAN.md — StatCan SSL probe + module stub
-last_updated: "2026-04-07T15:45:27.901Z"
+stopped_at: Completed 07-01-PLAN.md
+last_updated: "2026-04-07T15:46:27.115Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -51,6 +51,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 07-datastore-ssl P03 | 15 | 1 tasks | 7 files |
+| Phase 07-datastore-ssl P01 | 3 | 1 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,8 @@ Recent decisions affecting current work:
 - [Pre-Phase 7]: SSL — attempt `truststore` first; fall back to scoped `verify=False` on statcan client only; never touch shared http.py
 - [Phase 07-datastore-ssl]: STATCAN_VERIFY=True — certifi validates statcan.gc.ca, no truststore or verify=False needed
 - [Phase 07-datastore-ssl]: Scoped client pattern: _make_statcan_client() owns its verify= setting, shared http.py never touched
+- [Phase 07-datastore-ssl]: aiosqlite module-level singleton pattern — lazy init in get_db(); was_cached always False for local SQLite I/O
+- [Phase 07-datastore-ssl]: IDENTIFIER_RE regex allowlist ^[a-zA-Z_][a-zA-Z0-9_]{0,63}$ rejects SQL metacharacters before any SQL executes
 
 ### Pending Todos
 
@@ -77,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-07T15:45:27.899Z
-Stopped at: Completed 07-03-PLAN.md — StatCan SSL probe + module stub
+Last session: 2026-04-07T15:46:27.113Z
+Stopped at: Completed 07-01-PLAN.md
 Resume file: None

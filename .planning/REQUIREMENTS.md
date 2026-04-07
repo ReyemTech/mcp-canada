@@ -13,8 +13,8 @@
 - [ ] **DS-04**: Agent can list all tables in the datastore
 - [ ] **DS-05**: Agent can view the schema (columns and types) of a specific table
 - [ ] **DS-06**: Agent can drop a table by name
-- [ ] **DS-07**: Table and column names are validated against a regex allowlist to prevent SQL injection
-- [ ] **DS-08**: All database operations use async SQLite (aiosqlite) to avoid blocking the event loop
+- [x] **DS-07**: Table and column names are validated against a regex allowlist to prevent SQL injection
+- [x] **DS-08**: All database operations use async SQLite (aiosqlite) to avoid blocking the event loop
 
 ### StatCan Discovery
 
@@ -96,8 +96,8 @@
 | DS-04 | Phase 7 | Pending |
 | DS-05 | Phase 7 | Pending |
 | DS-06 | Phase 7 | Pending |
-| DS-07 | Phase 7 | Pending |
-| DS-08 | Phase 7 | Pending |
+| DS-07 | Phase 7 | Complete |
+| DS-08 | Phase 7 | Complete |
 | SC-01 | Phase 8 | Pending |
 | SC-02 | Phase 8 | Pending |
 | SC-03 | Phase 8 | Pending |

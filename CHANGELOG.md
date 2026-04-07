@@ -2,6 +2,27 @@
 
 <!-- CHANGELOG -->
 
+## v0.1.3 (2026-04-07)
+
+### Bug Fixes
+
+- **ci**: Resolve pyright errors on MCP content type union
+  ([`9fb300c`](https://github.com/ReyemTech/mcp-canada/commit/9fb300cecb6ff8caeb5e5173c280f1c1b0e0988c))
+
+### Chores
+
+- Add workflow_dispatch trigger to CI workflow
+  ([`063da1b`](https://github.com/ReyemTech/mcp-canada/commit/063da1b6002c1b2d1d35a97c1b0c2e37509086a9))
+
+- Sync uv.lock after release
+  ([`d65bcb4`](https://github.com/ReyemTech/mcp-canada/commit/d65bcb4641917d5961d0fc104f0423aa0cbae40d))
+
+### Documentation
+
+- Add CI and integration test badges to README
+  ([`1ab9a29`](https://github.com/ReyemTech/mcp-canada/commit/1ab9a29fa6305642923fb8de2ad53185785ac8c0))
+
+
 ## v0.1.2 (2026-04-06)
 
 ### Bug Fixes

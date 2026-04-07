@@ -269,3 +269,51 @@ class TestClaudeCodeCommand:
             "claude", "mcp", "add", "mcp-canada", "--scope", "user",
             "--", "uvx", "mcp-canada", "--modules", "weather",
         ]
+
+
+class TestArgparse:
+    """Test that argparse changes are backward compatible."""
+
+    def test_no_args_defaults_to_server_mode(self):
+        from mcp_canada.server import _build_parser
+        parser = _build_parser()
+        args = parser.parse_args([])
+        assert args.command is None
+        assert args.transport == "stdio"
+
+    def test_server_flags_still_work(self):
+        from mcp_canada.server import _build_parser
+        parser = _build_parser()
+        args = parser.parse_args(["--transport", "sse", "--port", "9000"])
+        assert args.command is None
+        assert args.transport == "sse"
+        assert args.port == 9000
+
+    def test_install_subcommand_parsed(self):
+        from mcp_canada.server import _build_parser
+        parser = _build_parser()
+        args = parser.parse_args(["install"])
+        assert args.command == "install"
+        assert args.platforms == []
+
+    def test_install_with_platforms(self):
+        from mcp_canada.server import _build_parser
+        parser = _build_parser()
+        args = parser.parse_args(["install", "claude-desktop", "cursor"])
+        assert args.command == "install"
+        assert args.platforms == ["claude-desktop", "cursor"]
+
+    def test_install_with_modules(self):
+        from mcp_canada.server import _build_parser
+        parser = _build_parser()
+        args = parser.parse_args(["install", "--modules", "weather,recalls"])
+        assert args.command == "install"
+        assert args.modules == "weather,recalls"
+
+    def test_install_with_platforms_and_modules(self):
+        from mcp_canada.server import _build_parser
+        parser = _build_parser()
+        args = parser.parse_args(["install", "cursor", "vscode", "--modules", "bank_of_canada"])
+        assert args.command == "install"
+        assert args.platforms == ["cursor", "vscode"]
+        assert args.modules == "bank_of_canada"

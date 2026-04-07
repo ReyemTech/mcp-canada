@@ -36,6 +36,11 @@ class TestToolDocstringQuality:
             "sc_get_bulk_vector_data",
             "sc_get_changed_series",
             "sc_get_changed_cubes",
+            # SDMX tools (Plan 02)
+            "sc_get_sdmx_structure",
+            "sc_get_sdmx_data",
+            "sc_get_sdmx_vector_data",
+            "sc_fetch_vectors_to_store",
         ]
         return [(name, getattr(tools, name)) for name in tool_names]
 
@@ -644,4 +649,397 @@ class TestScGetChangedCubes:
         ):
             from mcp_canada.modules.statcan.tools import sc_get_changed_cubes
             result = await sc_get_changed_cubes("2024-01-15", lang="fr")
+        assert result["_meta"]["lang"] == "fr"
+
+
+# ─── sc_get_sdmx_structure ────────────────────────────────────────────────────
+
+
+class TestScGetSdmxStructure:
+
+    @pytest.mark.asyncio
+    async def test_returns_make_response_with_dimensions(self):
+        from mcp_canada.modules.statcan.schemas import SDMXCodeValue, SDMXDimension, SDMXStructure
+        mock_structure = SDMXStructure(
+            product_id=18100004,
+            dimensions=[
+                SDMXDimension(
+                    position=1,
+                    id="GEO",
+                    codelist_id="CL_GEO_18100004",
+                    codes=[SDMXCodeValue(id="1", name_en="Canada", name_fr="Canada")],
+                ),
+                SDMXDimension(
+                    position=2,
+                    id="PRODUCTS",
+                    codelist_id="CL_PRODUCTS_18100004",
+                    codes=[SDMXCodeValue(id="1", name_en="All-items", name_fr="Ensemble")],
+                ),
+            ],
+            suggested_key="1.1",
+        )
+        with patch(
+            "mcp_canada.modules.statcan.tools.get_sdmx_structure",
+            new=AsyncMock(return_value=(mock_structure, False)),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_get_sdmx_structure
+            result = await sc_get_sdmx_structure(18100004)
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "statcan-sdmx"
+        assert "dimensions" in result["data"]
+        assert len(result["data"]["dimensions"]) == 2
+        assert result["data"]["suggested_key"] == "1.1"
+        dim0 = result["data"]["dimensions"][0]
+        assert "position" in dim0
+        assert "id" in dim0
+        assert "codes" in dim0
+
+    @pytest.mark.asyncio
+    async def test_409_returns_upstream_unavailable(self):
+        with patch(
+            "mcp_canada.modules.statcan.tools.get_sdmx_structure",
+            new=AsyncMock(side_effect=_make_409_error()),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_get_sdmx_structure
+            result = await sc_get_sdmx_structure(18100004)
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_UNAVAILABLE"
+
+    @pytest.mark.asyncio
+    async def test_value_error_returns_invalid_input(self):
+        with patch(
+            "mcp_canada.modules.statcan.tools.get_sdmx_structure",
+            new=AsyncMock(side_effect=ValueError("bad product")),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_get_sdmx_structure
+            result = await sc_get_sdmx_structure(999)
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_INPUT"
+
+    @pytest.mark.asyncio
+    async def test_generic_exception_returns_upstream_error(self):
+        with patch(
+            "mcp_canada.modules.statcan.tools.get_sdmx_structure",
+            new=AsyncMock(side_effect=Exception("network failure")),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_get_sdmx_structure
+            result = await sc_get_sdmx_structure(18100004)
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_passthrough(self):
+        from mcp_canada.modules.statcan.schemas import SDMXStructure
+        mock_structure = SDMXStructure(product_id=18100004, dimensions=[], suggested_key="")
+        with patch(
+            "mcp_canada.modules.statcan.tools.get_sdmx_structure",
+            new=AsyncMock(return_value=(mock_structure, False)),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_get_sdmx_structure
+            result = await sc_get_sdmx_structure(18100004, lang="fr")
+        assert result["_meta"]["lang"] == "fr"
+
+
+# ─── sc_get_sdmx_data ─────────────────────────────────────────────────────────
+
+
+class TestScGetSdmxData:
+
+    def _make_obs_rows(self):
+        from mcp_canada.modules.statcan.schemas import SDMXObservationRow
+        return [
+            SDMXObservationRow(period="2024-01", value=163.4, dimensions={"GEO": "Canada"}),
+            SDMXObservationRow(period="2024-02", value=164.0, dimensions={"GEO": "Canada"}),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_happy_path_with_raw_key(self):
+        with patch(
+            "mcp_canada.modules.statcan.tools.get_sdmx_data",
+            new=AsyncMock(return_value=(self._make_obs_rows(), False)),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_get_sdmx_data
+            result = await sc_get_sdmx_data(18100004, key="1.1")
+        assert "_meta" in result
+        assert isinstance(result["data"], list)
+        assert len(result["data"]) == 2
+        assert result["data"][0]["period"] == "2024-01"
+        assert result["data"][0]["value"] == 163.4
+
+    @pytest.mark.asyncio
+    async def test_invalid_input_last_n_with_date_range(self):
+        from mcp_canada.modules.statcan.tools import sc_get_sdmx_data
+        result = await sc_get_sdmx_data(18100004, key="1.1", last_n=5, start_period="2024-01")
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_INPUT"
+
+    @pytest.mark.asyncio
+    async def test_invalid_input_last_n_with_end_period(self):
+        from mcp_canada.modules.statcan.tools import sc_get_sdmx_data
+        result = await sc_get_sdmx_data(18100004, key="1.1", last_n=3, end_period="2024-12")
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_INPUT"
+
+    @pytest.mark.asyncio
+    async def test_dimensions_dict_calls_build_key(self):
+        from mcp_canada.modules.statcan.schemas import SDMXCodeValue, SDMXDimension, SDMXStructure
+        mock_structure = SDMXStructure(
+            product_id=18100004,
+            dimensions=[
+                SDMXDimension(
+                    position=1, id="GEO", codelist_id="CL_GEO",
+                    codes=[SDMXCodeValue(id="1", name_en="Canada", name_fr="Canada")],
+                ),
+            ],
+            suggested_key="1",
+        )
+        with (
+            patch(
+                "mcp_canada.modules.statcan.tools.get_sdmx_structure",
+                new=AsyncMock(return_value=(mock_structure, False)),
+            ),
+            patch(
+                "mcp_canada.modules.statcan.tools.get_sdmx_data",
+                new=AsyncMock(return_value=(self._make_obs_rows(), False)),
+            ) as mock_get_data,
+        ):
+            from mcp_canada.modules.statcan.tools import sc_get_sdmx_data
+            result = await sc_get_sdmx_data(18100004, dimensions={"GEO": "1"})
+        assert "_meta" in result
+        # Verify get_sdmx_data was called with a non-empty key built from dimensions
+        mock_get_data.assert_called_once()
+        called_key = mock_get_data.call_args[0][1]
+        assert called_key == "1"
+
+    @pytest.mark.asyncio
+    async def test_key_wins_over_dimensions(self):
+        """When both key and dimensions are provided, key takes precedence."""
+        with patch(
+            "mcp_canada.modules.statcan.tools.get_sdmx_data",
+            new=AsyncMock(return_value=(self._make_obs_rows(), False)),
+        ) as mock_get_data:
+            from mcp_canada.modules.statcan.tools import sc_get_sdmx_data
+            result = await sc_get_sdmx_data(18100004, key="1.1", dimensions={"GEO": "2"})
+        assert "_meta" in result
+        # Key "1.1" used — no structure fetch needed
+        mock_get_data.assert_called_once()
+        called_key = mock_get_data.call_args[0][1]
+        assert called_key == "1.1"
+
+    @pytest.mark.asyncio
+    async def test_409_returns_upstream_unavailable(self):
+        with patch(
+            "mcp_canada.modules.statcan.tools.get_sdmx_data",
+            new=AsyncMock(side_effect=_make_409_error()),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_get_sdmx_data
+            result = await sc_get_sdmx_data(18100004, key="1.1")
+        assert result["error"]["code"] == "UPSTREAM_UNAVAILABLE"
+
+    @pytest.mark.asyncio
+    async def test_lang_passthrough(self):
+        with patch(
+            "mcp_canada.modules.statcan.tools.get_sdmx_data",
+            new=AsyncMock(return_value=([], False)),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_get_sdmx_data
+            result = await sc_get_sdmx_data(18100004, key="1.1", lang="fr")
+        assert result["_meta"]["lang"] == "fr"
+
+
+# ─── sc_get_sdmx_vector_data ──────────────────────────────────────────────────
+
+
+class TestScGetSdmxVectorData:
+
+    def _make_obs_rows(self):
+        from mcp_canada.modules.statcan.schemas import SDMXObservationRow
+        return [
+            SDMXObservationRow(period="2024-01", value=163.4, dimensions={}),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_happy_path(self):
+        with patch(
+            "mcp_canada.modules.statcan.tools.get_sdmx_vector_data",
+            new=AsyncMock(return_value=(self._make_obs_rows(), False)),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_get_sdmx_vector_data
+            result = await sc_get_sdmx_vector_data(41690973, start_period="2024-01", end_period="2024-12")
+        assert "_meta" in result
+        assert isinstance(result["data"], list)
+        assert len(result["data"]) == 1
+        assert result["data"][0]["period"] == "2024-01"
+        assert result["data"][0]["value"] == 163.4
+
+    @pytest.mark.asyncio
+    async def test_409_returns_upstream_unavailable(self):
+        with patch(
+            "mcp_canada.modules.statcan.tools.get_sdmx_vector_data",
+            new=AsyncMock(side_effect=_make_409_error()),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_get_sdmx_vector_data
+            result = await sc_get_sdmx_vector_data(41690973)
+        assert result["error"]["code"] == "UPSTREAM_UNAVAILABLE"
+
+    @pytest.mark.asyncio
+    async def test_generic_exception(self):
+        with patch(
+            "mcp_canada.modules.statcan.tools.get_sdmx_vector_data",
+            new=AsyncMock(side_effect=Exception("timeout")),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_get_sdmx_vector_data
+            result = await sc_get_sdmx_vector_data(41690973)
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_passthrough(self):
+        with patch(
+            "mcp_canada.modules.statcan.tools.get_sdmx_vector_data",
+            new=AsyncMock(return_value=([], False)),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_get_sdmx_vector_data
+            result = await sc_get_sdmx_vector_data(41690973, lang="fr")
+        assert result["_meta"]["lang"] == "fr"
+
+
+# ─── sc_fetch_vectors_to_store ────────────────────────────────────────────────
+
+
+class TestScFetchVectorsToStore:
+
+    def _make_bulk_data(self):
+        from mcp_canada.modules.statcan.schemas import ObservationRow
+        row = ObservationRow(
+            ref_per="2024-01", ref_per_raw="2024-01", value=150.2,
+            decimals=1, scalar_factor_code=0, scalar_factor="units",
+            frequency_code=5, frequency="Monthly", status_code=0,
+            symbol_code=0, release_time="2024-02-15 08:30",
+        )
+        return {41690973: [row], 74804: [row]}
+
+    @pytest.mark.asyncio
+    async def test_happy_path_creates_table_and_inserts(self):
+        with (
+            patch(
+                "mcp_canada.modules.statcan.tools.get_bulk_vector_data",
+                new=AsyncMock(return_value=(self._make_bulk_data(), False)),
+            ),
+            patch(
+                "mcp_canada.modules.statcan.tools.create_table",
+                new=AsyncMock(return_value=(None, False)),
+            ),
+            patch(
+                "mcp_canada.modules.statcan.tools.insert_rows",
+                new=AsyncMock(return_value=(2, False)),
+            ),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_fetch_vectors_to_store
+            result = await sc_fetch_vectors_to_store(
+                vector_ids=[41690973, 74804],
+                start_release="2024-01-01",
+                end_release="2024-12-31",
+                table_name="cpi_data",
+            )
+        assert "_meta" in result
+        assert result["data"]["stored"] == 2
+        assert result["data"]["table"] == "cpi_data"
+        assert isinstance(result["data"]["vectors"], list)
+
+    @pytest.mark.asyncio
+    async def test_invalid_table_name_returns_invalid_input(self):
+        from mcp_canada.modules.statcan.tools import sc_fetch_vectors_to_store
+        result = await sc_fetch_vectors_to_store(
+            vector_ids=[41690973],
+            start_release="2024-01-01",
+            end_release="2024-12-31",
+            table_name="drop;--",
+        )
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_INPUT"
+
+    @pytest.mark.asyncio
+    async def test_table_name_starting_with_digit_is_invalid(self):
+        from mcp_canada.modules.statcan.tools import sc_fetch_vectors_to_store
+        result = await sc_fetch_vectors_to_store(
+            vector_ids=[41690973],
+            start_release="2024-01-01",
+            end_release="2024-12-31",
+            table_name="1invalid",
+        )
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_INPUT"
+
+    @pytest.mark.asyncio
+    async def test_not_found_on_empty_bulk_data(self):
+        with patch(
+            "mcp_canada.modules.statcan.tools.get_bulk_vector_data",
+            new=AsyncMock(return_value=({}, False)),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_fetch_vectors_to_store
+            result = await sc_fetch_vectors_to_store(
+                vector_ids=[99999999],
+                start_release="2024-01-01",
+                end_release="2024-12-31",
+                table_name="empty_table",
+            )
+        assert "error" in result
+        assert result["error"]["code"] == "NOT_FOUND"
+
+    @pytest.mark.asyncio
+    async def test_not_found_on_all_empty_obs_lists(self):
+        """Empty obs lists per vector should also yield NOT_FOUND."""
+        with patch(
+            "mcp_canada.modules.statcan.tools.get_bulk_vector_data",
+            new=AsyncMock(return_value=({41690973: []}, False)),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_fetch_vectors_to_store
+            result = await sc_fetch_vectors_to_store(
+                vector_ids=[41690973],
+                start_release="2024-01-01",
+                end_release="2024-12-31",
+                table_name="empty_table",
+            )
+        assert "error" in result
+        assert result["error"]["code"] == "NOT_FOUND"
+
+    @pytest.mark.asyncio
+    async def test_409_returns_upstream_unavailable(self):
+        with patch(
+            "mcp_canada.modules.statcan.tools.get_bulk_vector_data",
+            new=AsyncMock(side_effect=_make_409_error()),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_fetch_vectors_to_store
+            result = await sc_fetch_vectors_to_store(
+                vector_ids=[41690973],
+                start_release="2024-01-01",
+                end_release="2024-12-31",
+                table_name="cpi_data",
+            )
+        assert result["error"]["code"] == "UPSTREAM_UNAVAILABLE"
+
+    @pytest.mark.asyncio
+    async def test_lang_passthrough(self):
+        with (
+            patch(
+                "mcp_canada.modules.statcan.tools.get_bulk_vector_data",
+                new=AsyncMock(return_value=(self._make_bulk_data(), False)),
+            ),
+            patch(
+                "mcp_canada.modules.statcan.tools.create_table",
+                new=AsyncMock(return_value=(None, False)),
+            ),
+            patch(
+                "mcp_canada.modules.statcan.tools.insert_rows",
+                new=AsyncMock(return_value=(2, False)),
+            ),
+        ):
+            from mcp_canada.modules.statcan.tools import sc_fetch_vectors_to_store
+            result = await sc_fetch_vectors_to_store(
+                vector_ids=[41690973, 74804],
+                start_release="2024-01-01",
+                end_release="2024-12-31",
+                table_name="cpi_data",
+                lang="fr",
+            )
         assert result["_meta"]["lang"] == "fr"

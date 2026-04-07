@@ -23,12 +23,21 @@
 ## Quick Start
 
 ```bash
-uvx mcp-canada
+# Auto-configure your platform (interactive)
+uvx mcp-canada install
+
+# Or name platforms directly
+uvx mcp-canada install claude-desktop cursor vscode
 ```
 
-### Claude Desktop
+Supports 14 platforms: Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Zed, Codex CLI, Gemini CLI, Amazon Q, OpenCode, Cline, Roo Code, Goose CLI, Junie CLI.
 
-Add to your MCP config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+### Manual Setup
+
+<details>
+<summary>Claude Desktop</summary>
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
@@ -40,20 +49,25 @@ Add to your MCP config (`~/Library/Application Support/Claude/claude_desktop_con
   }
 }
 ```
+</details>
 
-### Claude Code
+<details>
+<summary>Claude Code</summary>
 
 ```bash
 claude mcp add mcp-canada -- uvx mcp-canada
 ```
+</details>
 
-### From Source
+<details>
+<summary>From Source</summary>
 
 ```bash
 git clone https://github.com/reyemtech/mcp-canada.git
 cd mcp-canada
 uv run mcp-canada
 ```
+</details>
 
 ### Options
 
@@ -66,23 +80,6 @@ uv run mcp-canada
 | `--debug` | DEBUG-level logging | `--debug` |
 
 Environment variable: `MCP_CANADA_MODULES=bank_of_canada,recalls`
-
-### Install on Your Platform
-
-Configure mcp-canada on any supported MCP client with one command:
-
-```bash
-# Interactive — select platforms from a list
-uvx mcp-canada install
-
-# Direct — name the platforms
-uvx mcp-canada install claude-desktop cursor vscode
-
-# With module filtering
-uvx mcp-canada install --modules bank_of_canada,weather
-```
-
-Supported platforms: Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Zed, Codex CLI, Gemini CLI, Amazon Q, OpenCode, Cline, Roo Code, Goose CLI, Junie CLI.
 
 ## Examples
 

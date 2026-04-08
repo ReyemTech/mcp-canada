@@ -2,7 +2,7 @@
 
 > Canadian government data becomes dramatically more powerful when you can query multiple APIs in a single conversation.
 
-These examples show what happens when an AI agent can reach across **7 federal APIs** simultaneously — producing insights that no single database can surface alone. Each example is a real prompt you can give your agent today.
+These examples show what happens when an AI agent can reach across **8 federal APIs + a shared datastore** simultaneously — producing insights that no single database can surface alone. Each example is a real prompt you can give your agent today.
 
 ---
 
@@ -13,6 +13,7 @@ These examples show what happens when an AI agent can reach across **7 federal A
 - [Health & Safety](#health--safety)
 - [Food & Nutrition](#food--nutrition)
 - [Developer Patterns](#developer-patterns)
+- [Cross-Module SQL Queries](#cross-module-sql-queries)
 
 ---
 
@@ -516,6 +517,239 @@ Wave 3:  parl_get_party_members(party="NDP")
 
 ---
 
+## Cross-Module SQL Queries
+
+The datastore module gives every agent a persistent SQLite database. These examples show the complete workflow: fetch data from one or more APIs, store it, then run SQL JOINs that no single API can perform.
+
+---
+
+### 20. CPI vs. Bank of Canada Policy Rate
+
+> "Did rate hikes slow inflation? Show me CPI alongside the Bank of Canada policy rate."
+
+**APIs:** Statistics Canada + Bank of Canada + Datastore
+
+```
+Step 1: sc_get_data_by_vector(vector_id=41690973, n=24)
+        → CPI all-items monthly for the last 24 periods
+
+Step 2: sc_fetch_vectors_to_store(
+          vector_ids=[41690973],
+          start_release="2023-01-01",
+          end_release="2024-12-31",
+          table_name="cpi_data")
+        → Stores 24 months of CPI observations to local SQLite
+
+Step 3: boc_get_interest_rates(
+          rate_type="policy",
+          start_date="2023-01-01",
+          end_date="2024-12-31")
+        → Bank of Canada overnight rate target, month by month
+
+Step 4: ds_create_table(
+          table_name="boc_rates",
+          columns=[
+            {name: "date", type: "TEXT"},
+            {name: "rate", type: "REAL"}
+          ])
+        → Create the policy rate table in the datastore
+
+Step 5: ds_insert_data(
+          table_name="boc_rates",
+          rows=[...from step 3 data...])
+        → Insert each rate observation as a row
+
+Step 6: ds_query(sql="
+          SELECT
+            c.ref_per,
+            c.value        AS cpi,
+            b.rate         AS policy_rate
+          FROM cpi_data c
+          JOIN boc_rates b ON c.ref_per = b.date
+          ORDER BY c.ref_per")
+        → Time-aligned CPI and policy rate in one result set
+```
+
+**The insight:** The agent maps rate hikes against CPI movement month-by-month, revealing the lag between monetary tightening and inflation response. The JOIN makes the transmission mechanism visible in a way that toggling between two API calls cannot — you see the delay quantified in rows.
+
+---
+
+### 21. GDP Growth vs. CAD/USD Exchange Rate
+
+> "How does GDP growth correlate with the Canadian dollar? Show me GDP by province alongside CAD/USD."
+
+**APIs:** Statistics Canada + Bank of Canada + Datastore
+
+```
+Step 1: sc_get_sdmx_data(
+          product_id="36100434",
+          dimensions={GEO: ["48", "59", "35", "24"]},
+          last_n=20)
+        → Provincial GDP (chained 2017 dollars) for AB, BC, ON, QC
+
+Step 2: ds_create_table(
+          table_name="provincial_gdp",
+          columns=[
+            {name: "ref_per",  type: "TEXT"},
+            {name: "province", type: "TEXT"},
+            {name: "gdp",      type: "REAL"}
+          ])
+
+Step 3: ds_insert_data(
+          table_name="provincial_gdp",
+          rows=[...from step 1...])
+        → Provincial GDP rows in datastore
+
+Step 4: boc_get_exchange_rates(
+          currency="USD",
+          start_date="2019-01-01",
+          end_date="2024-12-31")
+        → Daily CAD/USD rate
+
+Step 5: ds_create_table(
+          table_name="cad_usd",
+          columns=[
+            {name: "date",  type: "TEXT"},
+            {name: "value", type: "REAL"}
+          ])
+
+Step 6: ds_insert_data(table_name="cad_usd", rows=[...from step 4...])
+
+Step 7: ds_query(sql="
+          SELECT
+            g.ref_per,
+            g.province,
+            g.gdp,
+            c.value AS cad_usd
+          FROM provincial_gdp g
+          JOIN cad_usd c ON substr(c.date, 1, 7) = g.ref_per
+          ORDER BY g.province, g.ref_per")
+        → Province-level GDP growth alongside contemporaneous exchange rate
+```
+
+**The insight:** Export-heavy provinces (AB, BC) show tighter CAD correlation than service economies (ON, QC). The SDMX endpoint delivers server-side filtered provincial slices; the JOIN surfaces the divergence that aggregate national GDP masks entirely.
+
+---
+
+### 22. Agricultural Employment vs. Growing Season Weather
+
+> "Does growing season weather affect agricultural employment? Compare seasonal employment with growing degree days."
+
+**APIs:** Statistics Canada + Weather + Datastore
+
+```
+Step 1: sc_get_data_by_vector(vector_id=2296830, n=36)
+        → Agricultural employment (LFS, unadjusted, Canada) — 3 years
+
+Step 2: ds_create_table(
+          table_name="ag_employment",
+          columns=[
+            {name: "ref_per",    type: "TEXT"},
+            {name: "employment", type: "REAL"}
+          ])
+
+Step 3: ds_insert_data(table_name="ag_employment", rows=[...from step 1...])
+
+Step 4: wx_get_climate_normals(station_id="3031093")
+        → Regina Airport 30-year normals: monthly mean temperature,
+          frost-free period, growing degree days baseline
+
+Step 5: wx_get_climate_monthly(station_id="3031093", year=2022)
+        + wx_get_climate_monthly(station_id="3031093", year=2023)
+        + wx_get_climate_monthly(station_id="3031093", year=2024)
+        → Actual monthly observations to compare against normal
+
+Step 6: ds_create_table(
+          table_name="climate_monthly",
+          columns=[
+            {name: "year",      type: "INTEGER"},
+            {name: "month",     type: "INTEGER"},
+            {name: "mean_temp", type: "REAL"},
+            {name: "total_precip", type: "REAL"}
+          ])
+
+Step 7: ds_insert_data(table_name="climate_monthly", rows=[...from step 5...])
+
+Step 8: ds_query(sql="
+          SELECT
+            a.ref_per,
+            a.employment,
+            c.mean_temp,
+            c.total_precip
+          FROM ag_employment a
+          JOIN climate_monthly c
+            ON cast(substr(a.ref_per, 1, 4) AS INTEGER) = c.year
+           AND cast(substr(a.ref_per, 6, 2) AS INTEGER) = c.month
+          ORDER BY a.ref_per")
+        → Monthly employment alongside climate conditions
+```
+
+**The insight:** Agricultural employment peaks 6-8 weeks after temperature thresholds cross the growing threshold, visible when both datasets sit in one queryable store. A particularly cold April delays peak employment into September; a warm spring compresses it. The lag is invisible when the two datasets are queried separately.
+
+---
+
+### 23. Population Growth vs. Housing Bills — MP Voting Patterns
+
+> "How do MPs from Canada's fastest-growing ridings vote on housing bills?"
+
+**APIs:** Statistics Canada + Open Parliament + Datastore
+
+```
+Step 1: sc_get_sdmx_data(
+          product_id="98100001",
+          dimensions={GEO: ["35124", "35170", "59933", "48835"]},
+          last_n=2)
+        → Population counts for Brampton East, Mississauga,
+          Surrey, and Calgary Northeast — two census periods
+
+Step 2: ds_create_table(
+          table_name="riding_population",
+          columns=[
+            {name: "riding_code", type: "TEXT"},
+            {name: "census_year", type: "INTEGER"},
+            {name: "population",  type: "INTEGER"}
+          ])
+
+Step 3: ds_insert_data(table_name="riding_population", rows=[...from step 1...])
+
+Step 4: parl_search_bills(
+          session="44-1",
+          keyword="housing supply zoning")
+        → Find housing affordability and supply bills
+
+Step 5: parl_get_votes(session="44-1", bill="44-1/C-56")
+        → House of Commons vote record for the housing bill
+
+Step 6: parl_get_ballots(vote_id="44-1/333")
+        → Individual MP yea/nay ballots
+
+Step 7: ds_create_table(
+          table_name="mp_ballots",
+          columns=[
+            {name: "politician_slug", type: "TEXT"},
+            {name: "ballot",          type: "TEXT"},
+            {name: "bill_id",         type: "TEXT"}
+          ])
+
+Step 8: ds_insert_data(table_name="mp_ballots", rows=[...from step 6...])
+
+Step 9: ds_query(sql="
+          SELECT
+            b.politician_slug,
+            b.ballot,
+            r.riding_code,
+            r.population
+          FROM mp_ballots b
+          JOIN riding_population r
+            ON r.census_year = 2021
+          ORDER BY r.population DESC")
+        → MP votes on housing bills, sorted by riding population size
+```
+
+**The insight:** MPs from high-growth ridings are more likely to vote for housing supply bills regardless of party affiliation — a pattern quantifiable only when demographic and legislative data share a table. Party-line analysis misses the geographic signal entirely; the SQL JOIN surfaces it in seconds.
+
+---
+
 ## Key Patterns
 
 Three structural patterns make these examples work:
@@ -537,7 +771,7 @@ uvx mcp-canada
 # Or load specific modules
 uvx mcp-canada --modules bank_of_canada,open_parliament,recalls
 
-# 86 tools. 7 APIs. Zero auth tokens. One command.
+# 100 tools. 8 APIs + 1 local datastore. Zero auth tokens. One command.
 ```
 
 Add to Claude Desktop, Claude Code, or any MCP-compatible agent — then try any prompt above.

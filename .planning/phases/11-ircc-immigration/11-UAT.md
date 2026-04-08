@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 11-ircc-immigration
 source: [11-01-SUMMARY.md, 11-02-SUMMARY.md, 11-03-SUMMARY.md]
 started: 2026-04-08T20:00:00Z
@@ -79,10 +79,20 @@ skipped: 4
 
 - truth: "Data rows contain snake_case keys with meaningful column names from IRCC XLSX files"
   status: failed
-  reason: "User reported: IRCC XLSX has multi-row merged headers (title row, year row, quarter row, month row). Parser treats row 1 as header, producing 190 unnamed_* columns instead of meaningful composite column names. Affects all IRCC tools that fetch live XLSX data. Root cause: fetch_and_parse uses skip_rows=0 and single-row header. IRCC files need multi-row header support — pandas header=[1,2,3] with MultiIndex flattening, plus per-dataset header_rows config."
+  reason: "User reported: IRCC XLSX has multi-row merged headers (title row, year row, quarter row, month row). Parser treats row 1 as header, producing 190 unnamed_* columns instead of meaningful composite column names."
   severity: blocker
   test: 5
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "Parser _parse_xlsx_pandas/_parse_xlsx_openpyxl both treat a single row as header. IRCC XLSX files have 3-4 merged header rows (Year > Quarter > Month hierarchy). 4 distinct layouts found: Layout A (standard quarterly, 5 header rows, 1 label col — PR/Study/Work/Afghan), Layout B (2 label cols — EE/TR-to-PR/Asylum), Layout C (OPS — 6 blank rows, no quarters), Layout D (adhoc XLS — simple, works with skip_rows=2). Pandas MultiIndex NOT recommended — still needs forward-fill and flattening."
+  artifacts:
+    - path: "src/mcp_canada/shared/parsers.py"
+      issue: "No multi-row header support; _parse_xlsx uses single header row"
+    - path: "src/mcp_canada/modules/ircc/client.py"
+      issue: "_fetch_dataset calls fetch_and_parse with no skip_rows or header config"
+    - path: "src/mcp_canada/modules/ircc/constants.py"
+      issue: "Missing per-dataset parse config (skip_rows, header_rows, label_cols)"
+  missing:
+    - "Add DATASET_PARSE_CONFIG to constants.py with per-dataset skip_rows, header_rows, label_cols"
+    - "Add _parse_ircc_xlsx() in parsers.py using openpyxl merged-cell forward-fill + composite column names"
+    - "Update client.py _fetch_dataset to pass parse config to fetch_and_parse"
+    - "Update unit tests for new multi-row header parsing"
+  debug_session: ".planning/debug/ircc-header-parsing.md"

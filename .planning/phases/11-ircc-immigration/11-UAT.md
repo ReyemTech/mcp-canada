@@ -34,9 +34,7 @@ result: pass
 
 ### 6. Express Entry with Filter
 expected: Call `ircc_get_express_entry(stream="admissions", breakdown="gender", recent=2)`. Returns Express Entry admissions by gender for last 2 years. Nested format with label columns for the 2-label layout.
-result: issue
-reported: "2-label layout (gender + province) has forward-fill bug: label_2 carries last province into summary/total rows and next gender section. Also missing hierarchical nesting (gender > province > years). 1-label datasets work correctly."
-severity: minor
+result: pass
 
 ### 7. Ops Data — No Year Param
 expected: Call `ircc_get_ops(breakdown="pr_intake", recent=1)`. Returns operational processing data in nested format for most recent year only. No year param exists on this tool (monthly snapshots).
@@ -57,23 +55,11 @@ result: pass
 ## Summary
 
 total: 10
-passed: 9
-issues: 1
+passed: 10
+issues: 0
 pending: 0
 skipped: 0
 
 ## Gaps
 
-- truth: "2-label datasets (EE, TR-to-PR, asylum) nest correctly with gender/group > province hierarchy"
-  status: failed
-  reason: "User reported: label_2 forward-fills last province into summary rows and next group section. Missing hierarchical nesting for 2-label layout. 1-label datasets work correctly."
-  severity: minor
-  test: 6
-  root_cause: "Forward-fill for label_2 does not reset when label_1 changes to a new group or total row. Also, 2-label data should nest as group > sub-item > years instead of flat labels."
-  artifacts:
-    - path: "src/mcp_canada/shared/parsers.py"
-      issue: "Forward-fill logic for label columns doesn't reset label_2 when label_1 changes"
-  missing:
-    - "Reset label_2 forward-fill when label_1 changes value"
-    - "Add 2-label hierarchical nesting in _reshape_to_nested (gender > province > years)"
-  debug_session: ""
+[none]

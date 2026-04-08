@@ -81,7 +81,11 @@ Plans:
   2. Every new tool has at least one integration test scenario that calls it through the MCP Client layer (not client functions directly) and asserts on response shape
   3. README tool catalog lists all new statcan and datastore tools with accurate descriptions and updated tool count
   4. EXAMPLES.md contains at least one end-to-end example showing cross-module SQL queries combining StatCan and another module's data
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — Integration test audit + coverage verification (INF-06, INF-07)
+- [ ] 10-02-PLAN.md — README updates + EXAMPLES.md cross-module SQL examples (INF-08, INF-09)
 
 ## Progress
 
@@ -92,4 +96,4 @@ Plans:
 | 7. Datastore + SSL | 3/3 | Complete   | 2026-04-07 | - |
 | 8. StatCan WDS | 3/3 | Complete   | 2026-04-07 | - |
 | 9. SDMX + Composite | 1/2 | In Progress|  | - |
-| 10. Tests + Docs | v1.1 | 0/TBD | Not started | - |
+| 10. Tests + Docs | v1.1 | 0/2 | Not started | - |

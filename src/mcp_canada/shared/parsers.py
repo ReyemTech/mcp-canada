@@ -183,6 +183,163 @@ def _parse_xls(
     return result
 
 
+def _parse_ircc_xlsx(
+    content: bytes,
+    skip_rows: int,
+    header_rows: int,
+    label_cols: int,
+    sheet: str | int = 0,
+) -> list[dict[str, Any]]:
+    """Parse IRCC XLSX bytes with multi-row merged headers into a flat list of dicts.
+
+    IRCC XLSX files use 3-5 header rows encoding a Year > Quarter > Month hierarchy
+    via merged cells. This function uses openpyxl to forward-fill merged cells and
+    build flat composite column names like "col_2015_q1_jan" or "col_2015_total".
+
+    Args:
+        content: Raw XLSX file bytes.
+        skip_rows: Number of rows to skip before the header block (title, blank rows).
+        header_rows: Number of consecutive header rows to combine into column names.
+        label_cols: Number of label columns at the left (e.g. "Country", "Province").
+        sheet: Sheet name or 0-based index.
+
+    Returns:
+        list of dicts with normalized snake_case keys and privacy-masked values.
+    """
+    import openpyxl  # noqa: PLC0415
+
+    wb = openpyxl.load_workbook(BytesIO(content), read_only=False, data_only=True)
+    try:
+        if isinstance(sheet, int):
+            ws = wb.worksheets[sheet]
+        else:
+            ws = wb[sheet]
+
+        rows = [
+            tuple(cell.value for cell in row)
+            for row in ws.iter_rows()
+        ]
+    finally:
+        wb.close()
+
+    if not rows:
+        return []
+
+    # Skip title/blank rows
+    rows = rows[skip_rows:]
+    if len(rows) < header_rows + 1:
+        return []
+
+    # Extract the header rows block
+    header_block_raw = [list(row) for row in rows[:header_rows]]
+    data_rows = rows[header_rows:]
+
+    # Forward-fill None values in each header row (left-to-right) into a COPY.
+    # This is used to propagate year/quarter context to their month sub-columns.
+    # We keep the original (raw) values to know which columns had explicit content.
+    header_block_filled = [list(hrow) for hrow in header_block_raw]
+    for hrow in header_block_filled:
+        last_val: Any = None
+        for i, val in enumerate(hrow):
+            if val is not None:
+                last_val = val
+            elif last_val is not None:
+                hrow[i] = last_val
+
+    # Build composite column names.
+    # Strategy for temporal columns: use the filled value from each row,
+    # BUT only if the column EITHER had an explicit value in that row OR
+    # the row above (after fill) had a value for this column — unless the
+    # immediately-higher row already had an EXPLICIT value (meaning this
+    # column is "owned" by that level, not by forward-fill overflow).
+    #
+    # Simpler approach: for each temporal column, collect parts from each
+    # header row using the FILLED value, but deduplicate consecutive equal
+    # values AND skip values that are identical to the previous row's filled
+    # value when the current row's RAW value was None.
+    n_cols = len(header_block_filled[0]) if header_block_filled else 0
+    headers: list[str] = []
+    for col_idx in range(n_cols):
+        if col_idx < label_cols:
+            # Label columns: use the first filled row's value.
+            # When multiple label columns share a merged header cell, the first
+            # col gets the base name; subsequent cols get a numeric suffix to
+            # ensure uniqueness (e.g. "gender_and_province_1", "gender_and_province_2").
+            label_val = header_block_filled[0][col_idx]
+            if label_val is not None:
+                base_name = _normalize_key(str(label_val).strip())
+            else:
+                base_name = "label"
+            if col_idx == 0:
+                headers.append(base_name)
+            else:
+                # Check if this name already exists (from merged header)
+                if base_name in headers:
+                    headers.append(f"{base_name}_{col_idx + 1}")
+                else:
+                    headers.append(base_name)
+        else:
+            # Temporal columns: join values from each header row into composite names.
+            #
+            # Rule: use the forward-filled value for ALL rows EXCEPT the last header
+            # row (the most granular level, e.g. month). For the last row, only include
+            # its value if the RAW (pre-fill) value was explicitly set.
+            #
+            # This correctly handles "Year Total" columns where:
+            #   - row N-1 has "Year Total" explicitly (quarter level)
+            #   - row N (month level) is blank — so no month suffix is added
+            # And handles "Feb" columns where:
+            #   - row N-1 forward-fills "Q1" from the merged quarter cell
+            #   - row N has "Feb" explicitly — so Q1 + Feb are both included
+            last_row_idx = len(header_block_raw) - 1
+            parts = []
+            for row_idx, (raw_hrow, filled_hrow) in enumerate(
+                zip(header_block_raw, header_block_filled)
+            ):
+                filled_val = filled_hrow[col_idx]
+                if filled_val is None:
+                    continue
+                part = str(filled_val).strip()
+                if not part:
+                    continue
+
+                if row_idx < last_row_idx:
+                    # Upper rows (year, quarter): always include forward-fill context
+                    if not parts or parts[-1] != part:
+                        parts.append(part)
+                else:
+                    # Last row (month): only include if explicitly set in raw data
+                    raw_val = raw_hrow[col_idx]
+                    if raw_val is not None:
+                        if not parts or parts[-1] != part:
+                            parts.append(part)
+
+            if parts:
+                composite = "_".join(parts)
+                headers.append(_normalize_key(composite))
+            else:
+                headers.append(f"col_{col_idx}")
+
+    # Build data records, stripping trailing all-None rows
+    result: list[dict[str, Any]] = []
+    for row in data_rows:
+        # Skip all-None rows
+        if all(v is None for v in row):
+            continue
+        record = {
+            headers[i]: _mask_privacy(v)
+            for i, v in enumerate(row)
+            if i < len(headers)
+        }
+        result.append(record)
+
+    # Strip trailing all-None records (values all None after masking)
+    while result and all(v is None for v in result[-1].values()):
+        result.pop()
+
+    return result
+
+
 def _parse_csv(content: bytes, skip_rows: int = 0) -> list[dict[str, Any]]:
     """Parse CSV bytes (including BOM-prefixed) into a list of dicts.
 
@@ -209,6 +366,7 @@ async def fetch_and_parse(
     sheet: str | int = 0,
     skip_rows: int = 0,
     ttl: int = 86400,
+    ircc_parse_config: dict | None = None,
 ) -> tuple[list[dict[str, Any]], bool]:
     """Fetch a remote file and parse it into a list of dicts.
 
@@ -222,11 +380,15 @@ async def fetch_and_parse(
         sheet: Sheet name or 0-based index (XLSX/XLS only).
         skip_rows: Rows to skip before the header row.
         ttl: Cache TTL in seconds (default: 86400 = 24 hours).
+        ircc_parse_config: When provided (dict with skip_rows, header_rows, label_cols),
+            routes XLSX files through _parse_ircc_xlsx for multi-row merged header support.
+            Non-IRCC callers that omit this parameter get identical existing behavior.
 
     Returns:
         (list[dict], was_cached) where was_cached=True if served from cache.
     """
-    cache_key = f"parsers:{url}:{sheet}:{skip_rows}"
+    config_hash = str(sorted(ircc_parse_config.items())) if ircc_parse_config else ""
+    cache_key = f"parsers:{url}:{sheet}:{skip_rows}:{config_hash}"
 
     async def _fetch() -> list[dict[str, Any]]:
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -239,6 +401,8 @@ async def fetch_and_parse(
             return _parse_csv(raw, skip_rows)
         elif lower_url.endswith(".xls"):
             return _parse_xls(raw, sheet, skip_rows)
+        elif ircc_parse_config is not None:
+            return _parse_ircc_xlsx(raw, sheet=sheet, **ircc_parse_config)
         else:
             return _parse_xlsx(raw, sheet, skip_rows)
 

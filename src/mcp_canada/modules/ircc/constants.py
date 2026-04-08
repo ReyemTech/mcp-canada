@@ -36,6 +36,34 @@ CKAN_IDS: dict[str, str] = {
     "adhoc_pr": CKAN_ID_ADHOC_PR,
 }
 
+# Per-dataset XLSX parse configuration for multi-row merged headers.
+# Used by _fetch_dataset to pass the correct skip_rows, header_rows, label_cols
+# to _parse_ircc_xlsx via fetch_and_parse(ircc_parse_config=...).
+#
+# Layout A — Standard quarterly (1 label col, 3 header rows: year/quarter/month):
+#   pr, study, work_imp, work_tfwp, afghan
+# Layout B — Two-label quarterly (2 label cols, 3 header rows):
+#   ee_admissions, ee_invited, tr_to_pr
+# Layout B-monthly — Two-label, no quarter row (2 label cols, 2 header rows):
+#   asylum
+# Layout C — Operational (6 skip rows, 2 header rows: year/month):
+#   ops
+# Layout D — Legacy annual (simple 1 header row, already works):
+#   adhoc_pr (header_rows=1 routes through _parse_ircc_xlsx but produces same result)
+DATASET_PARSE_CONFIG: dict[str, dict[str, int]] = {
+    "pr":           {"skip_rows": 2, "header_rows": 3, "label_cols": 1},
+    "study":        {"skip_rows": 2, "header_rows": 3, "label_cols": 1},
+    "work_imp":     {"skip_rows": 2, "header_rows": 3, "label_cols": 1},
+    "work_tfwp":    {"skip_rows": 2, "header_rows": 3, "label_cols": 1},
+    "ee_admissions": {"skip_rows": 2, "header_rows": 3, "label_cols": 2},
+    "ee_invited":   {"skip_rows": 2, "header_rows": 3, "label_cols": 2},
+    "tr_to_pr":     {"skip_rows": 2, "header_rows": 3, "label_cols": 2},
+    "asylum":       {"skip_rows": 2, "header_rows": 2, "label_cols": 2},
+    "ops":          {"skip_rows": 6, "header_rows": 2, "label_cols": 1},
+    "afghan":       {"skip_rows": 2, "header_rows": 3, "label_cols": 1},
+    "adhoc_pr":     {"skip_rows": 2, "header_rows": 1, "label_cols": 1},
+}
+
 # Registry: DATASET_REGISTRY[dataset_key][breakdown_key][lang] = full URL
 # Note: Operational Processing filenames contain literal spaces — stored as-is, do NOT percent-encode.
 # Note: Ad-hoc PR files are English-only — only "en" key, no "fr" key.

@@ -2,6 +2,19 @@
 
 <!-- CHANGELOG -->
 
+## v0.4.1 (2026-04-08)
+
+### Bug Fixes
+
+- Include version in list_modules response
+  ([`b53148a`](https://github.com/ReyemTech/mcp-canada/commit/b53148a6957afe44fb3c493ccfcaeef7cb915481))
+
+### Chores
+
+- Sync uv.lock after release
+  ([`5d7752c`](https://github.com/ReyemTech/mcp-canada/commit/5d7752c52aeab8805934bfc0b6c4765de374b4e6))
+
+
 ## v0.4.0 (2026-04-08)
 
 ### Bug Fixes

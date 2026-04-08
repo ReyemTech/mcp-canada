@@ -116,6 +116,43 @@ def _reshape_to_nested(
             nested["years"] = years
         result.append(nested)
 
+    # Detect 2-label rows and group hierarchically.
+    # If all rows have exactly 2 non-"years" keys, group by the first label
+    # with sub-items keyed by the second label value.
+    if result:
+        label_keys_sets = [
+            [k for k in row if k != "years"]
+            for row in result
+        ]
+        # Check if all rows have exactly 2 label columns
+        if all(len(lk) == 2 for lk in label_keys_sets):
+            key1, key2 = label_keys_sets[0][0], label_keys_sets[0][1]
+            # Verify all rows use the same label key names
+            if all(lk[0] == key1 and lk[1] == key2 for lk in label_keys_sets):
+                grouped: dict[str, dict[str, Any]] = {}
+                for row in result:
+                    group = str(row.get(key1) or "")
+                    sub = row.get(key2)
+                    years_data = row.get("years", {})
+
+                    if not group:
+                        continue
+
+                    if group not in grouped:
+                        grouped[group] = {}
+
+                    if sub is not None:
+                        grouped[group][str(sub)] = {"years": years_data} if years_data else {}
+                    else:
+                        # Total/summary row for this group
+                        grouped[group]["total"] = {"years": years_data} if years_data else {}
+
+                # Convert to list format
+                result = [
+                    {"group": group_name, "items": items}
+                    for group_name, items in grouped.items()
+                ]
+
     return result
 
 

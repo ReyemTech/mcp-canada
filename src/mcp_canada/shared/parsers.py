@@ -384,8 +384,15 @@ def _parse_ircc_xlsx(
             if i >= len(headers):
                 break
             if i < label_cols:
-                # Forward-fill: use current value if non-empty, else last seen
-                if v is not None and (not isinstance(v, str) or v.strip()):
+                # Forward-fill: use current value if non-empty, else last seen.
+                # When a higher-level label changes, reset all subordinate labels
+                # (e.g. when gender changes, province resets to None).
+                is_present = v is not None and (not isinstance(v, str) or v.strip())
+                if is_present:
+                    if last_labels[i] != v:
+                        # This label changed — reset all labels below it
+                        for j in range(i + 1, label_cols):
+                            last_labels[j] = None
                     last_labels[i] = v
                 record[headers[i]] = _mask_privacy(last_labels[i])
             else:

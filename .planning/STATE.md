@@ -97,6 +97,10 @@ Recent decisions affecting current work:
 - [Phase 10-tests-docs]: Range-based WDS tools assert shape only (not count) — releases may be absent for fixed historical date ranges
 - [Phase 10-tests-docs]: CPI Canada coordinate '1.1.0.0.0.0.0.0.0.0' confirmed as stable anchor for coord-based WDS integration tests
 
+### Roadmap Evolution
+
+- Phase 11 added: IRCC Immigration — fetch and parse IRCC open data XLSX files (PR by country, province, category; study permits)
+
 ### Pending Todos
 
 None yet.

@@ -97,3 +97,19 @@ Plans:
 | 8. StatCan WDS | 3/3 | Complete   | 2026-04-07 | - |
 | 9. SDMX + Composite | 1/2 | In Progress|  | - |
 | 10. Tests + Docs | 2/2 | Complete    | 2026-04-08 | - |
+
+### Phase 11: IRCC Immigration
+**Goal**: Fetch and parse IRCC open data XLSX files (permanent residents by country/province/category, study permits, source countries) and expose as ircc_ tools with datastore integration
+**Depends on**: Phase 7 (datastore), Phase 10 (docs pattern)
+**Requirements**: TBD
+**Success Criteria** (what must be TRUE):
+  1. Agent can query permanent residents by country of citizenship, province, and immigration category
+  2. Agent can query study permit holders by country
+  3. All IRCC tools follow mcp-canada conventions (sc_ prefix pattern, envelopes, bilingual, BM25 keywords)
+  4. IRCC data can be stored to the shared datastore for cross-module SQL queries
+**Plans**: TBD
+**Depends on:** Phase 10
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 11 to break down)

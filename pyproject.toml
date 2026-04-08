@@ -31,6 +31,7 @@ dependencies = [
     "InquirerPy>=0.3.4",
     "aiosqlite>=0.22.0",
     "openpyxl>=3.1.5",
+    "xlrd>=2.0.2",
 ]
 
 [project.urls]
@@ -43,7 +44,6 @@ mcp-canada = "mcp_canada.server:main"
 [project.optional-dependencies]
 ircc = [
     "pandas>=3.0.2",
-    "xlrd>=2.0.2",
 ]
 
 [dependency-groups]

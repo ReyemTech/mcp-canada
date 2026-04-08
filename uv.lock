@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -916,12 +916,12 @@ dependencies = [
     { name = "openpyxl" },
     { name = "pydantic" },
     { name = "tenacity" },
+    { name = "xlrd" },
 ]
 
 [package.optional-dependencies]
 ircc = [
     { name = "pandas" },
-    { name = "xlrd" },
 ]
 
 [package.dev-dependencies]
@@ -946,7 +946,7 @@ requires-dist = [
     { name = "pandas", marker = "extra == 'ircc'", specifier = ">=3.0.2" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "tenacity", specifier = ">=8.0.0" },
-    { name = "xlrd", marker = "extra == 'ircc'", specifier = ">=2.0.2" },
+    { name = "xlrd", specifier = ">=2.0.2" },
 ]
 provides-extras = ["ircc"]
 

@@ -125,6 +125,14 @@ class TestMaskPrivacy:
 # ---------------------------------------------------------------------------
 
 
+_has_pandas = True
+try:
+    import pandas  # noqa: F401
+except ImportError:
+    _has_pandas = False
+
+
+@pytest.mark.skipif(not _has_pandas, reason="pandas not installed")
 class TestParseXlsxPandasPath:
     def test_uses_pandas_when_importable(self) -> None:
         """_parse_xlsx() calls pandas.read_excel when pandas is available."""

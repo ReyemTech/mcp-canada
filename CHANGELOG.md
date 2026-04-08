@@ -2,6 +2,136 @@
 
 <!-- CHANGELOG -->
 
+## v0.4.0 (2026-04-08)
+
+### Bug Fixes
+
+- **11**: Clean group names in 2-label nesting
+  ([`7ccee5e`](https://github.com/ReyemTech/mcp-canada/commit/7ccee5e7c6a73a07875fb4801416e106a49ca088))
+
+- **11**: Clean up IRCC column names and filter all-null data rows
+  ([`d6093a3`](https://github.com/ReyemTech/mcp-canada/commit/d6093a39da8c74194591fc6899bd40db9914cf74))
+
+- **11**: Forward-fill label columns in IRCC multi-row data
+  ([`8831b49`](https://github.com/ReyemTech/mcp-canada/commit/8831b499559e1492884b39dbfae0ec8f610b1da2))
+
+- **11**: Resolve pyright and ruff errors in test_parsers.py
+  ([`14cb3e1`](https://github.com/ReyemTech/mcp-canada/commit/14cb3e11ac946b08f56efed842839573aa408308))
+
+- **11**: Revise plans based on checker feedback
+  ([`ac3becc`](https://github.com/ReyemTech/mcp-canada/commit/ac3becc4b42a13333fdd5a0b9cc9a6858d114ff0))
+
+- **11**: Support French quarter names (t1-t4) in nested reshaping
+  ([`8e4b9aa`](https://github.com/ReyemTech/mcp-canada/commit/8e4b9aa5d97eb1f19689d9cdd0cee4c56139801f))
+
+- **11**: Transliterate accented chars in _normalize_key
+  ([`d35c7ef`](https://github.com/ReyemTech/mcp-canada/commit/d35c7ef0058431f1406686857648e14fa0a53ac6))
+
+- **11**: Treat empty strings as missing in IRCC label forward-fill
+  ([`63988f5`](https://github.com/ReyemTech/mcp-canada/commit/63988f51c5e4cf280f1f3ecbb117e523eee1119d))
+
+### Chores
+
+- Sync uv.lock after release
+  ([`065a0f5`](https://github.com/ReyemTech/mcp-canada/commit/065a0f599a26a1ad472c2e693726a259324d3255))
+
+### Documentation
+
+- Add Phase 11 — IRCC Immigration module
+  ([`34cce16`](https://github.com/ReyemTech/mcp-canada/commit/34cce164bb21383aa15252926c1c8d7a946295e8))
+
+- Update Phase 11 — shared file parsers + IRCC module
+  ([`66372ad`](https://github.com/ReyemTech/mcp-canada/commit/66372ad14fe017ded422d2d87626389f01efd063))
+
+- **11**: Add research and validation strategy
+  ([`fa2999e`](https://github.com/ReyemTech/mcp-canada/commit/fa2999ee384a2c7242e46319280a42da1d96fcd0))
+
+- **11**: Capture phase context
+  ([`2396f76`](https://github.com/ReyemTech/mcp-canada/commit/2396f768be5e9a2ff86aa07de37e6c927c642674))
+
+- **11**: Create gap closure plan for IRCC multi-row header parsing
+  ([`0189f93`](https://github.com/ReyemTech/mcp-canada/commit/0189f93886a2dde08b0df639fcfbb89e9011b3e6))
+
+- **11**: Create phase plan — shared parser + IRCC module
+  ([`e35bc43`](https://github.com/ReyemTech/mcp-canada/commit/e35bc4347221cfc68ce1044c1d2cd7e814a64930))
+
+- **11**: Research phase domain — shared parsers + IRCC immigration
+  ([`cfce467`](https://github.com/ReyemTech/mcp-canada/commit/cfce467c4547450f4408e47ee2c6b9ef1cbcfe3d))
+
+- **11-01**: Complete shared file parsers plan
+  ([`89afcad`](https://github.com/ReyemTech/mcp-canada/commit/89afcadaf55169d8910c40515d53294df4d2a7e9))
+
+- **11-02**: Complete IRCC module skeleton plan
+  ([`bc770eb`](https://github.com/ReyemTech/mcp-canada/commit/bc770eb89981b418979f355268615026ce2dcd7d))
+
+- **11-03**: Complete IRCC tool functions plan
+  ([`a940b4f`](https://github.com/ReyemTech/mcp-canada/commit/a940b4f849a5269387e11e8c90bb9a17b3952b03))
+
+- **11-04**: Complete IRCC multi-row header parser plan
+  ([`457f7e8`](https://github.com/ReyemTech/mcp-canada/commit/457f7e8948eafefbaf744beafa149ce4cc3b0422))
+
+- **phase-11**: Complete phase execution
+  ([`87a7f08`](https://github.com/ReyemTech/mcp-canada/commit/87a7f08e04956a03c700b048542319b71ff2cdcd))
+
+- **state**: Record phase 11 context session
+  ([`622b3a4`](https://github.com/ReyemTech/mcp-canada/commit/622b3a4f6354df792ace3de258b509411fff2154))
+
+### Features
+
+- **11**: Add filter and recent params to all IRCC tools
+  ([`b29663c`](https://github.com/ReyemTech/mcp-canada/commit/b29663ccfede51dd7193648b0c01eceac2636cbc))
+
+- **11**: Auto-convert numeric strings to int/float in parser
+  ([`4cfc8b6`](https://github.com/ReyemTech/mcp-canada/commit/4cfc8b61277446f2775b19b752544658963b8c54))
+
+- **11**: Fix 2-label forward-fill and add hierarchical nesting
+  ([`66fe56a`](https://github.com/ReyemTech/mcp-canada/commit/66fe56a6574c49ca114bf7dd1266eba47c9f1a50))
+
+- **11**: Reshape IRCC tool output to nested year > quarter > month format
+  ([`4b5bc2f`](https://github.com/ReyemTech/mcp-canada/commit/4b5bc2ff748dd3e42ca5597947e66692072f1643))
+
+- **11-01**: Implement shared file parsers (XLSX/CSV/XLS)
+  ([`618c69a`](https://github.com/ReyemTech/mcp-canada/commit/618c69af2012e7f8640e475e26f9efd509d6f2fd))
+
+- **11-02**: Create IRCC module skeleton and dataset registry
+  ([`f767d21`](https://github.com/ReyemTech/mcp-canada/commit/f767d21426ff6e64ea886967b9d860e50baae972))
+
+- **11-02**: Implement IRCC client functions
+  ([`b6a0f1d`](https://github.com/ReyemTech/mcp-canada/commit/b6a0f1d7f875079711d7c1b8778cd0d96c46a79c))
+
+- **11-03**: Add IRCC integration tests and update README
+  ([`6bbb134`](https://github.com/ReyemTech/mcp-canada/commit/6bbb134b58838c70340cb9920a23c3d864b3c41d))
+
+- **11-03**: Implement 10 ircc_ tool functions with TDD
+  ([`d3f8a7a`](https://github.com/ReyemTech/mcp-canada/commit/d3f8a7a8832c2f473bb4bf5a643e34a47a1128a7))
+
+- **11-04**: Add _parse_ircc_xlsx + DATASET_PARSE_CONFIG for multi-row merged headers
+  ([`24c3f1a`](https://github.com/ReyemTech/mcp-canada/commit/24c3f1a728ea60577a7f018fcd953151086b5a25))
+
+- **11-04**: Wire client.py to pass DATASET_PARSE_CONFIG to fetch_and_parse
+  ([`cf47603`](https://github.com/ReyemTech/mcp-canada/commit/cf47603ed2c4959cda4d80b136c5b3391b3624e4))
+
+### Testing
+
+- **11**: Complete UAT - 10/10 passed, all gaps resolved
+  ([`6b8c9c1`](https://github.com/ReyemTech/mcp-canada/commit/6b8c9c1414d72fed80679615f406585e2050c565))
+
+- **11**: Complete UAT - 6 passed, 2 issues
+  ([`784a065`](https://github.com/ReyemTech/mcp-canada/commit/784a065d6a14068a6957e5076e431131390f32d2))
+
+- **11**: Complete UAT - 9 passed, 1 minor issue
+  ([`55f7ed7`](https://github.com/ReyemTech/mcp-canada/commit/55f7ed77519fbf5fb3ea8b3afa4a0046f9a5bde8))
+
+- **11**: Diagnose IRCC header parsing blocker
+  ([`1d054bb`](https://github.com/ReyemTech/mcp-canada/commit/1d054bb69386accb1e23c6fcf3d3dc67a77612d9))
+
+- **11-01**: Add failing tests for shared file parsers
+  ([`74402c5`](https://github.com/ReyemTech/mcp-canada/commit/74402c51c2b52b10ccac10d2bc6b689841824044))
+
+- **11-02**: Add failing tests for IRCC client functions
+  ([`fa46086`](https://github.com/ReyemTech/mcp-canada/commit/fa460866995bc6b6ae51964b2aba47190c1d5211))
+
+
 ## v0.3.0 (2026-04-08)
 
 ### Bug Fixes

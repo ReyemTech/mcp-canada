@@ -4,7 +4,7 @@ milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
 stopped_at: Completed 11-ircc-immigration 11-03-PLAN.md
-last_updated: "2026-04-08T19:08:54.127Z"
+last_updated: "2026-04-08T19:14:24.782Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 5

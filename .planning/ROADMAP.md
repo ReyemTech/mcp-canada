@@ -96,4 +96,4 @@ Plans:
 | 7. Datastore + SSL | 3/3 | Complete   | 2026-04-07 | - |
 | 8. StatCan WDS | 3/3 | Complete   | 2026-04-07 | - |
 | 9. SDMX + Composite | 1/2 | In Progress|  | - |
-| 10. Tests + Docs | 2/2 | Complete   | 2026-04-08 | - |
+| 10. Tests + Docs | 2/2 | Complete    | 2026-04-08 | - |

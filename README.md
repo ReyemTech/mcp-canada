@@ -16,7 +16,7 @@
 
 ---
 
-**100 tools** across **8 federal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, and persistent local storage. All bilingual (English/French).
+**110 tools** across **9 federal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, and persistent local storage. All bilingual (English/French).
 
 
 ## Quick Start
@@ -86,7 +86,7 @@ See **[EXAMPLES.md](EXAMPLES.md)** for 23 cross-API intelligence scenarios — f
 
 ## How Discovery Works
 
-With 100 tools, listing all of them would consume half an agent's context window. Instead, **BM25 search** lets agents find exactly what they need:
+With 110 tools, listing all of them would consume half an agent's context window. Instead, **BM25 search** lets agents find exactly what they need:
 
 ```
 Agent: "What tools do you have for exchange rates?"
@@ -380,6 +380,29 @@ Local SQLite persistence layer for storing agent-generated data, fetched API res
 
 ---
 
+### 🍁 IRCC Immigration — 10 tools
+
+Permanent residents, temporary workers, study permits, Express Entry, asylum, and refugee data from [IRCC Open Data](https://www.ircc.canada.ca/opendata-donneesouvertes/data/).
+
+<!-- CATALOG:ircc:start -->
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `ircc_get_permanent_residents` | Get IRCC permanent resident admissions data by breakdown dimension. | `breakdown`, `year` |
+| `ircc_get_study_permits` | Get IRCC study permit issuance data by breakdown dimension. | `breakdown`, `year` |
+| `ircc_get_work_permits` | Get IRCC work permit data for IMP or TFWP programs. | `permit_type`, `breakdown`, `year` |
+| `ircc_get_express_entry` | Get IRCC Express Entry data for admissions or invited candidates. | `stream`, `breakdown`, `year` |
+| `ircc_get_tr_to_pr` | Get IRCC data on temporary residents who transitioned to permanent residence. | `breakdown`, `year` |
+| `ircc_get_asylum` | Get IRCC asylum claimant data by province and demographic breakdown. | `breakdown`, `year` |
+| `ircc_get_ops` | Get IRCC operational processing statistics (monthly snapshots). | `breakdown` |
+| `ircc_get_afghan` | Get IRCC data on Afghan refugees admitted to Canada. | `breakdown`, `year` |
+| `ircc_get_adhoc_pr` | Get IRCC ad-hoc historical permanent resident data (1980-2023, English-only). | `breakdown` |
+| `ircc_list_datasets` | List all available IRCC open data datasets with their breakdown dimensions. | — |
+<!-- CATALOG:ircc:end -->
+
+> **Note:** IRCC suppresses values between 0-5 (shown as null) and rounds all other values to the nearest multiple of 5 for privacy protection. Ad-hoc PR files (`ircc_get_adhoc_pr`) are English-only.
+
+---
+
 ## Response Format
 
 All tools return a consistent envelope:
@@ -429,6 +452,7 @@ src/mcp_canada/
     ├── ckan/              # 7 tools — Open Data Portal
     ├── nutrient_file/     # 8 tools — Canadian Nutrient File
     ├── datastore/         # 6 tools — local SQLite persistence
+    ├── ircc/              # 10 tools — IRCC Immigration Open Data
     └── weather/           # 34 tools — MSC GeoMet OGC API
         ├── current/       # 5 tools — realtime conditions, forecast, alerts
         ├── climate/       # 7 tools — daily/monthly/normals/trends

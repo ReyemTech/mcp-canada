@@ -1047,3 +1047,103 @@ class TestDatastoreScenarios:
         })
         assert "error" in result
         assert result["error"]["code"] == "INVALID_INPUT"
+
+
+# ─── IRCC Immigration scenarios ──────────────────────────────────────────────
+
+
+class TestIrccScenarios:
+
+    @pytest.mark.asyncio
+    async def test_ircc_permanent_residents_by_country(self, mcp_server):
+        """'How many permanent residents came from India in 2023?'"""
+        result = await call_tool(
+            mcp_server,
+            "ircc_get_permanent_residents",
+            {"breakdown": "country", "year": 2023},
+        )
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "IRCC Open Data"
+        assert isinstance(result["data"], list)
+
+    @pytest.mark.asyncio
+    async def test_ircc_study_permits(self, mcp_server):
+        """'How many study permits were issued by country?'"""
+        result = await call_tool(
+            mcp_server,
+            "ircc_get_study_permits",
+            {"breakdown": "country"},
+        )
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "IRCC Open Data"
+        assert isinstance(result["data"], list)
+
+    @pytest.mark.asyncio
+    async def test_ircc_discover_tools(self, mcp_server):
+        """'Find tools about Canadian immigration'"""
+        results = await discover(mcp_server, "immigration permanent residents Canada IRCC")
+        names = [r["name"] for r in results]
+        assert any(n.startswith("ircc_") for n in names), (
+            f"No ircc_ tools found for immigration query. Got: {names}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_ircc_invalid_breakdown(self, mcp_server):
+        """'What happens with a bad breakdown?'"""
+        result = await call_tool(
+            mcp_server,
+            "ircc_get_permanent_residents",
+            {"breakdown": "nonexistent"},
+        )
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_INPUT"
+
+    @pytest.mark.asyncio
+    async def test_ircc_list_datasets(self, mcp_server):
+        """'What IRCC datasets are available?'"""
+        result = await call_tool(mcp_server, "ircc_list_datasets", {})
+        assert "_meta" in result
+        assert isinstance(result["data"], list)
+        assert len(result["data"]) >= 10
+
+    @pytest.mark.asyncio
+    async def test_store_pr_data_to_datastore(self, mcp_server):
+        """Cross-module: fetch PR data then store to datastore and query it."""
+        pr_result = await call_tool(
+            mcp_server,
+            "ircc_get_permanent_residents",
+            {"breakdown": "country", "year": 2023},
+        )
+        assert "_meta" in pr_result
+        rows = pr_result["data"]
+        assert isinstance(rows, list)
+
+        # Create table and insert rows (use a subset to keep test fast)
+        sample_rows = rows[:3] if len(rows) >= 3 else rows
+        if not sample_rows:
+            pytest.skip("No PR data returned for year 2023 — skip cross-module test")
+
+        # Derive columns from the first row keys
+        first_row = sample_rows[0]
+        columns = [{"name": str(k), "type": "TEXT"} for k in first_row.keys()]
+
+        create_result = await call_tool(mcp_server, "ds_create_table", {
+            "table_name": "ircc_pr_test",
+            "columns": columns,
+        })
+        assert "_meta" in create_result
+
+        insert_result = await call_tool(mcp_server, "ds_insert_data", {
+            "table_name": "ircc_pr_test",
+            "rows": sample_rows,
+        })
+        assert "_meta" in insert_result
+
+        query_result = await call_tool(mcp_server, "ds_query", {
+            "sql": "SELECT * FROM ircc_pr_test",
+        })
+        assert "_meta" in query_result
+        assert query_result["data"]["row_count"] >= 1
+
+        # Cleanup
+        await call_tool(mcp_server, "ds_drop_table", {"table_name": "ircc_pr_test"})

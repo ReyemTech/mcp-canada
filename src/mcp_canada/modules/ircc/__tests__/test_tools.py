@@ -13,8 +13,6 @@ import httpx
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from mcp_canada.modules.ircc.constants import DATASET_REGISTRY
-from mcp_canada.shared.envelope import make_response, make_error
 
 
 # ---------------------------------------------------------------------------
@@ -67,7 +65,7 @@ class TestIrccGetPermanentResidents:
             side_effect=ValueError("Unknown breakdown 'nonexistent'"),
         ):
             from mcp_canada.modules.ircc.tools import ircc_get_permanent_residents
-            result = await ircc_get_permanent_residents(breakdown="nonexistent")
+            result = await ircc_get_permanent_residents(breakdown="nonexistent")  # type: ignore[arg-type]
         assert "error" in result
         assert result["error"]["code"] == "INVALID_INPUT"
 
@@ -152,7 +150,7 @@ class TestIrccGetStudyPermits:
             side_effect=ValueError("Unknown breakdown"),
         ):
             from mcp_canada.modules.ircc.tools import ircc_get_study_permits
-            result = await ircc_get_study_permits(breakdown="invalid")
+            result = await ircc_get_study_permits(breakdown="invalid")  # type: ignore[arg-type]
         assert result["error"]["code"] == "INVALID_INPUT"
 
 
@@ -191,7 +189,7 @@ class TestIrccGetWorkPermits:
     async def test_invalid_permit_type(self):
         """Invalid permit_type returns INVALID_INPUT."""
         from mcp_canada.modules.ircc.tools import ircc_get_work_permits
-        result = await ircc_get_work_permits(permit_type="invalid", breakdown="country")
+        result = await ircc_get_work_permits(permit_type="invalid", breakdown="country")  # type: ignore[arg-type]
         assert "error" in result
         assert result["error"]["code"] == "INVALID_INPUT"
 
@@ -204,7 +202,7 @@ class TestIrccGetWorkPermits:
             side_effect=ValueError("Unknown breakdown"),
         ):
             from mcp_canada.modules.ircc.tools import ircc_get_work_permits
-            result = await ircc_get_work_permits(permit_type="imp", breakdown="nonexistent")
+            result = await ircc_get_work_permits(permit_type="imp", breakdown="nonexistent")  # type: ignore[arg-type]
         assert result["error"]["code"] == "INVALID_INPUT"
 
 
@@ -242,7 +240,7 @@ class TestIrccGetExpressEntry:
     async def test_invalid_stream(self):
         """Invalid stream returns INVALID_INPUT."""
         from mcp_canada.modules.ircc.tools import ircc_get_express_entry
-        result = await ircc_get_express_entry(stream="invalid", breakdown="gender")
+        result = await ircc_get_express_entry(stream="invalid", breakdown="gender")  # type: ignore[arg-type]
         assert result["error"]["code"] == "INVALID_INPUT"
 
 
@@ -273,7 +271,7 @@ class TestIrccGetTrToPr:
             side_effect=ValueError("Unknown breakdown"),
         ):
             from mcp_canada.modules.ircc.tools import ircc_get_tr_to_pr
-            result = await ircc_get_tr_to_pr(breakdown="bad")
+            result = await ircc_get_tr_to_pr(breakdown="bad")  # type: ignore[arg-type]
         assert result["error"]["code"] == "INVALID_INPUT"
 
 
@@ -324,7 +322,7 @@ class TestIrccGetOps:
             side_effect=ValueError("Unknown breakdown"),
         ):
             from mcp_canada.modules.ircc.tools import ircc_get_ops
-            result = await ircc_get_ops(breakdown="bad")
+            result = await ircc_get_ops(breakdown="bad")  # type: ignore[arg-type]
         assert result["error"]["code"] == "INVALID_INPUT"
 
 

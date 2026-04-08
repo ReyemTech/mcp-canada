@@ -18,7 +18,6 @@
 
 **100 tools** across **8 federal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, and persistent local storage. All bilingual (English/French).
 
-> **Complementary to [mcp-statcan](https://github.com/reyemtech/mcp-statcan)** — which covers Statistics Canada. Together they form a complete Canadian government data toolkit.
 
 ## Quick Start
 
@@ -83,11 +82,11 @@ Environment variable: `MCP_CANADA_MODULES=bank_of_canada,recalls`
 
 ## Examples
 
-See **[EXAMPLES.md](EXAMPLES.md)** for 19 cross-API intelligence scenarios — from tracing prairie drought to the Canadian dollar, to building pharmaceutical safety audits, to assembling MP accountability briefs. Each example includes the exact prompt and tool chain you can run today.
+See **[EXAMPLES.md](EXAMPLES.md)** for 23 cross-API intelligence scenarios — from tracing prairie drought to the Canadian dollar, to building pharmaceutical safety audits, to assembling MP accountability briefs, to joining data from multiple APIs in a single SQL query. Each example includes the exact prompt and tool chain you can run today.
 
 ## How Discovery Works
 
-With 81 tools, listing all of them would consume half an agent's context window. Instead, **BM25 search** lets agents find exactly what they need:
+With 100 tools, listing all of them would consume half an agent's context window. Instead, **BM25 search** lets agents find exactly what they need:
 
 ```
 Agent: "What tools do you have for exchange rates?"
@@ -337,6 +336,8 @@ Real-time weather, climate, air quality, hydrology, and more from [MSC GeoMet OG
 ### 📊 Statistics Canada WDS + SDMX — 15 tools
 
 Time series data, cube metadata, catalog search, and SDMX server-side filtering from the [Statistics Canada Web Data Service](https://www.statcan.gc.ca/en/developers/wds).
+
+> Inspired by [mcp-statcan](https://github.com/aryanjhaveri/mcp-statcan) by Aryan Jhaveri.
 
 <!-- CATALOG:statcan:start -->
 | Tool | Description | Key Parameters |

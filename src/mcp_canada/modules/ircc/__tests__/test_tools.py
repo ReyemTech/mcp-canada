@@ -20,12 +20,24 @@ from unittest.mock import AsyncMock, MagicMock, patch
 # ---------------------------------------------------------------------------
 
 SAMPLE_ROWS = [
-    {"year": 2024, "country": "India", "admissions": 100},
-    {"year": 2023, "country": "Philippines", "admissions": 50},
-    {"year": 2022, "country": "China", "admissions": 75},
+    {
+        "country_of_citizenship": "India",
+        "2024_q1_jan": "100",
+        "2024_q1_total": "100",
+        "2024_total": "100",
+        "2023_q1_jan": "50",
+        "2023_q1_total": "50",
+        "2023_total": "50",
+    },
 ]
 
-SAMPLE_ROW_FR = [{"annee": 2024, "pays": "Inde", "admissions": 100}]
+SAMPLE_ROW_FR = [
+    {
+        "pays_de_citoyennete": "Inde",
+        "2024_q1_jan": "100",
+        "2024_total": "100",
+    },
+]
 
 
 def _make_client_mock(rows=None, cached=False):
@@ -71,7 +83,7 @@ class TestIrccGetPermanentResidents:
 
     @pytest.mark.asyncio
     async def test_year_filter_works(self):
-        """year parameter filters rows to matching year only."""
+        """year parameter filters nested output to matching year only."""
         with patch(
             "mcp_canada.modules.ircc.tools.fetch_permanent_residents",
             new_callable=AsyncMock,
@@ -80,21 +92,22 @@ class TestIrccGetPermanentResidents:
             from mcp_canada.modules.ircc.tools import ircc_get_permanent_residents
             result = await ircc_get_permanent_residents(breakdown="country", year=2024)
         assert "_meta" in result
-        assert all(r["year"] == 2024 for r in result["data"])
-        assert len(result["data"]) == 1
+        row = result["data"][0]
+        assert "2024" in row["years"]
+        assert "2023" not in row["years"]
 
     @pytest.mark.asyncio
     async def test_year_filter_fr_column(self):
-        """year filter works on French column name 'annee'."""
-        rows = [{"annee": 2024, "pays": "Inde"}, {"annee": 2023, "pays": "Chine"}]
+        """year filter works on French data with nested format."""
         with patch(
             "mcp_canada.modules.ircc.tools.fetch_permanent_residents",
             new_callable=AsyncMock,
-            return_value=(rows, False),
+            return_value=(list(SAMPLE_ROW_FR), False),
         ):
             from mcp_canada.modules.ircc.tools import ircc_get_permanent_residents
             result = await ircc_get_permanent_residents(breakdown="country", year=2024, lang="fr")
-        assert len(result["data"]) == 1
+        row = result["data"][0]
+        assert "2024" in row["years"]
 
     @pytest.mark.asyncio
     async def test_lang_passthrough(self):

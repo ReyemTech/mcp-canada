@@ -8,7 +8,8 @@ Privacy note: IRCC suppresses values between 0-5 (shown as null) and rounds all
 other values to the nearest multiple of 5.
 """
 
-from typing import Literal
+import re
+from typing import Any, Literal
 
 import httpx
 from fastmcp.tools import tool
@@ -32,17 +33,67 @@ from mcp_canada.shared.envelope import make_error, make_response
 _API_NAME = "IRCC Open Data"
 _API_BASE = "https://www.ircc.canada.ca/opendata-donneesouvertes/data/"
 
+# Patterns for temporal column names produced by the IRCC parser
+_RE_YEAR_QUARTER_MONTH = re.compile(r"^(\d{4})_(q\d)_(.+)$")
+_RE_YEAR_TOTAL = re.compile(r"^(\d{4})_(?:year_)?total$")
+_RE_YEAR_MONTH = re.compile(r"^(\d{4})_([a-z]+)$")
 
-def _filter_by_year(rows: list[dict], year: int) -> list[dict]:
-    """Filter rows to those matching the given year.
 
-    Checks multiple possible column names since EN/FR files differ.
+def _reshape_to_nested(
+    flat_rows: list[dict[str, Any]],
+    year: int | None = None,
+) -> list[dict[str, Any]]:
+    """Reshape flat IRCC rows into nested year > quarter > month dicts.
+
+    Input keys like "2015_q1_jan", "2015_q1_total", "2015_year_total"
+    become: {"years": {"2015": {"q1": {"jan": "90", "total": "435"}, "total": "2,630"}}}
+
+    Label columns (no year prefix) are preserved at the top level.
+    If year is specified, only that year is included in the output.
     """
-    year_str = str(year)
-    return [
-        r for r in rows
-        if any(str(r.get(k, "")) == year_str for k in ("year", "annee", "année", "Year", "Annee"))
-    ]
+    result: list[dict[str, Any]] = []
+    for row in flat_rows:
+        nested: dict[str, Any] = {}
+        years: dict[str, Any] = {}
+
+        for key, value in row.items():
+            # Try year_quarter_month (e.g. 2015_q1_jan, 2015_q1_total)
+            m = _RE_YEAR_QUARTER_MONTH.match(key)
+            if m:
+                yr, qtr, month = m.group(1), m.group(2), m.group(3)
+                years.setdefault(yr, {}).setdefault(qtr, {})[month] = value
+                continue
+
+            # Try year total (e.g. 2015_total, 2015_year_total)
+            m = _RE_YEAR_TOTAL.match(key)
+            if m:
+                yr = m.group(1)
+                years.setdefault(yr, {})["total"] = value
+                continue
+
+            # Try year_month without quarter (e.g. 2015_jan for asylum/ops)
+            m = _RE_YEAR_MONTH.match(key)
+            if m:
+                yr, month = m.group(1), m.group(2)
+                if month != "total":
+                    years.setdefault(yr, {})[month] = value
+                else:
+                    years.setdefault(yr, {})["total"] = value
+                continue
+
+            # Label column — keep at top level
+            nested[key] = value
+
+        # Apply year filter
+        if year is not None:
+            year_str = str(year)
+            years = {k: v for k, v in years.items() if k == year_str}
+
+        if years:
+            nested["years"] = years
+        result.append(nested)
+
+    return result
 
 
 def _registry_url(dataset_key: str, breakdown: str, lang: str) -> str:
@@ -80,11 +131,8 @@ async def ircc_get_permanent_residents(
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
-    if year is not None:
-        rows = _filter_by_year(rows, year)
-
     return make_response(
-        rows,
+        _reshape_to_nested(rows, year=year),
         api_name=_API_NAME,
         api_url=_registry_url("pr", breakdown, lang),
         cached=cached,
@@ -117,11 +165,8 @@ async def ircc_get_study_permits(
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
-    if year is not None:
-        rows = _filter_by_year(rows, year)
-
     return make_response(
-        rows,
+        _reshape_to_nested(rows, year=year),
         api_name=_API_NAME,
         api_url=_registry_url("study", breakdown, lang),
         cached=cached,
@@ -164,11 +209,8 @@ async def ircc_get_work_permits(
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
-    if year is not None:
-        rows = _filter_by_year(rows, year)
-
     return make_response(
-        rows,
+        _reshape_to_nested(rows, year=year),
         api_name=_API_NAME,
         api_url=_registry_url(dataset_key, breakdown, lang),
         cached=cached,
@@ -211,11 +253,8 @@ async def ircc_get_express_entry(
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
-    if year is not None:
-        rows = _filter_by_year(rows, year)
-
     return make_response(
-        rows,
+        _reshape_to_nested(rows, year=year),
         api_name=_API_NAME,
         api_url=_registry_url(dataset_key, breakdown, lang),
         cached=cached,
@@ -246,11 +285,8 @@ async def ircc_get_tr_to_pr(
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
-    if year is not None:
-        rows = _filter_by_year(rows, year)
-
     return make_response(
-        rows,
+        _reshape_to_nested(rows, year=year),
         api_name=_API_NAME,
         api_url=_registry_url("tr_to_pr", breakdown, lang),
         cached=cached,
@@ -281,11 +317,8 @@ async def ircc_get_asylum(
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
-    if year is not None:
-        rows = _filter_by_year(rows, year)
-
     return make_response(
-        rows,
+        _reshape_to_nested(rows, year=year),
         api_name=_API_NAME,
         api_url=_registry_url("asylum", breakdown, lang),
         cached=cached,
@@ -320,7 +353,7 @@ async def ircc_get_ops(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        rows,
+        _reshape_to_nested(rows),
         api_name=_API_NAME,
         api_url=_registry_url("ops", breakdown, lang),
         cached=cached,
@@ -351,11 +384,8 @@ async def ircc_get_afghan(
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
-    if year is not None:
-        rows = _filter_by_year(rows, year)
-
     return make_response(
-        rows,
+        _reshape_to_nested(rows, year=year),
         api_name=_API_NAME,
         api_url=_registry_url("afghan", breakdown, lang),
         cached=cached,
@@ -389,7 +419,7 @@ async def ircc_get_adhoc_pr(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        rows,
+        _reshape_to_nested(rows),
         api_name=_API_NAME,
         api_url=_registry_url("adhoc_pr", breakdown, lang),
         cached=cached,

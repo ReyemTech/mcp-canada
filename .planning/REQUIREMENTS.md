@@ -69,8 +69,8 @@
 - [x] **IRCC-04**: Agent can query permanent residents by country, province, gender, age, CMA, NOC, and immigration category
 - [x] **IRCC-05**: Agent can query study permits, work permits (IMP + TFWP), Express Entry (admissions + invited), TR-to-PR transitions, asylum claimants, operational processing, and Afghan refugees
 - [x] **IRCC-06**: IRCC tools handle bilingual file variants (EN/FR) and multi-sheet workbooks
-- [ ] **IRCC-07**: All IRCC tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Keywords/Use-for docstrings, ircc_ prefix)
-- [ ] **IRCC-08**: Parsed IRCC data can be stored to the shared datastore for cross-module SQL queries
+- [x] **IRCC-07**: All IRCC tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Keywords/Use-for docstrings, ircc_ prefix)
+- [x] **IRCC-08**: Parsed IRCC data can be stored to the shared datastore for cross-module SQL queries
 - [x] **IRCC-09**: Shared parser is reusable by any future module (not IRCC-specific)
 
 ## v2 Requirements

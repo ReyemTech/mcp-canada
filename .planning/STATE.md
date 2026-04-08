@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 11-ircc-immigration 11-02-PLAN.md
-last_updated: "2026-04-08T19:00:18.242Z"
+stopped_at: Completed 11-ircc-immigration 11-03-PLAN.md
+last_updated: "2026-04-08T19:08:54.127Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 13
-  completed_plans: 12
+  completed_plans: 13
   percent: 0
 ---
 
@@ -62,6 +62,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 10-tests-docs P01 | 10 | 2 tasks | 1 files |
 | Phase 11-ircc-immigration P01 | 8min | 1 tasks | 4 files |
 | Phase 11-ircc-immigration P02 | 4min | 2 tasks | 7 files |
+| Phase 11-ircc-immigration P03 | 18min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,8 @@ Recent decisions affecting current work:
 - [Phase 11-ircc-immigration]: DATASET_REGISTRY triple-nested dict (dataset, breakdown, lang) -> URL is single source of truth for IRCC module
 - [Phase 11-ircc-immigration]: adhoc_pr English-only: lang=fr raises ValueError since no fr key exists in registry for that dataset
 - [Phase 11-ircc-immigration]: _fetch_dataset private helper: all 11 IRCC client functions are one-liners delegating to this shared helper
+- [Phase 11-ircc-immigration]: Work permits (IMP + TFWP) combined into ircc_get_work_permits(permit_type); Express Entry combined into ircc_get_express_entry(stream) to reduce tool count
+- [Phase 11-ircc-immigration]: Year filtering via _filter_by_year checks year/annee/annee/Year column variants for EN/FR XLSX compatibility
 
 ### Roadmap Evolution
 
@@ -120,6 +123,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-08T19:00:18.240Z
-Stopped at: Completed 11-ircc-immigration 11-02-PLAN.md
+Last session: 2026-04-08T19:08:54.124Z
+Stopped at: Completed 11-ircc-immigration 11-03-PLAN.md
 Resume file: None

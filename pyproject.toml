@@ -30,6 +30,7 @@ dependencies = [
     "tenacity>=8.0.0",
     "InquirerPy>=0.3.4",
     "aiosqlite>=0.22.0",
+    "openpyxl>=3.1.5",
 ]
 
 [project.urls]
@@ -38,6 +39,12 @@ Issues = "https://github.com/reyemtech/mcp-canada/issues"
 
 [project.scripts]
 mcp-canada = "mcp_canada.server:main"
+
+[project.optional-dependencies]
+ircc = [
+    "pandas>=3.0.2",
+    "xlrd>=2.0.2",
+]
 
 [dependency-groups]
 dev = [

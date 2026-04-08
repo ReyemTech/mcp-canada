@@ -147,10 +147,25 @@ def _reshape_to_nested(
                         # Total/summary row for this group
                         grouped[group]["total"] = {"years": years_data} if years_data else {}
 
+                # Clean group names: strip " Total" suffix from groups that
+                # have sub-items beyond just "total" (i.e. actual breakdowns)
+                cleaned: dict[str, dict[str, Any]] = {}
+                for group_name, items in grouped.items():
+                    name = group_name
+                    has_subitems = any(k != "total" for k in items)
+                    if has_subitems and name.endswith(" Total"):
+                        name = name[: -len(" Total")]
+                    # Merge if cleaned name already exists (e.g. "Female Total" → "Female"
+                    # merges with standalone "Female" summary row)
+                    if name in cleaned:
+                        cleaned[name].update(items)
+                    else:
+                        cleaned[name] = items
+
                 # Convert to list format
                 result = [
                     {"group": group_name, "items": items}
-                    for group_name, items in grouped.items()
+                    for group_name, items in cleaned.items()
                 ]
 
     return result

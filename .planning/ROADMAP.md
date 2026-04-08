@@ -101,7 +101,7 @@ Plans:
 ### Phase 11: Shared File Parsers + IRCC Immigration
 **Goal**: Build a shared XLSX/CSV/XLS parser library, then create an IRCC module that uses it to expose 10 actively-updated immigration datasets (150+ files) as clean ircc_ tools
 **Depends on**: Phase 7 (datastore), Phase 10 (docs pattern)
-**Requirements**: TBD
+**Requirements**: IRCC-01, IRCC-02, IRCC-03, IRCC-04, IRCC-05, IRCC-06, IRCC-07, IRCC-08, IRCC-09
 **Success Criteria** (what must be TRUE):
   1. Shared parser can fetch and parse XLSX, CSV, and XLS files from any URL into list[dict] rows
   2. Agent can query permanent residents by country of citizenship, province, and immigration category
@@ -110,9 +110,9 @@ Plans:
   5. All IRCC tools follow mcp-canada conventions (envelopes, bilingual, BM25 keywords)
   6. Parsed IRCC data can be stored to the shared datastore for cross-module SQL queries
   7. Any future module can reuse the shared parser to fetch CKAN dataset resources
-**Plans**: TBD
-**Depends on:** Phase 10
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 11 to break down)
+- [ ] 11-01-PLAN.md — Shared file parser library (parsers.py) + openpyxl dependency + unit tests
+- [ ] 11-02-PLAN.md — IRCC module skeleton: dataset registry, client functions, unit tests
+- [ ] 11-03-PLAN.md — IRCC tool functions, integration tests, README update

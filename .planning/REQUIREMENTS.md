@@ -61,6 +61,18 @@
 - [x] **INF-08**: README updated with StatCan module and datastore documentation
 - [x] **INF-09**: EXAMPLES.md updated with cross-module SQL query examples
 
+### IRCC Immigration
+
+- [ ] **IRCC-01**: Shared parser can fetch and parse XLSX files from any URL into list[dict] rows with snake_case keys
+- [ ] **IRCC-02**: Shared parser can fetch and parse CSV files with BOM handling into list[dict] rows
+- [ ] **IRCC-03**: Privacy masking converts IRCC '--' suppressed values to None during parsing
+- [ ] **IRCC-04**: Agent can query permanent residents by country, province, gender, age, CMA, NOC, and immigration category
+- [ ] **IRCC-05**: Agent can query study permits, work permits (IMP + TFWP), Express Entry (admissions + invited), TR-to-PR transitions, asylum claimants, operational processing, and Afghan refugees
+- [ ] **IRCC-06**: IRCC tools handle bilingual file variants (EN/FR) and multi-sheet workbooks
+- [ ] **IRCC-07**: All IRCC tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Keywords/Use-for docstrings, ircc_ prefix)
+- [ ] **IRCC-08**: Parsed IRCC data can be stored to the shared datastore for cross-module SQL queries
+- [ ] **IRCC-09**: Shared parser is reusable by any future module (not IRCC-specific)
+
 ## v2 Requirements
 
 ### Extended Datastore
@@ -85,6 +97,8 @@
 | HTTP transport for datastore | SQLite is local-only by design |
 | SQLite full-text search on cube titles | BM25 discovery + in-memory cache handles this |
 | Migrating existing modules to use datastore | Future enhancement for v1.2+ |
+| Generic CKAN resource parser tool | Scope creep — shared/parsers.py makes this trivial to add later |
+| IRCC data change detection | Monitoring feature, not core |
 
 ## Traceability
 
@@ -122,12 +136,22 @@
 | INF-07 | Phase 10 | Complete |
 | INF-08 | Phase 10 | Complete |
 | INF-09 | Phase 10 | Complete |
+| IRCC-01 | Phase 11 | Planned |
+| IRCC-02 | Phase 11 | Planned |
+| IRCC-03 | Phase 11 | Planned |
+| IRCC-04 | Phase 11 | Planned |
+| IRCC-05 | Phase 11 | Planned |
+| IRCC-06 | Phase 11 | Planned |
+| IRCC-07 | Phase 11 | Planned |
+| IRCC-08 | Phase 11 | Planned |
+| IRCC-09 | Phase 11 | Planned |
 
 **Coverage:**
 - v1 requirements: 32 total
 - Mapped to phases: 32
 - Unmapped: 0
+- IRCC requirements: 9 total (Phase 11)
 
 ---
 *Requirements defined: 2026-04-07*
-*Last updated: 2026-04-07 after roadmap creation*
+*Last updated: 2026-04-08 after Phase 11 planning*

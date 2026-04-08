@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 11-ircc-immigration 11-03-PLAN.md
-last_updated: "2026-04-08T19:14:24.782Z"
+stopped_at: Completed 11-ircc-immigration 11-04-PLAN.md
+last_updated: "2026-04-08T19:57:44.586Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 5
   completed_phases: 5
-  total_plans: 13
-  completed_plans: 13
+  total_plans: 14
+  completed_plans: 14
   percent: 0
 ---
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 11-ircc-immigration P01 | 8min | 1 tasks | 4 files |
 | Phase 11-ircc-immigration P02 | 4min | 2 tasks | 7 files |
 | Phase 11-ircc-immigration P03 | 18min | 2 tasks | 4 files |
+| Phase 11-ircc-immigration P04 | 8min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,8 @@ Recent decisions affecting current work:
 - [Phase 11-ircc-immigration]: _fetch_dataset private helper: all 11 IRCC client functions are one-liners delegating to this shared helper
 - [Phase 11-ircc-immigration]: Work permits (IMP + TFWP) combined into ircc_get_work_permits(permit_type); Express Entry combined into ircc_get_express_entry(stream) to reduce tool count
 - [Phase 11-ircc-immigration]: Year filtering via _filter_by_year checks year/annee/annee/Year column variants for EN/FR XLSX compatibility
+- [Phase 11-ircc-immigration]: Last-row-only raw-value guard prevents spurious forward-fill in month header row for Year Total columns
+- [Phase 11-ircc-immigration]: Label col suffix (_{n}) added when multiple label cols share a merged header cell to prevent dict key collisions
 
 ### Roadmap Evolution
 
@@ -123,6 +126,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-08T19:08:54.124Z
-Stopped at: Completed 11-ircc-immigration 11-03-PLAN.md
+Last session: 2026-04-08T19:57:44.583Z
+Stopped at: Completed 11-ircc-immigration 11-04-PLAN.md
 Resume file: None

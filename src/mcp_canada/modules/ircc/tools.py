@@ -34,7 +34,7 @@ _API_NAME = "IRCC Open Data"
 _API_BASE = "https://www.ircc.canada.ca/opendata-donneesouvertes/data/"
 
 # Patterns for temporal column names produced by the IRCC parser
-_RE_YEAR_QUARTER_MONTH = re.compile(r"^(\d{4})_(q\d)_(.+)$")
+_RE_YEAR_QUARTER_MONTH = re.compile(r"^(\d{4})_([qt]\d)_(.+)$")
 _RE_YEAR_TOTAL = re.compile(r"^(\d{4})_(?:year_)?total$")
 _RE_YEAR_MONTH = re.compile(r"^(\d{4})_([a-z]+)$")
 

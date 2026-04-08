@@ -110,9 +110,10 @@ Plans:
   5. All IRCC tools follow mcp-canada conventions (envelopes, bilingual, BM25 keywords)
   6. Parsed IRCC data can be stored to the shared datastore for cross-module SQL queries
   7. Any future module can reuse the shared parser to fetch CKAN dataset resources
-**Plans:** 3/3 plans complete
+**Plans:** 4 plans (3 complete + 1 gap closure)
 
 Plans:
-- [ ] 11-01-PLAN.md — Shared file parser library (parsers.py) + openpyxl dependency + unit tests
-- [ ] 11-02-PLAN.md — IRCC module skeleton: dataset registry, client functions, unit tests
-- [ ] 11-03-PLAN.md — IRCC tool functions, integration tests, README update
+- [x] 11-01-PLAN.md — Shared file parser library (parsers.py) + openpyxl dependency + unit tests
+- [x] 11-02-PLAN.md — IRCC module skeleton: dataset registry, client functions, unit tests
+- [x] 11-03-PLAN.md — IRCC tool functions, integration tests, README update
+- [ ] 11-04-PLAN.md — Gap closure: IRCC multi-row merged header parsing (UAT blocker)

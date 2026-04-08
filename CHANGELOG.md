@@ -2,6 +2,19 @@
 
 <!-- CHANGELOG -->
 
+## v0.4.2 (2026-04-08)
+
+### Bug Fixes
+
+- Print version to stderr on server start
+  ([`b583860`](https://github.com/ReyemTech/mcp-canada/commit/b5838601b247955f1144b39284d369f120800e53))
+
+### Chores
+
+- Sync uv.lock after release
+  ([`c30083a`](https://github.com/ReyemTech/mcp-canada/commit/c30083a10f817169463ea1898d59cf670a831216))
+
+
 ## v0.4.1 (2026-04-08)
 
 ### Bug Fixes

@@ -112,4 +112,6 @@ async def test_list_modules_returns_module_info():
     assert isinstance(result, dict), "list_modules should return a dict"
     assert "_meta" in result, "list_modules response should have '_meta' key"
     assert "data" in result, "list_modules response should have 'data' key"
-    assert isinstance(result["data"], list), "list_modules data should be a list"
+    assert "version" in result["data"], "list_modules data should have 'version' key"
+    assert "modules" in result["data"], "list_modules data should have 'modules' key"
+    assert isinstance(result["data"]["modules"], list), "list_modules modules should be a list"

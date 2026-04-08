@@ -50,8 +50,10 @@ async def list_modules() -> dict:
                 "tool_count": tool_count,
             })
 
+    from mcp_canada import __version__
+
     return make_response(
-        module_infos,
+        {"version": __version__, "modules": module_infos},
         api_name="mcp-canada",
         api_url="internal://list_modules",
         cached=False,

@@ -2,6 +2,19 @@
 
 <!-- CHANGELOG -->
 
+## v0.4.3 (2026-04-08)
+
+### Bug Fixes
+
+- Move xlrd to base dependencies for adhoc_pr support
+  ([`6f21d74`](https://github.com/ReyemTech/mcp-canada/commit/6f21d741704018ed6435d0c37045cfc0fc5fce04))
+
+### Chores
+
+- Sync uv.lock after release
+  ([`ea33ba0`](https://github.com/ReyemTech/mcp-canada/commit/ea33ba0cd3ea938261a796e7e754748b641650da))
+
+
 ## v0.4.2 (2026-04-08)
 
 ### Bug Fixes

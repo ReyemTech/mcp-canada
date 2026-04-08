@@ -101,10 +101,13 @@ class TestMaskPrivacy:
 
         assert _mask_privacy(" -- ") is None
 
-    def test_numeric_string_unchanged(self) -> None:
+    def test_numeric_string_converted_to_int(self) -> None:
         from mcp_canada.shared.parsers import _mask_privacy
 
-        assert _mask_privacy("123") == "123"
+        assert _mask_privacy("123") == 123
+        assert _mask_privacy("2,630") == 2630
+        assert _mask_privacy("  13 365") == 13365
+        assert _mask_privacy("1.5") == 1.5
 
     def test_int_unchanged(self) -> None:
         from mcp_canada.shared.parsers import _mask_privacy
@@ -282,7 +285,7 @@ class TestParseCsv:
 
         assert len(result) == 1
         assert "country_of_citizenship" in result[0]
-        assert result[0]["year"] == "2020"
+        assert result[0]["year"] == 2020
 
     def test_privacy_masking_in_csv(self) -> None:
         """_parse_csv with '--' values returns None in output."""
@@ -295,7 +298,7 @@ class TestParseCsv:
         result = _parse_csv(content)
 
         assert result[0]["count"] is None
-        assert result[1]["count"] == "5"
+        assert result[1]["count"] == 5
 
 
 # ---------------------------------------------------------------------------
@@ -623,8 +626,8 @@ class TestParseIrccXlsx:
 
         row = result[0]
         assert row["country_of_citizenship"] == "Canada"
-        assert row["2015_q1_jan"] == "90"
-        assert row["2015_q1_feb"] == "2,630"
+        assert row["2015_q1_jan"] == 90
+        assert row["2015_q1_feb"] == 2630
 
     def test_layout_a_privacy_masking(self) -> None:
         """Layout A: '--' values are masked to None."""
@@ -637,7 +640,7 @@ class TestParseIrccXlsx:
         result = _parse_ircc_xlsx(content, skip_rows=2, header_rows=3, label_cols=1)
 
         assert result[0]["2015_q1_jan"] is None
-        assert result[0]["2015_q1_feb"] == "100"
+        assert result[0]["2015_q1_feb"] == 100
 
     def test_layout_a_strips_trailing_empty_rows(self) -> None:
         """Layout A: all-None data rows at end are stripped."""

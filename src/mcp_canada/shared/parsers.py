@@ -47,18 +47,38 @@ def _normalize_key(header: str) -> str:
     return key
 
 
-def _mask_privacy(value: Any) -> Any:
-    """Convert privacy-masked '--' values to None.
+_RE_NUMERIC_STR = re.compile(r"^[\s\d,.\u00a0\u202f]+$")
 
-    Returns None for '--' strings (with optional surrounding whitespace),
-    and None for pandas NaN/NaT/NA if pandas is available. All other
-    values are returned unchanged.
+
+def _mask_privacy(value: Any) -> Any:
+    """Clean and normalize cell values.
+
+    - Returns None for '--' privacy-masked strings
+    - Returns None for pandas NaN/NaT/NA
+    - Converts numeric strings to int/float: strips whitespace, removes
+      thousand separators (commas, spaces, non-breaking spaces)
+    - All other values returned unchanged
     """
     if value is None:
         return None
     if isinstance(value, str):
-        if value.strip() == "--":
+        stripped = value.strip()
+        if stripped == "--":
             return None
+        if not stripped:
+            return value
+        # Try to parse numeric strings (e.g. "13 365", "2,630", "1.5")
+        if _RE_NUMERIC_STR.match(stripped):
+            # Remove thousand separators: commas, regular spaces, non-breaking spaces
+            cleaned = stripped.replace(",", "").replace("\u00a0", "").replace("\u202f", "").replace(" ", "")
+            if not cleaned:
+                return value
+            try:
+                if "." in cleaned:
+                    return float(cleaned)
+                return int(cleaned)
+            except ValueError:
+                return value
         return value
     # Handle pandas NA types if pandas is available
     try:

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 11-ircc-immigration-01-PLAN.md
-last_updated: "2026-04-08T18:57:25.716Z"
+stopped_at: Completed 11-ircc-immigration 11-02-PLAN.md
+last_updated: "2026-04-08T19:00:18.242Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 13
-  completed_plans: 11
+  completed_plans: 12
   percent: 0
 ---
 
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 10-tests-docs P02 | 8min | 2 tasks | 2 files |
 | Phase 10-tests-docs P01 | 10 | 2 tasks | 1 files |
 | Phase 11-ircc-immigration P01 | 8min | 1 tasks | 4 files |
+| Phase 11-ircc-immigration P02 | 4min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,9 @@ Recent decisions affecting current work:
 - [Phase 10-tests-docs]: CPI Canada coordinate '1.1.0.0.0.0.0.0.0.0' confirmed as stable anchor for coord-based WDS integration tests
 - [Phase 11-ircc-immigration]: Parser uses pandas when available (better multi-sheet/encoding/types), falls back to openpyxl on ImportError
 - [Phase 11-ircc-immigration]: fetch_and_parse caches only successful results; errors propagate from _fetch() — never return [] on failure
+- [Phase 11-ircc-immigration]: DATASET_REGISTRY triple-nested dict (dataset, breakdown, lang) -> URL is single source of truth for IRCC module
+- [Phase 11-ircc-immigration]: adhoc_pr English-only: lang=fr raises ValueError since no fr key exists in registry for that dataset
+- [Phase 11-ircc-immigration]: _fetch_dataset private helper: all 11 IRCC client functions are one-liners delegating to this shared helper
 
 ### Roadmap Evolution
 
@@ -116,6 +120,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-08T18:57:25.714Z
-Stopped at: Completed 11-ircc-immigration-01-PLAN.md
+Last session: 2026-04-08T19:00:18.240Z
+Stopped at: Completed 11-ircc-immigration 11-02-PLAN.md
 Resume file: None

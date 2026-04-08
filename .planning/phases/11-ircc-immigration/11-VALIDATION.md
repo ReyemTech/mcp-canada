@@ -41,20 +41,20 @@ created: 2026-04-08
 | 11-01-01 | 01 | 1 | IRCC-01 | unit | `uv run pytest src/mcp_canada/shared/__tests__/test_parsers.py -x` | ❌ W0 | ⬜ pending |
 | 11-01-02 | 01 | 1 | IRCC-02 | unit | `uv run pytest src/mcp_canada/shared/__tests__/test_parsers.py -x` | ❌ W0 | ⬜ pending |
 | 11-01-03 | 01 | 1 | IRCC-03 | unit | `uv run pytest src/mcp_canada/shared/__tests__/test_parsers.py -x` | ❌ W0 | ⬜ pending |
-| 11-02-01 | 02 | 1 | IRCC-04 | unit | `uv run pytest src/mcp_canada/modules/ircc/__tests__/test_tools.py -x` | ❌ W0 | ⬜ pending |
-| 11-02-02 | 02 | 1 | IRCC-05 | unit | `uv run pytest src/mcp_canada/modules/ircc/__tests__/test_tools.py -x` | ❌ W0 | ⬜ pending |
-| 11-02-03 | 02 | 1 | IRCC-06 | unit | `uv run pytest src/mcp_canada/modules/ircc/__tests__/test_tools.py -x` | ❌ W0 | ⬜ pending |
+| 11-02-01 | 02 | 1 | IRCC-04 | unit | `uv run pytest src/mcp_canada/modules/ircc/__tests__/test_client.py -x` | ❌ W0 | ⬜ pending |
+| 11-02-02 | 02 | 1 | IRCC-05 | unit | `uv run pytest src/mcp_canada/modules/ircc/__tests__/test_client.py -x` | ❌ W0 | ⬜ pending |
+| 11-02-03 | 02 | 1 | IRCC-06 | unit | `uv run pytest src/mcp_canada/modules/ircc/__tests__/test_client.py -x` | ❌ W0 | ⬜ pending |
 | 11-03-01 | 03 | 2 | IRCC-07 | integration | `uv run pytest tests/integration/test_tool_scenarios.py::TestIrccScenarios -v -m integration` | ❌ W0 | ⬜ pending |
 | 11-03-02 | 03 | 2 | IRCC-08 | integration | `uv run pytest tests/integration/test_tool_scenarios.py::TestIrccScenarios::test_discover_ircc_tools -v -m integration` | ❌ W0 | ⬜ pending |
 | 11-03-03 | 03 | 2 | IRCC-09 | integration | `uv run pytest tests/integration/test_tool_scenarios.py::TestIrccScenarios::test_store_pr_data_to_datastore -v -m integration` | ❌ W0 | ⬜ pending |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: pending / green / red / flaky*
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] `src/mcp_canada/shared/__tests__/test_parsers.py` — unit tests for `fetch_and_parse()`, `_parse_xlsx()`, `_parse_csv()`, `_mask_privacy()`
+- [ ] `src/mcp_canada/shared/__tests__/test_parsers.py` — unit tests for `fetch_and_parse()`, `_parse_xlsx()`, `_parse_xlsx_pandas()`, `_parse_xlsx_openpyxl()`, `_parse_csv()`, `_mask_privacy()`
 - [ ] `src/mcp_canada/modules/ircc/__tests__/__init__.py` — empty init
 - [ ] `src/mcp_canada/modules/ircc/__tests__/conftest.py` — sample XLSX bytes fixtures (minimal synthetic workbook via openpyxl)
 - [ ] `src/mcp_canada/modules/ircc/__tests__/test_client.py` — client function tests with mocked `fetch_and_parse`

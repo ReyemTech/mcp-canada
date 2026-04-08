@@ -315,16 +315,36 @@ def _parse_ircc_xlsx(
                             parts.append(part)
 
             if parts:
-                composite = "_".join(parts)
-                headers.append(_normalize_key(composite))
+                # Deduplicate adjacent parts (e.g. ["2015", "2015 Total"] -> ["2015", "Total"])
+                deduped: list[str] = []
+                for p in parts:
+                    # If part starts with previous part text, strip the prefix
+                    if deduped:
+                        prev_lower = deduped[-1].lower().replace(" ", "_")
+                        p_lower = p.lower().replace(" ", "_")
+                        if p_lower.startswith(prev_lower + "_"):
+                            p = p[len(deduped[-1]) + 1:]
+                    if p and (not deduped or deduped[-1] != p):
+                        deduped.append(p)
+                composite = "_".join(deduped)
+                # Use _normalize_key but strip the col_ prefix for temporal columns
+                # since digit-leading names like "2015_q1_jan" are expected
+                key = _normalize_key(composite)
+                if key.startswith("col_"):
+                    key = key[4:]
+                headers.append(key)
             else:
                 headers.append(f"col_{col_idx}")
 
-    # Build data records, stripping trailing all-None rows
+    # Build data records, filtering out rows where all data columns are null
     result: list[dict[str, Any]] = []
     for row in data_rows:
-        # Skip all-None rows
+        # Skip rows where all values are None
         if all(v is None for v in row):
+            continue
+        # Skip rows where all DATA columns (after label cols) are None
+        data_values = list(row[label_cols:])
+        if all(v is None for v in data_values):
             continue
         record = {
             headers[i]: _mask_privacy(v)
@@ -332,10 +352,6 @@ def _parse_ircc_xlsx(
             if i < len(headers)
         }
         result.append(record)
-
-    # Strip trailing all-None records (values all None after masking)
-    while result and all(v is None for v in result[-1].values()):
-        result.pop()
 
     return result
 

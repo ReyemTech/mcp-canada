@@ -606,10 +606,10 @@ class TestParseIrccXlsx:
         # Label col: first header row value
         assert "country_of_citizenship" in row
         # Composite temporal cols: year_quarter_month
-        assert "col_2015_q1_jan" in row
-        assert "col_2015_q1_feb" in row
-        assert "col_2015_q1_q1_total" in row
-        assert "col_2015_year_total" in row
+        assert "2015_q1_jan" in row
+        assert "2015_q1_feb" in row
+        assert "2015_q1_total" in row
+        assert "2015_year_total" in row
 
     def test_layout_a_data_values_returned_as_is(self) -> None:
         """Layout A: numeric string values like '2,630' and '90' returned unchanged."""
@@ -623,8 +623,8 @@ class TestParseIrccXlsx:
 
         row = result[0]
         assert row["country_of_citizenship"] == "Canada"
-        assert row["col_2015_q1_jan"] == "90"
-        assert row["col_2015_q1_feb"] == "2,630"
+        assert row["2015_q1_jan"] == "90"
+        assert row["2015_q1_feb"] == "2,630"
 
     def test_layout_a_privacy_masking(self) -> None:
         """Layout A: '--' values are masked to None."""
@@ -636,8 +636,8 @@ class TestParseIrccXlsx:
         )
         result = _parse_ircc_xlsx(content, skip_rows=2, header_rows=3, label_cols=1)
 
-        assert result[0]["col_2015_q1_jan"] is None
-        assert result[0]["col_2015_q1_feb"] == "100"
+        assert result[0]["2015_q1_jan"] is None
+        assert result[0]["2015_q1_feb"] == "100"
 
     def test_layout_a_strips_trailing_empty_rows(self) -> None:
         """Layout A: all-None data rows at end are stripped."""
@@ -685,8 +685,8 @@ class TestParseIrccXlsx:
         assert len(result) == 1
         row = result[0]
         # Should have col_2015_jan (no quarter segment)
-        assert "col_2015_jan" in row
-        assert "col_2015_feb" in row
+        assert "2015_jan" in row
+        assert "2015_feb" in row
 
     def test_layout_c_ops_year_month_columns(self) -> None:
         """Layout C (ops, 6 skip rows, 2 header rows): produces year_month columns."""
@@ -699,8 +699,8 @@ class TestParseIrccXlsx:
 
         assert len(result) == 1
         row = result[0]
-        assert "col_2023_january" in row
-        assert "col_2023_february" in row
+        assert "2023_january" in row
+        assert "2023_february" in row
 
     def test_merged_cells_forward_filled(self) -> None:
         """Merged header cells produce None in non-anchor positions; must be forward-filled."""
@@ -716,7 +716,7 @@ class TestParseIrccXlsx:
 
         row = result[0]
         # All temporal columns should have "2015" as the year prefix
-        temporal_keys = [k for k in row.keys() if k.startswith("col_2015")]
+        temporal_keys = [k for k in row.keys() if k.startswith("2015")]
         assert len(temporal_keys) == 4  # Jan, Feb, Q1 Total, Year Total
 
     def test_existing_parse_xlsx_unchanged(self) -> None:

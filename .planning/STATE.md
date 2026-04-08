@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Phase 10 context gathered
-last_updated: "2026-04-08T15:21:12.331Z"
+stopped_at: Completed 10-tests-docs/10-01-PLAN.md
+last_updated: "2026-04-08T15:52:19.772Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
+  completed_phases: 4
+  total_plans: 10
+  completed_plans: 10
   percent: 0
 ---
 
@@ -58,6 +58,8 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 08-statcan-wds P03 | 7min | 2 tasks | 8 files |
 | Phase 09-sdmx-composite P01 | 4min | 2 tasks | 5 files |
 | Phase 09-sdmx-composite P02 | 18min | 2 tasks | 4 files |
+| Phase 10-tests-docs P02 | 8min | 2 tasks | 2 files |
+| Phase 10-tests-docs P01 | 10 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -90,6 +92,10 @@ Recent decisions affecting current work:
 - [Phase 09-sdmx-composite]: sc_get_sdmx_data mutual exclusion enforced at tool layer: lastN + date range check before any network call
 - [Phase 09-sdmx-composite]: sc_fetch_vectors_to_store validates table_name via IDENTIFIER_RE before any network call — fail-fast pattern
 - [Phase 09-sdmx-composite]: key wins over dimensions in sc_get_sdmx_data to avoid unnecessary structure fetch when raw key provided
+- [Phase 10-tests-docs]: StatCan credit placed in Statistics Canada section as blockquote, not in the README header
+- [Phase 10-tests-docs]: Cross-module SQL examples show full 3-phase workflow: fetch from API, store to datastore, JOIN in SQL
+- [Phase 10-tests-docs]: Range-based WDS tools assert shape only (not count) — releases may be absent for fixed historical date ranges
+- [Phase 10-tests-docs]: CPI Canada coordinate '1.1.0.0.0.0.0.0.0.0' confirmed as stable anchor for coord-based WDS integration tests
 
 ### Pending Todos
 
@@ -103,6 +109,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-08T15:21:12.328Z
-Stopped at: Phase 10 context gathered
-Resume file: .planning/phases/10-tests-docs/10-CONTEXT.md
+Last session: 2026-04-08T15:52:19.770Z
+Stopped at: Completed 10-tests-docs/10-01-PLAN.md
+Resume file: None

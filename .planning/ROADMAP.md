@@ -21,7 +21,7 @@ Phases 1-6 delivered 7 federal API modules (Bank of Canada, Open Parliament, Rec
 - [x] **Phase 7: Datastore + SSL** - SQLite persistence layer and StatCan SSL strategy resolved (completed 2026-04-07)
 - [x] **Phase 8: StatCan WDS** - All WDS discovery, series, data, and monitoring tools live (completed 2026-04-07)
 - [ ] **Phase 9: SDMX + Composite** - Server-side filtered queries and fetch-and-store bridge complete
-- [ ] **Phase 10: Tests + Docs** - Integration test coverage and README updated
+- [x] **Phase 10: Tests + Docs** - Integration test coverage and README updated (completed 2026-04-08)
 
 ## Phase Details
 
@@ -81,7 +81,7 @@ Plans:
   2. Every new tool has at least one integration test scenario that calls it through the MCP Client layer (not client functions directly) and asserts on response shape
   3. README tool catalog lists all new statcan and datastore tools with accurate descriptions and updated tool count
   4. EXAMPLES.md contains at least one end-to-end example showing cross-module SQL queries combining StatCan and another module's data
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 10-01-PLAN.md — Integration test audit + coverage verification (INF-06, INF-07)
@@ -96,4 +96,4 @@ Plans:
 | 7. Datastore + SSL | 3/3 | Complete   | 2026-04-07 | - |
 | 8. StatCan WDS | 3/3 | Complete   | 2026-04-07 | - |
 | 9. SDMX + Composite | 1/2 | In Progress|  | - |
-| 10. Tests + Docs | v1.1 | 0/2 | Not started | - |
+| 10. Tests + Docs | 2/2 | Complete   | 2026-04-08 | - |

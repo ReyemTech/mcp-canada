@@ -58,8 +58,8 @@
 - [x] **INF-05**: All tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Keywords/Use-for docstrings)
 - [ ] **INF-06**: Unit tests achieve 95%+ coverage for all new code
 - [ ] **INF-07**: Integration tests verify live StatCan API calls through the MCP Client layer
-- [ ] **INF-08**: README updated with StatCan module and datastore documentation
-- [ ] **INF-09**: EXAMPLES.md updated with cross-module SQL query examples
+- [x] **INF-08**: README updated with StatCan module and datastore documentation
+- [x] **INF-09**: EXAMPLES.md updated with cross-module SQL query examples
 
 ## v2 Requirements
 
@@ -120,8 +120,8 @@
 | INF-05 | Phase 8 | Complete |
 | INF-06 | Phase 10 | Pending |
 | INF-07 | Phase 10 | Pending |
-| INF-08 | Phase 10 | Pending |
-| INF-09 | Phase 10 | Pending |
+| INF-08 | Phase 10 | Complete |
+| INF-09 | Phase 10 | Complete |
 
 **Coverage:**
 - v1 requirements: 32 total

@@ -25,6 +25,7 @@ def _make_xlsx_bytes(
     """Create minimal XLSX bytes using openpyxl for test fixtures."""
     wb = openpyxl.Workbook()
     ws = wb.active
+    assert ws is not None
     ws.title = sheet_name
     ws.append(headers)
     for row in rows:
@@ -215,6 +216,7 @@ class TestParseXlsxOpenpyxlPath:
 
         wb = openpyxl.Workbook()
         ws = wb.active
+        assert ws is not None
         ws.append(["metadata row"])
         ws.append(["Year", "Count"])
         ws.append([2020, 100])
@@ -234,6 +236,7 @@ class TestParseXlsxOpenpyxlPath:
 
         wb = openpyxl.Workbook()
         ws0 = wb.active
+        assert ws0 is not None
         ws0.title = "First"
         ws0.append(["A"])
         ws0.append([1])
@@ -304,7 +307,6 @@ class TestFetchAndParse:
     @pytest.mark.asyncio
     async def test_calls_cached_fetch_and_returns_tuple(self) -> None:
         """fetch_and_parse calls cached_fetch with correct key and returns (list[dict], bool)."""
-        xlsx_bytes = _make_xlsx_bytes(["Year"], [[2020]])
         fake_data = [{"year": 2020}]
 
         with patch(

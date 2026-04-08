@@ -42,6 +42,8 @@ _RE_YEAR_MONTH = re.compile(r"^(\d{4})_([a-z]+)$")
 def _reshape_to_nested(
     flat_rows: list[dict[str, Any]],
     year: int | None = None,
+    recent: int | None = None,
+    filter_value: str | None = None,
 ) -> list[dict[str, Any]]:
     """Reshape flat IRCC rows into nested year > quarter > month dicts.
 
@@ -49,7 +51,13 @@ def _reshape_to_nested(
     become: {"years": {"2015": {"q1": {"jan": "90", "total": "435"}, "total": "2,630"}}}
 
     Label columns (no year prefix) are preserved at the top level.
-    If year is specified, only that year is included in the output.
+
+    Args:
+        flat_rows: Flat dicts from parser with temporal column names.
+        year: If set, only include data for this year.
+        recent: If set, only include the N most recent years.
+        filter_value: If set, case-insensitive substring match on label columns.
+            Only rows where any label column contains this string are returned.
     """
     result: list[dict[str, Any]] = []
     for row in flat_rows:
@@ -84,10 +92,25 @@ def _reshape_to_nested(
             # Label column — keep at top level
             nested[key] = value
 
+        # Filter by label value (case-insensitive substring match)
+        if filter_value is not None:
+            needle = filter_value.lower()
+            if not any(
+                needle in str(v).lower()
+                for v in nested.values()
+                if v is not None
+            ):
+                continue
+
         # Apply year filter
         if year is not None:
             year_str = str(year)
             years = {k: v for k, v in years.items() if k == year_str}
+
+        # Apply recent filter (keep N most recent years)
+        if recent is not None and years:
+            sorted_keys = sorted(years.keys(), reverse=True)[:recent]
+            years = {k: years[k] for k in sorted_keys}
 
         if years:
             nested["years"] = years
@@ -115,6 +138,8 @@ async def ircc_get_permanent_residents(
         "country_category", "csd", "adoptions"
     ] = "country",
     year: int | None = None,
+    recent: int | None = None,
+    filter: str | None = None,
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
     """Get IRCC permanent resident admissions data by breakdown dimension.
@@ -132,7 +157,7 @@ async def ircc_get_permanent_residents(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows, year=year),
+        _reshape_to_nested(rows, year=year, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url("pr", breakdown, lang),
         cached=cached,
@@ -150,6 +175,8 @@ async def ircc_get_study_permits(
         "country", "province_level", "gender", "annual_country", "annual_province"
     ] = "country",
     year: int | None = None,
+    recent: int | None = None,
+    filter: str | None = None,
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
     """Get IRCC study permit issuance data by breakdown dimension.
@@ -166,7 +193,7 @@ async def ircc_get_study_permits(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows, year=year),
+        _reshape_to_nested(rows, year=year, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url("study", breakdown, lang),
         cached=cached,
@@ -183,6 +210,8 @@ async def ircc_get_work_permits(
     permit_type: Literal["imp", "tfwp"] = "imp",
     breakdown: str = "province_program",
     year: int | None = None,
+    recent: int | None = None,
+    filter: str | None = None,
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
     """Get IRCC work permit data for IMP (International Mobility Program) or TFWP (Temporary Foreign Worker Program).
@@ -210,7 +239,7 @@ async def ircc_get_work_permits(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows, year=year),
+        _reshape_to_nested(rows, year=year, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url(dataset_key, breakdown, lang),
         cached=cached,
@@ -227,6 +256,8 @@ async def ircc_get_express_entry(
     stream: Literal["admissions", "invited"] = "admissions",
     breakdown: str = "gender",
     year: int | None = None,
+    recent: int | None = None,
+    filter: str | None = None,
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
     """Get IRCC Express Entry data for admissions or invited candidates.
@@ -254,7 +285,7 @@ async def ircc_get_express_entry(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows, year=year),
+        _reshape_to_nested(rows, year=year, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url(dataset_key, breakdown, lang),
         cached=cached,
@@ -270,6 +301,8 @@ async def ircc_get_express_entry(
 async def ircc_get_tr_to_pr(
     breakdown: Literal["study_permit", "imp", "tfwp", "pgwp"] = "study_permit",
     year: int | None = None,
+    recent: int | None = None,
+    filter: str | None = None,
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
     """Get IRCC data on temporary residents who transitioned to permanent residence.
@@ -286,7 +319,7 @@ async def ircc_get_tr_to_pr(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows, year=year),
+        _reshape_to_nested(rows, year=year, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url("tr_to_pr", breakdown, lang),
         cached=cached,
@@ -302,6 +335,8 @@ async def ircc_get_tr_to_pr(
 async def ircc_get_asylum(
     breakdown: Literal["province_office", "province_age", "province_gender"] = "province_office",
     year: int | None = None,
+    recent: int | None = None,
+    filter: str | None = None,
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
     """Get IRCC asylum claimant data by province and demographic breakdown.
@@ -318,7 +353,7 @@ async def ircc_get_asylum(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows, year=year),
+        _reshape_to_nested(rows, year=year, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url("asylum", breakdown, lang),
         cached=cached,
@@ -336,6 +371,8 @@ async def ircc_get_ops(
         "pr_intake", "copr_issued", "study_processed",
         "tr_processed", "trv_intake", "tr_approved"
     ] = "pr_intake",
+    recent: int | None = None,
+    filter: str | None = None,
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
     """Get IRCC operational processing statistics (monthly snapshots).
@@ -353,7 +390,7 @@ async def ircc_get_ops(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows),
+        _reshape_to_nested(rows, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url("ops", breakdown, lang),
         cached=cached,
@@ -369,6 +406,8 @@ async def ircc_get_ops(
 async def ircc_get_afghan(
     breakdown: Literal["gender", "age", "education", "language"] = "gender",
     year: int | None = None,
+    recent: int | None = None,
+    filter: str | None = None,
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
     """Get IRCC data on Afghan refugees admitted to Canada.
@@ -385,7 +424,7 @@ async def ircc_get_afghan(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows, year=year),
+        _reshape_to_nested(rows, year=year, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url("afghan", breakdown, lang),
         cached=cached,
@@ -402,6 +441,8 @@ async def ircc_get_adhoc_pr(
     breakdown: Literal[
         "category_1980", "country_1980", "province_cat_2000", "province_citz_2000"
     ] = "category_1980",
+    recent: int | None = None,
+    filter: str | None = None,
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
     """Get IRCC ad-hoc historical permanent resident data (1980-2023).
@@ -419,7 +460,7 @@ async def ircc_get_adhoc_pr(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows),
+        _reshape_to_nested(rows, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url("adhoc_pr", breakdown, lang),
         cached=cached,

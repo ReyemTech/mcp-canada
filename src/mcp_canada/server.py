@@ -162,6 +162,9 @@ def main() -> None:
 
     logging.basicConfig(level=log_level)
 
+    import sys
+    print(f"mcp-canada v{__version__}", file=sys.stderr)
+
     # Store parsed config for other modules to read
     _config.update(vars(args))
 

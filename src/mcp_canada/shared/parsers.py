@@ -336,7 +336,9 @@ def _parse_ircc_xlsx(
             else:
                 headers.append(f"col_{col_idx}")
 
-    # Build data records, filtering out rows where all data columns are null
+    # Build data records, filtering out rows where all data columns are null.
+    # Forward-fill label columns so grouped rows inherit their parent label.
+    last_labels: list[Any] = [None] * label_cols
     result: list[dict[str, Any]] = []
     for row in data_rows:
         # Skip rows where all values are None
@@ -346,11 +348,17 @@ def _parse_ircc_xlsx(
         data_values = list(row[label_cols:])
         if all(v is None for v in data_values):
             continue
-        record = {
-            headers[i]: _mask_privacy(v)
-            for i, v in enumerate(row)
-            if i < len(headers)
-        }
+        record: dict[str, Any] = {}
+        for i, v in enumerate(row):
+            if i >= len(headers):
+                break
+            if i < label_cols:
+                # Forward-fill: use current value if present, else last seen
+                if v is not None:
+                    last_labels[i] = v
+                record[headers[i]] = _mask_privacy(last_labels[i])
+            else:
+                record[headers[i]] = _mask_privacy(v)
         result.append(record)
 
     return result

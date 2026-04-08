@@ -739,6 +739,68 @@ class TestStatcanWdsScenarios:
             assert "code" in data["error"]
             assert data["error"]["code"] in ("UPSTREAM_ERROR", "UPSTREAM_UNAVAILABLE")
 
+    @pytest.mark.asyncio
+    async def test_get_series_info_by_coord(self, mcp_server):
+        """'Get series info for CPI Canada all-items by product and coordinate'"""
+        data = await call_tool(mcp_server, "sc_get_series_info_by_coord", {
+            "product_id": 18100004,
+            "coordinate": "1.1.0.0.0.0.0.0.0.0",
+        })
+        assert "_meta" in data
+        assert data["_meta"]["source"]["api"] == "statcan-wds"
+        assert "product_id" in data["data"]
+        assert "vector_id" in data["data"]
+        assert "frequency" in data["data"]
+
+    @pytest.mark.asyncio
+    async def test_get_data_by_coord(self, mcp_server):
+        """'Get the latest 3 observations for CPI Canada all-items by coordinate'"""
+        data = await call_tool(mcp_server, "sc_get_data_by_coord", {
+            "product_id": 18100004,
+            "coordinate": "1.1.0.0.0.0.0.0.0.0",
+            "n": 3,
+        })
+        assert "_meta" in data
+        assert data["_meta"]["source"]["api"] == "statcan-wds"
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) >= 1
+        row = data["data"][0]
+        assert "ref_per" in row
+        assert "value" in row
+
+    @pytest.mark.asyncio
+    async def test_get_data_by_date_range(self, mcp_server):
+        """'Get CPI all-items vector observations from Q1 2024'"""
+        data = await call_tool(mcp_server, "sc_get_data_by_date_range", {
+            "vector_id": 41690973,
+            "start_date": "2024-01-01",
+            "end_date": "2024-03-31",
+        })
+        assert "_meta" in data
+        assert data["_meta"]["source"]["api"] == "statcan-wds"
+        assert isinstance(data["data"], list)
+        # Accept empty list if no data for range; just verify shape
+        for row in data["data"]:
+            assert "ref_per" in row
+            assert "value" in row
+
+    @pytest.mark.asyncio
+    async def test_get_bulk_vector_data(self, mcp_server):
+        """'Get the most recent releases for multiple StatCan vectors in bulk'"""
+        data = await call_tool(mcp_server, "sc_get_bulk_vector_data", {
+            "vector_ids": [41690973, 74804],
+            "start_release": "2024-01-01",
+            "end_release": "2024-03-31",
+        })
+        assert "_meta" in data
+        assert data["_meta"]["source"]["api"] == "statcan-wds"
+        assert isinstance(data["data"], list)
+        # May be empty if no releases in range — assert shape only
+        for row in data["data"]:
+            assert "vector_id" in row
+            assert "ref_per" in row
+            assert "value" in row
+
 
 # ─── SDMX scenarios ───────────────────────────────────────────────────────────
 

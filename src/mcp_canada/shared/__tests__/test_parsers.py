@@ -432,7 +432,6 @@ def _make_ircc_xlsx_layout_a(
     # Row 6+: data
 
     n_months_per_q = 2
-    n_quarters = 1
     total_data_cols = n_months_per_q + 1  # months + Q total
     total_cols = 1 + total_data_cols + 1  # label + (months + q_total) + year_total
 

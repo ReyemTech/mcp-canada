@@ -5,7 +5,7 @@ fetch_and_parse(). Raises ValueError for unknown breakdown keys with a list of
 valid options. Network and parsing errors propagate to the tool layer.
 """
 
-from mcp_canada.modules.ircc.constants import DATASET_REGISTRY
+from mcp_canada.modules.ircc.constants import DATASET_PARSE_CONFIG, DATASET_REGISTRY
 from mcp_canada.shared.parsers import fetch_and_parse
 
 
@@ -40,7 +40,8 @@ async def _fetch_dataset(
             f"Language {lang!r} not available for {dataset_key}/{breakdown}. "
             f"Valid: {valid_langs}"
         )
-    return await fetch_and_parse(urls[lang])
+    parse_config = DATASET_PARSE_CONFIG.get(dataset_key)
+    return await fetch_and_parse(urls[lang], ircc_parse_config=parse_config)
 
 
 async def fetch_permanent_residents(

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import csv
 import re
+import unicodedata
 from io import BytesIO, StringIO
 from typing import Any
 
@@ -22,14 +23,21 @@ _NON_ALNUM = re.compile(r"[^a-z0-9]+")
 def _normalize_key(header: str) -> str:
     """Normalize a column header to a snake_case identifier.
 
+    Transliterates accented characters to ASCII (é→e, û→u) before
+    applying snake_case conversion.
+
     Examples:
         "Country of Citizenship" -> "country_of_citizenship"
         "  Year " -> "year"
         "123col" -> "col_123col"
         "" -> "col"
         "a/b-c d" -> "a_b_c_d"
+        "Février" -> "fevrier"
+        "Août" -> "aout"
     """
     key = header.strip().lower()
+    # Transliterate accented chars to ASCII (é→e, û→u, etc.)
+    key = unicodedata.normalize("NFKD", key).encode("ascii", "ignore").decode("ascii")
     key = _NON_ALNUM.sub("_", key)
     key = key.strip("_")
     if not key:

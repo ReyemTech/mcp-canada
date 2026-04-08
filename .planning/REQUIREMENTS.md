@@ -63,15 +63,15 @@
 
 ### IRCC Immigration
 
-- [ ] **IRCC-01**: Shared parser can fetch and parse XLSX files from any URL into list[dict] rows with snake_case keys
-- [ ] **IRCC-02**: Shared parser can fetch and parse CSV files with BOM handling into list[dict] rows
-- [ ] **IRCC-03**: Privacy masking converts IRCC '--' suppressed values to None during parsing
+- [x] **IRCC-01**: Shared parser can fetch and parse XLSX files from any URL into list[dict] rows with snake_case keys
+- [x] **IRCC-02**: Shared parser can fetch and parse CSV files with BOM handling into list[dict] rows
+- [x] **IRCC-03**: Privacy masking converts IRCC '--' suppressed values to None during parsing
 - [ ] **IRCC-04**: Agent can query permanent residents by country, province, gender, age, CMA, NOC, and immigration category
 - [ ] **IRCC-05**: Agent can query study permits, work permits (IMP + TFWP), Express Entry (admissions + invited), TR-to-PR transitions, asylum claimants, operational processing, and Afghan refugees
 - [ ] **IRCC-06**: IRCC tools handle bilingual file variants (EN/FR) and multi-sheet workbooks
 - [ ] **IRCC-07**: All IRCC tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Keywords/Use-for docstrings, ircc_ prefix)
 - [ ] **IRCC-08**: Parsed IRCC data can be stored to the shared datastore for cross-module SQL queries
-- [ ] **IRCC-09**: Shared parser is reusable by any future module (not IRCC-specific)
+- [x] **IRCC-09**: Shared parser is reusable by any future module (not IRCC-specific)
 
 ## v2 Requirements
 

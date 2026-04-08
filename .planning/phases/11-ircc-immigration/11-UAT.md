@@ -1,9 +1,9 @@
 ---
-status: diagnosed
+status: complete
 phase: 11-ircc-immigration
-source: [11-01-SUMMARY.md, 11-02-SUMMARY.md, 11-03-SUMMARY.md]
-started: 2026-04-08T20:00:00Z
-updated: 2026-04-08T20:45:00Z
+source: [11-01-SUMMARY.md, 11-02-SUMMARY.md, 11-03-SUMMARY.md, 11-04-SUMMARY.md]
+started: 2026-04-08T21:00:00Z
+updated: 2026-04-08T22:00:00Z
 ---
 
 ## Current Test
@@ -12,87 +12,68 @@ updated: 2026-04-08T20:45:00Z
 
 ## Tests
 
-### 1. Unit Tests Pass
-expected: Run `uv run pytest src/mcp_canada/shared/__tests__/test_parsers.py src/mcp_canada/modules/ircc/__tests__/ -x -v`. All 84 tests pass (23 parser + 33 client + 28 tools). No failures, no errors.
+### 1. Query Permanent Residents — Nested Format
+expected: Call `ircc_get_permanent_residents(breakdown="country", lang="en")`. Returns nested format with label at top level and `years` dict containing year > quarter > month hierarchy. Column names are clean (no col_ prefix, no unnamed_*).
 result: pass
 
-### 2. Coverage Threshold Met
-expected: Run `uv run pytest --cov=src/mcp_canada --cov-fail-under=95`. Coverage is >= 95% and the command exits with code 0.
+### 2. Filter by Country
+expected: Call `ircc_get_permanent_residents(breakdown="country", filter="Afghanistan")`. Returns only Afghanistan's row. Other countries excluded.
 result: pass
 
-### 3. Type Check and Lint Clean
-expected: Run `uv run pyright` and `uv run ruff check src/ tests/`. Both report 0 errors.
+### 3. Recent Years Only
+expected: Call `ircc_get_permanent_residents(breakdown="country", filter="India", recent=2)`. Returns India's data with only the 2 most recent years (2025, 2026).
 result: pass
 
-### 4. Discover IRCC Tools via BM25
-expected: Using the MCP server, call `discover_tools` with query "immigration Canada permanent residents". Response includes `ircc_get_permanent_residents` in the results. Try also "work permits study permits" — should find `ircc_get_work_permits` and `ircc_get_study_permits`.
+### 4. Specific Year
+expected: Call `ircc_get_permanent_residents(breakdown="country", filter="China", year=2024)`. Returns China's data with only 2024 in the years dict.
 result: pass
 
-### 5. Query Permanent Residents (Live)
-expected: Call `ircc_get_permanent_residents(breakdown="country", lang="en")` through the MCP server (or integration test). Returns data with `_meta` envelope containing `source.api`, `cached`, `lang`, `timestamp`. Data rows contain snake_case keys. Privacy-masked values (`--`) appear as null, not strings.
+### 5. Work Permits with Filter
+expected: Call `ircc_get_work_permits(permit_type="imp", breakdown="country", filter="India", recent=1)`. Returns IMP work permit data for India, most recent year only. Nested format.
+result: pass
+
+### 6. Express Entry with Filter
+expected: Call `ircc_get_express_entry(stream="admissions", breakdown="gender", recent=2)`. Returns Express Entry admissions by gender for last 2 years. Nested format with label columns for the 2-label layout.
 result: issue
-reported: "IRCC XLSX has multi-row merged headers (title, years, quarters, months). Parser treats row 1 as header, producing 190 unnamed_* columns with garbage data instead of meaningful column names."
-severity: blocker
+reported: "2-label layout (gender + province) has forward-fill bug: label_2 carries last province into summary/total rows and next gender section. Also missing hierarchical nesting (gender > province > years). 1-label datasets work correctly."
+severity: minor
 
-### 6. Query Work Permits — Combined IMP+TFWP
-expected: Call `ircc_get_work_permits(permit_type="imp", breakdown="country", lang="en")`. Returns work permit data with `_meta` envelope. Try also `permit_type="tfwp"` — should return TFWP-specific data. Both use the same tool function.
-result: issue
-reported: "same column issue as test 5 — multi-row merged headers produce unnamed_* columns"
-severity: blocker
-
-### 7. Query Express Entry — Combined Streams
-expected: Call `ircc_get_express_entry(stream="admissions", breakdown="category", lang="en")`. Returns Express Entry data. Try `stream="invited"` — should return invited candidates data.
-result: skipped
-reason: Same multi-row header blocker as tests 5-6. Will pass once parser is fixed.
-
-### 8. List Datasets (No Network Call)
-expected: Call `ircc_list_datasets(lang="en")`. Returns a list of all 11 dataset categories with their available breakdowns. Response is instant (reads from in-memory registry, no HTTP fetch).
+### 7. Ops Data — No Year Param
+expected: Call `ircc_get_ops(breakdown="pr_intake", recent=1)`. Returns operational processing data in nested format for most recent year only. No year param exists on this tool (monthly snapshots).
 result: pass
 
-### 9. Error Handling — Invalid Input
-expected: Call `ircc_get_permanent_residents(breakdown="nonexistent", lang="en")`. Returns structured error with `error.code` = "INVALID_INPUT" and `error.message` containing valid breakdown suggestions. Does NOT raise an exception or crash.
+### 8. French Language Variant
+expected: Call `ircc_get_study_permits(breakdown="country", filter="Inde", lang="fr", recent=1)`. Returns French IRCC data for India (filtered by French name "Inde"), most recent year, nested format. `_meta.lang` is "fr".
 result: pass
 
-### 10. French Language Variant
-expected: Call `ircc_get_study_permits(breakdown="country", lang="fr")`. Returns data from the French-language XLSX file. Column names are still snake_case (normalized). The `_meta.lang` field is "fr".
-result: skipped
-reason: Same multi-row header blocker as tests 5-6. Will pass once parser is fixed.
-
-### 11. Ad-hoc PR English-Only Constraint
-expected: Call `ircc_get_adhoc_pr(breakdown="category_1980", lang="fr")`. Returns structured error with `error.code` = "INVALID_INPUT" explaining this dataset is English-only. Does NOT crash.
+### 9. Ad-hoc PR English-Only Error
+expected: Call `ircc_get_adhoc_pr(breakdown="category_1980", lang="fr")`. Returns `INVALID_INPUT` error explaining English-only. Does not crash.
 result: pass
 
-### 12. Integration Tests Pass (Live APIs)
-expected: Run `uv run pytest tests/integration/test_tool_scenarios.py::TestIrccScenarios -v -m integration --timeout=120`. All 6 scenarios pass including the cross-module datastore test. Note: requires network access to IRCC servers.
-result: skipped
-reason: Same multi-row header blocker. Integration tests against live IRCC files will produce same garbage columns.
+### 10. Full Test Suite Passes
+expected: Run `uv run pytest --cov=src/mcp_canada --cov-fail-under=95`. All tests pass, coverage >= 95%.
+result: pass
 
 ## Summary
 
-total: 12
-passed: 6
-issues: 2
+total: 10
+passed: 9
+issues: 1
 pending: 0
-skipped: 4
+skipped: 0
 
 ## Gaps
 
-- truth: "Data rows contain snake_case keys with meaningful column names from IRCC XLSX files"
+- truth: "2-label datasets (EE, TR-to-PR, asylum) nest correctly with gender/group > province hierarchy"
   status: failed
-  reason: "User reported: IRCC XLSX has multi-row merged headers (title row, year row, quarter row, month row). Parser treats row 1 as header, producing 190 unnamed_* columns instead of meaningful composite column names."
-  severity: blocker
-  test: 5
-  root_cause: "Parser _parse_xlsx_pandas/_parse_xlsx_openpyxl both treat a single row as header. IRCC XLSX files have 3-4 merged header rows (Year > Quarter > Month hierarchy). 4 distinct layouts found: Layout A (standard quarterly, 5 header rows, 1 label col — PR/Study/Work/Afghan), Layout B (2 label cols — EE/TR-to-PR/Asylum), Layout C (OPS — 6 blank rows, no quarters), Layout D (adhoc XLS — simple, works with skip_rows=2). Pandas MultiIndex NOT recommended — still needs forward-fill and flattening."
+  reason: "User reported: label_2 forward-fills last province into summary rows and next group section. Missing hierarchical nesting for 2-label layout. 1-label datasets work correctly."
+  severity: minor
+  test: 6
+  root_cause: "Forward-fill for label_2 does not reset when label_1 changes to a new group or total row. Also, 2-label data should nest as group > sub-item > years instead of flat labels."
   artifacts:
     - path: "src/mcp_canada/shared/parsers.py"
-      issue: "No multi-row header support; _parse_xlsx uses single header row"
-    - path: "src/mcp_canada/modules/ircc/client.py"
-      issue: "_fetch_dataset calls fetch_and_parse with no skip_rows or header config"
-    - path: "src/mcp_canada/modules/ircc/constants.py"
-      issue: "Missing per-dataset parse config (skip_rows, header_rows, label_cols)"
+      issue: "Forward-fill logic for label columns doesn't reset label_2 when label_1 changes"
   missing:
-    - "Add DATASET_PARSE_CONFIG to constants.py with per-dataset skip_rows, header_rows, label_cols"
-    - "Add _parse_ircc_xlsx() in parsers.py using openpyxl merged-cell forward-fill + composite column names"
-    - "Update client.py _fetch_dataset to pass parse config to fetch_and_parse"
-    - "Update unit tests for new multi-row header parsing"
-  debug_session: ".planning/debug/ircc-header-parsing.md"
+    - "Reset label_2 forward-fill when label_1 changes value"
+    - "Add 2-label hierarchical nesting in _reshape_to_nested (gender > province > years)"
+  debug_session: ""

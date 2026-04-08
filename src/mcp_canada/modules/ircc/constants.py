@@ -304,6 +304,14 @@ DATASET_REGISTRY: dict[str, dict[str, dict[str, str]]] = {
             "en": BASE_URL + "Open Data - OPS TR Approved en.xlsx",
             "fr": BASE_URL + "Open Data - OPS TR Approved fr.xlsx",
         },
+        "trv_v1_approved": {
+            "en": BASE_URL + "Open Data - OPS TRV V-1 Approved en.xlsx",
+            "fr": BASE_URL + "Open Data - OPS TRV V-1 Approved fr.xlsx",
+        },
+        "new_citizens": {
+            "en": BASE_URL + "Open Data - New Citizens by COB en.xlsx",
+            "fr": BASE_URL + "Open Data - New Citizens by COB fr.xlsx",
+        },
     },
 
     # -------------------------------------------------------------------------

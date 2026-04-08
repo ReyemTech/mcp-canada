@@ -421,18 +421,20 @@ async def ircc_get_asylum(
 async def ircc_get_ops(
     breakdown: Literal[
         "pr_intake", "copr_issued", "study_processed",
-        "tr_processed", "trv_intake", "tr_approved"
+        "tr_processed", "trv_intake", "tr_approved",
+        "trv_v1_approved", "new_citizens"
     ] = "pr_intake",
     recent: int | None = None,
     filter: str | None = None,
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
-    """Get IRCC operational processing statistics (monthly snapshots).
+    """Get IRCC operational processing statistics and citizenship data (monthly snapshots).
 
     Covers PR intake, COPR issued, study permit processing, TR processing,
-    visitor visa intake, and TR approvals. No year filter — data is monthly.
-    Use for: IRCC processing times, application intake, operational stats, PR applications, study permit processing, visitor visa, TR approvals, COPR.
-    Keywords: IRCC operations, processing, intake, application, PR intake, COPR, study permit, TR processing, visitor visa, TRV, approval, monthly, statistics, backlog.
+    visitor visa intake, TR approvals, visitor visa V-1 approvals, and new Canadian citizens by country of birth.
+    No year filter — data is monthly.
+    Use for: IRCC processing times, application intake, operational stats, PR applications, study permit processing, visitor visa, TR approvals, COPR, new citizens, citizenship, naturalization, country of birth.
+    Keywords: IRCC operations, processing, intake, application, PR intake, COPR, study permit, TR processing, visitor visa, TRV, approval, monthly, statistics, backlog, citizenship, new citizens, naturalization, country of birth.
     """
     try:
         rows, cached = await fetch_ops(breakdown=breakdown, lang=lang)
@@ -545,7 +547,7 @@ async def ircc_list_datasets(
         "ee_invited": "Express Entry invited candidates (ITAs issued)",
         "tr_to_pr": "Temporary resident to permanent resident transitions",
         "asylum": "Asylum claimants",
-        "ops": "Operational processing statistics (monthly snapshots)",
+        "ops": "Operational processing statistics + new citizens (monthly snapshots)",
         "afghan": "Afghan refugees admitted to Canada",
         "adhoc_pr": "Ad-hoc historical PR data 1980-2023 (English-only)",
     }

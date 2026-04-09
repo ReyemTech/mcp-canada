@@ -413,3 +413,23 @@ Plans:
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 39 to break down)
+
+### Phase 40: MCP Prompts and Resources
+
+**Goal**: Add MCP prompts (guided workflow templates and quick lookup instructions) and resources (reference catalogs, documentation guides, response templates) to all 12 modules, extending the 5-file module pattern to 7-file with prompts.py and resources.py auto-discovered by FileSystemProvider
+**Depends on**: Phase 13 (all modules must exist)
+**Requirements**: PR-01, PR-02, PR-03, PR-04, PR-05, PR-06, PR-07, PR-08, PR-09, PR-10, PR-11, PR-12, PR-13, PR-14, PR-15, PR-16, PR-17, PR-18, PR-19, PR-20
+**Success Criteria** (what must be TRUE):
+  1. Every module has prompts.py with 4-6 bilingual @prompt functions (guided workflows + quick lookups) auto-discovered by FileSystemProvider
+  2. Every module has resources.py with 6-10 zero-parameter @resource functions using data://, docs://, template:// URI schemes
+  3. Prompts appear via prompts/list and resources via resources/list natively in MCP clients with no server.py changes
+  4. Integration tests verify discovery of >= 55 prompts and >= 70 resources through MCP Client layer
+  5. README catalogs all prompts and resources; CLAUDE.md documents 7-file module pattern
+**Plans:** 5 plans
+
+Plans:
+- [ ] 40-01-PLAN.md — Reference implementation: BoC prompts + resources + _example update + unit tests
+- [ ] 40-02-PLAN.md — StatCan + Datastore + CKAN prompts/resources + unit tests
+- [ ] 40-03-PLAN.md — Open Parliament + Recalls + Drug Database + Nutrient File prompts/resources + unit tests
+- [ ] 40-04-PLAN.md — Weather + IRCC + Ontario + Toronto prompts/resources + unit tests
+- [ ] 40-05-PLAN.md — Integration tests + README + CLAUDE.md documentation updates

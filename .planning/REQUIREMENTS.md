@@ -99,6 +99,29 @@
 - **TOR-11**: Agent can query short-term rental registrations by ward and status
 - **TOR-12**: All Toronto tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Keywords/Use-for docstrings, toronto_ prefix) and are discoverable via discover_tools
 
+### MCP Prompts and Resources
+
+- **PR-01**: Every module has a prompts.py with 4-6 @prompt functions auto-discovered by FileSystemProvider
+- **PR-02**: Guided workflow prompts return list[Message] with user + assistant roles priming multi-tool conversations
+- **PR-03**: Quick lookup prompts return str with specific tool name and parameter instructions
+- **PR-04**: All prompts accept bilingual lang parameter (Annotated[Literal["en", "fr"]]) and return content in chosen language
+- **PR-05**: Every module has a resources.py with 6-10 @resource functions using type-prefixed URIs (data://, docs://, template://)
+- **PR-06**: Catalog resources (data://) return valid JSON with bilingual en/fr labels for reference data agents need repeatedly
+- **PR-07**: Documentation resources (docs://) return markdown guides for API quirks, naming conventions, and interpretation
+- **PR-08**: Template resources (template://) return markdown with {placeholder} syntax for response formatting
+- **PR-09**: All resources use zero-parameter functions (not ResourceTemplate) with bilingual content inline
+- **PR-10**: Prompts follow module prefix naming convention (boc_, sc_, parl_, wx_, etc.)
+- **PR-11**: Resources use type-prefixed URIs: data://module/name, docs://module/name, template://module/name
+- **PR-12**: Prompts appear as slash-commands via prompts/list; resources appear via resources/list (native MCP visibility)
+- **PR-13**: No server.py changes needed — FileSystemProvider auto-discovers prompts and resources
+- **PR-14**: Bank of Canada module has prompts for rate analysis, policy rate lookup, currency comparison, commodity exploration, and inflation check
+- **PR-15**: StatCan module has prompts for data discovery, SDMX exploration, vector retrieval, store-and-query, and change monitoring
+- **PR-16**: Weather module has a single top-level prompts.py covering all sub-modules (current, climate, marine, hydro, etc.)
+- **PR-17**: IRCC, Ontario, and Toronto modules have prompts for their respective data exploration workflows
+- **PR-18**: Integration tests verify prompts discoverable via client.list_prompts() and resources via client.read_resource()
+- **PR-19**: README updated with prompt catalog (~60 prompts) and resource catalog (~80-100 resources)
+- **PR-20**: CLAUDE.md updated with 7-file module pattern and prompt/resource coding conventions
+
 ## v2 Requirements
 
 ### Extended Datastore
@@ -197,6 +220,26 @@
 | TOR-10 | Phase 13 | Planned |
 | TOR-11 | Phase 13 | Planned |
 | TOR-12 | Phase 13 | Planned |
+| PR-01 | Phase 40 | Planned |
+| PR-02 | Phase 40 | Planned |
+| PR-03 | Phase 40 | Planned |
+| PR-04 | Phase 40 | Planned |
+| PR-05 | Phase 40 | Planned |
+| PR-06 | Phase 40 | Planned |
+| PR-07 | Phase 40 | Planned |
+| PR-08 | Phase 40 | Planned |
+| PR-09 | Phase 40 | Planned |
+| PR-10 | Phase 40 | Planned |
+| PR-11 | Phase 40 | Planned |
+| PR-12 | Phase 40 | Planned |
+| PR-13 | Phase 40 | Planned |
+| PR-14 | Phase 40 | Planned |
+| PR-15 | Phase 40 | Planned |
+| PR-16 | Phase 40 | Planned |
+| PR-17 | Phase 40 | Planned |
+| PR-18 | Phase 40 | Planned |
+| PR-19 | Phase 40 | Planned |
+| PR-20 | Phase 40 | Planned |
 
 **Coverage:**
 - v1 requirements: 32 total
@@ -205,7 +248,8 @@
 - IRCC requirements: 9 total (Phase 11)
 - Ontario requirements: 8 total (Phase 12)
 - Toronto requirements: 12 total (Phase 13)
+- Prompts & Resources requirements: 20 total (Phase 40)
 
 ---
 *Requirements defined: 2026-04-07*
-*Last updated: 2026-04-09 after Phase 13 planning*
+*Last updated: 2026-04-09 after Phase 40 planning*

@@ -118,6 +118,7 @@ Recent decisions affecting current work:
 - Phase 14 added: York Region Municipal Government Open Data
 - Phase 15 added: British Columbia Government Open Data
 - Phase 16 added: Quebec Government Open Data
+- Phase 17 added: Alberta Government Open Data
 
 ### Pending Todos
 

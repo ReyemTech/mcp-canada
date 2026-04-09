@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 40-mcp-prompts-and-resources 40-02-PLAN.md
-last_updated: "2026-04-09T19:57:07.877Z"
+stopped_at: Completed 40-mcp-prompts-and-resources 40-03-PLAN.md
+last_updated: "2026-04-09T20:01:26.847Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 7
   total_plans: 23
-  completed_plans: 20
+  completed_plans: 22
   percent: 0
 ---
 
@@ -70,6 +70,8 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 13-toronto-municipal-government-open-data P02 | 5min | 2 tasks | 4 files |
 | Phase 40-mcp-prompts-and-resources P01 | 10min | 2 tasks | 5 files |
 | Phase 40-mcp-prompts-and-resources P02 | 18min | 2 tasks | 9 files |
+| Phase 40-mcp-prompts-and-resources P03 | 12min | 2 tasks | 12 files |
+| Phase 40-mcp-prompts-and-resources P04 | 12min | 2 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -128,6 +130,8 @@ Recent decisions affecting current work:
 - [Phase 40-mcp-prompts-and-resources]: StatCan resources use string keys ('1', '5', '9') for frequency/scalar codes matching JSON serialization of integer keys
 - [Phase 40-mcp-prompts-and-resources]: statcan_store_and_query prompt is the cross-module flagship: demonstrates sc_fetch_vectors_to_store -> ds_query chain
 - [Phase 40-mcp-prompts-and-resources]: ckan_federal_organizations uses org slugs as keys (not display names) — slugs are what the CKAN API organization= parameter accepts
+- [Phase 40-mcp-prompts-and-resources]: Guided workflow prompts (list[Message]) for multi-step tool chaining; quick lookups (str) for single-tool instructions — same pattern across all 4 modules
+- [Phase 40-mcp-prompts-and-resources]: Drug schedule codes follow Health Canada classification (Prescription/OTC/Schedule I-III/Unscheduled); Nutrient food groups use canonical CNF group IDs (1-25) matching the API's actual group_id values
 
 ### Roadmap Evolution
 
@@ -155,6 +159,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-09T19:57:07.872Z
-Stopped at: Completed 40-mcp-prompts-and-resources 40-02-PLAN.md
+Last session: 2026-04-09T20:01:22.403Z
+Stopped at: Completed 40-mcp-prompts-and-resources 40-03-PLAN.md
 Resume file: None

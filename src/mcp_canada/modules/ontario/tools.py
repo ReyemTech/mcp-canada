@@ -12,7 +12,7 @@ Each tool follows the 5-file module pattern:
 - BM25-optimized docstrings with Keywords: and Use for: lines
 """
 
-from typing import Literal
+from typing import Any, Literal
 
 import httpx
 from fastmcp.tools import tool
@@ -27,7 +27,6 @@ from mcp_canada.modules.ontario.client import (
 )
 from mcp_canada.modules.ontario.constants import BASE_URL
 from mcp_canada.shared.envelope import make_error, make_response
-from mcp_canada.shared.reshape import reshape_temporal_columns
 
 # API name and base URL for _meta envelope
 _API_NAME = "Ontario Data Catalogue"
@@ -222,17 +221,47 @@ async def ontario_get_dataset_stats(
 # ---------------------------------------------------------------------------
 
 
+def _filter_population_rows(
+    rows: list[dict[str, Any]],
+    scenario: str | None = None,
+    year: int | None = None,
+    gender: str | None = None,
+    filter_value: str | None = None,
+) -> list[dict[str, Any]]:
+    """Filter population projection rows by scenario, year, gender, or label substring."""
+    result = rows
+    if scenario is not None:
+        needle = scenario.upper()
+        result = [r for r in result if str(r.get("scenario", "")).upper() == needle]
+    if year is not None:
+        result = [r for r in result if r.get("year_july_1") == year]
+    if gender is not None:
+        needle = gender.upper()
+        result = [r for r in result if str(r.get("gender", "")).upper() == needle]
+    if filter_value is not None:
+        needle = filter_value.lower()
+        result = [
+            r for r in result
+            if any(needle in str(v).lower() for v in r.values() if v is not None)
+        ]
+    return result
+
+
 @tool
 async def ontario_get_population_projections(
+    scenario: str | None = None,
     year: int | None = None,
-    recent: int | None = None,
+    gender: str | None = None,
     filter: str | None = None,
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
-    """Fetch Ontario Ministry of Finance population projections by region (2024-2051).
+    """Fetch Ontario Ministry of Finance population projections by age and gender (2024-2051).
 
-    Use for: getting Ontario population forecasts, demographic projections by geography, provincial growth estimates, regional population trends from the Ministry of Finance.
-    Keywords: ontario, population, projections, forecast, demographics, growth, ministry of finance, provincial, region, 2024, 2051, estimates, age, geography.
+    Data is row-per-observation with scenario (REFERENCE/LOW-GROWTH/HIGH-GROWTH),
+    year, gender (MEN+/WOMEN+/TOTAL), and population counts by age group.
+    Filter by scenario, year, gender, or free-text search.
+    Use for: getting Ontario population forecasts, demographic projections, provincial growth estimates, age distribution, gender breakdown from the Ministry of Finance.
+    Keywords: ontario, population, projections, forecast, demographics, growth, ministry of finance, provincial, age, gender, scenario, reference, 2024, 2051, estimates.
     """
     try:
         rows, cached = await fetch_population_projections(lang=lang)
@@ -243,8 +272,12 @@ async def ontario_get_population_projections(
             lang=lang,
         )
 
+    filtered = _filter_population_rows(
+        rows, scenario=scenario, year=year, gender=gender, filter_value=filter,
+    )
+
     return make_response(
-        reshape_temporal_columns(rows, year=year, recent=recent, filter_value=filter),
+        filtered,
         api_name=_API_NAME,
         api_url=_API_URL,
         cached=cached,

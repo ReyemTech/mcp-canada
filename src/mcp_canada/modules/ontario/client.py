@@ -306,5 +306,6 @@ async def fetch_population_projections(
     return await fetch_and_parse(
         POPULATION_PROJECTIONS_RESOURCE_URL,
         sheet=0,
+        skip_rows=4,
         ttl=CACHE_TTL_DATA,
     )

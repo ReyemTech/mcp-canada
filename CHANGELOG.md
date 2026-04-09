@@ -2,6 +2,19 @@
 
 <!-- CHANGELOG -->
 
+## v0.4.4 (2026-04-09)
+
+### Bug Fixes
+
+- Add missing IRCC ops breakdowns — new citizens and TRV V-1 approved
+  ([`448f503`](https://github.com/ReyemTech/mcp-canada/commit/448f5032c393c0db34e4d06653c10d735ad8d99e))
+
+### Chores
+
+- Sync uv.lock after release
+  ([`568cad8`](https://github.com/ReyemTech/mcp-canada/commit/568cad8f862c34e2894595c23ef5ec86da34db77))
+
+
 ## v0.4.3 (2026-04-08)
 
 ### Bug Fixes

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 40-mcp-prompts-and-resources 40-04-PLAN.md
-last_updated: "2026-04-09T20:01:39.403Z"
+stopped_at: Completed 40-mcp-prompts-and-resources 40-05-PLAN.md
+last_updated: "2026-04-09T20:08:40.352Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 23
-  completed_plans: 22
+  completed_plans: 23
   percent: 0
 ---
 
@@ -72,6 +72,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 40-mcp-prompts-and-resources P02 | 18min | 2 tasks | 9 files |
 | Phase 40-mcp-prompts-and-resources P03 | 12min | 2 tasks | 12 files |
 | Phase 40-mcp-prompts-and-resources P04 | 12min | 2 tasks | 13 files |
+| Phase 40-mcp-prompts-and-resources P05 | 4min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -135,6 +136,7 @@ Recent decisions affecting current work:
 - [Phase 40-mcp-prompts-and-resources]: Weather prompts.py at top-level weather/ (not in sub-modules) — FileSystemProvider recursively scans so one file avoids duplicate discovery
 - [Phase 40-mcp-prompts-and-resources]: IRCC ircc_dataset_list resource maps all 10 dataset keys to tool names — provides complete discovery catalog for agents
 - [Phase 40-mcp-prompts-and-resources]: Toronto neighbourhood-list embeds all 140 neighbourhoods inline — avoids HTTP call to retrieve static reference data
+- [Phase 40-mcp-prompts-and-resources]: r.uri on FastMCP ResourceInfo is AnyUrl not str — must str(r.uri) before string containment tests in integration tests
 
 ### Roadmap Evolution
 
@@ -162,6 +164,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-09T20:01:39.395Z
-Stopped at: Completed 40-mcp-prompts-and-resources 40-04-PLAN.md
+Last session: 2026-04-09T20:08:40.348Z
+Stopped at: Completed 40-mcp-prompts-and-resources 40-05-PLAN.md
 Resume file: None

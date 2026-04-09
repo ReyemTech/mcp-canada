@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Phase 13 context gathered
-last_updated: "2026-04-09T16:29:01.068Z"
+stopped_at: Completed 13-toronto-municipal-government-open-data-01-PLAN.md
+last_updated: "2026-04-09T16:58:47.128Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 33
   completed_phases: 6
-  total_plans: 16
-  completed_plans: 16
+  total_plans: 18
+  completed_plans: 17
   percent: 0
 ---
 
@@ -66,6 +66,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 11-ircc-immigration P04 | 8min | 2 tasks | 5 files |
 | Phase 12-ontario-government-open-data P01 | 15min | 1 tasks | 7 files |
 | Phase 12-ontario-government-open-data P02 | 3min | 2 tasks | 4 files |
+| Phase 13-toronto-municipal-government-open-data P01 | 5min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -114,6 +115,9 @@ Recent decisions affecting current work:
 - [Phase 12-ontario-government-open-data]: ontario: cache key prefix distinguishes Ontario datasets from federal CKAN keys in shared aiocache
 - [Phase 12-ontario-government-open-data]: Population projections XLSX has no FR variant — lang parameter accepted for API consistency, same URL used for both languages
 - [Phase 12-ontario-government-open-data]: Patch client functions at tools module namespace (mcp_canada.modules.ontario.tools.*) not client module — functions are imported into tools.py namespace
+- [Phase 13-toronto-municipal-government-open-data]: GeoJSON .geojson check before .json in fetch_and_parse routing: .geojson ends with json so ordering matters
+- [Phase 13-toronto-municipal-government-open-data]: fetch_311_requests two-step: package_show discovers year ZIP URL then downloads — enables year-agnostic URL discovery
+- [Phase 13-toronto-municipal-government-open-data]: toronto: cache key prefix distinguishes Toronto datasets from federal CKAN keys in shared aiocache
 
 ### Roadmap Evolution
 
@@ -140,6 +144,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-09T16:29:01.059Z
-Stopped at: Phase 13 context gathered
-Resume file: .planning/phases/13-toronto-municipal-government-open-data/13-CONTEXT.md
+Last session: 2026-04-09T16:58:47.124Z
+Stopped at: Completed 13-toronto-municipal-government-open-data-01-PLAN.md
+Resume file: None

@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 13-toronto-municipal-government-open-data-02-PLAN.md
-last_updated: "2026-04-09T17:10:13.735Z"
+stopped_at: Phase 40 context gathered
+last_updated: "2026-04-09T19:01:08.776Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
-  total_phases: 33
+  total_phases: 34
   completed_phases: 7
   total_plans: 18
   completed_plans: 18
@@ -134,6 +134,7 @@ Recent decisions affecting current work:
 - Phases 18-26 added: Remaining provinces and territories (MB, SK, NS, NB, NL, PE, NT, YT, NU)
 - Phases 27-34 added: Major municipalities (Montreal, Vancouver, Calgary, Edmonton, Ottawa, Winnipeg, Halifax, Mississauga)
 - Phases 35-39 added: Regional municipalities (Peel, Durham, Halton, Waterloo, Metro Vancouver)
+- Phase 40 added: MCP Prompts and Resources — workflow prompts for guided data exploration, static resources for reference data across all modules
 
 ### Pending Todos
 
@@ -147,6 +148,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-09T17:06:15.676Z
-Stopped at: Completed 13-toronto-municipal-government-open-data-02-PLAN.md
-Resume file: None
+Last session: 2026-04-09T19:01:08.768Z
+Stopped at: Phase 40 context gathered
+Resume file: .planning/phases/40-mcp-prompts-and-resources/40-CONTEXT.md

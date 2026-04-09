@@ -8,8 +8,7 @@ Privacy note: IRCC suppresses values between 0-5 (shown as null) and rounds all
 other values to the nearest multiple of 5.
 """
 
-import re
-from typing import Any, Literal
+from typing import Literal
 
 import httpx
 from fastmcp.tools import tool
@@ -29,146 +28,10 @@ from mcp_canada.modules.ircc.client import (
 )
 from mcp_canada.modules.ircc.constants import DATASET_REGISTRY
 from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.reshape import reshape_temporal_columns
 
 _API_NAME = "IRCC Open Data"
 _API_BASE = "https://www.ircc.canada.ca/opendata-donneesouvertes/data/"
-
-# Patterns for temporal column names produced by the IRCC parser
-_RE_YEAR_QUARTER_MONTH = re.compile(r"^(\d{4})_([qt]\d)_(.+)$")
-_RE_YEAR_TOTAL = re.compile(r"^(\d{4})_(?:year_)?total$")
-_RE_YEAR_MONTH = re.compile(r"^(\d{4})_([a-z]+)$")
-
-
-def _reshape_to_nested(
-    flat_rows: list[dict[str, Any]],
-    year: int | None = None,
-    recent: int | None = None,
-    filter_value: str | None = None,
-) -> list[dict[str, Any]]:
-    """Reshape flat IRCC rows into nested year > quarter > month dicts.
-
-    Input keys like "2015_q1_jan", "2015_q1_total", "2015_year_total"
-    become: {"years": {"2015": {"q1": {"jan": "90", "total": "435"}, "total": "2,630"}}}
-
-    Label columns (no year prefix) are preserved at the top level.
-
-    Args:
-        flat_rows: Flat dicts from parser with temporal column names.
-        year: If set, only include data for this year.
-        recent: If set, only include the N most recent years.
-        filter_value: If set, case-insensitive substring match on label columns.
-            Only rows where any label column contains this string are returned.
-    """
-    result: list[dict[str, Any]] = []
-    for row in flat_rows:
-        nested: dict[str, Any] = {}
-        years: dict[str, Any] = {}
-
-        for key, value in row.items():
-            # Try year_quarter_month (e.g. 2015_q1_jan, 2015_q1_total)
-            m = _RE_YEAR_QUARTER_MONTH.match(key)
-            if m:
-                yr, qtr, month = m.group(1), m.group(2), m.group(3)
-                years.setdefault(yr, {}).setdefault(qtr, {})[month] = value
-                continue
-
-            # Try year total (e.g. 2015_total, 2015_year_total)
-            m = _RE_YEAR_TOTAL.match(key)
-            if m:
-                yr = m.group(1)
-                years.setdefault(yr, {})["total"] = value
-                continue
-
-            # Try year_month without quarter (e.g. 2015_jan for asylum/ops)
-            m = _RE_YEAR_MONTH.match(key)
-            if m:
-                yr, month = m.group(1), m.group(2)
-                if month != "total":
-                    years.setdefault(yr, {})[month] = value
-                else:
-                    years.setdefault(yr, {})["total"] = value
-                continue
-
-            # Label column — keep at top level
-            nested[key] = value
-
-        # Filter by label value (case-insensitive substring match)
-        if filter_value is not None:
-            needle = filter_value.lower()
-            if not any(
-                needle in str(v).lower()
-                for v in nested.values()
-                if v is not None
-            ):
-                continue
-
-        # Apply year filter
-        if year is not None:
-            year_str = str(year)
-            years = {k: v for k, v in years.items() if k == year_str}
-
-        # Apply recent filter (keep N most recent years)
-        if recent is not None and years:
-            sorted_keys = sorted(years.keys(), reverse=True)[:recent]
-            years = {k: years[k] for k in sorted_keys}
-
-        if years:
-            nested["years"] = years
-        result.append(nested)
-
-    # Detect 2-label rows and group hierarchically.
-    # If all rows have exactly 2 non-"years" keys, group by the first label
-    # with sub-items keyed by the second label value.
-    if result:
-        label_keys_sets = [
-            [k for k in row if k != "years"]
-            for row in result
-        ]
-        # Check if all rows have exactly 2 label columns
-        if all(len(lk) == 2 for lk in label_keys_sets):
-            key1, key2 = label_keys_sets[0][0], label_keys_sets[0][1]
-            # Verify all rows use the same label key names
-            if all(lk[0] == key1 and lk[1] == key2 for lk in label_keys_sets):
-                grouped: dict[str, dict[str, Any]] = {}
-                for row in result:
-                    group = str(row.get(key1) or "")
-                    sub = row.get(key2)
-                    years_data = row.get("years", {})
-
-                    if not group:
-                        continue
-
-                    if group not in grouped:
-                        grouped[group] = {}
-
-                    if sub is not None:
-                        grouped[group][str(sub)] = {"years": years_data} if years_data else {}
-                    else:
-                        # Total/summary row for this group
-                        grouped[group]["total"] = {"years": years_data} if years_data else {}
-
-                # Clean group names: strip " Total" suffix from groups that
-                # have sub-items beyond just "total" (i.e. actual breakdowns)
-                cleaned: dict[str, dict[str, Any]] = {}
-                for group_name, items in grouped.items():
-                    name = group_name
-                    has_subitems = any(k != "total" for k in items)
-                    if has_subitems and name.endswith(" Total"):
-                        name = name[: -len(" Total")]
-                    # Merge if cleaned name already exists (e.g. "Female Total" → "Female"
-                    # merges with standalone "Female" summary row)
-                    if name in cleaned:
-                        cleaned[name].update(items)
-                    else:
-                        cleaned[name] = items
-
-                # Convert to list format
-                result = [
-                    {"group": group_name, "items": items}
-                    for group_name, items in cleaned.items()
-                ]
-
-    return result
 
 
 def _registry_url(dataset_key: str, breakdown: str, lang: str) -> str:
@@ -209,7 +72,7 @@ async def ircc_get_permanent_residents(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows, year=year, recent=recent, filter_value=filter),
+        reshape_temporal_columns(rows, year=year, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url("pr", breakdown, lang),
         cached=cached,
@@ -245,7 +108,7 @@ async def ircc_get_study_permits(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows, year=year, recent=recent, filter_value=filter),
+        reshape_temporal_columns(rows, year=year, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url("study", breakdown, lang),
         cached=cached,
@@ -291,7 +154,7 @@ async def ircc_get_work_permits(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows, year=year, recent=recent, filter_value=filter),
+        reshape_temporal_columns(rows, year=year, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url(dataset_key, breakdown, lang),
         cached=cached,
@@ -337,7 +200,7 @@ async def ircc_get_express_entry(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows, year=year, recent=recent, filter_value=filter),
+        reshape_temporal_columns(rows, year=year, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url(dataset_key, breakdown, lang),
         cached=cached,
@@ -371,7 +234,7 @@ async def ircc_get_tr_to_pr(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows, year=year, recent=recent, filter_value=filter),
+        reshape_temporal_columns(rows, year=year, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url("tr_to_pr", breakdown, lang),
         cached=cached,
@@ -405,7 +268,7 @@ async def ircc_get_asylum(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows, year=year, recent=recent, filter_value=filter),
+        reshape_temporal_columns(rows, year=year, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url("asylum", breakdown, lang),
         cached=cached,
@@ -444,7 +307,7 @@ async def ircc_get_ops(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows, recent=recent, filter_value=filter),
+        reshape_temporal_columns(rows, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url("ops", breakdown, lang),
         cached=cached,
@@ -478,7 +341,7 @@ async def ircc_get_afghan(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows, year=year, recent=recent, filter_value=filter),
+        reshape_temporal_columns(rows, year=year, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url("afghan", breakdown, lang),
         cached=cached,
@@ -514,7 +377,7 @@ async def ircc_get_adhoc_pr(
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
 
     return make_response(
-        _reshape_to_nested(rows, recent=recent, filter_value=filter),
+        reshape_temporal_columns(rows, recent=recent, filter_value=filter),
         api_name=_API_NAME,
         api_url=_registry_url("adhoc_pr", breakdown, lang),
         cached=cached,

@@ -35,6 +35,7 @@ from mcp_canada.modules.bank_of_canada.constants import (
     INTEREST_RATE_SERIES,
 )
 from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.reshape import reshape_observations
 
 # API name and base URL for _meta envelope
 _API_NAME = "bank-of-canada-valet"
@@ -100,7 +101,7 @@ async def boc_get_exchange_rates(
         raise
 
     return make_response(
-        [row.model_dump() for row in rows],
+        reshape_observations(rows),
         api_name=_API_NAME,
         api_url=_API_URL,
         cached=cached,
@@ -148,7 +149,7 @@ async def boc_get_interest_rates(
     )
 
     return make_response(
-        [row.model_dump() for row in rows],
+        reshape_observations(rows),
         api_name=_API_NAME,
         api_url=_API_URL,
         cached=cached,
@@ -199,7 +200,7 @@ async def boc_get_commodity_prices(
         )
 
     return make_response(
-        [row.model_dump() for row in rows],
+        reshape_observations(rows),
         api_name=_API_NAME,
         api_url=_API_URL,
         cached=cached,
@@ -250,7 +251,7 @@ async def boc_get_inflation_data(
         )
 
     return make_response(
-        [row.model_dump() for row in rows],
+        reshape_observations(rows),
         api_name=_API_NAME,
         api_url=_API_URL,
         cached=cached,
@@ -372,7 +373,7 @@ async def boc_get_observations(
         raise
 
     return make_response(
-        [row.model_dump() for row in rows],
+        reshape_observations(rows),
         api_name=_API_NAME,
         api_url=_API_URL,
         cached=cached,

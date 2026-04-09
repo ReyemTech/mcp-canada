@@ -87,9 +87,9 @@ class TestBocGetExchangeRates:
         assert "_meta" in result
         assert result["_meta"]["source"]["api"] == "bank-of-canada-valet"
         assert "cached" in result["_meta"]
-        assert isinstance(result["data"], list)
-        assert len(result["data"]) == 2
-        assert result["data"][0]["series_name"] == "FXUSDCAD"
+        assert isinstance(result["data"], dict)
+        assert "FXUSDCAD" in result["data"]
+        assert "observations" in result["data"]["FXUSDCAD"]
 
     @pytest.mark.asyncio
     async def test_currency_filter_fetches_single_series(self):
@@ -214,7 +214,7 @@ class TestBocGetCommodityPrices:
             result = await tools.boc_get_commodity_prices()
 
         assert "_meta" in result
-        assert isinstance(result["data"], list)
+        assert isinstance(result["data"], dict)
         # Group fetch should be called with BCPI group
         mock_group.assert_called_once()
         call_args = mock_group.call_args
@@ -396,8 +396,8 @@ class TestBocGetObservations:
             result = await tools.boc_get_observations(series_names="FXUSDCAD")
 
         assert "_meta" in result
-        assert isinstance(result["data"], list)
-        assert len(result["data"]) == 2
+        assert isinstance(result["data"], dict)
+        assert "FXUSDCAD" in result["data"]
 
     @pytest.mark.asyncio
     async def test_invalid_series_returns_invalid_series_error(self):

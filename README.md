@@ -16,7 +16,7 @@
 
 ---
 
-**116 tools** across **9 federal APIs + 1 provincial API + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, and persistent local storage. All bilingual (English/French).
+**128 tools** across **9 federal APIs + 1 provincial API + 1 municipal API + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, and persistent local storage. All bilingual (English/French).
 
 
 ## Quick Start
@@ -420,6 +420,38 @@ Provincial datasets from the [Ontario Open Data Catalogue](https://data.ontario.
 
 ---
 
+### 🏙️ Toronto Open Data — 12 tools
+
+Municipal datasets from the [City of Toronto Open Data Portal](https://open.toronto.ca) (CKAN 2.9 API) with 500+ datasets. Includes TTC transit schedules (GTFS), neighbourhood census profiles, 311 service requests, RentSafeTO apartment evaluations, and short-term rental registrations.
+
+#### Discovery (5)
+
+<!-- CATALOG:toronto_discovery:start -->
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `toronto_search_datasets` | Search Toronto's Open Data portal (open.toronto.ca) for datasets by keyword. | `query`, `filter_query`, `rows` |
+| `toronto_get_dataset_details` | Get full details for a specific Toronto Open Data dataset including all resources. | `dataset_id` |
+| `toronto_get_resource` | Get details for a specific data resource (file) from the Toronto Open Data portal. | `resource_id` |
+| `toronto_list_organizations` | List all City of Toronto divisions and agencies that publish open data. | — |
+| `toronto_get_dataset_stats` | Get aggregate statistics for the Toronto Open Data portal (open.toronto.ca). | — |
+<!-- CATALOG:toronto_discovery:end -->
+
+#### Curated (7)
+
+<!-- CATALOG:toronto_curated:start -->
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `toronto_get_ttc_stops` | Search TTC (Toronto Transit Commission) stops by name from GTFS static schedule. | `query` |
+| `toronto_get_ttc_routes` | List TTC (Toronto Transit Commission) routes from GTFS static schedule data. | `route_type` |
+| `toronto_get_neighbourhood_profile` | Get census indicator data for Toronto neighbourhoods from the Neighbourhood Profiles dataset. | `neighbourhood`, `characteristic`, `limit` |
+| `toronto_compare_neighbourhoods` | Compare a single census indicator across all 140 Toronto neighbourhoods. | `characteristic`, `limit` |
+| `toronto_get_311_requests` | Fetch Toronto 311 service requests (citizen complaints and service calls) for a given year. | `year`, `ward`, `service_type`, `status`, `limit` |
+| `toronto_get_rentsafe_evaluations` | Query RentSafeTO apartment building evaluation scores from City of Toronto inspections. | `ward`, `min_score`, `limit` |
+| `toronto_get_short_term_rentals` | Query Toronto short-term rental (STR) operator registration records. | `ward`, `status`, `limit` |
+<!-- CATALOG:toronto_curated:end -->
+
+---
+
 ## Response Format
 
 All tools return a consistent envelope:
@@ -470,6 +502,8 @@ src/mcp_canada/
     ├── nutrient_file/     # 8 tools — Canadian Nutrient File
     ├── datastore/         # 6 tools — local SQLite persistence
     ├── ircc/              # 10 tools — IRCC Immigration Open Data
+    ├── ontario/           # 6 tools — Ontario Open Data Catalogue
+    ├── toronto/           # 12 tools — City of Toronto Open Data Portal
     └── weather/           # 34 tools — MSC GeoMet OGC API
         ├── current/       # 5 tools — realtime conditions, forecast, alerts
         ├── climate/       # 7 tools — daily/monthly/normals/trends

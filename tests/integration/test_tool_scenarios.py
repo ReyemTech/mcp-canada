@@ -497,6 +497,89 @@ class TestCrossModuleScenarios:
         datasets = await call_tool(mcp_server, "ckan_search_datasets", {"query": "food safety", "rows": 3})
         assert "_meta" in datasets
 
+
+# ─── Toronto scenarios ───────────────────────────────────────────────────────
+
+
+class TestTorontoToolScenarios:
+
+    @pytest.mark.asyncio
+    async def test_toronto_discovery(self, mcp_server):
+        """'What Toronto datasets are about cycling?'"""
+        results = await discover(mcp_server, "Toronto cycling datasets open data")
+        names = [r["name"] for r in results]
+        assert any(n.startswith("toronto_") for n in names)
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
+    async def test_toronto_dataset_details(self, mcp_server):
+        """'Tell me about the TTC routes dataset.'"""
+        data = await call_tool(mcp_server, "toronto_get_dataset_details", {
+            "dataset_id": "ttc-routes-and-schedules"
+        })
+        assert "_meta" in data
+        assert "data" in data
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(120)
+    async def test_toronto_ttc_stops(self, mcp_server):
+        """'Where are the subway stops?'"""
+        data = await call_tool(mcp_server, "toronto_get_ttc_stops", {"query": "station"})
+        assert "_meta" in data
+        assert isinstance(data.get("data", []), list)
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(120)
+    async def test_toronto_ttc_routes(self, mcp_server):
+        """'What TTC routes exist?'"""
+        data = await call_tool(mcp_server, "toronto_get_ttc_routes")
+        assert "_meta" in data
+        assert isinstance(data.get("data", []), list)
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
+    async def test_toronto_neighbourhood_profile(self, mcp_server):
+        """'What\'s the population of Rosedale?'"""
+        data = await call_tool(mcp_server, "toronto_get_neighbourhood_profile", {
+            "neighbourhood": "Rosedale",
+            "limit": 10
+        })
+        assert "_meta" in data
+        assert "data" in data
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
+    async def test_toronto_rentsafe(self, mcp_server):
+        """'Show me apartment buildings in Ward 10.'"""
+        data = await call_tool(mcp_server, "toronto_get_rentsafe_evaluations", {
+            "ward": "10",
+            "limit": 5
+        })
+        assert "_meta" in data
+        assert "data" in data
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
+    async def test_toronto_short_term_rentals(self, mcp_server):
+        """'List active Airbnb registrations.'"""
+        data = await call_tool(mcp_server, "toronto_get_short_term_rentals", {
+            "status": "registered",
+            "limit": 5
+        })
+        assert "_meta" in data
+        assert "data" in data
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
+    async def test_toronto_compare_neighbourhoods(self, mcp_server):
+        """'Compare median household income across Toronto neighbourhoods.'"""
+        data = await call_tool(mcp_server, "toronto_compare_neighbourhoods", {
+            "characteristic": "Median household income",
+            "limit": 20
+        })
+        assert "_meta" in data
+        assert "data" in data
+
     @pytest.mark.asyncio
     async def test_commodity_plus_agriculture(self, mcp_server):
         """'Get agriculture commodity prices and datasets.'"""

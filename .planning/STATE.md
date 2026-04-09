@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 40-mcp-prompts-and-resources 40-01-PLAN.md
-last_updated: "2026-04-09T19:45:51.523Z"
+stopped_at: Completed 40-mcp-prompts-and-resources 40-02-PLAN.md
+last_updated: "2026-04-09T19:57:07.877Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 7
   total_plans: 23
-  completed_plans: 19
+  completed_plans: 20
   percent: 0
 ---
 
@@ -69,6 +69,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 13-toronto-municipal-government-open-data P01 | 5min | 2 tasks | 8 files |
 | Phase 13-toronto-municipal-government-open-data P02 | 5min | 2 tasks | 4 files |
 | Phase 40-mcp-prompts-and-resources P01 | 10min | 2 tasks | 5 files |
+| Phase 40-mcp-prompts-and-resources P02 | 18min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -124,6 +125,9 @@ Recent decisions affecting current work:
 - [Phase 13-toronto-municipal-government-open-data]: GTFS/datastore tools catch generic Exception (not just HTTPStatusError) since ZIP errors are not HTTP errors
 - [Phase 40-mcp-prompts-and-resources]: Guided workflow prompts (list[Message]) for multi-step tool chaining; quick lookups (str) for single-tool instructions
 - [Phase 40-mcp-prompts-and-resources]: Resources are zero-parameter functions — lang param would promote to ResourceTemplate and remove from resources/list
+- [Phase 40-mcp-prompts-and-resources]: StatCan resources use string keys ('1', '5', '9') for frequency/scalar codes matching JSON serialization of integer keys
+- [Phase 40-mcp-prompts-and-resources]: statcan_store_and_query prompt is the cross-module flagship: demonstrates sc_fetch_vectors_to_store -> ds_query chain
+- [Phase 40-mcp-prompts-and-resources]: ckan_federal_organizations uses org slugs as keys (not display names) — slugs are what the CKAN API organization= parameter accepts
 
 ### Roadmap Evolution
 
@@ -151,6 +155,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-09T19:45:51.520Z
-Stopped at: Completed 40-mcp-prompts-and-resources 40-01-PLAN.md
+Last session: 2026-04-09T19:57:07.872Z
+Stopped at: Completed 40-mcp-prompts-and-resources 40-02-PLAN.md
 Resume file: None

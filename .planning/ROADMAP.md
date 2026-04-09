@@ -117,3 +117,13 @@ Plans:
 - [x] 11-02-PLAN.md — IRCC module skeleton: dataset registry, client functions, unit tests
 - [x] 11-03-PLAN.md — IRCC tool functions, integration tests, README update
 - [ ] 11-04-PLAN.md — Gap closure: IRCC multi-row merged header parsing (UAT blocker)
+
+### Phase 12: Ontario Government Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 11
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 12 to break down)

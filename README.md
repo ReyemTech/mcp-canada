@@ -16,7 +16,7 @@
 
 ---
 
-**110 tools** across **9 federal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, and persistent local storage. All bilingual (English/French).
+**116 tools** across **9 federal APIs + 1 provincial API + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, and persistent local storage. All bilingual (English/French).
 
 
 ## Quick Start
@@ -400,6 +400,23 @@ Permanent residents, temporary workers, study permits, Express Entry, asylum, an
 <!-- CATALOG:ircc:end -->
 
 > **Note:** IRCC suppresses values between 0-5 (shown as null) and rounds all other values to the nearest multiple of 5 for privacy protection. Ad-hoc PR files (`ircc_get_adhoc_pr`) are English-only.
+
+---
+
+### 🏛️ Ontario Government Open Data — 6 tools
+
+Provincial datasets from the [Ontario Open Data Catalogue](https://data.ontario.ca) (CKAN 3 API) with 3,000+ datasets from Ontario ministries and agencies. Includes curated population projections from the Ministry of Finance.
+
+<!-- CATALOG:ontario:start -->
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `ontario_search_datasets` | Search Ontario's Open Data Catalogue (data.ontario.ca) for datasets by keyword. | `query`, `filters`, `rows` |
+| `ontario_get_dataset_details` | Get full details for a specific Ontario Open Data dataset including all resources. | `dataset_id` |
+| `ontario_get_resource` | Get details for a specific data resource (file) from the Ontario Open Data Catalogue. | `resource_id` |
+| `ontario_list_organizations` | List all Ontario government ministries and agencies that publish open data. | `sort` |
+| `ontario_get_dataset_stats` | Get aggregate statistics for the Ontario Open Data Catalogue (data.ontario.ca). | — |
+| `ontario_get_population_projections` | Fetch Ontario Ministry of Finance population projections by region (2024-2051). | `year`, `recent`, `filter` |
+<!-- CATALOG:ontario:end -->
 
 ---
 

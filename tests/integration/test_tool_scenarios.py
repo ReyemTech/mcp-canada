@@ -1147,3 +1147,70 @@ class TestIrccScenarios:
 
         # Cleanup
         await call_tool(mcp_server, "ds_drop_table", {"table_name": "ircc_pr_test"})
+
+
+# ─── Ontario Government Open Data scenarios ───────────────────────────────────
+
+
+class TestOntarioToolScenarios:
+    """Ontario Open Data integration tests through the MCP Client layer.
+
+    Tests assert on response shape, not specific values (data changes daily).
+    All tests marked @pytest.mark.integration — live API required.
+    """
+
+    @pytest.mark.asyncio
+    async def test_ontario_search_population(self, mcp_server):
+        """'What Ontario datasets exist about population?'"""
+        data = await call_tool(mcp_server, "ontario_search_datasets", {
+            "query": "population",
+            "rows": 3,
+        })
+        assert "_meta" in data
+        assert data["_meta"]["source"]["api"] == "Ontario Data Catalogue"
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) >= 1
+
+    @pytest.mark.asyncio
+    async def test_ontario_dataset_details(self, mcp_server):
+        """'Show me details of a specific Ontario dataset'"""
+        data = await call_tool(mcp_server, "ontario_get_dataset_details", {
+            "dataset_id": "population-projections",
+        })
+        assert "_meta" in data
+        assert "id" in data["data"]
+        assert "title" in data["data"]
+
+    @pytest.mark.asyncio
+    async def test_ontario_list_organizations(self, mcp_server):
+        """'What Ontario ministries publish data?'"""
+        data = await call_tool(mcp_server, "ontario_list_organizations")
+        assert "_meta" in data
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) > 0
+
+    @pytest.mark.asyncio
+    async def test_ontario_portal_stats(self, mcp_server):
+        """'How many datasets does Ontario have?'"""
+        data = await call_tool(mcp_server, "ontario_get_dataset_stats")
+        assert "_meta" in data
+        assert "total_datasets" in data["data"]
+        assert isinstance(data["data"]["total_datasets"], int)
+
+    @pytest.mark.asyncio
+    async def test_ontario_discovery(self, mcp_server):
+        """discover_tools with query 'Ontario provincial data' finds at least one ontario_ tool."""
+        results = await discover(mcp_server, "Ontario provincial data")
+        names = [r["name"] for r in results]
+        assert any(n.startswith("ontario_") for n in names), (
+            f"No ontario_ tools found for 'Ontario provincial data'. Got: {names}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_ontario_search_error_handling(self, mcp_server):
+        """'Get details for a nonexistent Ontario dataset'"""
+        data = await call_tool(mcp_server, "ontario_get_dataset_details", {
+            "dataset_id": "nonexistent-dataset-zzz-abc-123",
+        })
+        assert "error" in data
+        assert data["error"]["code"] in ("NOT_FOUND", "UPSTREAM_ERROR")

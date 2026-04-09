@@ -73,6 +73,17 @@
 - [x] **IRCC-08**: Parsed IRCC data can be stored to the shared datastore for cross-module SQL queries
 - [x] **IRCC-09**: Shared parser is reusable by any future module (not IRCC-specific)
 
+### Ontario Open Data
+
+- [ ] **ONT-01**: Agent can search Ontario's Open Data Catalogue (data.ontario.ca) by keyword with pagination
+- [ ] **ONT-02**: Agent can get full details for a specific Ontario dataset including resources and metadata
+- [ ] **ONT-03**: Agent can get details for a specific Ontario data resource by resource ID
+- [ ] **ONT-04**: Agent can list Ontario government organizations (ministries) that publish open data
+- [ ] **ONT-05**: Agent can get aggregate Ontario portal statistics (total dataset count)
+- [ ] **ONT-06**: Agent can fetch and parse Ontario population projections data (XLSX from Ministry of Finance)
+- [ ] **ONT-07**: All Ontario tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Keywords/Use-for docstrings, ontario_ prefix)
+- [ ] **ONT-08**: Ontario tools are discoverable via discover_tools and callable via call_tool through the MCP Client layer
+
 ## v2 Requirements
 
 ### Extended Datastore
@@ -99,6 +110,9 @@
 | Migrating existing modules to use datastore | Future enhancement for v1.2+ |
 | Generic CKAN resource parser tool | Scope creep — shared/parsers.py makes this trivial to add later |
 | IRCC data change detection | Monitoring feature, not core |
+| Ontario ZIP resources (vehicle population, energy) | ZIP archives exceed reasonable MCP context budget |
+| Ontario education enrollment tools | Deferred to future phase — multi-sheet XLSX layout needs inspection |
+| Ontario hospital wait times | Restricted dataset — access_level prevents download |
 
 ## Traceability
 
@@ -145,13 +159,22 @@
 | IRCC-07 | Phase 11 | Planned |
 | IRCC-08 | Phase 11 | Planned |
 | IRCC-09 | Phase 11 | Planned |
+| ONT-01 | Phase 12 | Planned |
+| ONT-02 | Phase 12 | Planned |
+| ONT-03 | Phase 12 | Planned |
+| ONT-04 | Phase 12 | Planned |
+| ONT-05 | Phase 12 | Planned |
+| ONT-06 | Phase 12 | Planned |
+| ONT-07 | Phase 12 | Planned |
+| ONT-08 | Phase 12 | Planned |
 
 **Coverage:**
 - v1 requirements: 32 total
 - Mapped to phases: 32
 - Unmapped: 0
 - IRCC requirements: 9 total (Phase 11)
+- Ontario requirements: 8 total (Phase 12)
 
 ---
 *Requirements defined: 2026-04-07*
-*Last updated: 2026-04-08 after Phase 11 planning*
+*Last updated: 2026-04-08 after Phase 12 planning*

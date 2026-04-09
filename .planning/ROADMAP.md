@@ -119,14 +119,21 @@ Plans:
 - [ ] 11-04-PLAN.md — Gap closure: IRCC multi-row merged header parsing (UAT blocker)
 
 ### Phase 12: Ontario Government Open Data
-
-**Goal:** [To be planned]
-**Requirements**: TBD
-**Depends on:** Phase 11
-**Plans:** 0 plans
+**Goal**: Agents can search Ontario's 2,946 open datasets (data.ontario.ca), browse ministry organizations, get dataset/resource details, and fetch curated population projections data — reusing the proven CKAN client pattern and shared XLSX parser
+**Depends on**: Phase 11 (shared parsers)
+**Requirements**: ONT-01, ONT-02, ONT-03, ONT-04, ONT-05, ONT-06, ONT-07, ONT-08
+**Success Criteria** (what must be TRUE):
+  1. Agent can search Ontario datasets by keyword and get shaped results with bilingual title/description
+  2. Agent can get full dataset details, resource details, list organizations, and get portal statistics
+  3. Agent can fetch Ontario population projections from the Ministry of Finance XLSX file
+  4. All Ontario tools follow mcp-canada conventions (ontario_ prefix, envelopes, bilingual, BM25 keywords)
+  5. Ontario tools are discoverable via discover_tools and callable via call_tool through MCP Client
+  6. Unit tests at 95%+ coverage; integration tests verify live API through MCP Client layer
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 12 to break down)
+- [ ] 12-01-PLAN.md — Ontario module skeleton: constants, schemas, CKAN client layer, population projections parser, unit tests
+- [ ] 12-02-PLAN.md — Ontario tool functions, unit tests, integration tests, README update
 
 ### Phase 13: Toronto Municipal Government Open Data
 

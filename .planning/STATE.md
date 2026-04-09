@@ -4,7 +4,7 @@ milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
 stopped_at: Completed 40-mcp-prompts-and-resources 40-05-PLAN.md
-last_updated: "2026-04-09T20:08:40.352Z"
+last_updated: "2026-04-09T20:12:19.297Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34

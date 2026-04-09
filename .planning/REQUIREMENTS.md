@@ -84,6 +84,21 @@
 - [x] **ONT-07**: All Ontario tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Keywords/Use-for docstrings, ontario_ prefix)
 - [x] **ONT-08**: Ontario tools are discoverable via discover_tools and callable via call_tool through the MCP Client layer
 
+### Toronto Open Data
+
+- **TOR-01**: Shared parsers support GeoJSON FeatureCollection parsing with optional geometry inclusion
+- **TOR-02**: Shared parsers support JSON array/object parsing with GeoJSON auto-detection
+- **TOR-03**: Agent can search Toronto's Open Data Catalogue by keyword with pagination
+- **TOR-04**: Agent can get full details for a Toronto dataset including resources with datastore_active flag
+- **TOR-05**: Agent can search TTC stops by name from GTFS ZIP data
+- **TOR-06**: Agent can search TTC routes by type from GTFS ZIP data
+- **TOR-07**: Agent can get neighbourhood census profile indicators (2016 140-neighbourhood model via CKAN datastore)
+- **TOR-08**: Agent can compare a single census indicator across all 140 neighbourhoods
+- **TOR-09**: Agent can fetch 311 service requests filtered by year, ward, service type, and status (annual ZIP+CSV with client-side filtering)
+- **TOR-10**: Agent can query RentSafeTO apartment building evaluations by ward and minimum score
+- **TOR-11**: Agent can query short-term rental registrations by ward and status
+- **TOR-12**: All Toronto tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Keywords/Use-for docstrings, toronto_ prefix) and are discoverable via discover_tools
+
 ## v2 Requirements
 
 ### Extended Datastore
@@ -113,6 +128,9 @@
 | Ontario ZIP resources (vehicle population, energy) | ZIP archives exceed reasonable MCP context budget |
 | Ontario education enrollment tools | Deferred to future phase — multi-sheet XLSX layout needs inspection |
 | Ontario hospital wait times | Restricted dataset — access_level prevents download |
+| Toronto building permits curated tool | 232K+ active permits too large for client-side filter; use toronto_search_datasets discovery instead |
+| Toronto budget curated tool | Annual XLSX with no datastore access; discoverable via toronto_search_datasets |
+| Toronto 2021 neighbourhood profiles | XLSX-only (158-model), not datastore-active; use 2016 CSV (140-model) instead |
 
 ## Traceability
 
@@ -167,6 +185,18 @@
 | ONT-06 | Phase 12 | Planned |
 | ONT-07 | Phase 12 | Planned |
 | ONT-08 | Phase 12 | Planned |
+| TOR-01 | Phase 13 | Planned |
+| TOR-02 | Phase 13 | Planned |
+| TOR-03 | Phase 13 | Planned |
+| TOR-04 | Phase 13 | Planned |
+| TOR-05 | Phase 13 | Planned |
+| TOR-06 | Phase 13 | Planned |
+| TOR-07 | Phase 13 | Planned |
+| TOR-08 | Phase 13 | Planned |
+| TOR-09 | Phase 13 | Planned |
+| TOR-10 | Phase 13 | Planned |
+| TOR-11 | Phase 13 | Planned |
+| TOR-12 | Phase 13 | Planned |
 
 **Coverage:**
 - v1 requirements: 32 total
@@ -174,7 +204,8 @@
 - Unmapped: 0
 - IRCC requirements: 9 total (Phase 11)
 - Ontario requirements: 8 total (Phase 12)
+- Toronto requirements: 12 total (Phase 13)
 
 ---
 *Requirements defined: 2026-04-07*
-*Last updated: 2026-04-08 after Phase 12 planning*
+*Last updated: 2026-04-09 after Phase 13 planning*

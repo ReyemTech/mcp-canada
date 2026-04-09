@@ -136,14 +136,23 @@ Plans:
 - [ ] 12-02-PLAN.md — Ontario tool functions, unit tests, integration tests, README update
 
 ### Phase 13: Toronto Municipal Government Open Data
-
-**Goal:** [To be planned]
-**Requirements**: TBD
-**Depends on:** Phase 12
-**Plans:** 0 plans
+**Goal**: Agents can search Toronto's open data catalogue (open.toronto.ca), browse city divisions, get dataset/resource details, and use curated tools for TTC transit (GTFS), neighbourhood profiles, 311 service requests, RentSafeTO evaluations, and short-term rentals — with new shared GeoJSON/JSON parsers
+**Depends on**: Phase 12 (Ontario CKAN pattern)
+**Requirements**: TOR-01, TOR-02, TOR-03, TOR-04, TOR-05, TOR-06, TOR-07, TOR-08, TOR-09, TOR-10, TOR-11, TOR-12
+**Success Criteria** (what must be TRUE):
+  1. Shared parsers handle GeoJSON and JSON in addition to CSV/XLSX/XLS
+  2. Agent can search Toronto datasets and get shaped results with bilingual title/description
+  3. Agent can search TTC stops and routes from parsed GTFS ZIP data
+  4. Agent can query neighbourhood census indicators and compare across neighbourhoods
+  5. Agent can fetch 311 service requests with year/ward/type/status filters
+  6. Agent can query RentSafeTO evaluations and short-term rental registrations
+  7. All Toronto tools follow mcp-canada conventions (toronto_ prefix, envelopes, bilingual, BM25 keywords)
+  8. Unit tests at 95%+ coverage; integration tests verify live API through MCP Client layer
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 13 to break down)
+- [ ] 13-01-PLAN.md — Shared GeoJSON/JSON parsers + Toronto module skeleton: constants, schemas, client layer, unit tests
+- [ ] 13-02-PLAN.md — Toronto tool functions, unit tests, integration tests, README update
 
 ### Phase 14: York Region Municipal Government Open Data
 

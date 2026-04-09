@@ -31,7 +31,6 @@ from mcp_canada.modules.toronto.client import (
     fetch_search_datasets,
     fetch_short_term_rentals,
 )
-from mcp_canada.modules.toronto.constants import BASE_URL
 from mcp_canada.shared.envelope import make_error, make_response
 
 # API name and base URL for _meta envelope
@@ -166,7 +165,7 @@ async def toronto_list_organizations(
     Keywords: toronto, organizations, divisions, departments, agencies, publishers, municipal, government, city, list, browse, open data, catalogue.
     """
     try:
-        orgs, cached = await fetch_organizations(lang=lang)
+        orgs, cached = await fetch_organizations()
     except httpx.HTTPStatusError as exc:
         return make_error(
             "UPSTREAM_ERROR",

@@ -16,7 +16,7 @@
 
 ---
 
-**128 tools** across **9 federal APIs + 1 provincial API + 1 municipal API + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, and persistent local storage. All bilingual (English/French).
+**128 tools, ~64 prompts, and ~88 resources** across **9 federal APIs + 1 provincial API + 1 municipal API + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, and persistent local storage. All bilingual (English/French).
 
 
 ## Quick Start
@@ -452,6 +452,289 @@ Municipal datasets from the [City of Toronto Open Data Portal](https://open.toro
 
 ---
 
+## Prompt Catalog
+
+~64 workflow prompts across 12 modules. Prompts appear as slash-commands in Claude Desktop and other MCP-compatible clients. Discoverable via `client.list_prompts()`.
+
+All prompts accept `lang: "en" | "fr"`. **Guided workflows** return `list[Message]` (user + assistant roles for multi-step chaining). **Quick lookups** return a single user message with tool invocation instructions.
+
+### 🏦 Bank of Canada (5 prompts)
+
+| Prompt | Type | Description |
+|--------|------|-------------|
+| `boc_analyze_rates` | Guided | Exchange rate analysis workflow — chains `boc_search_series` → `boc_get_exchange_rates` |
+| `boc_get_policy_rate` | Quick | Get current BoC overnight policy rate |
+| `boc_compare_currencies` | Guided | Compare two currencies over a date range |
+| `boc_explore_commodities` | Guided | Explore BCPI commodity prices — chains `boc_list_groups` → `boc_get_commodity_prices` |
+| `boc_check_inflation` | Quick | Get CPI inflation data |
+
+### 📊 Statistics Canada (6 prompts)
+
+| Prompt | Type | Description |
+|--------|------|-------------|
+| `statcan_find_data` | Guided | Search for StatCan cubes and get vector data |
+| `statcan_quick_vector` | Quick | Get the latest N observations for a known vectorId |
+| `statcan_explore_sdmx` | Guided | Explore and filter StatCan data using SDMX key syntax |
+| `statcan_store_and_query` | Guided | Cross-module flagship: fetch vectors → store → SQL JOIN |
+| `statcan_monitor_changes` | Quick | Check which StatCan series changed today |
+| `statcan_compare_series` | Guided | Compare multiple StatCan time series |
+
+### 🗄️ Local Datastore (4 prompts)
+
+| Prompt | Type | Description |
+|--------|------|-------------|
+| `ds_create_and_query` | Guided | Create a table, insert data, and run SQL queries |
+| `ds_quick_query` | Quick | Run a SQL query against an existing datastore table |
+| `ds_explore_tables` | Quick | List tables and inspect schemas |
+| `ds_cross_module_join` | Guided | Fetch data from two APIs and JOIN in SQL |
+
+### 📊 CKAN Open Data (5 prompts)
+
+| Prompt | Type | Description |
+|--------|------|-------------|
+| `ckan_explore_federal_data` | Guided | Discover and download federal datasets from open.canada.ca |
+| `ckan_quick_search` | Quick | Search for federal datasets by keyword |
+| `ckan_browse_organizations` | Quick | Browse datasets by government organization |
+| `ckan_browse_by_tag` | Quick | Browse datasets by topic tag |
+| `ckan_portal_overview` | Quick | Get portal statistics and popular tags |
+
+### 🏛️ Open Parliament (5 prompts)
+
+| Prompt | Type | Description |
+|--------|------|-------------|
+| `parl_research_bill` | Guided | Research a federal bill — search → details → sponsor → votes |
+| `parl_find_mp` | Quick | Look up an MP's profile and riding |
+| `parl_track_voting` | Guided | Track how an MP votes on bills |
+| `parl_search_debates` | Quick | Search Hansard debate transcripts |
+| `parl_party_breakdown` | Guided | Get all MPs from a political party |
+
+### ⚠️ Recalls (4 prompts)
+
+| Prompt | Type | Description |
+|--------|------|-------------|
+| `recalls_investigate_alert` | Guided | Investigate a recall — search → details → related alerts |
+| `recalls_quick_search` | Quick | Search for recalls by keyword |
+| `recalls_check_food_safety` | Quick | Check for food product recalls |
+| `recalls_vehicle_safety` | Quick | Check for vehicle recalls |
+
+### 💊 Drug Database (5 prompts)
+
+| Prompt | Type | Description |
+|--------|------|-------------|
+| `drug_research_medication` | Guided | Research a drug — search → ingredients → schedule → status |
+| `drug_quick_search` | Quick | Search drugs by brand name or DIN |
+| `drug_check_company` | Quick | Look up a pharmaceutical company's products |
+| `drug_compare_generics` | Guided | Compare a brand drug to its generic equivalents |
+| `drug_check_status` | Quick | Get market status for a drug product |
+
+### 🥗 Canadian Nutrient File (5 prompts)
+
+| Prompt | Type | Description |
+|--------|------|-------------|
+| `nutrient_analyze_food` | Guided | Full nutrition analysis — search → amounts → serving sizes |
+| `nutrient_quick_search` | Quick | Search for foods in the Canadian Nutrient File |
+| `nutrient_compare_foods` | Guided | Compare nutritional content across multiple foods |
+| `nutrient_browse_food_groups` | Quick | List all foods in a food group category |
+| `nutrient_check_daily_values` | Quick | Look up daily value nutrient thresholds |
+
+### 🌤️ MSC GeoMet Weather (6 prompts)
+
+| Prompt | Type | Description |
+|--------|------|-------------|
+| `wx_check_weather` | Guided | Current conditions + forecast + alerts for a location |
+| `wx_quick_forecast` | Quick | Get a quick weather forecast |
+| `wx_analyze_climate` | Guided | Analyze historical climate data for a station |
+| `wx_check_air_quality` | Guided | Get AQHI readings and health recommendations |
+| `wx_water_conditions` | Guided | Check water levels and flood risk at a hydrometric station |
+| `wx_severe_weather` | Quick | Check for active severe weather alerts |
+
+### 🍁 IRCC Immigration (5 prompts)
+
+| Prompt | Type | Description |
+|--------|------|-------------|
+| `ircc_explore_immigration` | Guided | Explore IRCC immigration data — choose dataset → breakdown → year |
+| `ircc_quick_pr` | Quick | Get permanent resident admissions data |
+| `ircc_track_express_entry` | Guided | Track Express Entry admissions and invite rounds |
+| `ircc_compare_pathways` | Guided | Compare immigration pathways (PR vs study vs work) |
+| `ircc_analyze_trends` | Guided | Analyze multi-year immigration trends |
+
+### 🏛️ Ontario Open Data (4 prompts)
+
+| Prompt | Type | Description |
+|--------|------|-------------|
+| `ontario_explore_data` | Guided | Discover and download Ontario provincial datasets |
+| `ontario_quick_search` | Quick | Search for Ontario datasets by keyword |
+| `ontario_browse_ministries` | Quick | Browse datasets by Ontario ministry |
+| `ontario_population_data` | Guided | Get Ontario population projections by region |
+
+### 🏙️ Toronto Open Data (6 prompts)
+
+| Prompt | Type | Description |
+|--------|------|-------------|
+| `toronto_explore_city_data` | Guided | Discover and download Toronto municipal datasets |
+| `toronto_quick_search` | Quick | Search for Toronto datasets by keyword |
+| `toronto_explore_neighbourhood` | Guided | Explore census and service data for a neighbourhood |
+| `toronto_ttc_transit` | Guided | Look up TTC stops and routes from GTFS data |
+| `toronto_check_311` | Guided | Analyze 311 service requests by year/ward/type |
+| `toronto_rental_analysis` | Guided | Analyze rental data — RentSafeTO + short-term rentals |
+
+---
+
+## Resource Catalog
+
+~88 reference resources across 12 modules. Resources provide instant context without tool calls — agents can read them without consuming API rate limits. Discoverable via `client.list_resources()`.
+
+**URI scheme conventions:**
+- `data://` — JSON catalogs (machine-parseable key→value mappings)
+- `docs://` — Markdown documentation guides (human-readable explanations)
+- `template://` — Markdown response templates with `{placeholder}` syntax
+
+### 🏦 Bank of Canada (7 resources)
+
+| URI | Type | Description |
+|-----|------|-------------|
+| `data://boc/currency-codes` | Catalog | 17 FX currency codes with bilingual labels |
+| `data://boc/interest-rate-types` | Catalog | Rate types mapped to Valet series codes |
+| `data://boc/commodity-types` | Catalog | BCPI commodity categories with bilingual descriptions |
+| `data://boc/inflation-indicators` | Catalog | CPI measures with series codes and bilingual descriptions |
+| `docs://boc/series-naming` | Guide | FX/rate/CPI/BCPI series naming conventions |
+| `docs://boc/api-quirks` | Guide | Date formats, null values, cache TTLs, common 404 causes |
+| `template://boc/rate-report` | Template | Exchange rate report with `{currency}`, `{start_date}`, `{latest_value}` |
+
+### 📊 Statistics Canada (8 resources)
+
+| URI | Type | Description |
+|-----|------|-------------|
+| `data://statcan/frequency-codes` | Catalog | WDS frequency codes with bilingual labels |
+| `data://statcan/scalar-factor-codes` | Catalog | WDS scalar factor codes (units multipliers) |
+| `data://statcan/status-codes` | Catalog | WDS data status codes (provisional, revised, etc.) |
+| `data://statcan/uom-codes` | Catalog | WDS unit of measure codes with bilingual labels |
+| `docs://statcan/wds-guide` | Guide | WDS API overview, productId structure, coordinate system |
+| `docs://statcan/sdmx-key-syntax` | Guide | SDMX key syntax for filtered data retrieval |
+| `docs://statcan/coordinate-system` | Guide | How to build dot-separated dimension coordinates |
+| `template://statcan/time-series-report` | Template | Time series report with `{product_id}`, `{vector_id}`, `{observations}` |
+
+### 🗄️ Local Datastore (6 resources)
+
+| URI | Type | Description |
+|-----|------|-------------|
+| `data://datastore/column-types` | Catalog | Supported SQLite column types with examples |
+| `data://datastore/identifier-rules` | Catalog | Identifier regex pattern and allowed characters |
+| `docs://datastore/sql-guide` | Guide | Supported SQL statements, query examples, safety rules |
+| `docs://datastore/cross-module-patterns` | Guide | Fetch-store-JOIN workflow for cross-API analytics |
+| `template://datastore/query-report` | Template | SQL query result report template |
+| `template://datastore/schema-report` | Template | Table schema description template |
+
+### 📊 CKAN Open Data (7 resources)
+
+| URI | Type | Description |
+|-----|------|-------------|
+| `data://ckan/federal-organizations` | Catalog | Federal org slugs for use in `organization=` search filter |
+| `data://ckan/popular-tags` | Catalog | Most-used dataset tags on open.canada.ca |
+| `data://ckan/resource-formats` | Catalog | Available resource file formats (CSV, XLSX, GeoJSON, etc.) |
+| `docs://ckan/search-tips` | Guide | Advanced CKAN search syntax and filter examples |
+| `docs://ckan/api-quirks` | Guide | Pagination, bilingual fields, resource vs dataset distinction |
+| `template://ckan/dataset-summary` | Template | Dataset summary with `{title}`, `{organization}`, `{resources}` |
+| `template://ckan/resource-report` | Template | Resource download report template |
+
+### 🏛️ Open Parliament (7 resources)
+
+| URI | Type | Description |
+|-----|------|-------------|
+| `data://parliament/party-codes` | Catalog | Political party codes and bilingual names |
+| `data://parliament/session-format` | Catalog | Session ID format and recent sessions |
+| `data://parliament/bill-types` | Catalog | Bill type codes (C-, S-, M-) with descriptions |
+| `docs://parliament/voting-guide` | Guide | How divisions work, yea/nay/paired, how to look up ballots |
+| `docs://parliament/hansard-guide` | Guide | Hansard transcript structure and full-text search tips |
+| `docs://parliament/api-quirks` | Guide | Pagination, URL slug format, URL-based IDs |
+| `template://parliament/mp-profile` | Template | MP profile with `{name}`, `{party}`, `{riding}`, `{votes}` |
+
+### ⚠️ Recalls (6 resources)
+
+| URI | Type | Description |
+|-----|------|-------------|
+| `data://recalls/categories` | Catalog | Recall category codes (food, vehicle, health-product, etc.) |
+| `data://recalls/severity-levels` | Catalog | Recall risk severity levels |
+| `docs://recalls/search-tips` | Guide | Search strategies, category filtering, pagination |
+| `docs://recalls/food-safety-guide` | Guide | How to interpret food recall risk levels and actions |
+| `template://recalls/safety-alert` | Template | Safety alert summary with `{product}`, `{hazard}`, `{action}` |
+| `template://recalls/recall-report` | Template | Full recall report template |
+
+### 💊 Drug Database (7 resources)
+
+| URI | Type | Description |
+|-----|------|-------------|
+| `data://drug/schedule-codes` | Catalog | Health Canada schedule classification (Prescription/OTC/Schedule I-III) |
+| `data://drug/route-codes` | Catalog | Routes of administration with bilingual labels |
+| `data://drug/status-codes` | Catalog | Market status codes (marketed, discontinued, etc.) |
+| `data://drug/therapeutic-classes` | Catalog | ATC therapeutic class codes and descriptions |
+| `docs://drug/din-guide` | Guide | DIN vs drug_code distinction, how to find a drug_code |
+| `docs://drug/search-tips` | Guide | Brand vs generic search, company name matching |
+| `template://drug/medication-report` | Template | Drug profile with `{drug_code}`, `{brand_name}`, `{schedule}`, `{ingredients}` |
+
+### 🥗 Canadian Nutrient File (7 resources)
+
+| URI | Type | Description |
+|-----|------|-------------|
+| `data://nutrient/food-groups` | Catalog | CNF food group IDs (1-25) with bilingual names |
+| `data://nutrient/common-nutrients` | Catalog | Key nutrient IDs for common dietary analysis |
+| `data://nutrient/serving-size-measures` | Catalog | Common measure units used in CNF serving sizes |
+| `docs://nutrient/cnf-guide` | Guide | CNF data structure, food_id vs food_code, API overview |
+| `docs://nutrient/interpretation-guide` | Guide | How to interpret per-100g nutrient values and daily values |
+| `template://nutrient/food-profile` | Template | Food nutrition profile with `{food_name}`, `{nutrients}`, `{serving_size}` |
+| `template://nutrient/comparison-report` | Template | Multi-food comparison report template |
+
+### 🌤️ MSC GeoMet Weather (8 resources)
+
+| URI | Type | Description |
+|-----|------|-------------|
+| `data://weather/province-codes` | Catalog | Two-letter province/territory codes for station search |
+| `data://weather/common-stations` | Catalog | Well-known climate station IDs across provinces |
+| `data://weather/aqhi-scale` | Catalog | AQHI risk categories 1-10+ with health messages |
+| `data://weather/climate-normals-periods` | Catalog | Available 30-year climate normal periods |
+| `docs://weather/station-guide` | Guide | How to find station IDs, station types, coverage |
+| `docs://weather/climate-data-guide` | Guide | Daily vs monthly vs normals vs AHCCD distinctions |
+| `docs://weather/ogc-api-guide` | Guide | OGC API collections structure, bbox/datetime filtering |
+| `template://weather/forecast-report` | Template | Weather forecast report with `{location}`, `{conditions}`, `{forecast}` |
+
+### 🍁 IRCC Immigration (7 resources)
+
+| URI | Type | Description |
+|-----|------|-------------|
+| `data://ircc/immigration-categories` | Catalog | Immigration category codes and bilingual names |
+| `data://ircc/dataset-list` | Catalog | All 10 IRCC datasets mapped to tool names and breakdowns |
+| `data://ircc/express-entry-streams` | Catalog | Express Entry stream codes and descriptions |
+| `data://ircc/work-permit-types` | Catalog | IMP vs TFWP work permit program codes |
+| `docs://ircc/data-guide` | Guide | IRCC open data structure, XLSX format, suppression rules |
+| `docs://ircc/xlsx-quirks` | Guide | Multi-sheet XLSX parsing, suppressed values, year totals |
+| `template://ircc/immigration-report` | Template | Immigration data report with `{dataset}`, `{breakdown}`, `{year}`, `{data}` |
+
+### 🏛️ Ontario Open Data (6 resources)
+
+| URI | Type | Description |
+|-----|------|-------------|
+| `data://ontario/ministries` | Catalog | Ontario ministries and agencies with CKAN org slugs |
+| `data://ontario/popular-datasets` | Catalog | Frequently accessed Ontario datasets |
+| `data://ontario/resource-formats` | Catalog | Available file formats on data.ontario.ca |
+| `docs://ontario/ckan-guide` | Guide | Ontario CKAN API structure, filtering, pagination |
+| `docs://ontario/population-projections-guide` | Guide | Population projections XLSX structure, regions, years |
+| `template://ontario/dataset-report` | Template | Ontario dataset report with `{title}`, `{organization}`, `{resources}` |
+
+### 🏙️ Toronto Open Data (8 resources)
+
+| URI | Type | Description |
+|-----|------|-------------|
+| `data://toronto/city-divisions` | Catalog | City of Toronto divisions and agencies |
+| `data://toronto/ward-list` | Catalog | All 25 Toronto city council wards with names |
+| `data://toronto/neighbourhood-list` | Catalog | All 140 official Toronto neighbourhoods |
+| `data://toronto/311-service-types` | Catalog | Common 311 service request type codes |
+| `docs://toronto/ckan-guide` | Guide | Toronto CKAN API structure, dataset vs resource distinction |
+| `docs://toronto/neighbourhood-profiles-guide` | Guide | Census indicator categories, how to look up characteristics |
+| `docs://toronto/gtfs-guide` | Guide | TTC GTFS structure, stop vs route vs trip distinction |
+| `template://toronto/neighbourhood-report` | Template | Neighbourhood profile with `{neighbourhood}`, `{indicators}`, `{ward}` |
+
+---
+
 ## Response Format
 
 All tools return a consistent envelope:
@@ -516,7 +799,7 @@ src/mcp_canada/
         └── summary/       # 4 tools — composite summary, extremes, growing season, degree days
 ```
 
-Each module follows a **5-file pattern**:
+Each module follows a **7-file pattern**:
 
 | File | Purpose |
 |------|---------|
@@ -525,6 +808,8 @@ Each module follows a **5-file pattern**:
 | `schemas.py` | Pydantic v2 response models (always flat) |
 | `client.py` | Async HTTP functions with caching and rate limiting |
 | `tools.py` | `@tool` decorated MCP tool functions |
+| `prompts.py` | `@prompt` functions — guided workflows + quick lookups |
+| `resources.py` | `@resource` functions — catalogs, docs, templates |
 
 New modules are auto-discovered — drop a folder in `modules/` and it registers via FileSystemProvider.
 
@@ -552,10 +837,10 @@ uv run pytest --cov=src/mcp_canada --cov-fail-under=95
 
 Each module is self-contained. To add a new API:
 
-1. Create `src/mcp_canada/modules/your_api/` with the 5-file pattern
+1. Create `src/mcp_canada/modules/your_api/` with the 7-file pattern
 2. Add colocated `__tests__/` with unit tests
 3. Add integration tests in `tests/integration/test_tool_scenarios.py`
-4. Update this README's tool catalog
+4. Update this README's tool, prompt, and resource catalogs
 
 See [CLAUDE.md](CLAUDE.md) for coding conventions.
 

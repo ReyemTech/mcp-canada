@@ -114,6 +114,7 @@ Recent decisions affecting current work:
 
 - Phase 11 added: IRCC Immigration — fetch and parse IRCC open data XLSX files (PR by country, province, category; study permits)
 - Phase 12 added: Ontario Government Open Data
+- Phase 13 added: Toronto Municipal Government Open Data
 
 ### Pending Todos
 

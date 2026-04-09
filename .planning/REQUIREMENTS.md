@@ -75,12 +75,12 @@
 
 ### Ontario Open Data
 
-- [ ] **ONT-01**: Agent can search Ontario's Open Data Catalogue (data.ontario.ca) by keyword with pagination
-- [ ] **ONT-02**: Agent can get full details for a specific Ontario dataset including resources and metadata
-- [ ] **ONT-03**: Agent can get details for a specific Ontario data resource by resource ID
-- [ ] **ONT-04**: Agent can list Ontario government organizations (ministries) that publish open data
-- [ ] **ONT-05**: Agent can get aggregate Ontario portal statistics (total dataset count)
-- [ ] **ONT-06**: Agent can fetch and parse Ontario population projections data (XLSX from Ministry of Finance)
+- [x] **ONT-01**: Agent can search Ontario's Open Data Catalogue (data.ontario.ca) by keyword with pagination
+- [x] **ONT-02**: Agent can get full details for a specific Ontario dataset including resources and metadata
+- [x] **ONT-03**: Agent can get details for a specific Ontario data resource by resource ID
+- [x] **ONT-04**: Agent can list Ontario government organizations (ministries) that publish open data
+- [x] **ONT-05**: Agent can get aggregate Ontario portal statistics (total dataset count)
+- [x] **ONT-06**: Agent can fetch and parse Ontario population projections data (XLSX from Ministry of Finance)
 - [ ] **ONT-07**: All Ontario tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Keywords/Use-for docstrings, ontario_ prefix)
 - [ ] **ONT-08**: Ontario tools are discoverable via discover_tools and callable via call_tool through the MCP Client layer
 

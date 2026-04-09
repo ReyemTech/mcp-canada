@@ -129,7 +129,7 @@ Plans:
   4. All Ontario tools follow mcp-canada conventions (ontario_ prefix, envelopes, bilingual, BM25 keywords)
   5. Ontario tools are discoverable via discover_tools and callable via call_tool through MCP Client
   6. Unit tests at 95%+ coverage; integration tests verify live API through MCP Client layer
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 12-01-PLAN.md — Ontario module skeleton: constants, schemas, CKAN client layer, population projections parser, unit tests

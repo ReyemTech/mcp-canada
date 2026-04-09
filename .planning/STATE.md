@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 13-toronto-municipal-government-open-data-01-PLAN.md
-last_updated: "2026-04-09T16:58:47.128Z"
+stopped_at: Completed 13-toronto-municipal-government-open-data-02-PLAN.md
+last_updated: "2026-04-09T17:06:15.680Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 33
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 18
-  completed_plans: 17
+  completed_plans: 18
   percent: 0
 ---
 
@@ -67,6 +67,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 12-ontario-government-open-data P01 | 15min | 1 tasks | 7 files |
 | Phase 12-ontario-government-open-data P02 | 3min | 2 tasks | 4 files |
 | Phase 13-toronto-municipal-government-open-data P01 | 5min | 2 tasks | 8 files |
+| Phase 13-toronto-municipal-government-open-data P02 | 5min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -118,6 +119,8 @@ Recent decisions affecting current work:
 - [Phase 13-toronto-municipal-government-open-data]: GeoJSON .geojson check before .json in fetch_and_parse routing: .geojson ends with json so ordering matters
 - [Phase 13-toronto-municipal-government-open-data]: fetch_311_requests two-step: package_show discovers year ZIP URL then downloads — enables year-agnostic URL discovery
 - [Phase 13-toronto-municipal-government-open-data]: toronto: cache key prefix distinguishes Toronto datasets from federal CKAN keys in shared aiocache
+- [Phase 13-toronto-municipal-government-open-data]: Toronto fetch_organizations takes no lang param — tools.py calls without lang arg (Ontario client differs)
+- [Phase 13-toronto-municipal-government-open-data]: GTFS/datastore tools catch generic Exception (not just HTTPStatusError) since ZIP errors are not HTTP errors
 
 ### Roadmap Evolution
 
@@ -144,6 +147,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-09T16:58:47.124Z
-Stopped at: Completed 13-toronto-municipal-government-open-data-01-PLAN.md
+Last session: 2026-04-09T17:06:15.676Z
+Stopped at: Completed 13-toronto-municipal-government-open-data-02-PLAN.md
 Resume file: None

@@ -148,7 +148,7 @@ Plans:
   6. Agent can query RentSafeTO evaluations and short-term rental registrations
   7. All Toronto tools follow mcp-canada conventions (toronto_ prefix, envelopes, bilingual, BM25 keywords)
   8. Unit tests at 95%+ coverage; integration tests verify live API through MCP Client layer
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 13-01-PLAN.md — Shared GeoJSON/JSON parsers + Toronto module skeleton: constants, schemas, client layer, unit tests

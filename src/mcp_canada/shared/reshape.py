@@ -57,6 +57,7 @@ def reshape_observations(
 _RE_YEAR_QUARTER_MONTH = re.compile(r"^(\d{4})_([qt]\d)_(.+)$")
 _RE_YEAR_TOTAL = re.compile(r"^(\d{4})_(?:year_)?total$")
 _RE_YEAR_MONTH = re.compile(r"^(\d{4})_([a-z]+)$")
+_RE_YEAR_NUMERIC_MONTH = re.compile(r"^(\d{4})_(\d{2})$")
 
 
 def reshape_temporal_columns(
@@ -103,6 +104,13 @@ def reshape_temporal_columns(
                     years.setdefault(yr, {})[month] = value
                 else:
                     years.setdefault(yr, {})["total"] = value
+                continue
+
+            # Try year_MM numeric month (e.g. 2023_01 for citizenship data)
+            m = _RE_YEAR_NUMERIC_MONTH.match(key)
+            if m:
+                yr, month = m.group(1), m.group(2)
+                years.setdefault(yr, {})[month] = value
                 continue
 
             nested[key] = value

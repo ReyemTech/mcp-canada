@@ -62,6 +62,7 @@ DATASET_PARSE_CONFIG: dict[str, dict[str, int]] = {
     "ops":          {"skip_rows": 6, "header_rows": 2, "label_cols": 1},
     "afghan":       {"skip_rows": 2, "header_rows": 3, "label_cols": 1},
     "adhoc_pr":     {"skip_rows": 2, "header_rows": 1, "label_cols": 1},
+    "citizenship":  {"skip_rows": 2, "header_rows": 1, "label_cols": 1},
 }
 
 # Registry: DATASET_REGISTRY[dataset_key][breakdown_key][lang] = full URL
@@ -308,7 +309,14 @@ DATASET_REGISTRY: dict[str, dict[str, dict[str, str]]] = {
             "en": BASE_URL + "Open Data - OPS TRV V-1 Approved en.xlsx",
             "fr": BASE_URL + "Open Data - OPS TRV V-1 Approved fr.xlsx",
         },
-        "new_citizens": {
+    },
+
+    # -------------------------------------------------------------------------
+    # New Citizens by Country of Birth (same CKAN as Ops: 9b34e712)
+    # Simple layout: single header row with "YYYY / MM" columns
+    # -------------------------------------------------------------------------
+    "citizenship": {
+        "country": {
             "en": BASE_URL + "Open Data - New Citizens by COB en.xlsx",
             "fr": BASE_URL + "Open Data - New Citizens by COB fr.xlsx",
         },

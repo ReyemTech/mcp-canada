@@ -17,6 +17,7 @@ from mcp_canada.modules.ircc.client import (
     fetch_afghan,
     fetch_adhoc_pr,
     fetch_asylum,
+    fetch_citizenship,
     fetch_ee_admissions,
     fetch_ee_invited,
     fetch_ops,
@@ -285,19 +286,19 @@ async def ircc_get_ops(
     breakdown: Literal[
         "pr_intake", "copr_issued", "study_processed",
         "tr_processed", "trv_intake", "tr_approved",
-        "trv_v1_approved", "new_citizens"
+        "trv_v1_approved"
     ] = "pr_intake",
     recent: int | None = None,
     filter: str | None = None,
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
-    """Get IRCC operational processing statistics and citizenship data (monthly snapshots).
+    """Get IRCC operational processing statistics (monthly snapshots).
 
     Covers PR intake, COPR issued, study permit processing, TR processing,
-    visitor visa intake, TR approvals, visitor visa V-1 approvals, and new Canadian citizens by country of birth.
+    visitor visa intake, TR approvals, and visitor visa V-1 approvals.
     No year filter — data is monthly.
-    Use for: IRCC processing times, application intake, operational stats, PR applications, study permit processing, visitor visa, TR approvals, COPR, new citizens, citizenship, naturalization, country of birth.
-    Keywords: IRCC operations, processing, intake, application, PR intake, COPR, study permit, TR processing, visitor visa, TRV, approval, monthly, statistics, backlog, citizenship, new citizens, naturalization, country of birth.
+    Use for: IRCC processing times, application intake, operational stats, PR applications, study permit processing, visitor visa, TR approvals, COPR, V-1 visa.
+    Keywords: IRCC operations, processing, intake, application, PR intake, COPR, study permit, TR processing, visitor visa, TRV, V-1, approval, monthly, statistics, backlog.
     """
     try:
         rows, cached = await fetch_ops(breakdown=breakdown, lang=lang)
@@ -386,7 +387,40 @@ async def ircc_get_adhoc_pr(
 
 
 # ---------------------------------------------------------------------------
-# Tool 10: List all available datasets
+# Tool 10: New Canadian citizens
+# ---------------------------------------------------------------------------
+
+@tool
+async def ircc_get_citizenship(
+    breakdown: Literal["country"] = "country",
+    recent: int | None = None,
+    filter: str | None = None,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Get IRCC new Canadian citizens data by country of birth (monthly).
+
+    Covers persons granted Canadian citizenship, broken down by source country.
+    Use for: citizenship, naturalization, new citizens, country of birth, Canadian citizenship grants, IRCC citizenship data.
+    Keywords: citizenship, naturalization, new citizens, country of birth, Canadian, granted, persons, IRCC, immigration, monthly, source country.
+    """
+    try:
+        rows, cached = await fetch_citizenship(breakdown=breakdown, lang=lang)
+    except ValueError as exc:
+        return make_error("INVALID_INPUT", str(exc), lang=lang)
+    except httpx.HTTPStatusError as exc:
+        return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
+
+    return make_response(
+        reshape_temporal_columns(rows, recent=recent, filter_value=filter),
+        api_name=_API_NAME,
+        api_url=_registry_url("citizenship", breakdown, lang),
+        cached=cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool 11: List all available datasets
 # ---------------------------------------------------------------------------
 
 @tool
@@ -410,7 +444,8 @@ async def ircc_list_datasets(
         "ee_invited": "Express Entry invited candidates (ITAs issued)",
         "tr_to_pr": "Temporary resident to permanent resident transitions",
         "asylum": "Asylum claimants",
-        "ops": "Operational processing statistics + new citizens (monthly snapshots)",
+        "ops": "Operational processing statistics (monthly snapshots)",
+        "citizenship": "New Canadian citizens by country of birth (monthly)",
         "afghan": "Afghan refugees admitted to Canada",
         "adhoc_pr": "Ad-hoc historical PR data 1980-2023 (English-only)",
     }

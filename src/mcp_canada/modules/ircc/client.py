@@ -134,3 +134,11 @@ async def fetch_adhoc_pr(
     Requires xlrd (optional): pip install mcp-canada[ircc]
     """
     return await _fetch_dataset("adhoc_pr", breakdown, lang)
+
+
+async def fetch_citizenship(
+    breakdown: str = "country",
+    lang: str = "en",
+) -> tuple[list[dict], bool]:
+    """Fetch IRCC new Canadian citizens data by country of birth."""
+    return await _fetch_dataset("citizenship", breakdown, lang)

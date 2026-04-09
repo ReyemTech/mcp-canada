@@ -117,6 +117,7 @@ Recent decisions affecting current work:
 - Phase 13 added: Toronto Municipal Government Open Data
 - Phase 14 added: York Region Municipal Government Open Data
 - Phase 15 added: British Columbia Government Open Data
+- Phase 16 added: Quebec Government Open Data
 
 ### Pending Todos
 

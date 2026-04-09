@@ -157,3 +157,13 @@ Plans:
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 15 to break down)
+
+### Phase 16: Quebec Government Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 15
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 16 to break down)

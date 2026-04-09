@@ -47,9 +47,9 @@ created: 2026-04-09
 | 13-02-03 | 02 | 2 | TOR-05 | unit | `uv run pytest src/mcp_canada/modules/toronto/__tests__/test_tools.py::TestNeighbourhood -x` | ❌ W0 | ⬜ pending |
 | 13-02-04 | 02 | 2 | TOR-06 | unit | `uv run pytest src/mcp_canada/modules/toronto/__tests__/test_client.py::Test311Client -x` | ❌ W0 | ⬜ pending |
 | 13-02-05 | 02 | 2 | TOR-07 | unit | `uv run pytest src/mcp_canada/modules/toronto/__tests__/test_tools.py::TestRentSafe -x` | ❌ W0 | ⬜ pending |
-| 13-03-01 | 03 | 3 | TOR-10 | integration | `uv run pytest tests/integration/test_tool_scenarios.py::TestTorontoToolScenarios -v -m integration` | ❌ W0 | ⬜ pending |
-| 13-03-02 | 03 | 3 | TOR-11 | quality | `uv run pytest src/mcp_canada/shared/__tests__/test_quality.py -x` | ✅ | ⬜ pending |
-| 13-03-03 | 03 | 3 | TOR-12 | coverage | `uv run pytest --cov=src/mcp_canada --cov-fail-under=95` | ✅ | ⬜ pending |
+| 13-02-03 | 02 | 2 | TOR-10 | integration | `uv run pytest tests/integration/test_tool_scenarios.py::TestTorontoToolScenarios -v -m integration` | ❌ W0 | ⬜ pending |
+| 13-02-04 | 02 | 2 | TOR-11 | quality | `uv run pytest src/mcp_canada/shared/__tests__/test_quality.py -x` | ✅ | ⬜ pending |
+| 13-02-05 | 02 | 2 | TOR-12 | coverage | `uv run pytest --cov=src/mcp_canada --cov-fail-under=95` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 

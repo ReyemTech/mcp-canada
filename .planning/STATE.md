@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 40-mcp-prompts-and-resources 40-03-PLAN.md
-last_updated: "2026-04-09T20:01:26.847Z"
+stopped_at: Completed 40-mcp-prompts-and-resources 40-04-PLAN.md
+last_updated: "2026-04-09T20:01:39.403Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
@@ -132,6 +132,9 @@ Recent decisions affecting current work:
 - [Phase 40-mcp-prompts-and-resources]: ckan_federal_organizations uses org slugs as keys (not display names) — slugs are what the CKAN API organization= parameter accepts
 - [Phase 40-mcp-prompts-and-resources]: Guided workflow prompts (list[Message]) for multi-step tool chaining; quick lookups (str) for single-tool instructions — same pattern across all 4 modules
 - [Phase 40-mcp-prompts-and-resources]: Drug schedule codes follow Health Canada classification (Prescription/OTC/Schedule I-III/Unscheduled); Nutrient food groups use canonical CNF group IDs (1-25) matching the API's actual group_id values
+- [Phase 40-mcp-prompts-and-resources]: Weather prompts.py at top-level weather/ (not in sub-modules) — FileSystemProvider recursively scans so one file avoids duplicate discovery
+- [Phase 40-mcp-prompts-and-resources]: IRCC ircc_dataset_list resource maps all 10 dataset keys to tool names — provides complete discovery catalog for agents
+- [Phase 40-mcp-prompts-and-resources]: Toronto neighbourhood-list embeds all 140 neighbourhoods inline — avoids HTTP call to retrieve static reference data
 
 ### Roadmap Evolution
 
@@ -159,6 +162,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-09T20:01:22.403Z
-Stopped at: Completed 40-mcp-prompts-and-resources 40-03-PLAN.md
+Last session: 2026-04-09T20:01:39.395Z
+Stopped at: Completed 40-mcp-prompts-and-resources 40-04-PLAN.md
 Resume file: None

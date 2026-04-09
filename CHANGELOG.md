@@ -2,6 +2,217 @@
 
 <!-- CHANGELOG -->
 
+## v0.5.0 (2026-04-09)
+
+### Bug Fixes
+
+- Separate citizenship into own dataset with correct parse config
+  ([`499fa0a`](https://github.com/ReyemTech/mcp-canada/commit/499fa0ab3eb683403e0713f0821538249de8ec5d))
+
+- **12**: Fix population projections — skip_rows=4 and row-based filtering
+  ([`88d435b`](https://github.com/ReyemTech/mcp-canada/commit/88d435b17f77b222f501b218b47f15bd071f3465))
+
+- **12**: Nest population age data into age_groups and single_age dicts
+  ([`b369513`](https://github.com/ReyemTech/mcp-canada/commit/b369513327aaed681c23e91b18e60efb1257cb99))
+
+- **12**: Use substring matching for scenario and gender filters
+  ([`8e565d9`](https://github.com/ReyemTech/mcp-canada/commit/8e565d96d9d15e4ba2bead2598d3adb72cf11898))
+
+- **13-02**: Remove unused BASE_URL import and fix fetch_organizations call
+  ([`520ec3d`](https://github.com/ReyemTech/mcp-canada/commit/520ec3df24ee3d002b3a3dacd37d9e223786f6ec))
+
+### Chores
+
+- Sync uv.lock after release
+  ([`056efe0`](https://github.com/ReyemTech/mcp-canada/commit/056efe05394dade0981f5b69444c518ac8b4ea61))
+
+### Documentation
+
+- Add coverage badge to README
+  ([`0a5c6fa`](https://github.com/ReyemTech/mcp-canada/commit/0a5c6fa116eb67aaf7a5de40819d01a24370241c))
+
+- Add Phase 12 — Ontario Government Open Data
+  ([`a977a2c`](https://github.com/ReyemTech/mcp-canada/commit/a977a2cd8269a5710efa44c9a287be60f1c74df9))
+
+- Add Phase 13 — Toronto Municipal Government Open Data
+  ([`564f959`](https://github.com/ReyemTech/mcp-canada/commit/564f959ade3c60f9aafe536e7c9ddf6169bb7ecc))
+
+- Add Phase 14 — York Region Municipal Government Open Data
+  ([`ba7b168`](https://github.com/ReyemTech/mcp-canada/commit/ba7b168f32ea9b843057c03ed3b37654f13c3b23))
+
+- Add Phase 15 — British Columbia Government Open Data
+  ([`caf1f22`](https://github.com/ReyemTech/mcp-canada/commit/caf1f221190152b74806decaaeecade2037e1f64))
+
+- Add Phase 16 — Quebec Government Open Data
+  ([`69d43b7`](https://github.com/ReyemTech/mcp-canada/commit/69d43b79732bb76751365205d66718672cde11e8))
+
+- Add Phase 17 — Alberta Government Open Data
+  ([`56ee244`](https://github.com/ReyemTech/mcp-canada/commit/56ee244a2b9386422ee5a1fc26f5b2b773498310))
+
+- Add Phases 18-39 — all provinces, territories, municipalities, regions
+  ([`47e5a60`](https://github.com/ReyemTech/mcp-canada/commit/47e5a60e28ad951cc20c239c74369b9f4f7fed69))
+
+- Add public ROADMAP.md with provincial, municipal, and regional phases
+  ([`c94bb66`](https://github.com/ReyemTech/mcp-canada/commit/c94bb6629ead50520c1a0172eb2134d5480f382a))
+
+- **12**: Add research and validation strategy
+  ([`4d346d8`](https://github.com/ReyemTech/mcp-canada/commit/4d346d84363c64f7ad827b3d74d9ffe4f9ea89cf))
+
+- **12**: Add shared/reshape usage for population projections tool
+  ([`752b152`](https://github.com/ReyemTech/mcp-canada/commit/752b1520ac865a9a55e7a36aa76e134c099b6d74))
+
+- **12**: Create Ontario open data phase plan
+  ([`f60cb2a`](https://github.com/ReyemTech/mcp-canada/commit/f60cb2a1bab52b722b8381f2f7dfed74aea857fb))
+
+- **12**: Research Ontario Government Open Data phase
+  ([`a5b7436`](https://github.com/ReyemTech/mcp-canada/commit/a5b743611570e7d9066ae80865976b7057e5dbb7))
+
+- **12-01**: Complete Ontario module skeleton plan
+  ([`001fce1`](https://github.com/ReyemTech/mcp-canada/commit/001fce12b68ee84a377a629540ec1c2bda1325ed))
+
+- **12-02**: Complete Ontario tools plan — SUMMARY, STATE, ROADMAP
+  ([`40ab85d`](https://github.com/ReyemTech/mcp-canada/commit/40ab85d6288ad92e0fc5485ec19b2d81b21acc83))
+
+- **13**: Add research and validation strategy
+  ([`6976bbd`](https://github.com/ReyemTech/mcp-canada/commit/6976bbdbe74eca63f2d32b77a5b8bb406cf1f0af))
+
+- **13**: Capture phase context
+  ([`e313c19`](https://github.com/ReyemTech/mcp-canada/commit/e313c19546e8bd7dacbdafe3d370206a40130297))
+
+- **13**: Create phase plan for Toronto municipal open data
+  ([`f39e84f`](https://github.com/ReyemTech/mcp-canada/commit/f39e84f90f1868ccdb74fd620d881648be404a69))
+
+- **13**: Fix requirements coverage and validation plan references
+  ([`0b255e7`](https://github.com/ReyemTech/mcp-canada/commit/0b255e70053b0fb64f7d77023095411859ca3526))
+
+- **13**: Research Toronto CKAN API, GTFS, neighbourhood profiles, RentSafeTO
+  ([`b47795a`](https://github.com/ReyemTech/mcp-canada/commit/b47795a6b23a1a693aded70db74d76767398d9b3))
+
+- **13-01**: Complete Toronto module skeleton plan
+  ([`18881c6`](https://github.com/ReyemTech/mcp-canada/commit/18881c60ced2ed2ef0be7e3208be9e1c07025f07))
+
+- **13-02**: Complete Toronto tools plan — 12 tools, 52 unit tests, 8 integration tests, README
+  updated
+  ([`e816aa6`](https://github.com/ReyemTech/mcp-canada/commit/e816aa669f8d4034fed358927fcaa29fc59778ed))
+
+- **40**: Add research and validation strategy
+  ([`7bf48b2`](https://github.com/ReyemTech/mcp-canada/commit/7bf48b2ad205aa1fb258614d93e88641f69f72ef))
+
+- **40**: Capture phase context
+  ([`aff248d`](https://github.com/ReyemTech/mcp-canada/commit/aff248d2332326c5781d928c8bb60fda3d4d3881))
+
+- **40**: Create phase plan for MCP prompts and resources
+  ([`2b5314c`](https://github.com/ReyemTech/mcp-canada/commit/2b5314cd27dc50e2213581bf7020c9fcce4d25ba))
+
+- **40**: Research phase MCP prompts and resources
+  ([`f7a8cca`](https://github.com/ReyemTech/mcp-canada/commit/f7a8cca519fc3a0b763e3b3e2724e1e2fbb4fd6e))
+
+- **40-01**: Complete BoC prompts/resources plan — SUMMARY, STATE, ROADMAP updated
+  ([`36e38e8`](https://github.com/ReyemTech/mcp-canada/commit/36e38e85e8ed13c5acf3cf3c0fc67cc7b44a34fe))
+
+- **40-02**: Complete StatCan/Datastore/CKAN prompts and resources plan
+  ([`536e4cf`](https://github.com/ReyemTech/mcp-canada/commit/536e4cf7190e4d65c3d5b4b297673628a18cf76a))
+
+- **40-03**: Complete Open Parliament + Recalls + Drug DB + Nutrient File prompts/resources plan
+  ([`8584fb8`](https://github.com/ReyemTech/mcp-canada/commit/8584fb8a1ef352419220acd06c914313017b8791))
+
+- **40-04**: Complete Weather, IRCC, Ontario, Toronto prompts and resources plan
+  ([`b5cf4af`](https://github.com/ReyemTech/mcp-canada/commit/b5cf4af5aaffe24b0cea32aae269dbe2652e3d8e))
+
+- **40-05**: Complete integration tests + documentation plan — phase 40 complete
+  ([`59fc115`](https://github.com/ReyemTech/mcp-canada/commit/59fc115077bc58666d4b6321045c2d50570df48e))
+
+- **40-05**: Update README and CLAUDE.md with 7-file pattern and prompt/resource catalogs
+  ([`0dce5e8`](https://github.com/ReyemTech/mcp-canada/commit/0dce5e8d1f0dfc12abb0f9e71a58e3a23268c262))
+
+- **phase-12**: Complete phase execution
+  ([`43682a7`](https://github.com/ReyemTech/mcp-canada/commit/43682a7fdbdb1ddb8aba1c6079cd1fe0655c989f))
+
+- **phase-13**: Complete phase execution
+  ([`de2046b`](https://github.com/ReyemTech/mcp-canada/commit/de2046b164c271575d11fbf504abed08aa82e229))
+
+- **phase-40**: Complete phase execution
+  ([`663499a`](https://github.com/ReyemTech/mcp-canada/commit/663499ac611f98db978786dd7df74d9d8f7aaf5a))
+
+- **state**: Record phase 13 context session
+  ([`190125e`](https://github.com/ReyemTech/mcp-canada/commit/190125e76cbefabe0fa7045c9516c8b94d4f7ad9))
+
+- **state**: Record phase 40 context session
+  ([`84a3ced`](https://github.com/ReyemTech/mcp-canada/commit/84a3cedaae8b26c44fdd797c29b2c716c9844c63))
+
+### Features
+
+- **12-01**: Create Ontario open data module skeleton and CKAN client layer
+  ([`8dcb563`](https://github.com/ReyemTech/mcp-canada/commit/8dcb5631a53f3645c435300796c7e029bc0ec313))
+
+- **12-02**: Add Ontario integration tests and update README
+  ([`595f33b`](https://github.com/ReyemTech/mcp-canada/commit/595f33b0d01be827dcaea8f6b7674af1b984e2e2))
+
+- **12-02**: Implement Ontario tool functions with unit tests
+  ([`7952a29`](https://github.com/ReyemTech/mcp-canada/commit/7952a29f8a9948dfb861f9d90d68dccb53f30948))
+
+- **13-01**: Add GeoJSON and JSON parsers to shared/parsers.py
+  ([`6c04f0a`](https://github.com/ReyemTech/mcp-canada/commit/6c04f0a9f6d8b53e73b7f3ac43631f15f3964774))
+
+- **13-01**: Create Toronto module skeleton with full client layer and unit tests
+  ([`5be54b5`](https://github.com/ReyemTech/mcp-canada/commit/5be54b59f598b5485bd3dc5fbd36e4cec5e943c9))
+
+- **13-02**: Add Toronto integration tests and update README
+  ([`a94fbe7`](https://github.com/ReyemTech/mcp-canada/commit/a94fbe7a37ae461610142148c997c9af5ff8a4df))
+
+- **13-02**: Implement 12 toronto_ tool functions with BM25 docstrings and unit tests
+  ([`f040273`](https://github.com/ReyemTech/mcp-canada/commit/f040273767f48d922e1368a598d276636bf83916))
+
+- **40-01**: Add annotated prompt/resource templates to _example module
+  ([`81e7021`](https://github.com/ReyemTech/mcp-canada/commit/81e70219ec7f5fe338d36e8a2d4b090415e1b02b))
+
+- **40-01**: Add BoC prompts.py and resources.py reference implementation
+  ([`4792085`](https://github.com/ReyemTech/mcp-canada/commit/479208596d241261ceeecf741ab8306e8945756c))
+
+- **40-02**: Add Datastore and CKAN prompts.py, resources.py, and unit tests
+  ([`23d8c12`](https://github.com/ReyemTech/mcp-canada/commit/23d8c122b83daad6569004a3f9edf441fb683bb7))
+
+- **40-02**: Add StatCan prompts.py, resources.py, and unit tests
+  ([`fc7f6b3`](https://github.com/ReyemTech/mcp-canada/commit/fc7f6b3b30964b061dc7adc499c74d1f6b501414))
+
+- **40-03**: Add Drug Database + Nutrient File prompts/resources + tests
+  ([`f63a22a`](https://github.com/ReyemTech/mcp-canada/commit/f63a22a393a91947e82cd949c1abd17882f37263))
+
+- **40-03**: Add Open Parliament + Recalls prompts/resources + tests
+  ([`e2a43ff`](https://github.com/ReyemTech/mcp-canada/commit/e2a43ff5712481df9e66ad55d8607e80062f6bc0))
+
+- **40-04**: Add Ontario and Toronto prompts.py and resources.py
+  ([`684abac`](https://github.com/ReyemTech/mcp-canada/commit/684abac3be22f3cce5f2aed0715a05f8369cf8cc))
+
+- **40-04**: Add Weather and IRCC prompts.py and resources.py
+  ([`ebed253`](https://github.com/ReyemTech/mcp-canada/commit/ebed253b5fe89e3b41d8db01711d53b736477e99))
+
+- **40-05**: Add integration tests for prompts and resources through MCP Client
+  ([`74c8bb1`](https://github.com/ReyemTech/mcp-canada/commit/74c8bb1c4aada7a28da682ce8659ad8aa01b77e8))
+
+### Refactoring
+
+- Extract shared reshape utilities and apply to BOC tools
+  ([`485afdb`](https://github.com/ReyemTech/mcp-canada/commit/485afdb4c005e5155484cff24bc659522a4806f8))
+
+### Testing
+
+- **12**: Complete UAT - 8/8 passed
+  ([`414c387`](https://github.com/ReyemTech/mcp-canada/commit/414c387102e9d6efb8579f32362324f8b3b3656a))
+
+- **40**: Complete UAT - 8/8 passed
+  ([`2d4ba74`](https://github.com/ReyemTech/mcp-canada/commit/2d4ba7418fecd1cfdea94bfb2af4c76c93a491c3))
+
+- **40-01**: Add failing tests for BoC prompts and resources
+  ([`7843f45`](https://github.com/ReyemTech/mcp-canada/commit/7843f45bd5eede1a8029499528ea653386d14656))
+
+- **40-04**: Add failing tests for Ontario and Toronto prompts and resources
+  ([`72e7d85`](https://github.com/ReyemTech/mcp-canada/commit/72e7d85642ea1d54b20257b28d65ee59eb678771))
+
+- **40-04**: Add failing tests for Weather and IRCC prompts and resources
+  ([`2df020a`](https://github.com/ReyemTech/mcp-canada/commit/2df020a6b04bd4f020cc77eb0e4c8ece3a7e4a30))
+
+
 ## v0.4.4 (2026-04-09)
 
 ### Bug Fixes

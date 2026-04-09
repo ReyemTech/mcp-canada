@@ -232,12 +232,12 @@ def _filter_population_rows(
     result = rows
     if scenario is not None:
         needle = scenario.upper()
-        result = [r for r in result if str(r.get("scenario", "")).upper() == needle]
+        result = [r for r in result if needle in str(r.get("scenario", "")).upper()]
     if year is not None:
         result = [r for r in result if r.get("year_july_1") == year]
     if gender is not None:
         needle = gender.upper()
-        result = [r for r in result if str(r.get("gender", "")).upper() == needle]
+        result = [r for r in result if needle in str(r.get("gender", "")).upper()]
     if filter_value is not None:
         needle = filter_value.lower()
         result = [

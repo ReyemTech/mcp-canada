@@ -221,6 +221,54 @@ async def ontario_get_dataset_stats(
 # ---------------------------------------------------------------------------
 
 
+import re
+
+_RE_AGE_GROUP = re.compile(r"^col_(\d+)_to_(\d+)$")
+_RE_AGE_SINGLE = re.compile(r"^col_(\d+)$")
+_RE_AGE_PLUS = re.compile(r"^col_(\d+)_plus$")
+
+
+def _reshape_population_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Reshape a flat population row into nested age structure.
+
+    Separates flat col_* keys into:
+    - labels: scenario, year_july_1, gender, total
+    - age_groups: {"0_to_14": N, "15_to_64": N, "65_plus": N, "0_to_4": N, ...}
+    - single_age: {0: N, 1: N, 2: N, ..., 100: N}
+    """
+    labels: dict[str, Any] = {}
+    age_groups: dict[str, Any] = {}
+    single_age: dict[int, Any] = {}
+
+    for key, value in row.items():
+        # 5-year or broad age groups: col_0_to_14, col_15_to_64, etc.
+        m = _RE_AGE_GROUP.match(key)
+        if m:
+            age_groups[f"{m.group(1)}_to_{m.group(2)}"] = value
+            continue
+
+        # Age plus: col_65_plus, col_100_plus
+        m = _RE_AGE_PLUS.match(key)
+        if m:
+            age_groups[f"{m.group(1)}_plus"] = value
+            continue
+
+        # Single age: col_0, col_1, ..., col_100
+        m = _RE_AGE_SINGLE.match(key)
+        if m:
+            single_age[int(m.group(1))] = value
+            continue
+
+        # Label columns
+        labels[key] = value
+
+    if age_groups:
+        labels["age_groups"] = age_groups
+    if single_age:
+        labels["single_age"] = dict(sorted(single_age.items()))
+    return labels
+
+
 def _filter_population_rows(
     rows: list[dict[str, Any]],
     scenario: str | None = None,
@@ -228,7 +276,7 @@ def _filter_population_rows(
     gender: str | None = None,
     filter_value: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Filter population projection rows by scenario, year, gender, or label substring."""
+    """Filter and reshape population projection rows."""
     result = rows
     if scenario is not None:
         needle = scenario.upper()
@@ -244,7 +292,7 @@ def _filter_population_rows(
             r for r in result
             if any(needle in str(v).lower() for v in r.values() if v is not None)
         ]
-    return result
+    return [_reshape_population_row(r) for r in result]
 
 
 @tool

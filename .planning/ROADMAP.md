@@ -177,3 +177,223 @@ Plans:
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 17 to break down)
+
+### Phase 18: Manitoba Government Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 17
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 18 to break down)
+
+### Phase 19: Saskatchewan Government Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 18
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 19 to break down)
+
+### Phase 20: Nova Scotia Government Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 19
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 20 to break down)
+
+### Phase 21: New Brunswick Government Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 20
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 21 to break down)
+
+### Phase 22: Newfoundland and Labrador Government Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 21
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 22 to break down)
+
+### Phase 23: Prince Edward Island Government Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 22
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 23 to break down)
+
+### Phase 24: Northwest Territories Government Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 23
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 24 to break down)
+
+### Phase 25: Yukon Government Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 24
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 25 to break down)
+
+### Phase 26: Nunavut Government Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 25
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 26 to break down)
+
+### Phase 27: Montreal Municipal Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 26
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 27 to break down)
+
+### Phase 28: Vancouver Municipal Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 27
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 28 to break down)
+
+### Phase 29: Calgary Municipal Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 28
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 29 to break down)
+
+### Phase 30: Edmonton Municipal Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 29
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 30 to break down)
+
+### Phase 31: Ottawa Municipal Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 30
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 31 to break down)
+
+### Phase 32: Winnipeg Municipal Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 31
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 32 to break down)
+
+### Phase 33: Halifax Municipal Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 32
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 33 to break down)
+
+### Phase 34: Mississauga Municipal Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 33
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 34 to break down)
+
+### Phase 35: Peel Region Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 34
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 35 to break down)
+
+### Phase 36: Durham Region Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 35
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 36 to break down)
+
+### Phase 37: Halton Region Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 36
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 37 to break down)
+
+### Phase 38: Waterloo Region Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 37
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 38 to break down)
+
+### Phase 39: Metro Vancouver Regional Open Data
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 38
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 39 to break down)

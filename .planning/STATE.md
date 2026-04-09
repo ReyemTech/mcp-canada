@@ -119,6 +119,9 @@ Recent decisions affecting current work:
 - Phase 15 added: British Columbia Government Open Data
 - Phase 16 added: Quebec Government Open Data
 - Phase 17 added: Alberta Government Open Data
+- Phases 18-26 added: Remaining provinces and territories (MB, SK, NS, NB, NL, PE, NT, YT, NU)
+- Phases 27-34 added: Major municipalities (Montreal, Vancouver, Calgary, Edmonton, Ottawa, Winnipeg, Halifax, Mississauga)
+- Phases 35-39 added: Regional municipalities (Peel, Durham, Halton, Waterloo, Metro Vancouver)
 
 ### Pending Todos
 

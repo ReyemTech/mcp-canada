@@ -753,3 +753,205 @@ class TestParseIrccXlsx:
 
         sig = inspect.signature(fetch_and_parse)
         assert "ircc_parse_config" in sig.parameters
+
+
+# ---------------------------------------------------------------------------
+# _parse_geojson
+# ---------------------------------------------------------------------------
+
+
+import json  # noqa: E402
+
+
+class TestGeoJSON:
+    def _make_feature_collection(
+        self, features: list[dict[str, Any]]
+    ) -> bytes:
+        """Build GeoJSON FeatureCollection bytes."""
+        fc = {"type": "FeatureCollection", "features": features}
+        return json.dumps(fc).encode("utf-8")
+
+    def _make_feature(
+        self,
+        properties: dict[str, Any] | None,
+        geometry: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if geometry is None:
+            geometry = {"type": "Point", "coordinates": [-79.38, 43.65]}
+        return {
+            "type": "Feature",
+            "geometry": geometry,
+            "properties": properties,
+        }
+
+    def test_three_features_returns_three_dicts(self) -> None:
+        """FeatureCollection with 3 features returns 3 property dicts."""
+        from mcp_canada.shared.parsers import _parse_geojson
+
+        features = [
+            self._make_feature({"name": "A", "value": 1}),
+            self._make_feature({"name": "B", "value": 2}),
+            self._make_feature({"name": "C", "value": 3}),
+        ]
+        content = self._make_feature_collection(features)
+        result = _parse_geojson(content)
+
+        assert len(result) == 3
+        assert result[0] == {"name": "A", "value": 1}
+        assert result[1] == {"name": "B", "value": 2}
+        assert result[2] == {"name": "C", "value": 3}
+
+    def test_no_geometry_key_by_default(self) -> None:
+        """By default, geometry key is NOT included in output dicts."""
+        from mcp_canada.shared.parsers import _parse_geojson
+
+        features = [self._make_feature({"name": "A"})]
+        content = self._make_feature_collection(features)
+        result = _parse_geojson(content)
+
+        assert "geometry" not in result[0]
+
+    def test_include_geometry_true_adds_geometry_key(self) -> None:
+        """With include_geometry=True, each dict includes the 'geometry' key."""
+        from mcp_canada.shared.parsers import _parse_geojson
+
+        geom = {"type": "Point", "coordinates": [-79.38, 43.65]}
+        features = [self._make_feature({"name": "A"}, geometry=geom)]
+        content = self._make_feature_collection(features)
+        result = _parse_geojson(content, include_geometry=True)
+
+        assert "geometry" in result[0]
+        assert result[0]["geometry"] == geom
+
+    def test_empty_feature_collection_returns_empty_list(self) -> None:
+        """Empty FeatureCollection returns []."""
+        from mcp_canada.shared.parsers import _parse_geojson
+
+        content = self._make_feature_collection([])
+        result = _parse_geojson(content)
+
+        assert result == []
+
+    def test_feature_without_properties_returns_empty_dict(self) -> None:
+        """Feature with null properties returns an empty dict {}."""
+        from mcp_canada.shared.parsers import _parse_geojson
+
+        feature = {"type": "Feature", "geometry": None, "properties": None}
+        content = self._make_feature_collection([feature])
+        result = _parse_geojson(content)
+
+        assert result == [{}]
+
+
+# ---------------------------------------------------------------------------
+# _parse_json
+# ---------------------------------------------------------------------------
+
+
+class TestParseJSON:
+    def test_json_array_returns_list_of_dicts(self) -> None:
+        """JSON array of dicts returns list[dict] directly."""
+        from mcp_canada.shared.parsers import _parse_json
+
+        data = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+        content = json.dumps(data).encode("utf-8")
+        result = _parse_json(content)
+
+        assert result == data
+
+    def test_json_object_with_features_delegates_to_geojson(self) -> None:
+        """JSON object with 'features' key delegates to _parse_geojson."""
+        from mcp_canada.shared.parsers import _parse_json
+
+        fc = {
+            "type": "FeatureCollection",
+            "features": [
+                {"type": "Feature", "geometry": None, "properties": {"x": 1}},
+            ],
+        }
+        content = json.dumps(fc).encode("utf-8")
+        result = _parse_json(content)
+
+        assert result == [{"x": 1}]
+
+    def test_plain_json_object_wrapped_in_list(self) -> None:
+        """Plain JSON object (no 'features' key) is wrapped in a list."""
+        from mcp_canada.shared.parsers import _parse_json
+
+        obj = {"key": "value", "count": 42}
+        content = json.dumps(obj).encode("utf-8")
+        result = _parse_json(content)
+
+        assert result == [obj]
+
+
+# ---------------------------------------------------------------------------
+# fetch_and_parse routing for .geojson and .json URLs
+# ---------------------------------------------------------------------------
+
+
+class TestFetchAndParseGeoJsonRouting:
+    @pytest.mark.asyncio
+    async def test_routes_geojson_url_to_parse_geojson(self) -> None:
+        """fetch_and_parse routes .geojson URL to _parse_geojson."""
+        from mcp_canada.shared.parsers import fetch_and_parse
+
+        fake_content = json.dumps({
+            "type": "FeatureCollection",
+            "features": [
+                {"type": "Feature", "geometry": None, "properties": {"a": 1}},
+            ],
+        }).encode("utf-8")
+
+        async def fake_cached_fetch(key: str, ttl: int, fetcher: Any) -> tuple[Any, bool]:
+            data = await fetcher()
+            return data, False
+
+        mock_response = MagicMock()
+        mock_response.content = fake_content
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch("mcp_canada.shared.parsers.cached_fetch", side_effect=fake_cached_fetch),
+            patch("httpx.AsyncClient") as mock_client_cls,
+            patch("mcp_canada.shared.parsers._parse_geojson", return_value=[{"a": 1}]) as mock_gj,
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client_cls.return_value = mock_client
+
+            result, _ = await fetch_and_parse("https://example.com/data.geojson")
+
+        mock_gj.assert_called_once_with(fake_content)
+
+    @pytest.mark.asyncio
+    async def test_routes_json_url_to_parse_json(self) -> None:
+        """fetch_and_parse routes .json URL to _parse_json."""
+        from mcp_canada.shared.parsers import fetch_and_parse
+
+        fake_content = json.dumps([{"id": 1}]).encode("utf-8")
+
+        async def fake_cached_fetch(key: str, ttl: int, fetcher: Any) -> tuple[Any, bool]:
+            data = await fetcher()
+            return data, False
+
+        mock_response = MagicMock()
+        mock_response.content = fake_content
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch("mcp_canada.shared.parsers.cached_fetch", side_effect=fake_cached_fetch),
+            patch("httpx.AsyncClient") as mock_client_cls,
+            patch("mcp_canada.shared.parsers._parse_json", return_value=[{"id": 1}]) as mock_json,
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client_cls.return_value = mock_client
+
+            result, _ = await fetch_and_parse("https://example.com/data.json")
+
+        mock_json.assert_called_once_with(fake_content)

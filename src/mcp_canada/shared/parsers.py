@@ -1,12 +1,15 @@
-"""Shared file parser for XLSX, XLS, and CSV files from government URLs.
+"""Shared file parser for XLSX, XLS, CSV, GeoJSON, and JSON files from government URLs.
 
 Public API:
     fetch_and_parse(url, sheet, skip_rows, ttl) -> (list[dict], was_cached)
+    _parse_geojson(content, include_geometry) -> list[dict]
+    _parse_json(content) -> list[dict]
 """
 
 from __future__ import annotations
 
 import csv
+import json
 import re
 import unicodedata
 from io import BytesIO, StringIO
@@ -423,6 +426,55 @@ def _parse_csv(content: bytes, skip_rows: int = 0) -> list[dict[str, Any]]:
     return result
 
 
+def _parse_geojson(
+    content: bytes,
+    include_geometry: bool = False,
+) -> list[dict[str, Any]]:
+    """Parse GeoJSON FeatureCollection bytes into a list of property dicts.
+
+    Args:
+        content: Raw GeoJSON file bytes.
+        include_geometry: If True, each dict includes a 'geometry' key with the
+            feature's geometry object. Defaults to False (properties only).
+
+    Returns:
+        List of dicts, one per Feature. Each dict contains the Feature's
+        properties. If properties is None, returns an empty dict {}.
+    """
+    data = json.loads(content)
+    features = data.get("features", [])
+    result: list[dict[str, Any]] = []
+    for feature in features:
+        props = feature.get("properties") or {}
+        row: dict[str, Any] = dict(props)
+        if include_geometry:
+            row["geometry"] = feature.get("geometry")
+        result.append(row)
+    return result
+
+
+def _parse_json(content: bytes) -> list[dict[str, Any]]:
+    """Parse JSON bytes into a list of dicts.
+
+    Routing logic:
+    - JSON array: returned directly as list[dict].
+    - JSON object with 'features' key: delegated to _parse_geojson (GeoJSON).
+    - Plain JSON object: wrapped in a list and returned as [obj].
+
+    Args:
+        content: Raw JSON file bytes.
+
+    Returns:
+        List of dicts.
+    """
+    data = json.loads(content)
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict) and "features" in data:
+        return _parse_geojson(content)
+    return [data]
+
+
 async def fetch_and_parse(
     url: str,
     sheet: str | int = 0,
@@ -463,6 +515,10 @@ async def fetch_and_parse(
             return _parse_csv(raw, skip_rows)
         elif lower_url.endswith(".xls"):
             return _parse_xls(raw, sheet, skip_rows)
+        elif lower_url.endswith(".geojson"):
+            return _parse_geojson(raw)
+        elif lower_url.endswith(".json"):
+            return _parse_json(raw)
         elif ircc_parse_config is not None:
             return _parse_ircc_xlsx(raw, sheet=sheet, **ircc_parse_config)
         else:

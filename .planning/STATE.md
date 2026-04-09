@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 12-ontario-government-open-data 12-01-PLAN.md
-last_updated: "2026-04-09T14:30:12.862Z"
+stopped_at: Completed 12-ontario-government-open-data 12-02-PLAN.md
+last_updated: "2026-04-09T14:35:45.462Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 33
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 16
-  completed_plans: 15
+  completed_plans: 16
   percent: 0
 ---
 
@@ -65,6 +65,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 11-ircc-immigration P03 | 18min | 2 tasks | 4 files |
 | Phase 11-ircc-immigration P04 | 8min | 2 tasks | 5 files |
 | Phase 12-ontario-government-open-data P01 | 15min | 1 tasks | 7 files |
+| Phase 12-ontario-government-open-data P02 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -112,6 +113,7 @@ Recent decisions affecting current work:
 - [Phase 11-ircc-immigration]: Label col suffix (_{n}) added when multiple label cols share a merged header cell to prevent dict key collisions
 - [Phase 12-ontario-government-open-data]: ontario: cache key prefix distinguishes Ontario datasets from federal CKAN keys in shared aiocache
 - [Phase 12-ontario-government-open-data]: Population projections XLSX has no FR variant — lang parameter accepted for API consistency, same URL used for both languages
+- [Phase 12-ontario-government-open-data]: Patch client functions at tools module namespace (mcp_canada.modules.ontario.tools.*) not client module — functions are imported into tools.py namespace
 
 ### Roadmap Evolution
 
@@ -138,6 +140,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-09T14:30:12.859Z
-Stopped at: Completed 12-ontario-government-open-data 12-01-PLAN.md
+Last session: 2026-04-09T14:35:45.459Z
+Stopped at: Completed 12-ontario-government-open-data 12-02-PLAN.md
 Resume file: None

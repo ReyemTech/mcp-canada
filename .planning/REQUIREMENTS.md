@@ -81,8 +81,8 @@
 - [x] **ONT-04**: Agent can list Ontario government organizations (ministries) that publish open data
 - [x] **ONT-05**: Agent can get aggregate Ontario portal statistics (total dataset count)
 - [x] **ONT-06**: Agent can fetch and parse Ontario population projections data (XLSX from Ministry of Finance)
-- [ ] **ONT-07**: All Ontario tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Keywords/Use-for docstrings, ontario_ prefix)
-- [ ] **ONT-08**: Ontario tools are discoverable via discover_tools and callable via call_tool through the MCP Client layer
+- [x] **ONT-07**: All Ontario tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Keywords/Use-for docstrings, ontario_ prefix)
+- [x] **ONT-08**: Ontario tools are discoverable via discover_tools and callable via call_tool through the MCP Client layer
 
 ## v2 Requirements
 

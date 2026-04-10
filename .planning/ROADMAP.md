@@ -156,13 +156,24 @@ Plans:
 
 ### Phase 14: York Region Municipal Government Open Data
 
-**Goal:** [To be planned]
-**Requirements**: TBD
-**Depends on:** Phase 13
-**Plans:** 0 plans
+**Goal**: Agents can search 4 verified ArcGIS Hub portals in York Region (York Region regional, Markham, Newmarket, Aurora) and use curated tools for YRT/Viva transit, regional roads, public health, 2021 census demographics, and waste management — reusing a new `shared/arcgis_hub.py` client that will template future ArcGIS Hub modules. 6 York Region municipalities without public portals return structured NOT_FOUND.
+**Requirements**: YR-01, YR-02, YR-03, YR-04, YR-05, YR-06, YR-07, YR-08, YR-09, YR-10, YR-11, YR-12, YR-13, YR-14
+**Depends on**: Phase 13 (shared parsers with _parse_geojson reused)
+**Success Criteria** (what must be TRUE):
+  1. `shared/arcgis_hub.py` provides a reusable ArcGIS Hub Search API + FeatureServer client (search, query, layer metadata, count)
+  2. Agent can search each of 4 verified portals (york_region, markham, newmarket, aurora) via 5 discovery tools per prefix (20 total)
+  3. Agent can fetch curated York Region data: YRT/Viva transit stops/routes, regional road network, public health (beach water/hospital/drinking water), 2021 census age/sex/income by Dissemination Area, waste diversion and solid waste sites
+  4. Agent can query curated Markham data: civic addresses and SLRN road network
+  5. Municipalities without public ArcGIS Hub portals (Vaughan, Richmond Hill, King, East Gwillimbury, Georgina, Whitchurch-Stouffville general data) return structured NOT_FOUND via NoPortalError
+  6. Module follows 7-file pattern with prompts.py (4-6 bilingual prompts) and resources.py (6-10 resources covering portal catalog, municipality list, ESRI field naming, census variable reference, ArcGIS query patterns, response templates)
+  7. Unit test coverage ≥95%; integration tests verify live ArcGIS Hub endpoints through MCP Client layer
+  8. README reflects new tool catalog (~27 tools) and ArcGIS Hub as a second portal technology alongside CKAN
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 14 to break down)
+- [ ] 14-01-PLAN.md — Shared ArcGIS Hub client + York Region module skeleton (constants, schemas, client, unit tests)
+- [ ] 14-02-PLAN.md — York Region tool functions (20 discovery × 4 portals + 7 curated) + unit tests
+- [ ] 14-03-PLAN.md — Prompts, resources, integration tests, README, and REQUIREMENTS.md finalization
 
 ### Phase 15: British Columbia Government Open Data
 

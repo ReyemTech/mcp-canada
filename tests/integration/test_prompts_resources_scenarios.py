@@ -515,3 +515,30 @@ class TestYorkRegionPromptsResources:
         assert text, "york_region/esri-field-naming resource returned empty content"
         assert "OBJECTID" in text, "ESRI field naming guide must mention OBJECTID"
         assert "#" in text, "ESRI field naming guide must be markdown with headings"
+
+
+# ─── British Columbia prompts & resources ─────────────────────────────────────
+
+
+@pytest.mark.asyncio
+class TestBcPromptsResources:
+    """BC open data prompts and resources integration scenarios — Wave 0 stubs.
+
+    Plan 04 fills in the actual test implementations once prompts.py and resources.py
+    are populated.
+    """
+
+    @pytest.mark.xfail(reason="Plan 04 will implement bc_ prompts", strict=False)
+    async def test_bc_prompts_discoverable_via_list_prompts(self, mcp_server):
+        """BC prompts (bc_explore_wildfires etc.) appear in prompts/list."""
+        assert False
+
+    @pytest.mark.xfail(reason="Plan 04 will implement bc_ resources", strict=False)
+    async def test_bc_resources_readable_via_read_resource(self, mcp_server):
+        """BC resources (data://bc/*, docs://bc/*, template://bc/*) are readable."""
+        assert False
+
+    @pytest.mark.xfail(reason="Plan 04 will implement docs://bc/wfs-query-guide", strict=False)
+    async def test_bc_wfs_query_guide_resource_returns_markdown(self, mcp_server):
+        """docs://bc/wfs-query-guide returns markdown describing the CKAN→WFS two-step workflow."""
+        assert False

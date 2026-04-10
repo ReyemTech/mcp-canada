@@ -1399,3 +1399,56 @@ class TestYorkRegionToolScenarios:
         assert any(
             n in names for n in ("york_region_get_transit_stops", "york_region_search_datasets")
         ), f"No york_region transit tool found in BM25 results: {names}"
+
+
+# ─── British Columbia scenarios ───────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+class TestBcToolScenarios:
+    """BC open data tool integration scenarios — Wave 0 stubs.
+
+    Plan 02 fills in CKAN discovery scenarios; Plan 03 fills in curated WFS scenarios.
+    Each method is an xfail placeholder pointing at a specific tool name that will exist
+    once Plans 02/03 are executed.
+    """
+
+    @pytest.mark.xfail(reason="Plan 02 will implement bc_search_datasets", strict=False)
+    async def test_search_finds_wildfire_data(self, mcp_server):
+        """'Search BC open data for wildfire datasets'"""
+        assert False
+
+    @pytest.mark.xfail(reason="Plan 03 will implement bc_get_active_fires", strict=False)
+    async def test_active_fires_returns_meta(self, mcp_server):
+        """'Show me current active wildfires in BC'"""
+        assert False
+
+    @pytest.mark.xfail(reason="Plan 03 will implement bc_get_fire_perimeters", strict=False)
+    async def test_fire_perimeters_by_year(self, mcp_server):
+        """'Get historical fire perimeters for 2023 in BC'"""
+        assert False
+
+    @pytest.mark.xfail(reason="Plan 03 will implement bc_get_protected_areas", strict=False)
+    async def test_protected_areas_returns_parks(self, mcp_server):
+        """'List provincial parks in BC'"""
+        assert False
+
+    @pytest.mark.xfail(reason="Plan 03 will implement bc_get_mining_tenure", strict=False)
+    async def test_mining_tenure_mineral_claims(self, mcp_server):
+        """'Show me mineral claims in the Kamloops area'"""
+        assert False
+
+    @pytest.mark.xfail(reason="Plan 02/03 will implement discover_tools for BC", strict=False)
+    async def test_discover_bc_wildfire_tools(self, mcp_server):
+        """BM25 discovery finds bc_ wildfire tools"""
+        assert False
+
+    @pytest.mark.xfail(reason="Plan 02 will implement bc_query_features WFS routing", strict=False)
+    async def test_query_features_routes_to_wfs(self, mcp_server):
+        """bc_query_features routes to WFS when dataset has queryable_via_wfs=True"""
+        assert False
+
+    @pytest.mark.xfail(reason="Plan 02 will implement bc_query_features file routing", strict=False)
+    async def test_query_features_routes_to_file_parser(self, mcp_server):
+        """bc_query_features routes to file parser when dataset has queryable_via_wfs=False"""
+        assert False

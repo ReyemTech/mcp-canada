@@ -1297,3 +1297,105 @@ class TestOntarioToolScenarios:
         })
         assert "error" in data
         assert data["error"]["code"] in ("NOT_FOUND", "UPSTREAM_ERROR")
+
+
+# ─── York Region Municipal Open Data scenarios ────────────────────────────────
+
+
+class TestYorkRegionToolScenarios:
+    """York Region ArcGIS Hub integration tests through the MCP Client layer.
+
+    Tests assert on response shape only — live ArcGIS Hub APIs required.
+    All tests marked @pytest.mark.integration. Use timeout=90s for feature queries.
+    """
+
+    @pytest.mark.asyncio
+    async def test_york_region_search_transit(self, mcp_server):
+        """'What York Region datasets are about transit?'"""
+        data = await call_tool(mcp_server, "york_region_search_datasets", {
+            "query": "transit",
+            "limit": 5,
+        })
+        assert "_meta" in data
+        assert data["_meta"]["source"]["api"] == "arcgis-hub"
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) >= 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(90)
+    async def test_york_region_transit_stops_live(self, mcp_server):
+        """'Where are the YRT bus stops near Finch?'"""
+        data = await call_tool(mcp_server, "york_region_get_transit_stops", {
+            "query": "Finch",
+        })
+        assert "_meta" in data
+        # Response has features list (may be empty on API error but structure must be present)
+        assert "data" in data or "error" in data
+        if "data" in data:
+            assert isinstance(data["data"], list)
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(90)
+    async def test_york_region_hospitals(self, mcp_server):
+        """'Where are York Region hospitals?'"""
+        data = await call_tool(mcp_server, "york_region_get_public_health", {
+            "location_type": "hospital",
+        })
+        assert "_meta" in data or "error" in data
+        if "data" in data:
+            assert isinstance(data["data"], list)
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(90)
+    async def test_markham_search_addresses(self, mcp_server):
+        """'Find Main Street addresses in Markham'"""
+        data = await call_tool(mcp_server, "markham_get_addresses", {
+            "street": "Main",
+        })
+        assert "_meta" in data or "error" in data
+        if "data" in data:
+            assert isinstance(data["data"], list)
+
+    @pytest.mark.asyncio
+    async def test_aurora_list_categories_live(self, mcp_server):
+        """'What dataset categories exist in Aurora open data?'"""
+        data = await call_tool(mcp_server, "aurora_list_categories")
+        assert "_meta" in data or "error" in data
+        if "data" in data:
+            assert isinstance(data["data"], list)
+
+    @pytest.mark.asyncio
+    async def test_newmarket_search_datasets_live(self, mcp_server):
+        """'Search Newmarket open data for any datasets'"""
+        data = await call_tool(mcp_server, "newmarket_search_datasets", {
+            "query": "",
+            "limit": 5,
+        })
+        assert "_meta" in data or "error" in data
+        if "data" in data:
+            assert isinstance(data["data"], list)
+
+    @pytest.mark.asyncio
+    async def test_no_vaughan_tools_in_catalog(self, mcp_server):
+        """Municipalities without portals (vaughan, richmond_hill, etc.) have no registered tools."""
+        from fastmcp import Client
+        async with Client(mcp_server) as client:
+            tools = await client.list_tools()
+        tool_names = [t.name for t in tools]
+        no_portal_prefixes = [
+            "vaughan_", "richmond_hill_", "king_", "east_gwillimbury_", "georgina_"
+        ]
+        for prefix in no_portal_prefixes:
+            matching = [n for n in tool_names if n.startswith(prefix)]
+            assert matching == [], (
+                f"Unexpected tools found for portal-less municipality '{prefix}': {matching}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_discovery_finds_york_region_tool(self, mcp_server):
+        """BM25 discovery with 'york region transit bus stops' finds york_region_get_transit_stops."""
+        results = await discover(mcp_server, "york region transit bus stops")
+        names = [r["name"] for r in results]
+        assert any(
+            n in names for n in ("york_region_get_transit_stops", "york_region_search_datasets")
+        ), f"No york_region transit tool found in BM25 results: {names}"

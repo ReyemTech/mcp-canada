@@ -474,3 +474,44 @@ class TestCrossModulePrompts:
         for ns in module_namespaces:
             has_resource = any(f"://{ns}/" in u for u in uris)
             assert has_resource, f"No resource found for module namespace '{ns}'"
+
+
+# ─── York Region prompts and resources ───────────────────────────────────────
+
+
+@pytest.mark.asyncio
+class TestYorkRegionPromptsResources:
+    """York Region ArcGIS Hub prompts and resources integration tests.
+
+    Tests verify that prompts are discoverable via list_prompts() and resources
+    are readable via read_resource() through the full MCP Client layer.
+    """
+
+    async def test_york_region_prompts_discoverable(self, mcp_server):
+        """York Region prompts appear in prompts/list."""
+        prompts = await list_prompts(mcp_server)
+        names = [p.name for p in prompts]
+        yr_prompts = [n for n in names if n.startswith("york_region_") or n.startswith("markham_")]
+        assert len(yr_prompts) >= 5, (
+            f"Expected >= 5 York Region/Markham prompts, got {len(yr_prompts)}: {sorted(yr_prompts)}"
+        )
+        # Verify specific prompt names
+        assert "york_region_explore_transit" in names, (
+            f"york_region_explore_transit not in prompts list: {sorted(yr_prompts)}"
+        )
+
+    async def test_york_region_portals_resource(self, mcp_server):
+        """data://york_region/portals returns JSON with 10 municipalities."""
+        import json
+        text = await read_resource(mcp_server, "data://york_region/portals")
+        assert text, "york_region/portals resource returned empty content"
+        data = json.loads(text)
+        assert isinstance(data, list)
+        assert len(data) >= 10, f"Expected >= 10 portal entries, got {len(data)}"
+
+    async def test_york_region_esri_field_naming_docs(self, mcp_server):
+        """docs://york_region/esri-field-naming returns markdown containing OBJECTID."""
+        text = await read_resource(mcp_server, "docs://york_region/esri-field-naming")
+        assert text, "york_region/esri-field-naming resource returned empty content"
+        assert "OBJECTID" in text, "ESRI field naming guide must mention OBJECTID"
+        assert "#" in text, "ESRI field naming guide must be markdown with headings"

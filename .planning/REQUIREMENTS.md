@@ -99,6 +99,23 @@
 - **TOR-11**: Agent can query short-term rental registrations by ward and status
 - **TOR-12**: All Toronto tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Keywords/Use-for docstrings, toronto_ prefix) and are discoverable via discover_tools
 
+### York Region Municipal Open Data
+
+- **YR-01**: Shared `shared/arcgis_hub.py` provides a reusable ArcGIS Hub Search API + FeatureServer async client usable by any Canadian municipal module that publishes via ArcGIS Hub
+- **YR-02**: Client supports `/api/search/v1/collections/all/items` Hub Search endpoint with pagination via offset/limit (NOT the deprecated `/api/v2/datasets` which returns 404)
+- **YR-03**: Client supports FeatureServer query with `&f=geojson` and auto-paginates while `exceededTransferLimit=true` up to a MAX_RECORDS cap of 5000 per call, returning a `truncated` flag
+- **YR-04**: York Region module covers 4 verified ArcGIS Hub portals (york_region, markham, newmarket, aurora) and 6 municipalities without public portals return structured NOT_FOUND
+- **YR-05**: Each verified portal gets 5 discovery tools: search_datasets, get_dataset_details, query_features, list_organizations, list_categories (total 20 discovery tools)
+- **YR-06**: Agent can search YRT/Viva transit stops and routes from York Region Transportation FeatureServer
+- **YR-07**: Agent can fetch York Region regional road network from the Transportation FeatureServer
+- **YR-08**: Agent can query York Region public health & safety datasets (beach water testing, hospitals, drinking water adverse incidents)
+- **YR-09**: Agent can query York Region 2021 Census demographics (age/sex or income) by Dissemination Area with optional CSDNAME filter, returning a focused field set
+- **YR-10**: Agent can query York Region waste management data (annual diversion tonnages or solid waste site locations)
+- **YR-11**: Agent can search Markham civic addresses and road network (SLRN) via curated tools
+- **YR-12**: York Region module has prompts.py with 4-6 bilingual @prompt functions covering discovery workflows and curated data
+- **YR-13**: York Region module has resources.py with 6-10 zero-parameter @resource functions using data://, docs://, template:// URI schemes, including a portal catalog and municipality list
+- **YR-14**: All York Region tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, municipality prefix), are discoverable via discover_tools, and README reflects the new tool catalog
+
 ### MCP Prompts and Resources
 
 - **PR-01**: Every module has a prompts.py with 4-6 @prompt functions auto-discovered by FileSystemProvider
@@ -220,6 +237,20 @@
 | TOR-10 | Phase 13 | Planned |
 | TOR-11 | Phase 13 | Planned |
 | TOR-12 | Phase 13 | Planned |
+| YR-01 | Phase 14 | Planned |
+| YR-02 | Phase 14 | Planned |
+| YR-03 | Phase 14 | Planned |
+| YR-04 | Phase 14 | Planned |
+| YR-05 | Phase 14 | Planned |
+| YR-06 | Phase 14 | Planned |
+| YR-07 | Phase 14 | Planned |
+| YR-08 | Phase 14 | Planned |
+| YR-09 | Phase 14 | Planned |
+| YR-10 | Phase 14 | Planned |
+| YR-11 | Phase 14 | Planned |
+| YR-12 | Phase 14 | Planned |
+| YR-13 | Phase 14 | Planned |
+| YR-14 | Phase 14 | Planned |
 | PR-01 | Phase 40 | Planned |
 | PR-02 | Phase 40 | Planned |
 | PR-03 | Phase 40 | Planned |
@@ -242,9 +273,10 @@
 | PR-20 | Phase 40 | Planned |
 
 **Coverage:**
-- v1 requirements: 32 total
-- Mapped to phases: 32
+- v1 requirements: 46 total (added 14 York Region requirements in Phase 14)
+- Mapped to phases: 46
 - Unmapped: 0
+- York Region requirements: 14 total (Phase 14)
 - IRCC requirements: 9 total (Phase 11)
 - Ontario requirements: 8 total (Phase 12)
 - Toronto requirements: 12 total (Phase 13)

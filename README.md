@@ -17,7 +17,9 @@
 
 ---
 
-**128 tools, ~64 prompts, and ~88 resources** across **9 federal APIs + 1 provincial API + 1 municipal API + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, and persistent local storage. All bilingual (English/French).
+**155 tools, ~69 prompts, and ~96 resources** across **9 federal APIs + 1 provincial API + 2 municipal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, York Region ArcGIS Hub data, and persistent local storage. All bilingual (English/French).
+
+> **First ArcGIS Hub module** — shared infrastructure in `shared/arcgis_hub.py` is reusable for future Canadian municipal modules (BC, Calgary, Edmonton, and other cities publishing via ArcGIS Hub).
 
 
 ## Quick Start
@@ -453,9 +455,66 @@ Municipal datasets from the [City of Toronto Open Data Portal](https://open.toro
 
 ---
 
+### 🏗️ York Region Municipal Open Data — 27 tools
+
+Municipal datasets from **4 verified ArcGIS Hub portals** (York Region regional government, Markham, Newmarket, Aurora). York Region is the first ArcGIS Hub module in mcp-canada — a second portal technology alongside CKAN, covering Canada's 4th-largest regional municipality and its 1.17M residents. 6 of the 10 York Region area municipalities have no public ArcGIS Hub portal and are explicitly out of scope.
+
+**Note:** Each portal gets the same 5 discovery tools with a portal-specific prefix (`york_region_`, `markham_`, `newmarket_`, `aurora_`). York Region regional portal additionally gets 5 curated tools (transit, census, health, roads, waste). Markham gets 2 curated tools (addresses, road network).
+
+#### Discovery Tools — 20 (5 per portal)
+
+<!-- CATALOG:york_region_discovery:start -->
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `york_region_search_datasets` | Search York Region regional ArcGIS Hub portal by keyword. | `query`, `limit`, `offset` |
+| `york_region_get_dataset_details` | Get full details for a York Region regional Hub dataset by ID. | `dataset_id` |
+| `york_region_query_features` | Query any York Region FeatureServer layer with WHERE clause and field selection. | `service_url`, `layer_id`, `where`, `out_fields`, `max_records` |
+| `york_region_list_organizations` | List publisher organizations on the York Region Hub portal. | — |
+| `york_region_list_categories` | List dataset category tags on the York Region Hub portal. | — |
+| `markham_search_datasets` | Search City of Markham ArcGIS Hub portal by keyword. | `query`, `limit`, `offset` |
+| `markham_get_dataset_details` | Get full details for a Markham Hub dataset by ID. | `dataset_id` |
+| `markham_query_features` | Query any Markham FeatureServer layer. | `service_url`, `layer_id`, `where`, `out_fields` |
+| `markham_list_organizations` | List publisher organizations on the Markham Hub portal. | — |
+| `markham_list_categories` | List dataset category tags on the Markham Hub portal. | — |
+| `newmarket_search_datasets` | Search Town of Newmarket ArcGIS Hub portal by keyword. | `query`, `limit`, `offset` |
+| `newmarket_get_dataset_details` | Get full details for a Newmarket Hub dataset by ID. | `dataset_id` |
+| `newmarket_query_features` | Query any Newmarket FeatureServer layer. | `service_url`, `layer_id`, `where`, `out_fields` |
+| `newmarket_list_organizations` | List publisher organizations on the Newmarket Hub portal. | — |
+| `newmarket_list_categories` | List dataset category tags on the Newmarket Hub portal. | — |
+| `aurora_search_datasets` | Search Town of Aurora ArcGIS Hub portal by keyword. | `query`, `limit`, `offset` |
+| `aurora_get_dataset_details` | Get full details for an Aurora Hub dataset by ID. | `dataset_id` |
+| `aurora_query_features` | Query any Aurora FeatureServer layer. | `service_url`, `layer_id`, `where`, `out_fields` |
+| `aurora_list_organizations` | List publisher organizations on the Aurora Hub portal. | — |
+| `aurora_list_categories` | List dataset category tags on the Aurora Hub portal. | — |
+<!-- CATALOG:york_region_discovery:end -->
+
+#### York Region Curated — 5
+
+<!-- CATALOG:york_region_curated:start -->
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `york_region_get_transit_stops` | Search YRT/Viva bus stops by name from York Region Transportation FeatureServer. | `query`, `include_geometry`, `max_records` |
+| `york_region_get_transit_routes` | List YRT/Viva transit routes from York Region Transportation FeatureServer. | `route_short_name`, `include_geometry` |
+| `york_region_get_road_network` | Fetch York Region regional road network (~762 roads) from FeatureServer. | `name`, `include_geometry`, `max_records` |
+| `york_region_get_public_health` | Query York Region public health & safety data by location type (beach_water, hospital, drinking_water). | `location_type`, `include_geometry` |
+| `york_region_get_census_demographics` | Query York Region 2021 Census demographics by Dissemination Area with optional municipality filter. | `dataset`, `csdname`, `max_records` |
+| `york_region_get_waste_data` | Query York Region waste management data (diversion_statistics or sites). | `dataset`, `include_geometry` |
+<!-- CATALOG:york_region_curated:end -->
+
+#### Markham Curated — 2
+
+<!-- CATALOG:markham_curated:start -->
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `markham_get_addresses` | Search Markham civic address registry with optional street name filter. | `street`, `include_geometry`, `max_records` |
+| `markham_get_road_network` | Query Markham SLRN (Street Location Reference Network) road network by road name. | `name`, `include_geometry`, `max_records` |
+<!-- CATALOG:markham_curated:end -->
+
+---
+
 ## Prompt Catalog
 
-~64 workflow prompts across 12 modules. Prompts appear as slash-commands in Claude Desktop and other MCP-compatible clients. Discoverable via `client.list_prompts()`.
+~69 workflow prompts across 13 modules. Prompts appear as slash-commands in Claude Desktop and other MCP-compatible clients. Discoverable via `client.list_prompts()`.
 
 All prompts accept `lang: "en" | "fr"`. **Guided workflows** return `list[Message]` (user + assistant roles for multi-step chaining). **Quick lookups** return a single user message with tool invocation instructions.
 
@@ -579,11 +638,21 @@ All prompts accept `lang: "en" | "fr"`. **Guided workflows** return `list[Messag
 | `toronto_check_311` | Guided | Analyze 311 service requests by year/ward/type |
 | `toronto_rental_analysis` | Guided | Analyze rental data — RentSafeTO + short-term rentals |
 
+### 🏗️ York Region Municipal Open Data (5 prompts)
+
+| Prompt | Type | Description |
+|--------|------|-------------|
+| `york_region_explore_transit` | Guided | YRT/Viva transit analysis — chains `york_region_get_transit_stops` → `york_region_get_transit_routes` |
+| `york_region_explore_census` | Guided | Compare 2021 Census demographics across York Region municipalities |
+| `york_region_explore_health` | Guided | Explore public health data — beach water, hospitals, drinking water |
+| `york_region_quick_dataset_search` | Quick | One-shot search across York Region and municipality portals |
+| `markham_explore_infrastructure` | Guided | Explore Markham civic addresses and SLRN road network |
+
 ---
 
 ## Resource Catalog
 
-~88 reference resources across 12 modules. Resources provide instant context without tool calls — agents can read them without consuming API rate limits. Discoverable via `client.list_resources()`.
+~96 reference resources across 13 modules. Resources provide instant context without tool calls — agents can read them without consuming API rate limits. Discoverable via `client.list_resources()`.
 
 **URI scheme conventions:**
 - `data://` — JSON catalogs (machine-parseable key→value mappings)
@@ -734,6 +803,19 @@ All prompts accept `lang: "en" | "fr"`. **Guided workflows** return `list[Messag
 | `docs://toronto/gtfs-guide` | Guide | TTC GTFS structure, stop vs route vs trip distinction |
 | `template://toronto/neighbourhood-report` | Template | Neighbourhood profile with `{neighbourhood}`, `{indicators}`, `{ward}` |
 
+### 🏗️ York Region Municipal Open Data (8 resources)
+
+| URI | Type | Description |
+|-----|------|-------------|
+| `data://york_region/portals` | Catalog | All 10 York Region municipalities with portal status (4 verified, 6 no portal) |
+| `data://york_region/municipalities` | Catalog | All 9 local municipalities + region with 2021 Census population and area |
+| `data://york_region/feature_services` | Catalog | York Region curated FeatureServer catalog with tool names and layer IDs |
+| `docs://york_region/esri-field-naming` | Guide | ESRI field naming conventions (OBJECTID, ALL_CAPS, Shape__Length) |
+| `docs://york_region/portal-landscape` | Guide | Which 4 of 10 municipalities have ArcGIS Hub portals and why others don't |
+| `docs://york_region/census-variables` | Guide | 2021 Census focused field set (10 columns), CSDNAME filter, full 364-field access |
+| `docs://york_region/arcgis-query-patterns` | Guide | ArcGIS SQL WHERE clause syntax — LIKE, case sensitivity, quoting, 1=1 pattern |
+| `template://york_region/transit-query-response` | Template | YRT/Viva transit results with `{stop_name}`, `{route_short_name}`, `{wheelchair_boarding}` |
+
 ---
 
 ## Response Format
@@ -788,6 +870,7 @@ src/mcp_canada/
     ├── ircc/              # 10 tools — IRCC Immigration Open Data
     ├── ontario/           # 6 tools — Ontario Open Data Catalogue
     ├── toronto/           # 12 tools — City of Toronto Open Data Portal
+    ├── york_region/       # 27 tools — York Region ArcGIS Hub (4 portals: york_region, markham, newmarket, aurora)
     └── weather/           # 34 tools — MSC GeoMet OGC API
         ├── current/       # 5 tools — realtime conditions, forecast, alerts
         ├── climate/       # 7 tools — daily/monthly/normals/trends

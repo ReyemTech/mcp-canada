@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Phase 15 context gathered
-last_updated: "2026-04-10T21:20:08.283Z"
+stopped_at: Completed 15-01-PLAN.md
+last_updated: "2026-04-10T22:14:06.317Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 9
-  total_plans: 26
-  completed_plans: 26
+  total_plans: 30
+  completed_plans: 27
   percent: 0
 ---
 
@@ -76,6 +76,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 14-york-region-municipal-government-open-data P01 | 8min | 2 tasks | 9 files |
 | Phase 14-york-region-municipal-government-open-data P02 | 8min | 2 tasks | 2 files |
 | Phase 14-york-region-municipal-government-open-data P03 | 10min | 2 tasks | 7 files |
+| Phase 15-british-columbia-government-open-data P01 | 8min | 3 tasks | 18 files |
 
 ## Accumulated Context
 
@@ -149,6 +150,9 @@ Recent decisions affecting current work:
 - [Phase 14-york-region-municipal-government-open-data]: max_records silently clamped to 5000 in all query_features tools, documented in docstring
 - [Phase 14-york-region-municipal-government-open-data]: york_region_quick_dataset_search takes query: str + lang — quick lookup prompts can accept content params alongside lang
 - [Phase 14-york-region-municipal-government-open-data]: York Region resources embed bilingual content inline (name_en/name_fr per entry) — avoids lang param which would convert FunctionResource to ResourceTemplate
+- [Phase 15-british-columbia-government-open-data]: shared/ogc.py uses response.content (bytes) for _parse_geojson — satisfies no-json-on-400-path rule and reuses existing _parse_geojson(bytes) signature
+- [Phase 15-british-columbia-government-open-data]: typeNames (plural) serialization from type_name (singular) Python kwarg — WFS 2.0 spec requirement documented with inline comment
+- [Phase 15-british-columbia-government-open-data]: CLIMATE_STATIONS_LAYER intentionally aliases WEATHER_STATIONS_LAYER — same BCGW layer, climate-oriented docstring for the 15th curated bc_ tool
 
 ### Roadmap Evolution
 
@@ -176,6 +180,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-10T21:20:08.279Z
-Stopped at: Phase 15 context gathered
-Resume file: .planning/phases/15-british-columbia-government-open-data/15-CONTEXT.md
+Last session: 2026-04-10T22:14:06.314Z
+Stopped at: Completed 15-01-PLAN.md
+Resume file: None

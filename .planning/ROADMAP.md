@@ -180,7 +180,7 @@ Plans:
 **Goal:** Agents can search the BC Data Catalogue (CKAN + bcgov custom extensions) and query BC Geographic Warehouse geospatial layers via WFS 2.0, with 20 curated bc_ tools (5 discovery + 15 WFS-backed) covering wildfire, forestry, environment, natural resources, health, transportation, and climate. Introduces a reusable `shared/ogc.py` WFS client (third portal tech alongside CKAN and ArcGIS Hub) plus 6 prompts and 7 resources.
 **Requirements**: TBD (no explicit REQ IDs yet — delivers on milestone provincial coverage goal)
 **Depends on:** Phase 14
-**Plans:** 4 plans
+**Plans:** 1/4 plans executed
 
 Plans:
 - [ ] 15-01-PLAN.md — shared/ogc.py WFS 2.0 client + british_columbia module skeleton + Wave 0 test stubs

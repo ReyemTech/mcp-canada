@@ -177,13 +177,16 @@ Plans:
 
 ### Phase 15: British Columbia Government Open Data
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Agents can search the BC Data Catalogue (CKAN + bcgov custom extensions) and query BC Geographic Warehouse geospatial layers via WFS 2.0, with 20 curated bc_ tools (5 discovery + 15 WFS-backed) covering wildfire, forestry, environment, natural resources, health, transportation, and climate. Introduces a reusable `shared/ogc.py` WFS client (third portal tech alongside CKAN and ArcGIS Hub) plus 6 prompts and 7 resources.
+**Requirements**: TBD (no explicit REQ IDs yet — delivers on milestone provincial coverage goal)
 **Depends on:** Phase 14
-**Plans:** 0 plans
+**Plans:** 4 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 15 to break down)
+- [ ] 15-01-PLAN.md — shared/ogc.py WFS 2.0 client + british_columbia module skeleton + Wave 0 test stubs
+- [ ] 15-02-PLAN.md — CKAN client functions + 5 discovery tools (bc_search_datasets, bc_get_dataset_details, bc_query_features, bc_list_organizations, bc_list_categories)
+- [ ] 15-03-PLAN.md — _wfs_fetch caching layer + 15 curated WFS tools (wildfire, forestry, environment, mining, health, transportation, climate)
+- [ ] 15-04-PLAN.md — 6 prompts + 7 resources + integration tests + README + CLAUDE.md updates
 
 ### Phase 16: Quebec Government Open Data
 

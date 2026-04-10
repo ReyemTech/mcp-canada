@@ -23,7 +23,17 @@ from .client import (
     fetch_search_datasets,
     fetch_tags,
 )
-from .constants import BASE_URL, MAX_RECORDS, WFS_BASE_URL, CACHE_TTL_STATIC
+from .constants import (
+    ACTIVE_FIRES_LAYER,
+    BASE_URL,
+    CACHE_TTL_STATIC,
+    CUT_BLOCKS_LAYER,
+    FIRE_PERIMETERS_LAYER,
+    FOREST_TENURE_LAYER,
+    MAX_RECORDS,
+    PROTECTED_AREAS_LAYER,
+    WFS_BASE_URL,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -253,7 +263,7 @@ async def bc_query_features(
         # Route 1: WFS query via BC Geographic Warehouse
         object_name = details["object_name"]
         try:
-            wfs_result, was_cached = await _wfs_fetch(
+            (features, truncated), was_cached = await _wfs_fetch(
                 layer=object_name,
                 cql=cql,
                 max_records=max_records,
@@ -269,9 +279,9 @@ async def bc_query_features(
 
         return make_response(
             {
-                "features": wfs_result.get("features", []),
-                "count": wfs_result.get("count", len(wfs_result.get("features", []))),
-                "truncated": wfs_result.get("truncated", False),
+                "features": features,
+                "count": len(features),
+                "truncated": truncated,
             },
             api_name="bc-wfs",
             api_url=WFS_BASE_URL,
@@ -375,5 +385,281 @@ async def bc_list_categories(
         api_name="bc-data-catalogue",
         api_url=BASE_URL + "tag_list",
         cached=cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Plan 03 helpers
+# ---------------------------------------------------------------------------
+
+
+def _append_gte(cql: str | None, field: str, value: float | int) -> str:
+    """Append a >= clause to an existing CQL string, or create it if cql is None."""
+    clause = f"{field} >= {value}"
+    return f"{cql} AND {clause}" if cql else clause
+
+
+def _append_like(cql: str | None, field: str, value: str) -> str:
+    """Append a LIKE clause (value%) to an existing CQL string."""
+    escaped = value.replace("'", "''")
+    clause = f"{field} LIKE '{escaped}%'"
+    return f"{cql} AND {clause}" if cql else clause
+
+
+# ---------------------------------------------------------------------------
+# Tool 6: bc_get_active_fires
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def bc_get_active_fires(
+    status: str | None = None,
+    centre: str | None = None,
+    min_size_hectares: float | None = None,
+    max_records: int = MAX_RECORDS,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Query currently active wildfires in British Columbia from the BCGW WFS.
+
+    Use for: Checking real-time BC wildfire incidents by status, fire centre, or minimum size — use for emergency awareness, fire season monitoring, and geographic analysis of active wildfire hotspots.
+    Keywords: british columbia, bc, wildfire, active fire, incident, status, fire centre, emergency, province, size, current, real-time
+    """
+    filters: dict[str, Any] = {}
+    if status:
+        filters["FIRE_STATUS"] = status
+    if centre:
+        filters["FIRE_CENTRE"] = centre
+    cql = _build_cql(filters)
+    if min_size_hectares is not None:
+        cql = _append_gte(cql, "CURRENT_SIZE", min_size_hectares)
+    try:
+        (features, truncated), was_cached = await _wfs_fetch(
+            layer=ACTIVE_FIRES_LAYER,
+            cql=cql,
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except WfsError as exc:
+        return make_error(
+            "UPSTREAM_ERROR",
+            f"WFS error: {exc.message}",
+            lang=lang,
+            exception_code=exc.code,
+        )
+    return make_response(
+        {"features": features, "truncated": truncated},
+        api_name="bc-wfs",
+        api_url=WFS_BASE_URL,
+        cached=was_cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool 7: bc_get_fire_perimeters
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def bc_get_fire_perimeters(
+    year: int | None = None,
+    cause: str | None = None,
+    min_size_hectares: float | None = None,
+    max_records: int = MAX_RECORDS,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Query historical BC wildfire perimeters from the BCGW WFS.
+
+    Year is required to bound the query (676+ fires per year in historical dataset).
+    Use for: Analyzing historical BC wildfire burn areas by year, cause, or minimum size — use for post-fire analysis, land use planning, and historical fire pattern research.
+    Keywords: british columbia, bc, wildfire, fire perimeters, historical, burn area, year, cause, hectares, polygon, boundary, forest
+    """
+    if year is None:
+        return make_error(
+            "INVALID_INPUT",
+            "Parameter 'year' is required for bc_get_fire_perimeters (dataset has 676+ fires/year).",
+            lang=lang,
+        )
+    filters: dict[str, Any] = {"FIRE_YEAR": int(year)}
+    if cause:
+        filters["FIRE_CAUSE"] = cause
+    cql = _build_cql(filters)
+    if min_size_hectares is not None:
+        cql = _append_gte(cql, "FIRE_SIZE_HECTARES", min_size_hectares)
+    try:
+        (features, truncated), was_cached = await _wfs_fetch(
+            layer=FIRE_PERIMETERS_LAYER,
+            cql=cql,
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except WfsError as exc:
+        return make_error(
+            "UPSTREAM_ERROR",
+            f"WFS error: {exc.message}",
+            lang=lang,
+            exception_code=exc.code,
+        )
+    return make_response(
+        {"features": features, "truncated": truncated},
+        api_name="bc-wfs",
+        api_url=WFS_BASE_URL,
+        cached=was_cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool 8: bc_get_forest_tenure
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def bc_get_forest_tenure(
+    status: str | None = "ACTIVE",
+    tenure_type: str | None = None,
+    client_name: str | None = None,
+    district: str | None = None,
+    max_records: int = MAX_RECORDS,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Query BC forest tenure licences from the BCGW WFS.
+
+    Use for: Finding BC forest tenure licence holders, active managed licences by district or client name — use for forestry compliance, resource extraction analysis, and tenure mapping.
+    Keywords: british columbia, bc, forest tenure, licence, managed, client, district, forestry, cutting rights, bcgw, silviculture, tenure holder
+    """
+    filters: dict[str, Any] = {}
+    if status:
+        filters["LIFE_CYCLE_STATUS_CODE"] = status
+    if tenure_type:
+        filters["ML_TYPE_CODE"] = tenure_type
+    if district:
+        filters["ADMIN_DISTRICT_NAME"] = district
+    cql = _build_cql(filters)
+    if client_name:
+        cql = _append_like(cql, "CLIENT_NAME", client_name)
+    try:
+        (features, truncated), was_cached = await _wfs_fetch(
+            layer=FOREST_TENURE_LAYER,
+            cql=cql,
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except WfsError as exc:
+        return make_error(
+            "UPSTREAM_ERROR",
+            f"WFS error: {exc.message}",
+            lang=lang,
+            exception_code=exc.code,
+        )
+    return make_response(
+        {"features": features, "truncated": truncated},
+        api_name="bc-wfs",
+        api_url=WFS_BASE_URL,
+        cached=was_cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool 9: bc_get_cut_blocks
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def bc_get_cut_blocks(
+    status: str | None = "ACTIVE",
+    district: str | None = None,
+    client_name: str | None = None,
+    max_records: int = MAX_RECORDS,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Query BC forest cut block polygons from the BCGW WFS (FTEN_CUT_BLOCK_POLY_SVW).
+
+    Use for: Analyzing BC forest harvesting cut blocks by status, district, or licence holder — use for timber supply analysis, post-harvest monitoring, and forest regeneration tracking.
+    Keywords: british columbia, bc, cut blocks, harvest, forestry, logging, ften, polygon, district, status, timber, silviculture
+    """
+    filters: dict[str, Any] = {}
+    if status:
+        filters["LIFE_CYCLE_STATUS_CODE"] = status
+    if district:
+        filters["ADMIN_DISTRICT_NAME"] = district
+    if client_name:
+        filters["CLIENT_NAME"] = client_name
+    cql = _build_cql(filters)
+    try:
+        (features, truncated), was_cached = await _wfs_fetch(
+            layer=CUT_BLOCKS_LAYER,
+            cql=cql,
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except WfsError as exc:
+        return make_error(
+            "UPSTREAM_ERROR",
+            f"WFS error: {exc.message}",
+            lang=lang,
+            exception_code=exc.code,
+        )
+    return make_response(
+        {"features": features, "truncated": truncated},
+        api_name="bc-wfs",
+        api_url=WFS_BASE_URL,
+        cached=was_cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool 10: bc_get_protected_areas
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def bc_get_protected_areas(
+    designation: str | None = None,
+    min_area_ha: float | None = None,
+    name: str | None = None,
+    max_records: int = MAX_RECORDS,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Query BC protected lands from the BCGW WFS (WHSE_TANTALIS.TA_PARK_ECORES_PA_SVW).
+
+    Use for: Discovering BC provincial parks, ecological reserves, and protected areas by designation, size, or name — use for conservation analysis, land use planning, and park boundary queries.
+    Keywords: british columbia, bc, protected areas, provincial parks, ecological reserve, conservation, designation, hectares, tantalis, parkland, boundaries, wildlife
+    """
+    filters: dict[str, Any] = {}
+    if designation:
+        filters["PROTECTED_LANDS_DESIGNATION"] = designation
+    cql = _build_cql(filters)
+    if name:
+        cql = _append_like(cql, "PROTECTED_LANDS_NAME", name)
+    if min_area_ha is not None:
+        cql = _append_gte(cql, "OFFICIAL_AREA_HA", min_area_ha)
+    try:
+        (features, truncated), was_cached = await _wfs_fetch(
+            layer=PROTECTED_AREAS_LAYER,
+            cql=cql,
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except WfsError as exc:
+        return make_error(
+            "UPSTREAM_ERROR",
+            f"WFS error: {exc.message}",
+            lang=lang,
+            exception_code=exc.code,
+        )
+    return make_response(
+        {"features": features, "truncated": truncated},
+        api_name="bc-wfs",
+        api_url=WFS_BASE_URL,
+        cached=was_cached,
         lang=lang,
     )

@@ -22,18 +22,19 @@ from mcp_canada.shared.parsers import fetch_and_parse  # noqa: F401 — used by 
 from mcp_canada.shared.rate_limiter import get_limiter
 
 from .constants import (
+    ACTIVE_FIRES_LAYER,
     BASE_URL,
-    CACHE_TTL_ACTIVE,  # noqa: F401 — used by Plan 03
+    CACHE_TTL_ACTIVE,
     CACHE_TTL_META,
     CACHE_TTL_SEARCH,
     CACHE_TTL_STATIC,
     MAX_RECORDS,
     RATE_GROUP_CKAN,
-    RATE_GROUP_WFS,  # noqa: F401 — used by Plan 03
+    RATE_GROUP_WFS,
     RATE_LIMIT_CKAN,
-    RATE_LIMIT_WFS,  # noqa: F401 — used by Plan 03
-    WFS_BASE_URL,  # noqa: F401 — used by Plan 03
-    WFS_PAGE_SIZE,  # noqa: F401 — used by Plan 03
+    RATE_LIMIT_WFS,
+    WFS_BASE_URL,
+    WFS_PAGE_SIZE,
 )
 
 __all__ = [
@@ -286,8 +287,11 @@ async def fetch_tags() -> tuple[list[str], bool]:
 
 
 # ---------------------------------------------------------------------------
-# WFS Feature Fetch — implemented in Plan 03
+# WFS Feature Fetch
 # ---------------------------------------------------------------------------
+
+# Layers that use the short active-fires TTL (5min). All other layers use CACHE_TTL_STATIC.
+_ACTIVE_LAYERS: frozenset[str] = frozenset({ACTIVE_FIRES_LAYER})
 
 
 async def _wfs_fetch(
@@ -295,11 +299,41 @@ async def _wfs_fetch(
     cql: str | None = None,
     max_records: int = MAX_RECORDS,
     include_geometry: bool = False,
-    ttl: int = CACHE_TTL_STATIC,
-) -> tuple[dict[str, Any], bool]:
+) -> tuple[tuple[list[dict[str, Any]], bool], bool]:
     """Fetch features from a BCGW WFS layer with caching and rate limiting.
 
-    Plan 03 implements this function body. Returns
-    {"features": [...], "count": N, "truncated": bool} tuple.
+    Selects CACHE_TTL_ACTIVE for the active fires layer and CACHE_TTL_STATIC for
+    all other layers. WfsError is NOT caught here — it propagates to the curated
+    tool layer so each tool can translate it to make_error with the exception code.
+
+    Args:
+        layer: BCGW object_name (e.g. "WHSE_LAND_AND_NATURAL_RESOURCE.PROT_CURRENT_FIRE_PNTS_SP").
+        cql: Optional CQL_FILTER string for server-side filtering.
+        max_records: Maximum total records to return (default 5000 — hard cap).
+        include_geometry: If True, include GeoJSON geometry in each feature dict.
+
+    Returns:
+        ((features, truncated), was_cached) tuple where features is a list of
+        property dicts and truncated is True when the 5000-record cap was hit.
+
+    Raises:
+        WfsError: When the WFS server returns an ows:ExceptionReport (propagates to tools).
     """
-    raise NotImplementedError("Plan 03 will implement _wfs_fetch")
+    ttl = CACHE_TTL_ACTIVE if layer in _ACTIVE_LAYERS else CACHE_TTL_STATIC
+    cache_key = f"bc:wfs:{layer}:{cql or ''}:{max_records}:{include_geometry}"
+    limiter = get_limiter(RATE_GROUP_WFS, RATE_LIMIT_WFS)
+
+    async def fetcher() -> tuple[list[dict[str, Any]], bool]:
+        await limiter.acquire()
+        features, truncated = await wfs_page_all(
+            WFS_BASE_URL,
+            type_name=layer,
+            cql_filter=cql,
+            max_records=max_records,
+            page_size=WFS_PAGE_SIZE,
+            include_geometry=include_geometry,
+        )
+        return (features, truncated)
+
+    result, was_cached = await cached_fetch(cache_key, ttl, fetcher)
+    return result, was_cached

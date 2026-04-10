@@ -306,6 +306,264 @@ class TestFetchTags:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# TestWfsFetchShared
+# ---------------------------------------------------------------------------
+
+
+class TestWfsFetchShared:
+    """Tests for _wfs_fetch — caching strategy, rate limiting, and WfsError propagation."""
+
+    @pytest.mark.asyncio
+    async def test_wfs_fetch_uses_wfs_base_url(self, monkeypatch):
+        """_wfs_fetch calls wfs_page_all with WFS_BASE_URL as base_url."""
+        from mcp_canada.modules.british_columbia.client import _wfs_fetch
+        from mcp_canada.modules.british_columbia.constants import ACTIVE_FIRES_LAYER, WFS_BASE_URL
+
+        captured = {}
+
+        async def fake_wfs_page_all(base_url, type_name, **kwargs):
+            captured["base_url"] = base_url
+            return ([], False)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.wfs_page_all",
+            fake_wfs_page_all,
+        )
+        await _wfs_fetch(ACTIVE_FIRES_LAYER)
+        assert captured["base_url"] == WFS_BASE_URL
+
+    @pytest.mark.asyncio
+    async def test_wfs_fetch_passes_layer_to_type_name(self, monkeypatch):
+        """_wfs_fetch forwards the layer string as type_name to wfs_page_all."""
+        from mcp_canada.modules.british_columbia.client import _wfs_fetch
+
+        captured = {}
+
+        async def fake_wfs_page_all(base_url, type_name, **kwargs):
+            captured["type_name"] = type_name
+            return ([], False)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.wfs_page_all",
+            fake_wfs_page_all,
+        )
+        await _wfs_fetch("WHSE_FOREST_TENURE.FTEN_CUT_BLOCK_POLY_SVW")
+        assert captured["type_name"] == "WHSE_FOREST_TENURE.FTEN_CUT_BLOCK_POLY_SVW"
+
+    @pytest.mark.asyncio
+    async def test_wfs_fetch_forwards_cql_filter(self, monkeypatch):
+        """_wfs_fetch passes cql parameter as cql_filter to wfs_page_all."""
+        from mcp_canada.modules.british_columbia.client import _wfs_fetch
+
+        captured = {}
+
+        async def fake_wfs_page_all(base_url, type_name, **kwargs):
+            captured["cql_filter"] = kwargs.get("cql_filter")
+            return ([], False)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.wfs_page_all",
+            fake_wfs_page_all,
+        )
+        await _wfs_fetch("SOME_LAYER", cql="FIRE_YEAR=2023")
+        assert captured["cql_filter"] == "FIRE_YEAR=2023"
+
+    @pytest.mark.asyncio
+    async def test_wfs_fetch_respects_max_records(self, monkeypatch):
+        """_wfs_fetch passes max_records to wfs_page_all."""
+        from mcp_canada.modules.british_columbia.client import _wfs_fetch
+
+        captured = {}
+
+        async def fake_wfs_page_all(base_url, type_name, **kwargs):
+            captured["max_records"] = kwargs.get("max_records")
+            return ([], False)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.wfs_page_all",
+            fake_wfs_page_all,
+        )
+        await _wfs_fetch("SOME_LAYER", max_records=100)
+        assert captured["max_records"] == 100
+
+    @pytest.mark.asyncio
+    async def test_wfs_fetch_forwards_include_geometry(self, monkeypatch):
+        """_wfs_fetch passes include_geometry to wfs_page_all."""
+        from mcp_canada.modules.british_columbia.client import _wfs_fetch
+
+        captured = {}
+
+        async def fake_wfs_page_all(base_url, type_name, **kwargs):
+            captured["include_geometry"] = kwargs.get("include_geometry")
+            return ([], False)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.wfs_page_all",
+            fake_wfs_page_all,
+        )
+        await _wfs_fetch("SOME_LAYER", include_geometry=True)
+        assert captured["include_geometry"] is True
+
+    @pytest.mark.asyncio
+    async def test_wfs_fetch_cache_key_incorporates_layer_cql_max_records_include_geometry(
+        self, monkeypatch
+    ):
+        """_wfs_fetch cache key includes layer, cql, max_records, include_geometry."""
+        from mcp_canada.modules.british_columbia.client import _wfs_fetch
+
+        captured_key = {}
+
+        async def fake_cached_fetch(key, ttl, fetcher):
+            captured_key["key"] = key
+            return (await fetcher(), False)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.cached_fetch",
+            fake_cached_fetch,
+        )
+
+        async def fake_wfs_page_all(base_url, type_name, **kwargs):
+            return ([], False)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.wfs_page_all",
+            fake_wfs_page_all,
+        )
+        await _wfs_fetch("MY_LAYER", cql="X=1", max_records=50, include_geometry=True)
+        key = captured_key["key"]
+        assert "MY_LAYER" in key
+        assert "X=1" in key
+        assert "50" in key
+        assert "True" in key
+
+    @pytest.mark.asyncio
+    async def test_wfs_fetch_uses_active_ttl_for_active_fires_layer(self, monkeypatch):
+        """_wfs_fetch uses CACHE_TTL_ACTIVE for ACTIVE_FIRES_LAYER."""
+        from mcp_canada.modules.british_columbia.client import _wfs_fetch
+        from mcp_canada.modules.british_columbia.constants import (
+            ACTIVE_FIRES_LAYER,
+            CACHE_TTL_ACTIVE,
+        )
+
+        captured_ttl = {}
+
+        async def fake_cached_fetch(key, ttl, fetcher):
+            captured_ttl["ttl"] = ttl
+            return (await fetcher(), False)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.cached_fetch",
+            fake_cached_fetch,
+        )
+
+        async def fake_wfs_page_all(base_url, type_name, **kwargs):
+            return ([], False)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.wfs_page_all",
+            fake_wfs_page_all,
+        )
+        await _wfs_fetch(ACTIVE_FIRES_LAYER)
+        assert captured_ttl["ttl"] == CACHE_TTL_ACTIVE
+
+    @pytest.mark.asyncio
+    async def test_wfs_fetch_uses_static_ttl_for_other_layers(self, monkeypatch):
+        """_wfs_fetch uses CACHE_TTL_STATIC for all non-active-fires layers."""
+        from mcp_canada.modules.british_columbia.client import _wfs_fetch
+        from mcp_canada.modules.british_columbia.constants import CACHE_TTL_STATIC
+
+        captured_ttl = {}
+
+        async def fake_cached_fetch(key, ttl, fetcher):
+            captured_ttl["ttl"] = ttl
+            return (await fetcher(), False)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.cached_fetch",
+            fake_cached_fetch,
+        )
+
+        async def fake_wfs_page_all(base_url, type_name, **kwargs):
+            return ([], False)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.wfs_page_all",
+            fake_wfs_page_all,
+        )
+        await _wfs_fetch("WHSE_FOREST_TENURE.FTEN_MANAGED_LICENCE_POLY_SVW")
+        assert captured_ttl["ttl"] == CACHE_TTL_STATIC
+
+    @pytest.mark.asyncio
+    async def test_wfs_fetch_rate_limited_bc_wfs_5hz(self, monkeypatch):
+        """_wfs_fetch calls get_limiter with bc_wfs and rate=5.0."""
+        from mcp_canada.modules.british_columbia.client import _wfs_fetch
+        from mcp_canada.modules.british_columbia.constants import RATE_GROUP_WFS, RATE_LIMIT_WFS
+        from unittest.mock import AsyncMock, MagicMock
+
+        captured = {}
+        mock_limiter = MagicMock()
+        mock_limiter.acquire = AsyncMock()
+
+        def fake_get_limiter(source, rate):
+            captured["source"] = source
+            captured["rate"] = rate
+            return mock_limiter
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.get_limiter",
+            fake_get_limiter,
+        )
+
+        async def fake_wfs_page_all(base_url, type_name, **kwargs):
+            return ([], False)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.wfs_page_all",
+            fake_wfs_page_all,
+        )
+        await _wfs_fetch("SOME_LAYER")
+        assert captured["source"] == RATE_GROUP_WFS
+        assert captured["rate"] == RATE_LIMIT_WFS
+
+    @pytest.mark.asyncio
+    async def test_wfs_fetch_wraps_wfs_error(self, monkeypatch):
+        """_wfs_fetch lets WfsError from wfs_page_all propagate (not caught)."""
+        from mcp_canada.modules.british_columbia.client import _wfs_fetch
+        from mcp_canada.shared.ogc import WfsError
+
+        async def fake_wfs_page_all(base_url, type_name, **kwargs):
+            raise WfsError("InvalidParameterValue", "Feature type unknown")
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.wfs_page_all",
+            fake_wfs_page_all,
+        )
+        with pytest.raises(WfsError) as exc_info:
+            await _wfs_fetch("BAD_LAYER")
+        assert exc_info.value.code == "InvalidParameterValue"
+
+    @pytest.mark.asyncio
+    async def test_wfs_fetch_returns_features_and_truncated(self, monkeypatch):
+        """_wfs_fetch returns ((features, truncated), was_cached)."""
+        from mcp_canada.modules.british_columbia.client import _wfs_fetch
+
+        sample_features = [{"FIRE_NUMBER": "C00001"}]
+
+        async def fake_wfs_page_all(base_url, type_name, **kwargs):
+            return (sample_features, True)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.wfs_page_all",
+            fake_wfs_page_all,
+        )
+        result, was_cached = await _wfs_fetch("SOME_LAYER")
+        features, truncated = result
+        assert features == sample_features
+        assert truncated is True
+        assert was_cached is False
+
+
 class TestQueryableViaWfsDetection:
     """Unit tests for _compute_queryable_via_wfs helper (synchronous pure logic)."""
 

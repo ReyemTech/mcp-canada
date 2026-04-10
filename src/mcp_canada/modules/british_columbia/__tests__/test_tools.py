@@ -252,7 +252,7 @@ class TestBcQueryFeatures:
         """bc_query_features calls _wfs_fetch when queryable_via_wfs=True."""
         from mcp_canada.modules.british_columbia.tools import bc_query_features
 
-        wfs_result = ({"features": [{"FIRE_NUMBER": "C00001"}], "count": 1, "truncated": False}, False)
+        wfs_result = (([{"FIRE_NUMBER": "C00001"}], False), False)
         with (
             patch(
                 "mcp_canada.modules.british_columbia.tools.fetch_dataset_details",
@@ -298,7 +298,7 @@ class TestBcQueryFeatures:
         """bc_query_features passes max_records to _wfs_fetch."""
         from mcp_canada.modules.british_columbia.tools import bc_query_features
 
-        wfs_result = ({"features": [], "count": 0, "truncated": False}, False)
+        wfs_result = (([], False), False)
         with (
             patch(
                 "mcp_canada.modules.british_columbia.tools.fetch_dataset_details",
@@ -319,7 +319,7 @@ class TestBcQueryFeatures:
         """bc_query_features passes include_geometry to _wfs_fetch."""
         from mcp_canada.modules.british_columbia.tools import bc_query_features
 
-        wfs_result = ({"features": [], "count": 0, "truncated": False}, False)
+        wfs_result = (([], False), False)
         with (
             patch(
                 "mcp_canada.modules.british_columbia.tools.fetch_dataset_details",
@@ -340,7 +340,7 @@ class TestBcQueryFeatures:
         """bc_query_features converts filter dict to CQL string before calling _wfs_fetch."""
         from mcp_canada.modules.british_columbia.tools import bc_query_features
 
-        wfs_result = ({"features": [], "count": 0, "truncated": False}, False)
+        wfs_result = (([], False), False)
         with (
             patch(
                 "mcp_canada.modules.british_columbia.tools.fetch_dataset_details",
@@ -407,10 +407,7 @@ class TestBcQueryFeatures:
         """bc_query_features includes truncated=True in data when WFS cap is hit."""
         from mcp_canada.modules.british_columbia.tools import bc_query_features
 
-        wfs_result = (
-            {"features": [{"X": 1}] * 5000, "count": 5000, "truncated": True},
-            False,
-        )
+        wfs_result = (([{"X": 1}] * 5000, True), False)
         with (
             patch(
                 "mcp_canada.modules.british_columbia.tools.fetch_dataset_details",
@@ -535,44 +532,317 @@ class TestBcListCategories:
 # ---------------------------------------------------------------------------
 
 
-class TestBcGetActiveFires:
-    """Tests for bc_get_active_fires (WHSE_LAND_AND_NATURAL_RESOURCE.PROT_CURRENT_FIRE_PNTS_SP). Plan 03 implements."""
+_SAMPLE_FIRE_FEATURES = [{"FIRE_NUMBER": "C00001", "FIRE_STATUS": "Active", "CURRENT_SIZE": 50.0}]
+_SAMPLE_PERIM_FEATURES = [{"FIRE_YEAR": 2023, "FIRE_SIZE_HECTARES": 500.0}]
+_SAMPLE_FORESTTEN_FEATURES = [{"LIFE_CYCLE_STATUS_CODE": "ACTIVE", "CLIENT_NAME": "Weyerhaeuser"}]
+_SAMPLE_CUTBLOCK_FEATURES = [{"LIFE_CYCLE_STATUS_CODE": "ACTIVE", "ADMIN_DISTRICT_NAME": "DKM"}]
+_SAMPLE_PROTAREA_FEATURES = [{"PROTECTED_LANDS_NAME": "Test Park", "OFFICIAL_AREA_HA": 5000.0}]
 
-    @pytest.mark.xfail(reason="Plan 03 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+
+class TestBcGetActiveFires:
+    """Tests for bc_get_active_fires (WHSE_LAND_AND_NATURAL_RESOURCE.PROT_CURRENT_FIRE_PNTS_SP)."""
+
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_with_bc_wfs_api(self):
+        """bc_get_active_fires returns _meta with api=bc-wfs."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_active_fires
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_FIRE_FEATURES, False), False)),
+        ):
+            result = await bc_get_active_fires()
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "bc-wfs"
+
+    @pytest.mark.asyncio
+    async def test_builds_cql_with_status_and_centre_filters(self):
+        """bc_get_active_fires passes FIRE_STATUS and FIRE_CENTRE via CQL to _wfs_fetch."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_active_fires
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_FIRE_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_active_fires(status="Out", centre="Cariboo Fire Centre")
+        cql = mock_wfs.call_args[1].get("cql") or mock_wfs.call_args[0][1] if mock_wfs.call_args[0] else mock_wfs.call_args[1].get("cql")
+        assert cql is not None
+        assert "FIRE_STATUS='Out'" in cql
+        assert "FIRE_CENTRE='Cariboo Fire Centre'" in cql
+
+    @pytest.mark.asyncio
+    async def test_no_cql_when_all_filters_none(self):
+        """bc_get_active_fires passes cql=None to _wfs_fetch when no filters given."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_active_fires
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_FIRE_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_active_fires()
+        cql = mock_wfs.call_args[1].get("cql")
+        assert cql is None
+
+    @pytest.mark.asyncio
+    async def test_min_size_uses_gte_operator(self):
+        """bc_get_active_fires appends CURRENT_SIZE >= N to CQL for min_size_hectares."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_active_fires
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_FIRE_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_active_fires(min_size_hectares=1000.0)
+        cql = mock_wfs.call_args[1].get("cql")
+        assert cql is not None
+        assert "CURRENT_SIZE" in cql
+        assert "1000" in cql
+
+    @pytest.mark.asyncio
+    async def test_wraps_wfs_error_as_upstream_error(self):
+        """bc_get_active_fires returns UPSTREAM_ERROR when WfsError is raised."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_active_fires
+        from mcp_canada.shared.ogc import WfsError
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(side_effect=WfsError("InvalidParameterValue", "Bad layer")),
+        ):
+            result = await bc_get_active_fires()
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_propagates_lang_fr(self):
+        """bc_get_active_fires respects lang=fr in _meta."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_active_fires
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_FIRE_FEATURES, False), False)),
+        ):
+            result = await bc_get_active_fires(lang="fr")
+        assert result["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_returns_truncated_flag(self):
+        """bc_get_active_fires includes truncated=True when WFS cap is hit."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_active_fires
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_FIRE_FEATURES, True), False)),
+        ):
+            result = await bc_get_active_fires()
+        assert result["data"]["truncated"] is True
+
+    def test_docstring_has_8_plus_keywords(self):
+        """bc_get_active_fires docstring has at least 8 keywords."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_active_fires
+
+        doc = bc_get_active_fires.__doc__ or ""
+        kw_line = next((line for line in doc.splitlines() if "Keywords:" in line), "")
+        keywords = [k.strip() for k in kw_line.split("Keywords:")[-1].split(",") if k.strip()]
+        assert len(keywords) >= 8
 
 
 class TestBcGetFirePerimeters:
-    """Tests for bc_get_fire_perimeters (WHSE_LAND_AND_NATURAL_RESOURCE.PROT_HISTORICAL_FIRE_POLYS_SP). Plan 03 implements."""
+    """Tests for bc_get_fire_perimeters (WHSE_LAND_AND_NATURAL_RESOURCE.PROT_HISTORICAL_FIRE_POLYS_SP)."""
 
-    @pytest.mark.xfail(reason="Plan 03 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_requires_year_param(self):
+        """bc_get_fire_perimeters returns INVALID_INPUT when year is None."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_fire_perimeters
+
+        result = await bc_get_fire_perimeters(year=None)
+        assert result["error"]["code"] == "INVALID_INPUT"
+
+    @pytest.mark.asyncio
+    async def test_builds_cql_with_year(self):
+        """bc_get_fire_perimeters passes FIRE_YEAR=2023 in CQL."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_fire_perimeters
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_PERIM_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_fire_perimeters(year=2023)
+        cql = mock_wfs.call_args[1].get("cql")
+        assert cql is not None
+        assert "FIRE_YEAR=2023" in cql
+
+    @pytest.mark.asyncio
+    async def test_optional_cause_filter(self):
+        """bc_get_fire_perimeters appends FIRE_CAUSE filter when cause is given."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_fire_perimeters
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_PERIM_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_fire_perimeters(year=2023, cause="Human")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "FIRE_CAUSE='Human'" in cql
+
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope(self):
+        """bc_get_fire_perimeters returns proper _meta envelope."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_fire_perimeters
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_PERIM_FEATURES, False), False)),
+        ):
+            result = await bc_get_fire_perimeters(year=2023)
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "bc-wfs"
 
 
 class TestBcGetForestTenure:
-    """Tests for bc_get_forest_tenure (WHSE_FOREST_TENURE.FTEN_MANAGED_LICENCE_POLY_SVW). Plan 03 implements."""
+    """Tests for bc_get_forest_tenure (WHSE_FOREST_TENURE.FTEN_MANAGED_LICENCE_POLY_SVW)."""
 
-    @pytest.mark.xfail(reason="Plan 03 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_defaults_to_active_status(self):
+        """bc_get_forest_tenure uses LIFE_CYCLE_STATUS_CODE='ACTIVE' by default."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_forest_tenure
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_FORESTTEN_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_forest_tenure()
+        cql = mock_wfs.call_args[1].get("cql")
+        assert cql is not None
+        assert "LIFE_CYCLE_STATUS_CODE='ACTIVE'" in cql
+
+    @pytest.mark.asyncio
+    async def test_client_name_uses_like_operator(self):
+        """bc_get_forest_tenure uses CLIENT_NAME LIKE 'value%' for partial match."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_forest_tenure
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_FORESTTEN_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_forest_tenure(client_name="Weyerhaeuser")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "CLIENT_NAME" in cql
+        assert "LIKE" in cql
+        assert "Weyerhaeuser" in cql
+
+    @pytest.mark.asyncio
+    async def test_meta_envelope(self):
+        """bc_get_forest_tenure returns proper _meta envelope."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_forest_tenure
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_FORESTTEN_FEATURES, False), False)),
+        ):
+            result = await bc_get_forest_tenure()
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "bc-wfs"
 
 
 class TestBcGetCutBlocks:
-    """Tests for bc_get_cut_blocks (WHSE_FOREST_TENURE.FTEN_CUT_BLOCK_POLY_SVW). Plan 03 implements."""
+    """Tests for bc_get_cut_blocks (WHSE_FOREST_TENURE.FTEN_CUT_BLOCK_POLY_SVW)."""
 
-    @pytest.mark.xfail(reason="Plan 03 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_uses_ften_cut_block_poly_svw_layer(self):
+        """bc_get_cut_blocks uses FTEN_CUT_BLOCK_POLY_SVW layer (not deprecated POLYGONS). Pitfall 9."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_cut_blocks
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_CUTBLOCK_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_cut_blocks()
+        layer = mock_wfs.call_args[1].get("layer") or mock_wfs.call_args[0][0]
+        assert "FTEN_CUT_BLOCK_POLY_SVW" in layer
+
+    @pytest.mark.asyncio
+    async def test_defaults_to_active_status(self):
+        """bc_get_cut_blocks uses LIFE_CYCLE_STATUS_CODE='ACTIVE' by default."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_cut_blocks
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_CUTBLOCK_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_cut_blocks()
+        cql = mock_wfs.call_args[1].get("cql")
+        assert cql is not None
+        assert "LIFE_CYCLE_STATUS_CODE='ACTIVE'" in cql
+
+    @pytest.mark.asyncio
+    async def test_meta_envelope(self):
+        """bc_get_cut_blocks returns proper _meta envelope."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_cut_blocks
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_CUTBLOCK_FEATURES, False), False)),
+        ):
+            result = await bc_get_cut_blocks()
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "bc-wfs"
 
 
 class TestBcGetProtectedAreas:
-    """Tests for bc_get_protected_areas (WHSE_TANTALIS.TA_PARK_ECORES_PA_SVW). Plan 03 implements."""
+    """Tests for bc_get_protected_areas (WHSE_TANTALIS.TA_PARK_ECORES_PA_SVW)."""
 
-    @pytest.mark.xfail(reason="Plan 03 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_uses_whse_tantalis_layer(self):
+        """bc_get_protected_areas uses WHSE_TANTALIS.TA_PARK_ECORES_PA_SVW. Pitfall 8."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_protected_areas
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_PROTAREA_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_protected_areas()
+        layer = mock_wfs.call_args[1].get("layer") or mock_wfs.call_args[0][0]
+        assert "WHSE_TANTALIS" in layer
+        assert "TA_PARK_ECORES_PA_SVW" in layer
+
+    @pytest.mark.asyncio
+    async def test_designation_filter(self):
+        """bc_get_protected_areas passes PROTECTED_LANDS_DESIGNATION in CQL."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_protected_areas
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_PROTAREA_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_protected_areas(designation="PROVINCIAL PARK")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "PROTECTED_LANDS_DESIGNATION='PROVINCIAL PARK'" in cql
+
+    @pytest.mark.asyncio
+    async def test_min_area_filter(self):
+        """bc_get_protected_areas appends OFFICIAL_AREA_HA >= N for min_area_ha."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_protected_areas
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_PROTAREA_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_protected_areas(min_area_ha=100.0)
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "OFFICIAL_AREA_HA" in cql
+        assert "100" in cql
+
+    @pytest.mark.asyncio
+    async def test_meta_envelope(self):
+        """bc_get_protected_areas returns proper _meta envelope."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_protected_areas
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_PROTAREA_FEATURES, False), False)),
+        ):
+            result = await bc_get_protected_areas()
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "bc-wfs"
 
 
 class TestBcGetWaterWells:

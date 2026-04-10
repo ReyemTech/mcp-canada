@@ -7,7 +7,6 @@ All HTTP calls are patched at the client module namespace.
 from __future__ import annotations
 
 import pytest
-import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from mcp_canada.modules.british_columbia.client import (

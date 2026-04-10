@@ -27,11 +27,21 @@ from .constants import (
     ACTIVE_FIRES_LAYER,
     BASE_URL,
     CACHE_TTL_STATIC,
+    CLIMATE_STATIONS_LAYER,
     CUT_BLOCKS_LAYER,
+    EMERGENCY_ROOMS_LAYER,
     FIRE_PERIMETERS_LAYER,
+    FISH_HABITAT_LAYER,
     FOREST_TENURE_LAYER,
+    HIGHWAY_PROFILES_LAYER,
+    LOCAL_PARKS_LAYER,
     MAX_RECORDS,
+    MINING_TENURE_LAYER,
     PROTECTED_AREAS_LAYER,
+    ROAD_STRUCTURES_LAYER,
+    WALK_IN_CLINICS_LAYER,
+    WATER_WELLS_LAYER,
+    WEATHER_STATIONS_LAYER,
     WFS_BASE_URL,
 )
 
@@ -645,6 +655,504 @@ async def bc_get_protected_areas(
     try:
         (features, truncated), was_cached = await _wfs_fetch(
             layer=PROTECTED_AREAS_LAYER,
+            cql=cql,
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except WfsError as exc:
+        return make_error(
+            "UPSTREAM_ERROR",
+            f"WFS error: {exc.message}",
+            lang=lang,
+            exception_code=exc.code,
+        )
+    return make_response(
+        {"features": features, "truncated": truncated},
+        api_name="bc-wfs",
+        api_url=WFS_BASE_URL,
+        cached=was_cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool 11: bc_get_water_wells
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def bc_get_water_wells(
+    city: str | None = None,
+    well_class: str | None = None,
+    aquifer_id: int | None = None,
+    intended_use: str | None = None,
+    max_records: int = MAX_RECORDS,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Query BC groundwater wells from the BCGW WFS (WHSE_WATER_MANAGEMENT.GW_WATER_WELLS_WRBC_SVW).
+
+    At least one of city, well_class, or aquifer_id is required — the dataset has 130K+ records
+    and an unfiltered call would be very slow (RESEARCH Pitfall 5).
+    Use for: Locating BC groundwater wells by city, well class, aquifer, or intended water use — use for water resource analysis, environmental review, and aquifer mapping.
+    Keywords: british columbia, bc, water wells, groundwater, aquifer, well class, city, drinking water, domestic, irrigation, environmental
+    """
+    if city is None and well_class is None and aquifer_id is None:
+        return make_error(
+            "INVALID_INPUT",
+            "bc_get_water_wells requires at least one of city, well_class, or aquifer_id "
+            "(dataset has 130K+ records — Pitfall 5).",
+            lang=lang,
+        )
+    filters: dict[str, Any] = {}
+    if city:
+        filters["CITY"] = city
+    if well_class:
+        filters["WELL_CLASS"] = well_class
+    if aquifer_id is not None:
+        filters["AQUIFER_ID"] = int(aquifer_id)
+    if intended_use:
+        filters["INTENDED_WATER_USE"] = intended_use
+    cql = _build_cql(filters)
+    try:
+        (features, truncated), was_cached = await _wfs_fetch(
+            layer=WATER_WELLS_LAYER,
+            cql=cql,
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except WfsError as exc:
+        return make_error(
+            "UPSTREAM_ERROR",
+            f"WFS error: {exc.message}",
+            lang=lang,
+            exception_code=exc.code,
+        )
+    return make_response(
+        {"features": features, "truncated": truncated},
+        api_name="bc-wfs",
+        api_url=WFS_BASE_URL,
+        cached=was_cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool 12: bc_get_wildfire_weather_stations
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def bc_get_wildfire_weather_stations(
+    name: str | None = None,
+    min_elevation: int | None = None,
+    max_records: int = MAX_RECORDS,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Query BC wildfire weather monitoring stations from the BCGW WFS.
+
+    Use for: Finding BC wildfire weather stations by name or elevation — use for fire weather monitoring, FFMC/BUI/FWI calculation inputs, and station coverage analysis.
+    Keywords: british columbia, bc, wildfire, weather stations, monitoring, temperature, humidity, rainfall, rh, ffmc, fire weather index, elevation
+    """
+    cql: str | None = None
+    if name:
+        cql = _append_like(cql, "STATION_NAME", name)
+    if min_elevation is not None:
+        cql = _append_gte(cql, "ELEVATION", min_elevation)
+    try:
+        (features, truncated), was_cached = await _wfs_fetch(
+            layer=WEATHER_STATIONS_LAYER,
+            cql=cql,
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except WfsError as exc:
+        return make_error(
+            "UPSTREAM_ERROR",
+            f"WFS error: {exc.message}",
+            lang=lang,
+            exception_code=exc.code,
+        )
+    return make_response(
+        {"features": features, "truncated": truncated},
+        api_name="bc-wfs",
+        api_url=WFS_BASE_URL,
+        cached=was_cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool 13: bc_get_local_parks
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def bc_get_local_parks(
+    municipality: str | None = None,
+    regional_district: str | None = None,
+    park_type: str | None = None,
+    max_records: int = MAX_RECORDS,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Query BC local and regional parks from the BCGW WFS (WHSE_BASEMAPPING.GBA_LOCAL_REG_GREENSPACES_SP).
+
+    Use for: Locating BC local and regional parks, greenspaces, and recreational areas by municipality, regional district, or park type — use for urban planning, recreation analysis, and green space mapping.
+    Keywords: british columbia, bc, local parks, municipal, regional, greenspace, recreation, municipality, district, parkland, trails, outdoors
+    """
+    filters: dict[str, Any] = {}
+    if municipality:
+        filters["MUNICIPALITY"] = municipality
+    if regional_district:
+        filters["REGIONAL_DISTRICT"] = regional_district
+    if park_type:
+        filters["PARK_TYPE"] = park_type
+    cql = _build_cql(filters)
+    try:
+        (features, truncated), was_cached = await _wfs_fetch(
+            layer=LOCAL_PARKS_LAYER,
+            cql=cql,
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except WfsError as exc:
+        return make_error(
+            "UPSTREAM_ERROR",
+            f"WFS error: {exc.message}",
+            lang=lang,
+            exception_code=exc.code,
+        )
+    return make_response(
+        {"features": features, "truncated": truncated},
+        api_name="bc-wfs",
+        api_url=WFS_BASE_URL,
+        cached=was_cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool 14: bc_get_mining_tenure
+# ---------------------------------------------------------------------------
+
+_TENURE_TYPE_MAP: dict[str, str] = {"mineral": "M", "placer": "P"}
+
+
+@tool
+async def bc_get_mining_tenure(
+    tenure_type: str | None = None,
+    owner_name: str | None = None,
+    min_area_ha: float | None = None,
+    max_records: int = MAX_RECORDS,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Query BC mining tenure claims from the BCGW WFS (WHSE_MINERAL_TENURE.MTA_ACQUIRED_TENURE_SVW).
+
+    tenure_type must be 'mineral' or 'placer' if provided; maps to TENURE_TYPE_CODE 'M' or 'P'.
+    Use for: Finding BC mining claims by tenure type (mineral/placer), owner name, or minimum area — use for mining rights analysis, resource extraction research, and prospecting zone identification.
+    Keywords: british columbia, bc, mining tenure, mineral, placer, claim, owner, area, hectares, prospecting, acquisition, bcgw
+    """
+    if tenure_type is not None and tenure_type not in _TENURE_TYPE_MAP:
+        return make_error(
+            "INVALID_INPUT",
+            f"tenure_type must be 'mineral' or 'placer', got '{tenure_type}'.",
+            lang=lang,
+        )
+    filters: dict[str, Any] = {}
+    if tenure_type:
+        filters["TENURE_TYPE_CODE"] = _TENURE_TYPE_MAP[tenure_type]
+    cql = _build_cql(filters)
+    if owner_name:
+        cql = _append_like(cql, "OWNER_NAME", owner_name)
+    if min_area_ha is not None:
+        cql = _append_gte(cql, "AREA_IN_HECTARES", min_area_ha)
+    try:
+        (features, truncated), was_cached = await _wfs_fetch(
+            layer=MINING_TENURE_LAYER,
+            cql=cql,
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except WfsError as exc:
+        return make_error(
+            "UPSTREAM_ERROR",
+            f"WFS error: {exc.message}",
+            lang=lang,
+            exception_code=exc.code,
+        )
+    return make_response(
+        {"features": features, "truncated": truncated},
+        api_name="bc-wfs",
+        api_url=WFS_BASE_URL,
+        cached=was_cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool 15: bc_get_fish_habitat
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def bc_get_fish_habitat(
+    feature_code: str | None = None,
+    max_records: int = MAX_RECORDS,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Query BC fish habitat holding areas from the BCGW WFS (WHSE_WILDLIFE_MANAGEMENT.CRIMS_HOLDING_AREAS).
+
+    Use for: Finding BC coastal and marine fish habitat areas, salmon holding zones, and herring spawn areas — use for fisheries management, marine conservation, and coastal resource analysis.
+    Keywords: british columbia, bc, fish habitat, salmon, herring, coastal, holding area, crims, marine, wildlife, fisheries, spawn
+    """
+    filters: dict[str, Any] = {}
+    if feature_code:
+        filters["FEATURE_CODE"] = feature_code
+    cql = _build_cql(filters)
+    try:
+        (features, truncated), was_cached = await _wfs_fetch(
+            layer=FISH_HABITAT_LAYER,
+            cql=cql,
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except WfsError as exc:
+        return make_error(
+            "UPSTREAM_ERROR",
+            f"WFS error: {exc.message}",
+            lang=lang,
+            exception_code=exc.code,
+        )
+    return make_response(
+        {"features": features, "truncated": truncated},
+        api_name="bc-wfs",
+        api_url=WFS_BASE_URL,
+        cached=was_cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool 16: bc_get_emergency_rooms
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def bc_get_emergency_rooms(
+    locality: str | None = None,
+    wheelchair_accessible: bool | None = None,
+    max_records: int = MAX_RECORDS,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Query BC hospital emergency rooms from the BCGW WFS (WHSE_IMAGERY_AND_BASE_MAPS.GSR_EMERGENCY_ROOMS_SV).
+
+    Use for: Locating BC emergency rooms by city or accessibility — use for health care access analysis, emergency planning, and patient routing.
+    Keywords: british columbia, bc, emergency rooms, hospital, 24 hour, health care, er, accessibility, facility, acute care, locality
+    """
+    filters: dict[str, Any] = {}
+    if locality:
+        filters["LOCALITY"] = locality
+    if wheelchair_accessible is not None:
+        filters["WHEELCHAIR_ACCESSIBLE_IND"] = "Y" if wheelchair_accessible else "N"
+    cql = _build_cql(filters)
+    try:
+        (features, truncated), was_cached = await _wfs_fetch(
+            layer=EMERGENCY_ROOMS_LAYER,
+            cql=cql,
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except WfsError as exc:
+        return make_error(
+            "UPSTREAM_ERROR",
+            f"WFS error: {exc.message}",
+            lang=lang,
+            exception_code=exc.code,
+        )
+    return make_response(
+        {"features": features, "truncated": truncated},
+        api_name="bc-wfs",
+        api_url=WFS_BASE_URL,
+        cached=was_cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool 17: bc_get_walk_in_clinics
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def bc_get_walk_in_clinics(
+    locality: str | None = None,
+    max_records: int = MAX_RECORDS,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Query BC walk-in medical clinics from the BCGW WFS (WHSE_IMAGERY_AND_BASE_MAPS.GSR_MED_WALK_IN_CLINICS_SV).
+
+    Use for: Locating BC walk-in medical clinics by city — use for primary care access analysis, health service mapping, and patient navigation.
+    Keywords: british columbia, bc, walk in clinic, medical, primary care, health facility, locality, provider, urgent care, physician
+    """
+    filters: dict[str, Any] = {}
+    if locality:
+        filters["LOCALITY"] = locality
+    cql = _build_cql(filters)
+    try:
+        (features, truncated), was_cached = await _wfs_fetch(
+            layer=WALK_IN_CLINICS_LAYER,
+            cql=cql,
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except WfsError as exc:
+        return make_error(
+            "UPSTREAM_ERROR",
+            f"WFS error: {exc.message}",
+            lang=lang,
+            exception_code=exc.code,
+        )
+    return make_response(
+        {"features": features, "truncated": truncated},
+        api_name="bc-wfs",
+        api_url=WFS_BASE_URL,
+        cached=was_cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool 18: bc_get_highway_profiles
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def bc_get_highway_profiles(
+    highway_number: str | None = None,
+    admin_unit: str | None = None,
+    min_lanes: int | None = None,
+    max_records: int = MAX_RECORDS,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Query BC highway profile segments from the BCGW WFS (WHSE_IMAGERY_AND_BASE_MAPS.MOT_HIGHWAY_PROFILES_SP).
+
+    Use for: Analyzing BC highway segments by route number, administrative unit, or lane count — use for transportation planning, road capacity analysis, and infrastructure reporting.
+    Keywords: british columbia, bc, highway, profile, road, number, lanes, transportation, ministry, mot, segment, admin, route
+    """
+    filters: dict[str, Any] = {}
+    if highway_number:
+        filters["HIGHWAY_NUMBER"] = highway_number
+    if admin_unit:
+        filters["ADMIN_UNIT_NAME"] = admin_unit
+    cql = _build_cql(filters)
+    if min_lanes is not None:
+        cql = _append_gte(cql, "NUMBER_OF_LANES", min_lanes)
+    try:
+        (features, truncated), was_cached = await _wfs_fetch(
+            layer=HIGHWAY_PROFILES_LAYER,
+            cql=cql,
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except WfsError as exc:
+        return make_error(
+            "UPSTREAM_ERROR",
+            f"WFS error: {exc.message}",
+            lang=lang,
+            exception_code=exc.code,
+        )
+    return make_response(
+        {"features": features, "truncated": truncated},
+        api_name="bc-wfs",
+        api_url=WFS_BASE_URL,
+        cached=was_cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool 19: bc_get_road_structures
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def bc_get_road_structures(
+    structure_type: str | None = None,
+    max_records: int = MAX_RECORDS,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Query BC road structures from the BCGW WFS (WHSE_IMAGERY_AND_BASE_MAPS.MOT_ROAD_STRUCTURE_SP).
+
+    structure_type filters on STRUCTURE_TYPE_CODE (e.g. 'BRIDGE', 'CULVERT', 'TUNNEL').
+    Note: Exact field values should be confirmed via a live query; typical values are BRIDGE and CULVERT.
+    Use for: Locating BC road infrastructure structures like bridges, culverts, and tunnels — use for transportation asset management, infrastructure analysis, and route planning.
+    Keywords: british columbia, bc, road structures, bridges, culverts, tunnels, infrastructure, transportation, ministry, mot, assets, highway
+    """
+    filters: dict[str, Any] = {}
+    if structure_type:
+        filters["STRUCTURE_TYPE_CODE"] = structure_type
+    cql = _build_cql(filters)
+    try:
+        (features, truncated), was_cached = await _wfs_fetch(
+            layer=ROAD_STRUCTURES_LAYER,
+            cql=cql,
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except WfsError as exc:
+        return make_error(
+            "UPSTREAM_ERROR",
+            f"WFS error: {exc.message}",
+            lang=lang,
+            exception_code=exc.code,
+        )
+    return make_response(
+        {"features": features, "truncated": truncated},
+        api_name="bc-wfs",
+        api_url=WFS_BASE_URL,
+        cached=was_cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool 20: bc_get_climate_stations
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def bc_get_climate_stations(
+    name: str | None = None,
+    min_elevation: int | None = None,
+    max_records: int = MAX_RECORDS,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Query BC climate observation stations from the BCGW WFS.
+
+    This exposes the same BCGW layer as bc_get_wildfire_weather_stations
+    (WHSE_LAND_AND_NATURAL_RESOURCE.PROT_WEATHER_STATIONS_SP) from a climate-analysis
+    perspective. For long-term climate normals use Environment Canada (ECCC) data via
+    the weather module.
+    Use for: Discovering BC climate observation stations for historical and current climate data — use for climate trend analysis, precipitation studies, and long-term temperature records.
+    Keywords: british columbia, bc, climate, weather stations, temperature, precipitation, eccc, historical, normal, observation, elevation, environment canada
+    """
+    cql: str | None = None
+    if name:
+        cql = _append_like(cql, "STATION_NAME", name)
+    if min_elevation is not None:
+        cql = _append_gte(cql, "ELEVATION", min_elevation)
+    try:
+        (features, truncated), was_cached = await _wfs_fetch(
+            layer=CLIMATE_STATIONS_LAYER,
             cql=cql,
             max_records=max_records,
             include_geometry=include_geometry,

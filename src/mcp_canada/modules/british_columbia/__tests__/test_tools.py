@@ -845,91 +845,478 @@ class TestBcGetProtectedAreas:
         assert result["_meta"]["source"]["api"] == "bc-wfs"
 
 
+_SAMPLE_WELL_FEATURES = [{"WELL_CLASS": "DOMESTIC", "CITY": "Kamloops", "AQUIFER_ID": 101}]
+_SAMPLE_WX_FEATURES = [{"STATION_NAME": "Kamloops", "ELEVATION": 1200}]
+_SAMPLE_PARK_FEATURES = [{"MUNICIPALITY": "Kelowna", "PARK_TYPE": "NEIGHBOURHOOD"}]
+_SAMPLE_MINING_FEATURES = [{"TENURE_TYPE_CODE": "M", "OWNER_NAME": "Test Mining Corp", "AREA_IN_HECTARES": 30.0}]
+_SAMPLE_FISH_FEATURES = [{"FEATURE_CODE": "DA11100000", "HOLDING_AREA_ID": 1}]
+_SAMPLE_ER_FEATURES = [{"LOCALITY": "Vancouver", "WHEELCHAIR_ACCESSIBLE_IND": "Y"}]
+_SAMPLE_CLINIC_FEATURES = [{"LOCALITY": "Victoria", "FACILITY_NAME": "Vic Walk-In"}]
+_SAMPLE_HWY_FEATURES = [{"HIGHWAY_NUMBER": "1", "ADMIN_UNIT_NAME": "South Coast", "NUMBER_OF_LANES": 4}]
+_SAMPLE_STRUCT_FEATURES = [{"STRUCTURE_TYPE_CODE": "BRIDGE", "STRUCTURE_NAME": "Test Bridge"}]
+_SAMPLE_CLIMATE_FEATURES = [{"STATION_NAME": "Whistler", "ELEVATION": 2100}]
+
+
 class TestBcGetWaterWells:
-    """Tests for bc_get_water_wells (WHSE_WATER_MANAGEMENT.GW_WATER_WELLS_WRBC_SVW). Plan 03 implements.
+    """Tests for bc_get_water_wells (WHSE_WATER_MANAGEMENT.GW_WATER_WELLS_WRBC_SVW)."""
 
-    IMPORTANT: Must include test_requires_at_least_one_filter — water wells has ~130K records
-    (RESEARCH Pitfall 5). Tool must require at least one filter (city, aquifer_id, well_class)
-    to prevent runaway WFS fetches.
-    """
+    @pytest.mark.asyncio
+    async def test_requires_at_least_one_filter(self):
+        """bc_get_water_wells returns INVALID_INPUT when no filter provided (130K-record guard)."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_water_wells
 
-    @pytest.mark.xfail(reason="Plan 03 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+        result = await bc_get_water_wells()
+        assert result["error"]["code"] == "INVALID_INPUT"
 
-    @pytest.mark.xfail(reason="Plan 03 will implement — 130K-record guard", strict=False)
-    def test_requires_at_least_one_filter(self):
-        """bc_get_water_wells must return INVALID_INPUT when no filter provided (130K-record guard)."""
-        assert False
+    @pytest.mark.asyncio
+    async def test_city_filter(self):
+        """bc_get_water_wells passes CITY='Kamloops' in CQL."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_water_wells
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_WELL_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_water_wells(city="Kamloops")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "CITY='Kamloops'" in cql
+
+    @pytest.mark.asyncio
+    async def test_well_class_filter(self):
+        """bc_get_water_wells passes WELL_CLASS in CQL."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_water_wells
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_WELL_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_water_wells(well_class="DOMESTIC")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "WELL_CLASS='DOMESTIC'" in cql
+
+    @pytest.mark.asyncio
+    async def test_aquifer_id_numeric_no_quotes(self):
+        """bc_get_water_wells passes AQUIFER_ID as integer (no quotes) in CQL."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_water_wells
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_WELL_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_water_wells(aquifer_id=123)
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "AQUIFER_ID=123" in cql
+
+    @pytest.mark.asyncio
+    async def test_multiple_filters_joined_with_and(self):
+        """bc_get_water_wells joins multiple filters with AND."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_water_wells
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_WELL_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_water_wells(city="Kelowna", well_class="DOMESTIC")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "AND" in cql
+        assert "CITY='Kelowna'" in cql
+        assert "WELL_CLASS='DOMESTIC'" in cql
 
 
 class TestBcGetWildfireWeatherStations:
-    """Tests for bc_get_wildfire_weather_stations (WHSE_LAND_AND_NATURAL_RESOURCE.PROT_WEATHER_STATIONS_SP). Plan 03 implements."""
+    """Tests for bc_get_wildfire_weather_stations (WHSE_LAND_AND_NATURAL_RESOURCE.PROT_WEATHER_STATIONS_SP)."""
 
-    @pytest.mark.xfail(reason="Plan 03 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_name_like_filter(self):
+        """bc_get_wildfire_weather_stations uses STATION_NAME LIKE 'value%'."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_wildfire_weather_stations
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_WX_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_wildfire_weather_stations(name="Kamloops")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "STATION_NAME" in cql
+        assert "LIKE" in cql
+        assert "Kamloops" in cql
+
+    @pytest.mark.asyncio
+    async def test_min_elevation_gte(self):
+        """bc_get_wildfire_weather_stations uses ELEVATION >= N."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_wildfire_weather_stations
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_WX_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_wildfire_weather_stations(min_elevation=1000)
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "ELEVATION" in cql
+        assert "1000" in cql
+
+    @pytest.mark.asyncio
+    async def test_meta_envelope(self):
+        """bc_get_wildfire_weather_stations returns proper _meta envelope."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_wildfire_weather_stations
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_WX_FEATURES, False), False)),
+        ):
+            result = await bc_get_wildfire_weather_stations()
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "bc-wfs"
 
 
 class TestBcGetLocalParks:
-    """Tests for bc_get_local_parks (WHSE_BASEMAPPING.GBA_LOCAL_REG_GREENSPACES_SP). Plan 03 implements."""
+    """Tests for bc_get_local_parks (WHSE_BASEMAPPING.GBA_LOCAL_REG_GREENSPACES_SP)."""
 
-    @pytest.mark.xfail(reason="Plan 03 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_municipality_filter(self):
+        """bc_get_local_parks passes MUNICIPALITY in CQL."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_local_parks
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_PARK_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_local_parks(municipality="Kelowna")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "MUNICIPALITY='Kelowna'" in cql
+
+    @pytest.mark.asyncio
+    async def test_regional_district_filter(self):
+        """bc_get_local_parks passes REGIONAL_DISTRICT in CQL."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_local_parks
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_PARK_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_local_parks(regional_district="Central Okanagan")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "REGIONAL_DISTRICT='Central Okanagan'" in cql
+
+    @pytest.mark.asyncio
+    async def test_meta_envelope(self):
+        """bc_get_local_parks returns proper _meta envelope."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_local_parks
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_PARK_FEATURES, False), False)),
+        ):
+            result = await bc_get_local_parks()
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "bc-wfs"
 
 
 class TestBcGetMiningTenure:
-    """Tests for bc_get_mining_tenure (WHSE_MINERAL_TENURE.MTA_ACQUIRED_TENURE_SVW). Plan 03 implements."""
+    """Tests for bc_get_mining_tenure (WHSE_MINERAL_TENURE.MTA_ACQUIRED_TENURE_SVW)."""
 
-    @pytest.mark.xfail(reason="Plan 03 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_mineral_maps_to_tenure_type_code_m(self):
+        """bc_get_mining_tenure maps tenure_type='mineral' to TENURE_TYPE_CODE='M'."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_mining_tenure
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_MINING_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_mining_tenure(tenure_type="mineral")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "TENURE_TYPE_CODE='M'" in cql
+
+    @pytest.mark.asyncio
+    async def test_placer_maps_to_tenure_type_code_p(self):
+        """bc_get_mining_tenure maps tenure_type='placer' to TENURE_TYPE_CODE='P'."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_mining_tenure
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_MINING_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_mining_tenure(tenure_type="placer")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "TENURE_TYPE_CODE='P'" in cql
+
+    @pytest.mark.asyncio
+    async def test_invalid_tenure_type_returns_invalid_input(self):
+        """bc_get_mining_tenure returns INVALID_INPUT for unknown tenure type."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_mining_tenure
+
+        result = await bc_get_mining_tenure(tenure_type="coal")
+        assert result["error"]["code"] == "INVALID_INPUT"
+
+    @pytest.mark.asyncio
+    async def test_owner_name_like_filter(self):
+        """bc_get_mining_tenure uses OWNER_NAME LIKE 'value%'."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_mining_tenure
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_MINING_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_mining_tenure(owner_name="Test")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "OWNER_NAME" in cql
+        assert "LIKE" in cql
+
+    @pytest.mark.asyncio
+    async def test_min_area_ha_gte(self):
+        """bc_get_mining_tenure uses AREA_IN_HECTARES >= N."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_mining_tenure
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_MINING_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_mining_tenure(min_area_ha=50.0)
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "AREA_IN_HECTARES" in cql
+        assert "50" in cql
 
 
 class TestBcGetFishHabitat:
-    """Tests for bc_get_fish_habitat (WHSE_WILDLIFE_MANAGEMENT.CRIMS_HOLDING_AREAS). Plan 03 implements."""
+    """Tests for bc_get_fish_habitat (WHSE_WILDLIFE_MANAGEMENT.CRIMS_HOLDING_AREAS)."""
 
-    @pytest.mark.xfail(reason="Plan 03 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_feature_code_filter(self):
+        """bc_get_fish_habitat passes FEATURE_CODE in CQL."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_fish_habitat
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_FISH_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_fish_habitat(feature_code="DA11100000")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "FEATURE_CODE='DA11100000'" in cql
+
+    @pytest.mark.asyncio
+    async def test_meta_envelope(self):
+        """bc_get_fish_habitat returns proper _meta envelope."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_fish_habitat
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_FISH_FEATURES, False), False)),
+        ):
+            result = await bc_get_fish_habitat()
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "bc-wfs"
 
 
 class TestBcGetEmergencyRooms:
-    """Tests for bc_get_emergency_rooms (WHSE_IMAGERY_AND_BASE_MAPS.GSR_EMERGENCY_ROOMS_SV). Plan 03 implements."""
+    """Tests for bc_get_emergency_rooms (WHSE_IMAGERY_AND_BASE_MAPS.GSR_EMERGENCY_ROOMS_SV)."""
 
-    @pytest.mark.xfail(reason="Plan 03 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_locality_filter(self):
+        """bc_get_emergency_rooms passes LOCALITY in CQL."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_emergency_rooms
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_ER_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_emergency_rooms(locality="Vancouver")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "LOCALITY='Vancouver'" in cql
+
+    @pytest.mark.asyncio
+    async def test_wheelchair_accessible_true_maps_to_y(self):
+        """bc_get_emergency_rooms maps wheelchair_accessible=True to WHEELCHAIR_ACCESSIBLE_IND='Y'."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_emergency_rooms
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_ER_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_emergency_rooms(wheelchair_accessible=True)
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "WHEELCHAIR_ACCESSIBLE_IND='Y'" in cql
+
+    @pytest.mark.asyncio
+    async def test_wheelchair_accessible_false_maps_to_n(self):
+        """bc_get_emergency_rooms maps wheelchair_accessible=False to WHEELCHAIR_ACCESSIBLE_IND='N'."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_emergency_rooms
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_ER_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_emergency_rooms(wheelchair_accessible=False)
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "WHEELCHAIR_ACCESSIBLE_IND='N'" in cql
+
+    @pytest.mark.asyncio
+    async def test_meta_envelope(self):
+        """bc_get_emergency_rooms returns proper _meta envelope."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_emergency_rooms
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_ER_FEATURES, False), False)),
+        ):
+            result = await bc_get_emergency_rooms()
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "bc-wfs"
 
 
 class TestBcGetWalkInClinics:
-    """Tests for bc_get_walk_in_clinics (WHSE_IMAGERY_AND_BASE_MAPS.GSR_MED_WALK_IN_CLINICS_SV). Plan 03 implements."""
+    """Tests for bc_get_walk_in_clinics (WHSE_IMAGERY_AND_BASE_MAPS.GSR_MED_WALK_IN_CLINICS_SV)."""
 
-    @pytest.mark.xfail(reason="Plan 03 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_locality_filter(self):
+        """bc_get_walk_in_clinics passes LOCALITY in CQL."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_walk_in_clinics
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_CLINIC_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_walk_in_clinics(locality="Victoria")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "LOCALITY='Victoria'" in cql
+
+    @pytest.mark.asyncio
+    async def test_meta_envelope(self):
+        """bc_get_walk_in_clinics returns proper _meta envelope."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_walk_in_clinics
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_CLINIC_FEATURES, False), False)),
+        ):
+            result = await bc_get_walk_in_clinics()
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "bc-wfs"
 
 
 class TestBcGetHighwayProfiles:
-    """Tests for bc_get_highway_profiles (WHSE_IMAGERY_AND_BASE_MAPS.MOT_HIGHWAY_PROFILES_SP). Plan 03 implements."""
+    """Tests for bc_get_highway_profiles (WHSE_IMAGERY_AND_BASE_MAPS.MOT_HIGHWAY_PROFILES_SP)."""
 
-    @pytest.mark.xfail(reason="Plan 03 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_highway_number_filter(self):
+        """bc_get_highway_profiles passes HIGHWAY_NUMBER in CQL."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_highway_profiles
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_HWY_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_highway_profiles(highway_number="1")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "HIGHWAY_NUMBER='1'" in cql
+
+    @pytest.mark.asyncio
+    async def test_admin_unit_filter(self):
+        """bc_get_highway_profiles passes ADMIN_UNIT_NAME in CQL."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_highway_profiles
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_HWY_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_highway_profiles(admin_unit="South Coast")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "ADMIN_UNIT_NAME='South Coast'" in cql
+
+    @pytest.mark.asyncio
+    async def test_min_lanes_gte(self):
+        """bc_get_highway_profiles uses NUMBER_OF_LANES >= N."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_highway_profiles
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_HWY_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_highway_profiles(min_lanes=4)
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "NUMBER_OF_LANES" in cql
+        assert "4" in cql
 
 
 class TestBcGetRoadStructures:
-    """Tests for bc_get_road_structures (WHSE_IMAGERY_AND_BASE_MAPS.MOT_ROAD_STRUCTURE_SP). Plan 03 implements."""
+    """Tests for bc_get_road_structures (WHSE_IMAGERY_AND_BASE_MAPS.MOT_ROAD_STRUCTURE_SP)."""
 
-    @pytest.mark.xfail(reason="Plan 03 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_structure_type_filter(self):
+        """bc_get_road_structures passes STRUCTURE_TYPE_CODE in CQL."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_road_structures
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_STRUCT_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_road_structures(structure_type="BRIDGE")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "STRUCTURE_TYPE_CODE='BRIDGE'" in cql
+
+    @pytest.mark.asyncio
+    async def test_meta_envelope(self):
+        """bc_get_road_structures returns proper _meta envelope."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_road_structures
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_STRUCT_FEATURES, False), False)),
+        ):
+            result = await bc_get_road_structures()
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "bc-wfs"
 
 
 class TestBcGetClimateStations:
-    """Tests for bc_get_climate_stations (WHSE_LAND_AND_NATURAL_RESOURCE.PROT_WEATHER_STATIONS_SP — climate alias). Plan 03 implements."""
+    """Tests for bc_get_climate_stations (PROT_WEATHER_STATIONS_SP climate alias)."""
 
-    @pytest.mark.xfail(reason="Plan 03 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_uses_weather_stations_layer_alias(self):
+        """bc_get_climate_stations queries PROT_WEATHER_STATIONS_SP (same as wildfire weather)."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_climate_stations
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_CLIMATE_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_climate_stations()
+        layer = mock_wfs.call_args[1].get("layer") or mock_wfs.call_args[0][0]
+        assert "PROT_WEATHER_STATIONS_SP" in layer
+
+    def test_docstring_mentions_shared_layer_and_eccc(self):
+        """bc_get_climate_stations docstring explicitly references ECCC and shared layer."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_climate_stations
+
+        doc = bc_get_climate_stations.__doc__ or ""
+        assert "ECCC" in doc or "Environment Canada" in doc
+        assert "PROT_WEATHER_STATIONS_SP" in doc or "bc_get_wildfire_weather_stations" in doc
+
+    @pytest.mark.asyncio
+    async def test_name_filter(self):
+        """bc_get_climate_stations uses STATION_NAME LIKE filter."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_climate_stations
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_CLIMATE_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_climate_stations(name="Whistler")
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "STATION_NAME" in cql
+        assert "LIKE" in cql
+        assert "Whistler" in cql
+
+    @pytest.mark.asyncio
+    async def test_min_elevation_gte(self):
+        """bc_get_climate_stations uses ELEVATION >= N."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_climate_stations
+
+        with patch(
+            "mcp_canada.modules.british_columbia.tools._wfs_fetch",
+            new=AsyncMock(return_value=((_SAMPLE_CLIMATE_FEATURES, False), False)),
+        ) as mock_wfs:
+            await bc_get_climate_stations(min_elevation=500)
+        cql = mock_wfs.call_args[1].get("cql")
+        assert "ELEVATION" in cql
+        assert "500" in cql

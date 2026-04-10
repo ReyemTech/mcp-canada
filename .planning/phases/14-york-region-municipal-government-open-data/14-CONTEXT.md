@@ -1,12 +1,13 @@
 # Phase 14: York Region Municipal Government Open Data - Context
 
 **Gathered:** 2026-04-10
+**Updated:** 2026-04-10 (scope adjusted post-research — 6 municipalities have no public portal)
 **Status:** Ready for planning
 
 <domain>
 ## Phase Boundary
 
-Add York Region's municipal open data to mcp-canada. York Region uses **ArcGIS Hub** (Esri), not CKAN — this is the FIRST ArcGIS Hub module in the project and requires building new shared infrastructure. Covers the regional government portal PLUS all 9 local municipalities (Markham, Vaughan, Richmond Hill, Aurora, Newmarket, King, East Gwillimbury, Whitchurch-Stouffville, Georgina) in a federated single-module layout.
+Add York Region's municipal open data to mcp-canada. York Region uses **ArcGIS Hub** (Esri), not CKAN — this is the FIRST ArcGIS Hub module in the project and requires building new shared infrastructure. Covers **4 verified ArcGIS Hub portals**: York Region regional government + Markham + Newmarket + Aurora. Research confirmed that Vaughan, Richmond Hill, King, East Gwillimbury, Whitchurch-Stouffville, and Georgina do NOT have public ArcGIS Hub portals and are explicitly out of scope.
 
 </domain>
 
@@ -20,17 +21,17 @@ Add York Region's municipal open data to mcp-canada. York Region uses **ArcGIS H
 - Server-side filtering via simplified named parameters (ward=, category=, min_year=) that the client translates to ArcGIS WHERE clauses internally — agents don't need SQL knowledge
 - Auto-paginate with a cap (max 5000 records per tool call), return `truncated: true` flag when cap hit
 
-### Federation scope
-- Single `src/mcp_canada/modules/york_region/` module covering 10 portals total (York Region regional + 9 local municipalities)
-- Tool prefixes per portal using full municipality name: `york_region_`, `markham_`, `vaughan_`, `richmond_hill_`, `aurora_`, `newmarket_`, `king_`, `east_gwillimbury_`, `whitchurch_stouffville_`, `georgina_`
-- All 10 portals get the same 5 discovery tools: search_datasets, get_dataset_details, query_features, list_organizations, list_categories
-- Small portals with fewer datasets (King, etc.) get identical treatment — fewer results is fine
+### Federation scope (REVISED post-research)
+- Single `src/mcp_canada/modules/york_region/` module covering **4 verified portals** (down from 10)
+- Tool prefixes per portal: `york_region_`, `markham_`, `newmarket_`, `aurora_`
+- All 4 portals get the same 5 discovery tools: search_datasets, get_dataset_details, query_features, list_organizations, list_categories
+- **Out of scope (no public portals exist):** Vaughan, Richmond Hill, King, East Gwillimbury, Whitchurch-Stouffville, Georgina — these can be added as their own future phases if portals become available
 - Portal base URLs stored in constants.py per-portal mapping
 
-### Curated datasets
-- **York Region regional portal** gets 5 curated areas: transit (YRT/Viva stops + routes via Feature Service, no licensed GTFS), road network, census/demographics, public health statistics, waste management
-- **Markham, Vaughan, Richmond Hill** (3 largest cities) each get 1-2 curated tools (addresses, roads)
-- Remaining 6 local municipalities get discovery-only (no curated tools)
+### Curated datasets (REVISED post-research)
+- **York Region regional portal** gets 5 curated areas: transit (YRT/Viva stops + routes via Feature Service, no licensed GTFS), road network, census/demographics (2021 DA-level), public health/safety (beach water, hospitals), waste management
+- **Markham** gets 2 curated tools: civic addresses + road network (SLRN) — URLs verified
+- **Newmarket and Aurora:** discovery-only (small portals, 61 and 21 items respectively)
 - YRT/Viva transit: use ArcGIS Feature Services only — skip the licensed GTFS feed (avoids license dependency)
 
 ### Geometry handling
@@ -41,7 +42,8 @@ Add York Region's municipal open data to mcp-canada. York Region uses **ArcGIS H
 - Create `shared/arcgis_hub.py` as a reusable ArcGIS REST Feature Service client
 - Future ArcGIS Hub modules (likely British Columbia, several other cities) reuse it — same way Ontario's CKAN client effectively templated Toronto's
 - york_region/client.py wraps shared/arcgis_hub.py with portal-specific constants
-- Catalog search via the undocumented `/api/v2/datasets` Hub API (same endpoint ArcGIS Hub UI uses — stable in practice) with fallback to portal services directory listing if the Hub API errors
+- Catalog search via `/api/search/v1/collections/all/items` (research-verified endpoint — the previously assumed `/api/v2/datasets` returns 404)
+- Fetch layer metadata first to read `maxRecordCount` before paginating (varies: 1000 for Transportation Layer 2, 2000 for most others)
 
 ### Prompts and Resources (Phase 40 pattern)
 - Include prompts.py and resources.py from the start (7-file pattern, not retrofit)
@@ -98,14 +100,17 @@ Add York Region's municipal open data to mcp-canada. York Region uses **ArcGIS H
 - Hub catalog search: `{portal_base}/api/v2/datasets?filter[source]={org_id}&q={keyword}`
 - Max records per request: typically 1000-2000 (varies by Feature Service configuration — detect via `maxRecordCount` metadata)
 - York Region is a two-tier government — regional data (transit, health, roads, demographics) vs local data (addresses, zoning, building permits)
-- Tool count estimate: 5 discovery × 10 portals + 5 curated (regional) + 6 curated (3 cities × 2 each) = ~61 tools
+- Tool count estimate (REVISED): 5 discovery × 4 portals + 5 curated (York Region) + 2 curated (Markham) = ~27 tools
 
 </specifics>
 
 <deferred>
 ## Deferred Ideas
 
-None — discussion stayed within phase scope
+- Vaughan municipal open data — no public ArcGIS Hub or CKAN portal exists as of 2026-04. Re-evaluate when portal becomes available.
+- Richmond Hill municipal open data — same as Vaughan, no public portal.
+- King Township, East Gwillimbury, Whitchurch-Stouffville (general), Georgina — no standalone open data portals. Revisit if they publish portals.
+- YRT/Viva real-time GTFS feed — requires license agreement with YRT. Could be added later as a separate phase if license is obtained.
 
 </deferred>
 

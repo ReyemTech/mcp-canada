@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 14-york-region-municipal-government-open-data 14-01-PLAN.md
-last_updated: "2026-04-10T16:08:49.338Z"
+stopped_at: Completed 14-york-region-municipal-government-open-data 14-02-PLAN.md
+last_updated: "2026-04-10T16:15:57.376Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 8
   total_plans: 26
-  completed_plans: 24
+  completed_plans: 25
   percent: 0
 ---
 
@@ -74,6 +74,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 40-mcp-prompts-and-resources P04 | 12min | 2 tasks | 13 files |
 | Phase 40-mcp-prompts-and-resources P05 | 4min | 2 tasks | 3 files |
 | Phase 14-york-region-municipal-government-open-data P01 | 8min | 2 tasks | 9 files |
+| Phase 14-york-region-municipal-government-open-data P02 | 8min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -142,6 +143,9 @@ Recent decisions affecting current work:
 - [Phase 14-york-region-municipal-government-open-data]: NoPortalError (not ValueError) for municipalities without public ArcGIS Hub portals — enables typed catch in tools
 - [Phase 14-york-region-municipal-government-open-data]: PORTAL_URLS has 10 keys: 4 real URLs + 5 None + 1 census-only Whitchurch-Stouffville hub
 - [Phase 14-york-region-municipal-government-open-data]: query_feature_service passes returnGeometry=false when include_geometry=False — reduces response payload
+- [Phase 14-york-region-municipal-government-open-data]: _call_client private async helper centralises all error handling across all 27 york_region tools
+- [Phase 14-york-region-municipal-government-open-data]: Dispatch tools (get_public_health, get_census_demographics, get_waste_data) return make_error('INVALID_INPUT') with valid= list for invalid enum values
+- [Phase 14-york-region-municipal-government-open-data]: max_records silently clamped to 5000 in all query_features tools, documented in docstring
 
 ### Roadmap Evolution
 
@@ -169,6 +173,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-10T16:08:49.316Z
-Stopped at: Completed 14-york-region-municipal-government-open-data 14-01-PLAN.md
+Last session: 2026-04-10T16:15:57.372Z
+Stopped at: Completed 14-york-region-municipal-government-open-data 14-02-PLAN.md
 Resume file: None

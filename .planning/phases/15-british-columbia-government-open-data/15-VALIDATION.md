@@ -44,13 +44,13 @@ updated: 2026-04-10
 | 15-01-01 | 01 | 1 | shared/ogc.py WFS client | unit | `uv run pytest src/mcp_canada/shared/__tests__/test_ogc.py -x` | ✅ | ✅ green |
 | 15-01-02 | 01 | 1 | bc module skeleton imports | unit | `uv run python -c "from mcp_canada.modules import british_columbia; print(british_columbia.MODULE_NAME)"` | ✅ | ✅ green |
 | 15-01-03 | 01 | 1 | Wave 0 test stubs collect | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/ --collect-only -q` | ✅ | ✅ green |
-| 15-02-01 | 02 | 2 | bc_search_datasets tool | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcSearchDatasets -x` | ✅ | ⬜ pending |
-| 15-02-02 | 02 | 2 | bc_get_dataset_details + queryable_via_wfs | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetDatasetDetails -x` | ✅ | ⬜ pending |
-| 15-02-03 | 02 | 2 | bc_query_features routing | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcQueryFeatures -x` | ✅ | ⬜ pending |
-| 15-02-04 | 02 | 2 | bc_list_organizations | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcListOrganizations -x` | ✅ | ⬜ pending |
-| 15-02-05 | 02 | 2 | bc_list_categories | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcListCategories -x` | ✅ | ⬜ pending |
-| 15-02-06 | 02 | 2 | fetch_search_datasets client | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_client.py::TestFetchSearchDatasets -x` | ✅ | ⬜ pending |
-| 15-02-07 | 02 | 2 | fetch_dataset_details + WFS detection | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_client.py::TestQueryableViaWfsDetection -x` | ✅ | ⬜ pending |
+| 15-02-01 | 02 | 2 | bc_search_datasets tool | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcSearchDatasets -x` | ✅ | ✅ green |
+| 15-02-02 | 02 | 2 | bc_get_dataset_details + queryable_via_wfs | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetDatasetDetails -x` | ✅ | ✅ green |
+| 15-02-03 | 02 | 2 | bc_query_features routing | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcQueryFeatures -x` | ✅ | ✅ green |
+| 15-02-04 | 02 | 2 | bc_list_organizations | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcListOrganizations -x` | ✅ | ✅ green |
+| 15-02-05 | 02 | 2 | bc_list_categories | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcListCategories -x` | ✅ | ✅ green |
+| 15-02-06 | 02 | 2 | fetch_search_datasets client | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_client.py::TestFetchSearchDatasets -x` | ✅ | ✅ green |
+| 15-02-07 | 02 | 2 | fetch_dataset_details + WFS detection | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_client.py::TestQueryableViaWfsDetection -x` | ✅ | ✅ green |
 | 15-03-01 | 03 | 3 | bc_get_active_fires | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetActiveFires -x` | ✅ | ⬜ pending |
 | 15-03-02 | 03 | 3 | bc_get_fire_perimeters | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetFirePerimeters -x` | ✅ | ⬜ pending |
 | 15-03-03 | 03 | 3 | bc_get_forest_tenure | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetForestTenure -x` | ✅ | ⬜ pending |

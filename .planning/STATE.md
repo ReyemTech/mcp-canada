@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 15-01-PLAN.md
-last_updated: "2026-04-10T22:14:06.317Z"
+stopped_at: Completed 15-02-PLAN.md
+last_updated: "2026-04-10T22:21:51.508Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 9
   total_plans: 30
-  completed_plans: 27
+  completed_plans: 28
   percent: 0
 ---
 
@@ -77,6 +77,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 14-york-region-municipal-government-open-data P02 | 8min | 2 tasks | 2 files |
 | Phase 14-york-region-municipal-government-open-data P03 | 10min | 2 tasks | 7 files |
 | Phase 15-british-columbia-government-open-data P01 | 8min | 3 tasks | 18 files |
+| Phase 15-british-columbia-government-open-data P02 | 5min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -153,6 +154,11 @@ Recent decisions affecting current work:
 - [Phase 15-british-columbia-government-open-data]: shared/ogc.py uses response.content (bytes) for _parse_geojson — satisfies no-json-on-400-path rule and reuses existing _parse_geojson(bytes) signature
 - [Phase 15-british-columbia-government-open-data]: typeNames (plural) serialization from type_name (singular) Python kwarg — WFS 2.0 spec requirement documented with inline comment
 - [Phase 15-british-columbia-government-open-data]: CLIMATE_STATIONS_LAYER intentionally aliases WEATHER_STATIONS_LAYER — same BCGW layer, climate-oriented docstring for the 15th curated bc_ tool
+- [Phase Phase 15]: _api_get mirrors Ontario CKAN pattern: BASE_URL + path, envelope unwrap, raises HTTPStatusError on success=False
+- [Phase Phase 15]: bc: prefix isolates BC cache keys from Ontario/Toronto/federal CKAN keys in shared aiocache
+- [Phase Phase 15]: _compute_queryable_via_wfs is synchronous pure helper — returns (bool, object_name|None) from resource list
+- [Phase Phase 15]: bc_list_categories surfaces tags not groups — BC CKAN group_list returns HTTP 403 (RESEARCH Pitfall 7)
+- [Phase Phase 15]: _build_cql upper-cases all field names to match BCGW uppercase convention (RESEARCH Pitfall 6)
 
 ### Roadmap Evolution
 
@@ -180,6 +186,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-10T22:14:06.314Z
-Stopped at: Completed 15-01-PLAN.md
+Last session: 2026-04-10T22:21:51.504Z
+Stopped at: Completed 15-02-PLAN.md
 Resume file: None

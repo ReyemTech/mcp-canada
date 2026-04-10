@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 14-york-region-municipal-government-open-data 14-02-PLAN.md
-last_updated: "2026-04-10T16:15:57.376Z"
+stopped_at: Completed 14-york-region-municipal-government-open-data 14-03-PLAN.md
+last_updated: "2026-04-10T16:26:26.283Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 26
-  completed_plans: 25
+  completed_plans: 26
   percent: 0
 ---
 
@@ -75,6 +75,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 40-mcp-prompts-and-resources P05 | 4min | 2 tasks | 3 files |
 | Phase 14-york-region-municipal-government-open-data P01 | 8min | 2 tasks | 9 files |
 | Phase 14-york-region-municipal-government-open-data P02 | 8min | 2 tasks | 2 files |
+| Phase 14-york-region-municipal-government-open-data P03 | 10min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -146,6 +147,8 @@ Recent decisions affecting current work:
 - [Phase 14-york-region-municipal-government-open-data]: _call_client private async helper centralises all error handling across all 27 york_region tools
 - [Phase 14-york-region-municipal-government-open-data]: Dispatch tools (get_public_health, get_census_demographics, get_waste_data) return make_error('INVALID_INPUT') with valid= list for invalid enum values
 - [Phase 14-york-region-municipal-government-open-data]: max_records silently clamped to 5000 in all query_features tools, documented in docstring
+- [Phase 14-york-region-municipal-government-open-data]: york_region_quick_dataset_search takes query: str + lang — quick lookup prompts can accept content params alongside lang
+- [Phase 14-york-region-municipal-government-open-data]: York Region resources embed bilingual content inline (name_en/name_fr per entry) — avoids lang param which would convert FunctionResource to ResourceTemplate
 
 ### Roadmap Evolution
 
@@ -173,6 +176,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-10T16:15:57.372Z
-Stopped at: Completed 14-york-region-municipal-government-open-data 14-02-PLAN.md
+Last session: 2026-04-10T16:26:26.280Z
+Stopped at: Completed 14-york-region-municipal-government-open-data 14-03-PLAN.md
 Resume file: None

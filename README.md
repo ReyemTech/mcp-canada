@@ -17,7 +17,7 @@
 
 ---
 
-**155 tools, ~69 prompts, and ~96 resources** across **9 federal APIs + 1 provincial API + 2 municipal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, York Region ArcGIS Hub data, and persistent local storage. All bilingual (English/French).
+**175 tools, ~69 prompts, and ~96 resources** across **9 federal APIs + 2 provincial APIs + 2 municipal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, York Region ArcGIS Hub data, British Columbia CKAN + WFS geospatial data, and persistent local storage. All bilingual (English/French).
 
 > **First ArcGIS Hub module** — shared infrastructure in `shared/arcgis_hub.py` is reusable for future Canadian municipal modules (BC, Calgary, Edmonton, and other cities publishing via ArcGIS Hub).
 
@@ -509,6 +509,46 @@ Municipal datasets from **4 verified ArcGIS Hub portals** (York Region regional 
 | `markham_get_addresses` | Search Markham civic address registry with optional street name filter. | `street`, `include_geometry`, `max_records` |
 | `markham_get_road_network` | Query Markham SLRN (Street Location Reference Network) road network by road name. | `name`, `include_geometry`, `max_records` |
 <!-- CATALOG:markham_curated:end -->
+
+---
+
+### 🌲 British Columbia Open Data — 20 tools
+
+Provincial datasets from the [BC Data Catalogue](https://catalogue.data.gov.bc.ca) (CKAN 2.9 API) and the [BC Geographic Warehouse](https://www2.gov.bc.ca/gov/content/data/geographic-data-services/bc-spatial-data-infrastructure/bc-geographic-warehouse) WFS 2.0 endpoint. 13,000+ datasets including active wildfires, fire perimeters, protected areas, mining tenure, water wells, and highway infrastructure.
+
+#### Discovery (5)
+
+<!-- CATALOG:bc_discovery:start -->
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `bc_search_datasets` | Search BC Data Catalogue for datasets by keyword, organization, or filter query. | `q`, `rows`, `start`, `fq` |
+| `bc_get_dataset_details` | Get full metadata for a BC Data Catalogue dataset including WFS queryability. | `package_id` |
+| `bc_query_features` | Query any BCGW WFS layer by object_name with optional CQL filter. | `object_name`, `cql`, `max_records`, `include_geometry` |
+| `bc_list_organizations` | List all BC Data Catalogue organizations (ministries and agencies). | — |
+| `bc_list_categories` | List available BC Data Catalogue tags for subject-area discovery. | — |
+<!-- CATALOG:bc_discovery:end -->
+
+#### Curated WFS (15)
+
+<!-- CATALOG:bc_curated:start -->
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `bc_get_active_fires` | Fetch current active wildfire point locations from BCGW. | `fire_centre`, `fire_cause`, `min_size`, `max_records`, `include_geometry` |
+| `bc_get_fire_perimeters` | Fetch historical wildfire perimeter polygons from BCGW. | `fire_year`, `min_size`, `max_records`, `include_geometry` |
+| `bc_get_forest_tenure` | Fetch active BC forest tenure agreements from BCGW. | `client_name`, `max_records`, `include_geometry` |
+| `bc_get_cut_blocks` | Fetch BC cut block (harvested area) polygons from BCGW. | `admin_district`, `max_records`, `include_geometry` |
+| `bc_get_protected_areas` | Fetch BC provincial parks and protected areas from BCGW. | `designation`, `min_area_ha`, `max_records`, `include_geometry` |
+| `bc_get_water_wells` | Fetch BC groundwater well records from BCGW. | `city`, `well_class`, `aquifer_id`, `max_records`, `include_geometry` |
+| `bc_get_wildfire_weather_stations` | Fetch BC wildfire weather monitoring station locations from BCGW. | `station_name`, `max_records`, `include_geometry` |
+| `bc_get_local_parks` | Fetch BC local and regional park boundaries from BCGW. | `municipality`, `park_type`, `max_records`, `include_geometry` |
+| `bc_get_mining_tenure` | Fetch BC active mining tenure claims from BCGW. | `tenure_type`, `owner_name`, `max_records`, `include_geometry` |
+| `bc_get_fish_habitat` | Fetch BC fish habitat and holding area features from BCGW. | `max_records`, `include_geometry` |
+| `bc_get_emergency_rooms` | Fetch BC emergency room and urgent care facility locations from BCGW. | `locality`, `max_records`, `include_geometry` |
+| `bc_get_walk_in_clinics` | Fetch BC walk-in clinic locations from BCGW. | `locality`, `max_records`, `include_geometry` |
+| `bc_get_highway_profiles` | Fetch BC provincial highway profile segments from BCGW. | `highway_number`, `max_records`, `include_geometry` |
+| `bc_get_road_structures` | Fetch BC road structure (bridge, tunnel, overpass) records from BCGW. | `structure_type`, `max_records`, `include_geometry` |
+| `bc_get_climate_stations` | Fetch BC climate monitoring station locations from BCGW. | `station_name`, `max_records`, `include_geometry` |
+<!-- CATALOG:bc_curated:end -->
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 phase: 15
 slug: british-columbia-government-open-data
-status: wave-0-complete
+status: wave-3-complete
 nyquist_compliant: true
 wave_0_complete: true
 created: 2026-04-10
@@ -51,22 +51,22 @@ updated: 2026-04-10
 | 15-02-05 | 02 | 2 | bc_list_categories | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcListCategories -x` | ✅ | ✅ green |
 | 15-02-06 | 02 | 2 | fetch_search_datasets client | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_client.py::TestFetchSearchDatasets -x` | ✅ | ✅ green |
 | 15-02-07 | 02 | 2 | fetch_dataset_details + WFS detection | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_client.py::TestQueryableViaWfsDetection -x` | ✅ | ✅ green |
-| 15-03-01 | 03 | 3 | bc_get_active_fires | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetActiveFires -x` | ✅ | ⬜ pending |
-| 15-03-02 | 03 | 3 | bc_get_fire_perimeters | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetFirePerimeters -x` | ✅ | ⬜ pending |
-| 15-03-03 | 03 | 3 | bc_get_forest_tenure | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetForestTenure -x` | ✅ | ⬜ pending |
-| 15-03-04 | 03 | 3 | bc_get_cut_blocks | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetCutBlocks -x` | ✅ | ⬜ pending |
-| 15-03-05 | 03 | 3 | bc_get_protected_areas | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetProtectedAreas -x` | ✅ | ⬜ pending |
-| 15-03-06 | 03 | 3 | bc_get_water_wells (130K guard) | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetWaterWells -x` | ✅ | ⬜ pending |
-| 15-03-07 | 03 | 3 | bc_get_wildfire_weather_stations | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetWildfireWeatherStations -x` | ✅ | ⬜ pending |
-| 15-03-08 | 03 | 3 | bc_get_local_parks | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetLocalParks -x` | ✅ | ⬜ pending |
-| 15-03-09 | 03 | 3 | bc_get_mining_tenure | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetMiningTenure -x` | ✅ | ⬜ pending |
-| 15-03-10 | 03 | 3 | bc_get_fish_habitat | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetFishHabitat -x` | ✅ | ⬜ pending |
-| 15-03-11 | 03 | 3 | bc_get_emergency_rooms | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetEmergencyRooms -x` | ✅ | ⬜ pending |
-| 15-03-12 | 03 | 3 | bc_get_walk_in_clinics | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetWalkInClinics -x` | ✅ | ⬜ pending |
-| 15-03-13 | 03 | 3 | bc_get_highway_profiles | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetHighwayProfiles -x` | ✅ | ⬜ pending |
-| 15-03-14 | 03 | 3 | bc_get_road_structures | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetRoadStructures -x` | ✅ | ⬜ pending |
-| 15-03-15 | 03 | 3 | bc_get_climate_stations | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetClimateStations -x` | ✅ | ⬜ pending |
-| 15-03-16 | 03 | 3 | _wfs_fetch shared helper | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_client.py::TestWfsFetchShared -x` | ✅ | ⬜ pending |
+| 15-03-01 | 03 | 3 | bc_get_active_fires | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetActiveFires -x` | ✅ | ✅ green |
+| 15-03-02 | 03 | 3 | bc_get_fire_perimeters | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetFirePerimeters -x` | ✅ | ✅ green |
+| 15-03-03 | 03 | 3 | bc_get_forest_tenure | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetForestTenure -x` | ✅ | ✅ green |
+| 15-03-04 | 03 | 3 | bc_get_cut_blocks | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetCutBlocks -x` | ✅ | ✅ green |
+| 15-03-05 | 03 | 3 | bc_get_protected_areas | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetProtectedAreas -x` | ✅ | ✅ green |
+| 15-03-06 | 03 | 3 | bc_get_water_wells (130K guard) | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetWaterWells -x` | ✅ | ✅ green |
+| 15-03-07 | 03 | 3 | bc_get_wildfire_weather_stations | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetWildfireWeatherStations -x` | ✅ | ✅ green |
+| 15-03-08 | 03 | 3 | bc_get_local_parks | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetLocalParks -x` | ✅ | ✅ green |
+| 15-03-09 | 03 | 3 | bc_get_mining_tenure | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetMiningTenure -x` | ✅ | ✅ green |
+| 15-03-10 | 03 | 3 | bc_get_fish_habitat | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetFishHabitat -x` | ✅ | ✅ green |
+| 15-03-11 | 03 | 3 | bc_get_emergency_rooms | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetEmergencyRooms -x` | ✅ | ✅ green |
+| 15-03-12 | 03 | 3 | bc_get_walk_in_clinics | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetWalkInClinics -x` | ✅ | ✅ green |
+| 15-03-13 | 03 | 3 | bc_get_highway_profiles | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetHighwayProfiles -x` | ✅ | ✅ green |
+| 15-03-14 | 03 | 3 | bc_get_road_structures | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetRoadStructures -x` | ✅ | ✅ green |
+| 15-03-15 | 03 | 3 | bc_get_climate_stations | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetClimateStations -x` | ✅ | ✅ green |
+| 15-03-16 | 03 | 3 | _wfs_fetch shared helper | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_client.py::TestWfsFetchShared -x` | ✅ | ✅ green |
 | 15-04-01 | 04 | 4 | bc prompts (6) | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_prompts_resources.py::TestBcPrompts -x` | ✅ | ⬜ pending |
 | 15-04-02 | 04 | 4 | bc resources (7) | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_prompts_resources.py::TestBcResources -x` | ✅ | ⬜ pending |
 | 15-04-03 | 04 | 4 | bc integration scenarios | integration | `uv run pytest tests/integration/test_tool_scenarios.py::TestBcToolScenarios -m integration --timeout=120` | ✅ | ⬜ pending |

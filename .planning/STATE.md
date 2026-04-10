@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 15-02-PLAN.md
-last_updated: "2026-04-10T22:21:51.508Z"
+stopped_at: Completed 15-03-PLAN.md
+last_updated: "2026-04-10T23:44:36.921Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 9
   total_plans: 30
-  completed_plans: 28
+  completed_plans: 29
   percent: 0
 ---
 
@@ -78,6 +78,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 14-york-region-municipal-government-open-data P03 | 10min | 2 tasks | 7 files |
 | Phase 15-british-columbia-government-open-data P01 | 8min | 3 tasks | 18 files |
 | Phase 15-british-columbia-government-open-data P02 | 5min | 2 tasks | 5 files |
+| Phase 15-british-columbia-government-open-data P03 | 45min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -159,6 +160,8 @@ Recent decisions affecting current work:
 - [Phase Phase 15]: _compute_queryable_via_wfs is synchronous pure helper — returns (bool, object_name|None) from resource list
 - [Phase Phase 15]: bc_list_categories surfaces tags not groups — BC CKAN group_list returns HTTP 403 (RESEARCH Pitfall 7)
 - [Phase Phase 15]: _build_cql upper-cases all field names to match BCGW uppercase convention (RESEARCH Pitfall 6)
+- [Phase Phase 15-british-columbia-government-open-data]: Two private helpers _append_gte/_append_like added to tools.py for >= and LIKE CQL clauses — _build_cql handles equality only, helpers compose on top
+- [Phase Phase 15-british-columbia-government-open-data]: bc_get_water_wells 130K-record guard returns INVALID_INPUT before any network call when no filter provided (Pitfall 5)
 
 ### Roadmap Evolution
 
@@ -186,6 +189,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-10T22:21:51.504Z
-Stopped at: Completed 15-02-PLAN.md
+Last session: 2026-04-10T23:44:36.917Z
+Stopped at: Completed 15-03-PLAN.md
 Resume file: None

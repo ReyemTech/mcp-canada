@@ -1,69 +1,402 @@
-"""Wave 0 test class scaffolds for british_columbia client functions.
+"""Unit tests for british_columbia client functions.
 
-Plans 02 and 03 fill in the actual test implementations.
-Each class has one xfail placeholder so pytest --collect-only counts them.
+Covers CKAN search/show/org/tag and the queryable_via_wfs derivation logic.
+All HTTP calls are patched at the client module namespace.
 """
 
 from __future__ import annotations
 
 import pytest
+import pytest_asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from mcp_canada.modules.british_columbia.client import (
+    _compute_queryable_via_wfs,
+    fetch_dataset_details,
+    fetch_organizations,
+    fetch_search_datasets,
+    fetch_tags,
+)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _make_http_response(json_data: dict, status_code: int = 200):
+    """Build a mock httpx.Response-like object."""
+    resp = MagicMock()
+    resp.status_code = status_code
+    resp.json.return_value = json_data
+    resp.raise_for_status = MagicMock()
+    return resp
+
+
+# ---------------------------------------------------------------------------
+# TestFetchSearchDatasets
+# ---------------------------------------------------------------------------
 
 
 class TestFetchSearchDatasets:
-    """Tests for fetch_search_datasets (CKAN package_search). Plan 02 implements."""
+    """Tests for fetch_search_datasets (CKAN package_search)."""
 
-    @pytest.mark.xfail(reason="Plan 02 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_returns_shaped_summaries(self, sample_ckan_package_search_response):
+        """fetch_search_datasets returns list of flat summary dicts."""
+        mock_resp = _make_http_response(sample_ckan_package_search_response)
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+            results, was_cached = await fetch_search_datasets(q="wildfire")
+        assert isinstance(results, list)
+        assert len(results) == 2
+        # Check required summary fields
+        for r in results:
+            assert "id" in r
+            assert "name" in r
+            assert "title" in r
+            assert "notes" in r
+            assert "organization" in r
+            assert "metadata_modified" in r
+
+    @pytest.mark.asyncio
+    async def test_passes_rows_and_start_pagination_params(self, sample_ckan_package_search_response):
+        """fetch_search_datasets forwards rows and start to api_get."""
+        mock_resp = _make_http_response(sample_ckan_package_search_response)
+        mock_api_get = AsyncMock(return_value=mock_resp)
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=mock_api_get):
+            await fetch_search_datasets(q="test", rows=5, start=10)
+        call_kwargs = mock_api_get.call_args
+        # params is second positional arg (url, params, ...)
+        params = call_kwargs[0][1] if call_kwargs[0] else call_kwargs[1].get("params", {})
+        assert params.get("rows") == 5
+        assert params.get("start") == 10
+
+    @pytest.mark.asyncio
+    async def test_passes_fq_filter_when_provided(self, sample_ckan_package_search_response):
+        """fetch_search_datasets includes fq in CKAN params when provided."""
+        mock_resp = _make_http_response(sample_ckan_package_search_response)
+        mock_api_get = AsyncMock(return_value=mock_resp)
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=mock_api_get):
+            await fetch_search_datasets(q="fire", fq="organization:bc-wildfire-service")
+        call_kwargs = mock_api_get.call_args
+        params = call_kwargs[0][1] if call_kwargs[0] else call_kwargs[1].get("params", {})
+        assert params.get("fq") == "organization:bc-wildfire-service"
+
+    @pytest.mark.asyncio
+    async def test_second_call_is_cached(self, sample_ckan_package_search_response, monkeypatch):
+        """Second fetch_search_datasets call uses cache (was_cached=True)."""
+        # We override the autouse fixture to simulate cache hit on second call
+        call_count = 0
+
+        async def fake_cached_fetch_with_hit(key, ttl, fetcher):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return (await fetcher(), False)
+            return (await fetcher(), True)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.cached_fetch",
+            fake_cached_fetch_with_hit,
+        )
+        mock_resp = _make_http_response(sample_ckan_package_search_response)
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+            _, first_cached = await fetch_search_datasets(q="fire")
+            _, second_cached = await fetch_search_datasets(q="fire")
+        assert first_cached is False
+        assert second_cached is True
+
+    @pytest.mark.asyncio
+    async def test_rate_limited_by_bc_ckan(self, sample_ckan_package_search_response, monkeypatch):
+        """fetch_search_datasets calls get_limiter with bc_ckan and rate=10.0."""
+        from mcp_canada.modules.british_columbia.constants import RATE_GROUP_CKAN, RATE_LIMIT_CKAN
+
+        captured = {}
+        mock_limiter = MagicMock()
+        mock_limiter.acquire = AsyncMock()
+
+        def fake_get_limiter(source, rate):
+            captured["source"] = source
+            captured["rate"] = rate
+            return mock_limiter
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.get_limiter",
+            fake_get_limiter,
+        )
+        mock_resp = _make_http_response(sample_ckan_package_search_response)
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+            await fetch_search_datasets(q="fire")
+        assert captured["source"] == RATE_GROUP_CKAN
+        assert captured["rate"] == RATE_LIMIT_CKAN
+
+
+# ---------------------------------------------------------------------------
+# TestFetchDatasetDetails
+# ---------------------------------------------------------------------------
 
 
 class TestFetchDatasetDetails:
-    """Tests for fetch_dataset_details (CKAN package_show) including queryable_via_wfs derivation.
+    """Tests for fetch_dataset_details (CKAN package_show + queryable_via_wfs derivation)."""
 
-    Plan 02 asserts that datasets with bcdc_type=geographic + bc geographic warehouse
-    storage_location + object_name get queryable_via_wfs=True.
-    """
+    @pytest.mark.asyncio
+    async def test_returns_dataset_with_resources(self, sample_ckan_package_show_wfs_response):
+        """fetch_dataset_details returns dict with resources list."""
+        mock_resp = _make_http_response(sample_ckan_package_show_wfs_response)
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+            result, _ = await fetch_dataset_details("pkg-fire-001")
+        assert "resources" in result
+        assert isinstance(result["resources"], list)
 
-    @pytest.mark.xfail(reason="Plan 02 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_computes_queryable_via_wfs_true_when_bcgw_geographic_resource(
+        self, sample_ckan_package_show_wfs_response
+    ):
+        """WFS dataset with bc geographic warehouse storage gets queryable_via_wfs=True."""
+        mock_resp = _make_http_response(sample_ckan_package_show_wfs_response)
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+            result, _ = await fetch_dataset_details("pkg-fire-001")
+        assert result["queryable_via_wfs"] is True
+
+    @pytest.mark.asyncio
+    async def test_computes_queryable_via_wfs_false_when_file_only(
+        self, sample_ckan_package_show_file_response
+    ):
+        """File-only dataset gets queryable_via_wfs=False."""
+        mock_resp = _make_http_response(sample_ckan_package_show_file_response)
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+            result, _ = await fetch_dataset_details("pkg-fire-002")
+        assert result["queryable_via_wfs"] is False
+
+    @pytest.mark.asyncio
+    async def test_surfaces_object_name_from_first_queryable_resource(
+        self, sample_ckan_package_show_wfs_response
+    ):
+        """fetch_dataset_details surfaces object_name from the first WFS-queryable resource."""
+        mock_resp = _make_http_response(sample_ckan_package_show_wfs_response)
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+            result, _ = await fetch_dataset_details("pkg-fire-001")
+        assert result["object_name"] == "WHSE_LAND_AND_NATURAL_RESOURCE.PROT_HISTORICAL_FIRE_POLYS_SP"
+
+    @pytest.mark.asyncio
+    async def test_object_name_is_none_when_no_queryable_resource(
+        self, sample_ckan_package_show_file_response
+    ):
+        """File-only dataset has object_name=None."""
+        mock_resp = _make_http_response(sample_ckan_package_show_file_response)
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+            result, _ = await fetch_dataset_details("pkg-fire-002")
+        assert result["object_name"] is None
+
+    @pytest.mark.asyncio
+    async def test_raises_not_found_for_missing_package(self):
+        """fetch_dataset_details raises httpx.HTTPStatusError on 404."""
+        import httpx
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 404
+        mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Not Found", request=MagicMock(), response=mock_resp
+        )
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+            with pytest.raises(httpx.HTTPStatusError):
+                await fetch_dataset_details("nonexistent-package")
+
+    @pytest.mark.asyncio
+    async def test_caches_per_package_id(self, sample_ckan_package_show_wfs_response, monkeypatch):
+        """Second call for same package_id uses cache."""
+        call_count = 0
+
+        async def fake_cached_fetch_with_hit(key, ttl, fetcher):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return (await fetcher(), False)
+            return (await fetcher(), True)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.cached_fetch",
+            fake_cached_fetch_with_hit,
+        )
+        mock_resp = _make_http_response(sample_ckan_package_show_wfs_response)
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+            _, first_cached = await fetch_dataset_details("pkg-fire-001")
+            _, second_cached = await fetch_dataset_details("pkg-fire-001")
+        assert first_cached is False
+        assert second_cached is True
+
+
+# ---------------------------------------------------------------------------
+# TestFetchOrganizations
+# ---------------------------------------------------------------------------
 
 
 class TestFetchOrganizations:
-    """Tests for fetch_organizations (CKAN organization_list). Plan 02 implements."""
+    """Tests for fetch_organizations (CKAN organization_list)."""
 
-    @pytest.mark.xfail(reason="Plan 02 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_returns_list_of_org_dicts(self, sample_ckan_organization_list_response):
+        """fetch_organizations returns list of organization dicts."""
+        mock_resp = _make_http_response(sample_ckan_organization_list_response)
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+            result, was_cached = await fetch_organizations()
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_cached_24h(self, sample_ckan_organization_list_response, monkeypatch):
+        """fetch_organizations uses CACHE_TTL_META (86400s) TTL."""
+        from mcp_canada.modules.british_columbia.constants import CACHE_TTL_META
+
+        captured_ttl = {}
+
+        async def fake_cached_fetch_capture(key, ttl, fetcher):
+            captured_ttl["ttl"] = ttl
+            return (await fetcher(), False)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.cached_fetch",
+            fake_cached_fetch_capture,
+        )
+        mock_resp = _make_http_response(sample_ckan_organization_list_response)
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+            await fetch_organizations()
+        assert captured_ttl["ttl"] == CACHE_TTL_META
+
+
+# ---------------------------------------------------------------------------
+# TestFetchTags
+# ---------------------------------------------------------------------------
 
 
 class TestFetchTags:
-    """Tests for fetch_tags (CKAN tag_list). Plan 02 implements."""
+    """Tests for fetch_tags (CKAN tag_list)."""
 
-    @pytest.mark.xfail(reason="Plan 02 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    @pytest.mark.asyncio
+    async def test_returns_list_of_tag_strings(self, sample_ckan_tag_list_response):
+        """fetch_tags returns a list of tag name strings."""
+        mock_resp = _make_http_response(sample_ckan_tag_list_response)
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+            result, was_cached = await fetch_tags()
+        assert isinstance(result, list)
+        assert all(isinstance(t, str) for t in result)
+        assert "wildfire" in result
+
+    @pytest.mark.asyncio
+    async def test_cached_24h(self, sample_ckan_tag_list_response, monkeypatch):
+        """fetch_tags uses CACHE_TTL_META (86400s) TTL."""
+        from mcp_canada.modules.british_columbia.constants import CACHE_TTL_META
+
+        captured_ttl = {}
+
+        async def fake_cached_fetch_capture(key, ttl, fetcher):
+            captured_ttl["ttl"] = ttl
+            return (await fetcher(), False)
+
+        monkeypatch.setattr(
+            "mcp_canada.modules.british_columbia.client.cached_fetch",
+            fake_cached_fetch_capture,
+        )
+        mock_resp = _make_http_response(sample_ckan_tag_list_response)
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+            await fetch_tags()
+        assert captured_ttl["ttl"] == CACHE_TTL_META
 
 
-class TestWfsFetchShared:
-    """Tests for _wfs_fetch — caching, rate limiting, pagination cap. Plan 03 implements."""
-
-    @pytest.mark.xfail(reason="Plan 03 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+# ---------------------------------------------------------------------------
+# TestQueryableViaWfsDetection
+# ---------------------------------------------------------------------------
 
 
 class TestQueryableViaWfsDetection:
-    """Tests for the queryable_via_wfs derivation logic in fetch_dataset_details.
+    """Unit tests for _compute_queryable_via_wfs helper (synchronous pure logic)."""
 
-    A dataset is WFS-queryable when it has a resource with:
-    - bcdc_type = "geographic"
-    - resource_storage_location containing "bc geographic warehouse"
-    - object_name is not None/empty
+    def test_returns_true_for_bcgw_geographic_with_object_name(self):
+        """Returns (True, object_name) for a BCGW geographic resource."""
+        resources = [
+            {
+                "bcdc_type": "geographic",
+                "resource_storage_location": "bc geographic warehouse",
+                "object_name": "WHSE_LAND_AND_NATURAL_RESOURCE.PROT_CURRENT_FIRE_PNTS_SP",
+            }
+        ]
+        queryable, object_name = _compute_queryable_via_wfs(resources)
+        assert queryable is True
+        assert object_name == "WHSE_LAND_AND_NATURAL_RESOURCE.PROT_CURRENT_FIRE_PNTS_SP"
 
-    Plan 02 implements this logic.
-    """
+    def test_returns_false_when_bcdc_type_is_webservice(self):
+        """bcdc_type=webservice (WMS/KML) does not qualify as WFS-queryable."""
+        resources = [
+            {
+                "bcdc_type": "webservice",
+                "resource_storage_location": "bc geographic warehouse",
+                "object_name": "WHSE_LAND_AND_NATURAL_RESOURCE.SOME_LAYER",
+            }
+        ]
+        queryable, object_name = _compute_queryable_via_wfs(resources)
+        assert queryable is False
+        assert object_name is None
 
-    @pytest.mark.xfail(reason="Plan 02 will implement", strict=False)
-    def test_placeholder(self):
-        assert False
+    def test_returns_false_when_storage_location_is_pub_data_gov_bc_ca(self):
+        """pub.data.gov.bc.ca storage = file download, not WFS queryable."""
+        resources = [
+            {
+                "bcdc_type": "geographic",
+                "resource_storage_location": "pub.data.gov.bc.ca",
+                "object_name": "WHSE_LAND_AND_NATURAL_RESOURCE.SOME_LAYER",
+            }
+        ]
+        queryable, object_name = _compute_queryable_via_wfs(resources)
+        assert queryable is False
+        assert object_name is None
+
+    def test_returns_false_when_storage_location_is_esri_arcgis_online(self):
+        """esri arcgis online storage = ArcGIS REST endpoint, not WFS queryable."""
+        resources = [
+            {
+                "bcdc_type": "geographic",
+                "resource_storage_location": "esri arcgis online",
+                "object_name": "WHSE_LAND_AND_NATURAL_RESOURCE.SOME_LAYER",
+            }
+        ]
+        queryable, object_name = _compute_queryable_via_wfs(resources)
+        assert queryable is False
+        assert object_name is None
+
+    def test_returns_false_when_object_name_is_empty_string_or_missing(self):
+        """Empty string or missing object_name does not qualify for WFS routing."""
+        resources_empty = [
+            {
+                "bcdc_type": "geographic",
+                "resource_storage_location": "bc geographic warehouse",
+                "object_name": "",
+            }
+        ]
+        queryable, _ = _compute_queryable_via_wfs(resources_empty)
+        assert queryable is False
+
+        resources_missing = [
+            {
+                "bcdc_type": "geographic",
+                "resource_storage_location": "bc geographic warehouse",
+            }
+        ]
+        queryable2, _ = _compute_queryable_via_wfs(resources_missing)
+        assert queryable2 is False
+
+    def test_returns_true_with_multiple_resources_if_any_one_matches(self):
+        """Returns (True, object_name) if any resource in the list qualifies."""
+        resources = [
+            {
+                "bcdc_type": "document",
+                "resource_storage_location": "pub.data.gov.bc.ca",
+                "object_name": None,
+            },
+            {
+                "bcdc_type": "geographic",
+                "resource_storage_location": "bc geographic warehouse",
+                "object_name": "WHSE_FOREST_TENURE.FTEN_MANAGED_LICENCE_POLY_SVW",
+            },
+        ]
+        queryable, object_name = _compute_queryable_via_wfs(resources)
+        assert queryable is True
+        assert object_name == "WHSE_FOREST_TENURE.FTEN_MANAGED_LICENCE_POLY_SVW"

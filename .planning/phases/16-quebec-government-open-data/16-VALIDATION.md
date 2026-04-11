@@ -42,9 +42,9 @@ created: 2026-04-11
 |---------|------|------|---------------------|-----------|-------------------|-------------|--------|
 | 16-01-01 | 01 | 1 | quebec module skeleton | unit | `uv run python -c "from mcp_canada.modules import quebec; print(quebec.MODULE_NAME)"` | ✅ | ✅ green |
 | 16-01-02 | 01 | 1 | Wave 0 test stubs collect | unit | `uv run pytest src/mcp_canada/modules/quebec/__tests__/ --collect-only -q` | ✅ | ✅ green |
-| 16-02-01 | 02 | 2 | CKAN client functions | unit | `uv run pytest src/mcp_canada/modules/quebec/__tests__/test_client.py -x` | ❌ W0 | ⬜ pending |
-| 16-02-02 | 02 | 2 | 5 discovery tools | unit | `uv run pytest src/mcp_canada/modules/quebec/__tests__/test_tools.py -x -k "TestQuebecSearch or TestQuebecGet or TestQuebecQuery or TestQuebecList"` | ❌ W0 | ⬜ pending |
-| 16-02-03 | 02 | 2 | TestSharedApiGetContract (Phase 15 lesson) | unit | `uv run pytest src/mcp_canada/modules/quebec/__tests__/test_client.py::TestSharedApiGetContract -x` | ❌ W0 | ⬜ pending |
+| 16-02-01 | 02 | 2 | CKAN client functions | unit | `uv run pytest src/mcp_canada/modules/quebec/__tests__/test_client.py -x` | ✅ | ✅ green |
+| 16-02-02 | 02 | 2 | 5 discovery tools | unit | `uv run pytest src/mcp_canada/modules/quebec/__tests__/test_tools.py -x -k "TestQuebecSearch or TestQuebecGet or TestQuebecQuery or TestQuebecList"` | ✅ | ✅ green |
+| 16-02-03 | 02 | 2 | TestSharedApiGetContract (Phase 15 lesson) | unit | `uv run pytest src/mcp_canada/modules/quebec/__tests__/test_client.py::TestSharedApiGetContract -x` | ✅ | ✅ green |
 | 16-03-01 | 03 | 3 | Health/MSSS curated tools | unit | `uv run pytest src/mcp_canada/modules/quebec/__tests__/test_tools.py::TestQuebecGetHospitals -x` | ❌ W0 | ⬜ pending |
 | 16-03-02 | 03 | 3 | MTQ transport curated tools | unit | `uv run pytest src/mcp_canada/modules/quebec/__tests__/test_tools.py::TestQuebecGetRoadEvents -x` | ❌ W0 | ⬜ pending |
 | 16-04-01 | 04 | 4 | Environment + demographics tools | unit | `uv run pytest src/mcp_canada/modules/quebec/__tests__/test_tools.py -x -k "Air or Water or Population or Parks or Electricity or Forest"` | ❌ W0 | ⬜ pending |

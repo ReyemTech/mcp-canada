@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 16-01-PLAN.md
-last_updated: "2026-04-11T20:19:25.099Z"
+stopped_at: Completed 16-02-PLAN.md
+last_updated: "2026-04-11T21:24:35.552Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 10
   total_plans: 35
-  completed_plans: 32
+  completed_plans: 33
   percent: 0
 ---
 
@@ -174,6 +174,8 @@ Recent decisions affecting current work:
 - [Phase 16-quebec-government-open-data]: MTQ WFS CSV-only: always outputformat=csv — GeoJSON returns HTTP 400 (MapServer json.tmpl missing)
 - [Phase 16-quebec-government-open-data]: DQ metadata French-primary: title/notes French-only, no title_translated; lang affects error messages only
 - [Phase 16-quebec-government-open-data]: SOPFEU/Hydro-Québec deferred: not on DQ CKAN; replaced by road events + electricity production tools
+- [Phase 16]: _api_get return type is Any (not dict[str, Any]): CKAN org/group list returns lists at result level
+- [Phase 16]: group_list for categories: DQ has 10 thematic groups; tag_list returns 4200+ noisy tags
 
 ### Roadmap Evolution
 
@@ -201,6 +203,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-11T20:19:25.096Z
-Stopped at: Completed 16-01-PLAN.md
+Last session: 2026-04-11T21:24:35.451Z
+Stopped at: Completed 16-02-PLAN.md
 Resume file: None

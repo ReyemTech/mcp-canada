@@ -522,23 +522,54 @@ class TestYorkRegionPromptsResources:
 
 @pytest.mark.asyncio
 class TestBcPromptsResources:
-    """BC open data prompts and resources integration scenarios — Wave 0 stubs.
+    """BC open data prompts and resources integration scenarios.
 
-    Plan 04 fills in the actual test implementations once prompts.py and resources.py
-    are populated.
+    Verifies BC prompts and resources are discoverable and readable through the MCP Client layer.
     """
 
-    @pytest.mark.xfail(reason="Plan 04 will implement bc_ prompts", strict=False)
     async def test_bc_prompts_discoverable_via_list_prompts(self, mcp_server):
         """BC prompts (bc_explore_wildfires etc.) appear in prompts/list."""
-        assert False
+        prompts = await list_prompts(mcp_server)
+        names = [p.name for p in prompts]
+        bc_prompts = [n for n in names if n.startswith("bc_")]
+        assert len(bc_prompts) >= 6, (
+            f"Expected >= 6 bc_ prompts, got {len(bc_prompts)}: {sorted(bc_prompts)}"
+        )
+        # Verify all 6 expected prompts are present
+        expected = [
+            "bc_explore_wildfires",
+            "bc_explore_forestry",
+            "bc_explore_environment",
+            "bc_quick_dataset_search",
+            "bc_check_water_quality",
+            "bc_wildfire_status_now",
+        ]
+        for name in expected:
+            assert name in names, (
+                f"Expected bc_ prompt '{name}' not found in prompts/list. "
+                f"bc_ prompts found: {sorted(bc_prompts)}"
+            )
 
-    @pytest.mark.xfail(reason="Plan 04 will implement bc_ resources", strict=False)
     async def test_bc_resources_readable_via_read_resource(self, mcp_server):
         """BC resources (data://bc/*, docs://bc/*, template://bc/*) are readable."""
-        assert False
+        resources = await list_resources(mcp_server)
+        bc_resources = [r for r in resources if "/bc/" in str(r.uri)]
+        assert len(bc_resources) >= 7, (
+            f"Expected >= 7 bc/ resources, got {len(bc_resources)}: "
+            f"{[str(r.uri) for r in bc_resources]}"
+        )
+        # Read each bc/ resource and assert content is non-empty
+        for r in bc_resources:
+            uri = str(r.uri)
+            content = await read_resource(mcp_server, uri)
+            assert content, f"Resource {uri} returned empty content"
+            assert len(content) > 10, f"Resource {uri} content too short: {len(content)} chars"
 
-    @pytest.mark.xfail(reason="Plan 04 will implement docs://bc/wfs-query-guide", strict=False)
     async def test_bc_wfs_query_guide_resource_returns_markdown(self, mcp_server):
-        """docs://bc/wfs-query-guide returns markdown describing the CKAN→WFS two-step workflow."""
-        assert False
+        """docs://bc/wfs-query-guide returns markdown describing the CKAN->WFS two-step workflow."""
+        content = await read_resource(mcp_server, "docs://bc/wfs-query-guide")
+        assert content, "docs://bc/wfs-query-guide returned empty content"
+        assert "CKAN" in content, "WFS query guide must mention CKAN"
+        assert "WFS" in content, "WFS query guide must mention WFS"
+        assert "bc_query_features" in content, "WFS query guide must reference bc_query_features"
+        assert "#" in content, "WFS query guide must be markdown with headings"

@@ -17,9 +17,10 @@
 
 ---
 
-**175 tools, ~69 prompts, and ~96 resources** across **9 federal APIs + 2 provincial APIs + 2 municipal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, York Region ArcGIS Hub data, British Columbia CKAN + WFS geospatial data, and persistent local storage. All bilingual (English/French).
+**175 tools, ~75 prompts, and ~103 resources** across **9 federal APIs + 2 provincial APIs + 2 municipal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, York Region ArcGIS Hub data, British Columbia CKAN + WFS geospatial data, and persistent local storage. All bilingual (English/French).
 
 > **First ArcGIS Hub module** — shared infrastructure in `shared/arcgis_hub.py` is reusable for future Canadian municipal modules (BC, Calgary, Edmonton, and other cities publishing via ArcGIS Hub).
+> **First OGC WFS module** — BC introduces WFS 2.0 (OGC) support via `shared/ogc.py`, making WFS the third portal technology alongside CKAN and ArcGIS Hub. See `docs://bc/wfs-query-guide` for the CKAN→WFS two-step workflow.
 
 
 ## Quick Start
@@ -554,7 +555,7 @@ Provincial datasets from the [BC Data Catalogue](https://catalogue.data.gov.bc.c
 
 ## Prompt Catalog
 
-~69 workflow prompts across 13 modules. Prompts appear as slash-commands in Claude Desktop and other MCP-compatible clients. Discoverable via `client.list_prompts()`.
+~75 workflow prompts across 14 modules. Prompts appear as slash-commands in Claude Desktop and other MCP-compatible clients. Discoverable via `client.list_prompts()`.
 
 All prompts accept `lang: "en" | "fr"`. **Guided workflows** return `list[Message]` (user + assistant roles for multi-step chaining). **Quick lookups** return a single user message with tool invocation instructions.
 
@@ -688,11 +689,22 @@ All prompts accept `lang: "en" | "fr"`. **Guided workflows** return `list[Messag
 | `york_region_quick_dataset_search` | Quick | One-shot search across York Region and municipality portals |
 | `markham_explore_infrastructure` | Guided | Explore Markham civic addresses and SLRN road network |
 
+### 🌲 British Columbia Open Data (6 prompts)
+
+| Prompt | Type | Description |
+|--------|------|-------------|
+| `bc_explore_wildfires` | Guided | Multi-step wildfire analysis — chains `bc_get_active_fires` → `bc_get_fire_perimeters` → `bc_get_wildfire_weather_stations` |
+| `bc_explore_forestry` | Guided | Forestry land use analysis — chains `bc_get_forest_tenure` → `bc_get_cut_blocks` → `bc_get_protected_areas` |
+| `bc_explore_environment` | Guided | Environmental pressure analysis — chains `bc_get_water_wells` → `bc_get_local_parks` → `bc_get_mining_tenure` |
+| `bc_quick_dataset_search` | Quick | Two-step BC dataset discovery: CKAN search → WFS queryability check |
+| `bc_check_water_quality` | Quick | Retrieve BC groundwater well records by city, well class, or aquifer ID |
+| `bc_wildfire_status_now` | Quick | Get current active wildfire status filtered by urgency or fire centre |
+
 ---
 
 ## Resource Catalog
 
-~96 reference resources across 13 modules. Resources provide instant context without tool calls — agents can read them without consuming API rate limits. Discoverable via `client.list_resources()`.
+~103 reference resources across 14 modules. Resources provide instant context without tool calls — agents can read them without consuming API rate limits. Discoverable via `client.list_resources()`.
 
 **URI scheme conventions:**
 - `data://` — JSON catalogs (machine-parseable key→value mappings)
@@ -855,6 +867,18 @@ All prompts accept `lang: "en" | "fr"`. **Guided workflows** return `list[Messag
 | `docs://york_region/census-variables` | Guide | 2021 Census focused field set (10 columns), CSDNAME filter, full 364-field access |
 | `docs://york_region/arcgis-query-patterns` | Guide | ArcGIS SQL WHERE clause syntax — LIKE, case sensitivity, quoting, 1=1 pattern |
 | `template://york_region/transit-query-response` | Template | YRT/Viva transit results with `{stop_name}`, `{route_short_name}`, `{wheelchair_boarding}` |
+
+### 🌲 British Columbia Open Data (7 resources)
+
+| URI | Type | Description |
+|-----|------|-------------|
+| `data://bc/ministries` | Catalog | BC ministry and agency CKAN org slugs with bilingual names and descriptions |
+| `data://bc/wildfire-status-codes` | Catalog | FIRE_STATUS codes (Active, Out of Control, Being Held, etc.) + FIRE_CAUSE codes with bilingual labels |
+| `data://bc/object-name-prefixes` | Catalog | All 10 WHSE schema prefixes + 15 curated mcp-canada layer `object_name` mappings |
+| `docs://bc/wfs-query-guide` | Guide | CKAN→WFS two-step workflow, CQL syntax primer, pagination notes (bilingual) |
+| `docs://bc/bcdc-api-quirks` | Guide | BCDC custom fields (bcdc_type, object_name), queryable_via_wfs derivation, no-groups quirk |
+| `template://bc/wildfire-report` | Template | Wildfire season report with `{fire_season}`, `{total_active_fires}`, `{largest_fire}`, centre breakdown |
+| `template://bc/dataset-report` | Template | Dataset exploration report with `{object_name}`, `{queryable_via_wfs}`, `{sample_data}` |
 
 ---
 

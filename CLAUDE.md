@@ -61,6 +61,18 @@ Every module in `src/mcp_canada/modules/{name}/`:
 - `rate_limiter.py` — `get_limiter(source, rate)` per-source TokenBucket
 - `http.py` — `api_get(url, params, headers)` with retry on 429/5xx
 - `i18n.py` — `t(key, lang)` bilingual error messages
+- `arcgis_hub.py` — ArcGIS Hub FeatureServer client (Phase 14: York Region and other ArcGIS Hub portals)
+- `ogc.py` — OGC WFS 2.0 client (Phase 15: BC Geographic Warehouse; reuse for Quebec and other provinces with WFS portals)
+
+### Portal Technologies (3)
+
+| Technology | Client | First used | Pattern |
+|-----------|--------|------------|---------|
+| **CKAN** | `shared/http.py` + per-module `_api_get` | Federal CKAN, Ontario, Toronto, BC CKAN | `BASE_URL + /api/3/action/` |
+| **ArcGIS Hub** | `shared/arcgis_hub.py` | Phase 14: York Region | FeatureServer `query` endpoint |
+| **OGC WFS 2.0** | `shared/ogc.py` | Phase 15: British Columbia | `GetFeature` with CQL_FILTER; two-step CKAN→WFS workflow |
+
+**BC two-step CKAN→WFS workflow:** Discover datasets via `bc_search_datasets` (CKAN) → get `object_name` + `queryable_via_wfs` via `bc_get_dataset_details` → query geospatial features via `bc_query_features` (WFS). See `docs://bc/wfs-query-guide` resource for full CQL syntax and examples.
 
 ## Core Rules
 

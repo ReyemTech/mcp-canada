@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 15-04-PLAN.md
-last_updated: "2026-04-11T01:49:33.986Z"
+stopped_at: Completed 15-05-PLAN.md
+last_updated: "2026-04-11T04:26:11.313Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 10
-  total_plans: 30
-  completed_plans: 30
+  total_plans: 31
+  completed_plans: 31
   percent: 0
 ---
 
@@ -80,6 +80,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 15-british-columbia-government-open-data P02 | 5min | 2 tasks | 5 files |
 | Phase 15-british-columbia-government-open-data P03 | 45min | 2 tasks | 5 files |
 | Phase 15-british-columbia-government-open-data P04 | 10min | 2 tasks | 7 files |
+| Phase 15-british-columbia-government-open-data P05 | 7min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -166,6 +167,8 @@ Recent decisions affecting current work:
 - [Phase Phase 15]: bc_quick_dataset_search and bc_wildfire_status_now are parameter-free quick lookups (return str instructions) — agents supply their own parameters; contrast with york_region_quick_dataset_search which takes query:str
 - [Phase Phase 15]: BC resources.py uses async def for consistency with York Region pattern — both async and sync def work with FastMCP FunctionResource
 - [Phase Phase 15]: WFS/OGC documented as third portal technology in CLAUDE.md alongside CKAN and ArcGIS Hub — shared/ogc.py reusable for Quebec and other provinces
+- [Phase 15-british-columbia-government-open-data]: BC _api_get fix: treat shared api_get return as parsed dict; drop .raise_for_status()/.json(); check envelope.get('success') directly
+- [Phase 15-british-columbia-government-open-data]: Water wells bilingual guard: inline lang=='en' ternary (not t() import) — matches prompts.py convention, avoids first t() production import for one-off message
 
 ### Roadmap Evolution
 
@@ -193,6 +196,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-11T01:20:12.501Z
-Stopped at: Completed 15-04-PLAN.md
+Last session: 2026-04-11T04:26:11.310Z
+Stopped at: Completed 15-05-PLAN.md
 Resume file: None

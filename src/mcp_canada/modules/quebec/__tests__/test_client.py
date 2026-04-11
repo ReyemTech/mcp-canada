@@ -253,33 +253,101 @@ class TestFetchQueryDataset:
 
 
 class TestFetchHealthInstallations:
-    async def test_returns_installation_list(self):
-        pytest.skip("Plan 03")
+    async def test_returns_installation_list(self, sample_datastore_installations_response):
+        with patch(
+            "mcp_canada.modules.quebec.client._datastore_get",
+            new=AsyncMock(return_value=sample_datastore_installations_response["result"]),
+        ):
+            result, was_cached = await q_client.fetch_health_installations()
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0].instal_name == "Hôpital de Chicoutimi"
+        assert result[0].is_chsgs is True
+        assert result[0].is_clsc is False
 
-    async def test_filters_by_clsc_flag(self):
-        pytest.skip("Plan 03")
+    async def test_filters_by_clsc_flag(self, sample_datastore_installations_response):
+        sample = dict(sample_datastore_installations_response)
+        sample["result"]["records"][0]["CLSC"] = "Oui"
+        sample["result"]["records"][0]["CHSGS"] = "Non"
+        mock_ds = AsyncMock(return_value=sample["result"])
+        with patch(
+            "mcp_canada.modules.quebec.client._datastore_get",
+            new=mock_ds,
+        ):
+            result, _ = await q_client.fetch_health_installations(instal_type="CLSC")
+        assert mock_ds.call_args.args[0] == "2aa06e66-c1d0-4e2f-bf3c-c2e413c3f84d"
+        # The second arg (params) should include filters for CLSC
+        params = mock_ds.call_args.args[1]
+        assert "filters" in params
+        assert "CLSC" in params["filters"]
+        assert result[0].is_clsc is True
 
-    async def test_filters_by_hospital_flag(self):
-        pytest.skip("Plan 03")
+    async def test_filters_by_hospital_flag(self, sample_datastore_installations_response):
+        mock_ds = AsyncMock(return_value=sample_datastore_installations_response["result"])
+        with patch(
+            "mcp_canada.modules.quebec.client._datastore_get",
+            new=mock_ds,
+        ):
+            await q_client.fetch_health_installations(instal_type="CHSGS")
+        params = mock_ds.call_args.args[1]
+        assert "CHSGS" in params.get("filters", "")
 
-    async def test_filters_by_region(self):
-        pytest.skip("Plan 03")
+    async def test_filters_by_region(self, sample_datastore_installations_response):
+        mock_ds = AsyncMock(return_value=sample_datastore_installations_response["result"])
+        with patch(
+            "mcp_canada.modules.quebec.client._datastore_get",
+            new=mock_ds,
+        ):
+            await q_client.fetch_health_installations(rss_name="Montréal")
+        params = mock_ds.call_args.args[1]
+        assert "RSS_NOM" in params.get("filters", "")
 
 
 class TestFetchErWaitTimes:
-    async def test_returns_116_rows(self):
-        pytest.skip("Plan 03")
+    async def test_returns_116_rows(self, sample_datastore_er_response):
+        with patch(
+            "mcp_canada.modules.quebec.client._datastore_get",
+            new=AsyncMock(return_value=sample_datastore_er_response["result"]),
+        ):
+            result, _ = await q_client.fetch_er_wait_times()
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert result[0].installation == "Hôpital de Rimouski"
+        assert result[0].functional_stretchers == 20
+        assert result[0].patients_over_24h == 3
 
-    async def test_optional_q_filter(self):
-        pytest.skip("Plan 03")
+    async def test_optional_q_filter(self, sample_datastore_er_response):
+        mock_ds = AsyncMock(return_value=sample_datastore_er_response["result"])
+        with patch(
+            "mcp_canada.modules.quebec.client._datastore_get",
+            new=mock_ds,
+        ):
+            await q_client.fetch_er_wait_times(installation="Rimouski")
+        params = mock_ds.call_args.args[1]
+        assert params.get("q") == "Rimouski"
 
 
 class TestFetchPopulationByMunicipality:
-    async def test_parses_mamh_csv(self):
-        pytest.skip("Plan 03")
+    async def test_parses_mamh_csv(self, sample_mamh_municipalities_csv):
+        with patch(
+            "mcp_canada.modules.quebec.client.fetch_and_parse",
+            new=AsyncMock(return_value=(sample_mamh_municipalities_csv, False)),
+        ):
+            result, _ = await q_client.fetch_population_by_municipality()
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert result[0].municipality == "Montréal"
+        assert result[0].population == 1762949
+        assert result[0].admin_region == "06"
 
-    async def test_region_filter(self):
-        pytest.skip("Plan 03")
+    async def test_region_filter(self, sample_mamh_municipalities_csv):
+        with patch(
+            "mcp_canada.modules.quebec.client.fetch_and_parse",
+            new=AsyncMock(return_value=(sample_mamh_municipalities_csv, False)),
+        ):
+            result, _ = await q_client.fetch_population_by_municipality(region="03")
+        assert len(result) == 1
+        assert result[0].municipality == "Québec"
 
 
 # ---------------------------------------------------------------------------
@@ -289,37 +357,143 @@ class TestFetchPopulationByMunicipality:
 
 class TestFetchRoadConditions:
     async def test_parses_conditions_csv(self):
-        pytest.skip("Plan 03")
+        sample_rows = [
+            {
+                "NumeroSegment": "12345",
+                "NumeroRoute": "40",
+                "NomRoute": "Autoroute 40",
+                "NomRegion": "Montréal",
+                "DescriptionEtatChausseeEN": "Good",
+                "DescriptionEtatChausseeFR": "Bon",
+                "DescriptionVisibiliteEN": "Clear",
+                "DescriptionVisibiliteFR": "Dégagé",
+                "IndicateurPresenceLamesNeige": "Non",
+                "DateEtHeureCondition": "2026-04-11 08:00",
+            }
+        ]
+        with patch(
+            "mcp_canada.modules.quebec.client.fetch_and_parse",
+            new=AsyncMock(return_value=(sample_rows, False)),
+        ):
+            result, _ = await q_client.fetch_road_conditions(lang="en")
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["pavement_status"] == "Good"
+        assert result[0]["route_num"] == "40"
 
-    async def test_optional_route_filter(self):
-        pytest.skip("Plan 03")
+    async def test_bilingual_column_fr(self):
+        sample_rows = [
+            {
+                "NumeroSegment": "12345",
+                "NumeroRoute": "40",
+                "NomRoute": "Autoroute 40",
+                "NomRegion": "Montréal",
+                "DescriptionEtatChausseeEN": "Good",
+                "DescriptionEtatChausseeFR": "Bon",
+                "DescriptionVisibiliteEN": "Clear",
+                "DescriptionVisibiliteFR": "Dégagé",
+                "IndicateurPresenceLamesNeige": "Non",
+                "DateEtHeureCondition": "2026-04-11 08:00",
+            }
+        ]
+        with patch(
+            "mcp_canada.modules.quebec.client.fetch_and_parse",
+            new=AsyncMock(return_value=(sample_rows, False)),
+        ):
+            result, _ = await q_client.fetch_road_conditions(lang="fr")
+        assert result[0]["pavement_status"] == "Bon"
+
+    async def test_returns_empty_on_parse_error(self):
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.fetch_and_parse",
+                new=AsyncMock(side_effect=Exception("WFS endpoint down")),
+            ):
+                result, _ = await q_client.fetch_road_conditions()
+        assert result == []
 
 
 class TestFetchRoadWorks:
-    async def test_parses_mtq_wfs_csv(self):
-        pytest.skip("Plan 03")
+    async def test_parses_mtq_wfs_csv(self, sample_mtq_road_works_csv):
+        with patch(
+            "mcp_canada.modules.quebec.client.fetch_and_parse",
+            new=AsyncMock(return_value=(sample_mtq_road_works_csv, False)),
+        ):
+            result, _ = await q_client.fetch_road_works(lang="fr")
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0].route == "A-25"
+        assert result[0].description == "Fermeture d'une voie sens nord entre km 7 et km 9."
 
-    async def test_optional_route_filter(self):
-        pytest.skip("Plan 03")
+    async def test_bilingual_description_en(self, sample_mtq_road_works_csv):
+        with patch(
+            "mcp_canada.modules.quebec.client.fetch_and_parse",
+            new=AsyncMock(return_value=(sample_mtq_road_works_csv, False)),
+        ):
+            result, _ = await q_client.fetch_road_works(lang="en")
+        assert result[0].description == "One lane closed northbound between km 7 and km 9."
 
 
 class TestFetchRoadEvents:
-    async def test_parses_evenements_csv(self):
-        pytest.skip("Plan 03")
+    async def test_parses_evenements_csv(self, sample_mtq_road_events_csv):
+        with patch(
+            "mcp_canada.modules.quebec.client.fetch_and_parse",
+            new=AsyncMock(return_value=(sample_mtq_road_events_csv, False)),
+        ):
+            result, _ = await q_client.fetch_road_events()
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0].route == "A-40"
+        assert result[0].cause == "Collision"
+        assert result[0].municipality == "Montréal"
 
 
 class TestFetchBridgeStructures:
-    async def test_returns_bridge_rows(self):
-        pytest.skip("Plan 03")
+    async def test_returns_bridge_rows(self, sample_mtq_bridges_csv):
+        with patch(
+            "mcp_canada.modules.quebec.client.fetch_and_parse",
+            new=AsyncMock(return_value=(sample_mtq_bridges_csv, False)),
+        ):
+            result, _ = await q_client.fetch_bridge_structures(route="10")
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0].structure_id == "S-12345"
+        assert result[0].route_num == "10"
+        assert result[0].municipality == "Granby"
 
     async def test_requires_at_least_one_filter(self):
-        pytest.skip("Plan 03")
+        # The filter guard is in the TOOL (not client) — client can be called without filters
+        # but returns empty if nothing matches (test that it doesn't error without filters)
+        with patch(
+            "mcp_canada.modules.quebec.client.fetch_and_parse",
+            new=AsyncMock(return_value=([], False)),
+        ):
+            result, _ = await q_client.fetch_bridge_structures()
+        assert result == []
 
-    async def test_route_filter(self):
-        pytest.skip("Plan 03")
+    async def test_route_filter(self, sample_mtq_bridges_csv):
+        with patch(
+            "mcp_canada.modules.quebec.client.fetch_and_parse",
+            new=AsyncMock(return_value=(sample_mtq_bridges_csv, False)),
+        ):
+            result_match, _ = await q_client.fetch_bridge_structures(route="10")
+            result_no_match, _ = await q_client.fetch_bridge_structures(route="999")
+        assert len(result_match) == 1
+        assert len(result_no_match) == 0
 
-    async def test_municipality_filter(self):
-        pytest.skip("Plan 03")
+    async def test_municipality_filter(self, sample_mtq_bridges_csv):
+        with patch(
+            "mcp_canada.modules.quebec.client.fetch_and_parse",
+            new=AsyncMock(return_value=(sample_mtq_bridges_csv, False)),
+        ):
+            result, _ = await q_client.fetch_bridge_structures(municipality="Granby")
+        assert len(result) == 1
+        assert result[0].municipality == "Granby"
 
 
 # ---------------------------------------------------------------------------

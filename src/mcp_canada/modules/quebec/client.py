@@ -33,18 +33,33 @@ from mcp_canada.shared.rate_limiter import get_limiter
 
 from .constants import (
     BASE_URL,
+    CACHE_TTL_ACTIVE,
+    CACHE_TTL_DAILY,
     CACHE_TTL_META,
     CACHE_TTL_SEARCH,
     DEFAULT_HEADERS,
+    MAMH_MUN_CSV_URL,
+    MSSS_ER_RESOURCE_ID,
+    MSSS_INSTALLATIONS_RESOURCE_ID,
+    MTQ_BRIDGES_URL,
+    MTQ_ROAD_CONDITIONS_URL,
+    MTQ_ROAD_EVENTS_URL,
+    MTQ_ROAD_WORKS_URL,
     RATE_GROUP,
     RATE_LIMIT,
 )
 from .schemas import (
+    QuebecBridgeStructure,
     QuebecCategory,
     QuebecDatasetDetails,
     QuebecDatasetSummary,
+    QuebecErWaitRow,
+    QuebecHealthInstallation,
     QuebecOrganization,
+    QuebecPopulationRow,
     QuebecResource,
+    QuebecRoadEvent,
+    QuebecRoadWork,
 )
 
 __all__ = [
@@ -78,7 +93,7 @@ _limiter = get_limiter(RATE_GROUP, RATE_LIMIT)
 # ---------------------------------------------------------------------------
 
 
-async def _api_get(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+async def _api_get(path: str, params: dict[str, Any] | None = None) -> Any:
     """Quebec CKAN envelope unwrap helper.
 
     CRITICAL: shared api_get already returns PARSED JSON (dict). NEVER call
@@ -90,7 +105,8 @@ async def _api_get(path: str, params: dict[str, Any] | None = None) -> dict[str,
         params: Optional query parameters.
 
     Returns:
-        The unwrapped CKAN result field (dict or list wrapped in a dict).
+        The unwrapped CKAN result field (dict for package_search/package_show,
+        list for organization_list/group_list/tag_list).
 
     Raises:
         httpx.HTTPStatusError: When CKAN returns success=False or api_get returns non-dict.
@@ -129,7 +145,7 @@ def _flatten_dataset_summary(raw: dict[str, Any]) -> QuebecDatasetSummary:
         organization_slug=org.get("name") if isinstance(org, dict) else None,
         organization_title=org.get("title") if isinstance(org, dict) else None,
         groups=[
-            g.get("name")
+            str(g.get("name"))
             for g in (raw.get("groups") or [])
             if isinstance(g, dict) and g.get("name")
         ],
@@ -307,95 +323,318 @@ async def fetch_query_dataset(
 
 
 # ---------------------------------------------------------------------------
-# Health / MSSS — Plan 03 fills bodies
+# Health / MSSS — Plan 03
 # ---------------------------------------------------------------------------
+
+_INSTAL_TYPE_COLUMN = {
+    "CLSC": "CLSC",
+    "CHSGS": "CHSGS",
+    "CHSLD": "CHSLD",
+    "CHPSY": "CHPSY",
+}
+
+
+def _safe_float(v: Any) -> float | None:
+    try:
+        return float(v) if v not in (None, "", "null") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_int(v: Any) -> int | None:
+    try:
+        return int(v) if v not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _yes_no_to_bool(v: Any) -> bool:
+    return str(v).strip().lower() == "oui"
+
+
+def _flatten_installation(r: dict[str, Any]) -> QuebecHealthInstallation:
+    return QuebecHealthInstallation(
+        instal_code=r.get("INSTAL_COD"),
+        instal_name=r.get("INSTAL_NOM"),
+        etab_name=r.get("ETAB_NOM"),
+        rss_name=r.get("RSS_NOM"),
+        mrc_name=r.get("MRC_NOM"),
+        municipality=r.get("MUN_NOM"),
+        address=r.get("ADRESSE"),
+        postal_code=r.get("CODE_POSTA"),
+        latitude=_safe_float(r.get("LATITUDE")),
+        longitude=_safe_float(r.get("LONGITUDE")),
+        is_clsc=_yes_no_to_bool(r.get("CLSC")),
+        is_chsgs=_yes_no_to_bool(r.get("CHSGS")),
+        is_chsld=_yes_no_to_bool(r.get("CHSLD")),
+        is_chpsy=_yes_no_to_bool(r.get("CHPSY")),
+        date_updated=r.get("DATE_MAJ"),
+    )
 
 
 async def fetch_health_installations(
-    installation_type: str | None = None,
-    region: str | None = None,
-    limit: int = 100,
-    offset: int = 0,
-) -> tuple[list[dict[str, Any]], bool]:
-    """MSSS health installations via datastore_search — Plan 03 implements.
+    instal_type: str | None = None,
+    rss_name: str | None = None,
+    limit: int = 200,
+) -> tuple[list[QuebecHealthInstallation], bool]:
+    """MSSS health installations via datastore_search.
 
-    installation_type: 'clsc', 'hospital', 'chsld', 'chpsy', or None for all.
+    instal_type: One of CLSC, CHSGS, CHSLD, CHPSY. None returns all types.
+    rss_name: Optional health region (RSS) name filter.
+    limit: Max rows (default 200, max 2000).
     """
-    raise NotImplementedError("Plan 03 implements fetch_health_installations")
+    cache_key = f"quebec:msss:installations:{instal_type}:{rss_name}:{limit}"
+
+    async def _fetch() -> list[QuebecHealthInstallation]:
+        import json
+
+        params: dict[str, Any] = {"limit": limit}
+        filters: dict[str, Any] = {}
+        if instal_type and instal_type.upper() in _INSTAL_TYPE_COLUMN:
+            filters[_INSTAL_TYPE_COLUMN[instal_type.upper()]] = "Oui"
+        if rss_name:
+            filters["RSS_NOM"] = rss_name
+        if filters:
+            params["filters"] = json.dumps(filters)
+        result = await _datastore_get(MSSS_INSTALLATIONS_RESOURCE_ID, params)
+        return [_flatten_installation(r) for r in (result.get("records") or [])]
+
+    return await cached_fetch(cache_key, CACHE_TTL_DAILY, _fetch)
+
+
+def _flatten_er_row(r: dict[str, Any]) -> QuebecErWaitRow:
+    return QuebecErWaitRow(
+        establishment=r.get("Nom_etablissement"),
+        installation=r.get("Nom_installation"),
+        functional_stretchers=_safe_int(r.get("Nombre_de_civieres_fonctionnelles")),
+        occupied_stretchers=_safe_int(r.get("Nombre_de_civieres_occupees")),
+        patients_over_24h=_safe_int(
+            r.get("Nombre_de_patients_sur_civiere_plus_de_24_heures")
+        ),
+        patients_over_48h=_safe_int(
+            r.get("Nombre_de_patients_sur_civiere_plus_de_48_heures")
+        ),
+        extraction_time=(
+            r.get("Heure_de_l'extraction_(image)") or r.get("Heure_de_l_extraction")
+        ),
+        last_updated=r.get("Mise_a_jour"),
+    )
 
 
 async def fetch_er_wait_times(
-    q: str | None = None,
-) -> tuple[list[dict[str, Any]], bool]:
-    """MSSS ER hourly wait times via datastore_search — Plan 03 implements.
+    installation: str | None = None,
+    limit: int = 200,
+) -> tuple[list[QuebecErWaitRow], bool]:
+    """MSSS ER hourly situation via datastore_search.
 
-    116 rows (one per ER department), updated hourly.
+    installation: Full-text search on installation name (e.g. "Rimouski").
+    116 rows total (one per hospital ER), updated hourly.
     """
-    raise NotImplementedError("Plan 03 implements fetch_er_wait_times")
+    cache_key = f"quebec:msss:er:{installation}:{limit}"
+
+    async def _fetch() -> list[QuebecErWaitRow]:
+        params: dict[str, Any] = {"limit": limit}
+        if installation:
+            params["q"] = installation
+        result = await _datastore_get(MSSS_ER_RESOURCE_ID, params)
+        return [_flatten_er_row(r) for r in (result.get("records") or [])]
+
+    return await cached_fetch(cache_key, CACHE_TTL_ACTIVE, _fetch)
+
+
+def _flatten_population_row(r: dict[str, Any]) -> QuebecPopulationRow:
+    return QuebecPopulationRow(
+        mcode=r.get("mcode"),
+        municipality=r.get("munnom"),
+        admin_region=r.get("regadm"),
+        mrc=r.get("mrc"),
+        population=_safe_int(r.get("mpopul")),
+        area_km2=_safe_float(r.get("msuperf")),
+        municipal_type=r.get("mcodedesi"),
+        mayor=r.get("mayor"),
+    )
 
 
 async def fetch_population_by_municipality(
     region: str | None = None,
-) -> tuple[list[dict[str, Any]], bool]:
-    """MAMH municipality registry via fetch_and_parse(MAMH_MUN_CSV_URL) — Plan 03 implements.
+    limit: int | None = None,
+) -> tuple[list[QuebecPopulationRow], bool]:
+    """MAMH municipality registry via fetch_and_parse(MAMH_MUN_CSV_URL).
 
     1,282 rows. Optional region filter on regadm (administrative region code).
     """
-    raise NotImplementedError("Plan 03 implements fetch_population_by_municipality")
+    cache_key = f"quebec:mamh:pop:{region}:{limit}"
+
+    async def _fetch() -> list[QuebecPopulationRow]:
+        rows, _ = await fetch_and_parse(MAMH_MUN_CSV_URL, ttl=CACHE_TTL_DAILY)
+        out: list[QuebecPopulationRow] = []
+        for r in rows:
+            if region and str(r.get("regadm", "")).strip() != region.strip():
+                continue
+            out.append(_flatten_population_row(r))
+            if limit is not None and len(out) >= limit:
+                break
+        return out
+
+    return await cached_fetch(cache_key, CACHE_TTL_DAILY, _fetch)
 
 
 # ---------------------------------------------------------------------------
-# Transport / MTQ — Plan 03 fills bodies
+# Transport / MTQ — Plan 03
 # ---------------------------------------------------------------------------
 
 
 async def fetch_road_conditions(
-    route: str | None = None,
-    region: str | None = None,
-    limit: int = 200,
+    lang: str = "en",
 ) -> tuple[list[dict[str, Any]], bool]:
-    """MTQ road conditions via WFS CSV (ms:conditions_routieres) — Plan 03 implements.
+    """MTQ winter road conditions via WFS CSV (ms:conditions_routieres).
 
-    LOW confidence on live WFS for this layer — test during implementation.
+    LOW confidence on live WFS for this layer (research flagged). If endpoint
+    returns HTTP 400 or errors, returns empty list gracefully.
     Bilingual columns: DescriptionEtatChausseeFR/EN, DescriptionVisibiliteFR/EN.
     """
-    raise NotImplementedError("Plan 03 implements fetch_road_conditions")
+    cache_key = f"quebec:mtq:road_cond:{lang}"
+
+    async def _fetch() -> list[dict[str, Any]]:
+        try:
+            rows, _ = await fetch_and_parse(MTQ_ROAD_CONDITIONS_URL, ttl=CACHE_TTL_ACTIVE)
+        except Exception:
+            return []
+        desc_col = "DescriptionEtatChausseeFR" if lang == "fr" else "DescriptionEtatChausseeEN"
+        vis_col = "DescriptionVisibiliteFR" if lang == "fr" else "DescriptionVisibiliteEN"
+        out = []
+        for r in rows:
+            out.append({
+                "segment_id": r.get("NumeroSegment"),
+                "route_num": r.get("NumeroRoute"),
+                "route_name": r.get("NomRoute"),
+                "region": r.get("NomRegion"),
+                "pavement_status": r.get(desc_col),
+                "visibility": r.get(vis_col),
+                "has_snow_presence": r.get("IndicateurPresenceLamesNeige"),
+                "timestamp": r.get("DateEtHeureCondition"),
+            })
+        return out
+
+    return await cached_fetch(cache_key, CACHE_TTL_ACTIVE, _fetch)
+
+
+def _flatten_road_work(r: dict[str, Any], lang: str) -> QuebecRoadWork:
+    desc = r.get("descriptionFrancais") if lang == "fr" else r.get("descriptionAnglais")
+    return QuebecRoadWork(
+        identifier=r.get("identifiant"),
+        chantier_id=r.get("identifiantChantier"),
+        route=r.get("routeAutoroute"),
+        obstruction_type=r.get("entraveType"),
+        start=r.get("debut"),
+        end=r.get("fin"),
+        updated=r.get("miseAJour"),
+        work_description=r.get("identificationDesTravaux"),
+        location=r.get("localisation"),
+        direction=r.get("direction"),
+        description=desc,
+    )
 
 
 async def fetch_road_works(
-    route: str | None = None,
-    limit: int = 200,
-) -> tuple[list[dict[str, Any]], bool]:
-    """MTQ active road construction zones via WFS CSV (ms:chantiers_mtmdet) — Plan 03 implements.
+    lang: str = "en",
+) -> tuple[list[QuebecRoadWork], bool]:
+    """MTQ active road construction zones via WFS CSV (ms:chantiers_mtmdet).
 
     Confirmed working. Bilingual: descriptionFrancais / descriptionAnglais.
     """
-    raise NotImplementedError("Plan 03 implements fetch_road_works")
+    cache_key = f"quebec:mtq:road_works:{lang}"
+
+    async def _fetch() -> list[QuebecRoadWork]:
+        rows, _ = await fetch_and_parse(MTQ_ROAD_WORKS_URL, ttl=CACHE_TTL_ACTIVE)
+        return [_flatten_road_work(r, lang) for r in rows]
+
+    return await cached_fetch(cache_key, CACHE_TTL_ACTIVE, _fetch)
 
 
-async def fetch_road_events(
-    route: str | None = None,
-    limit: int = 200,
-) -> tuple[list[dict[str, Any]], bool]:
-    """MTQ active road events/warnings via WFS CSV (ms:evenements) — Plan 03 implements.
+def _flatten_road_event(r: dict[str, Any]) -> QuebecRoadEvent:
+    return QuebecRoadEvent(
+        identifier=r.get("identifiant"),
+        obstruction=r.get("entrave"),
+        route=r.get("numeroRoute"),
+        location=r.get("localisation"),
+        direction=r.get("direction"),
+        municipality=r.get("municipalite"),
+        duration=r.get("duree"),
+        cause=r.get("cause"),
+        consequence=r.get("consequence"),
+        detour=r.get("detour"),
+        regions=r.get("regions"),
+        active_since=r.get("enVigueurDepuis"),
+    )
+
+
+async def fetch_road_events() -> tuple[list[QuebecRoadEvent], bool]:
+    """MTQ active road events/warnings via WFS CSV (ms:evenements).
 
     French-only columns in this CSV — no English equivalent available.
     """
-    raise NotImplementedError("Plan 03 implements fetch_road_events")
+    cache_key = "quebec:mtq:road_events"
+
+    async def _fetch() -> list[QuebecRoadEvent]:
+        rows, _ = await fetch_and_parse(MTQ_ROAD_EVENTS_URL, ttl=CACHE_TTL_ACTIVE)
+        return [_flatten_road_event(r) for r in rows]
+
+    return await cached_fetch(cache_key, CACHE_TTL_ACTIVE, _fetch)
+
+
+def _flatten_bridge(r: dict[str, Any]) -> QuebecBridgeStructure:
+    return QuebecBridgeStructure(
+        structure_id=r.get("ide_strct"),
+        dossier_num=r.get("num_dossr"),
+        year=_safe_int(r.get("val_annee_")),
+        status_code=r.get("code_des_s"),
+        route_name=r.get("nom_route"),
+        obstacle=r.get("nom_obstc"),
+        municipality=r.get("nom_muncp"),
+        municipality_code=r.get("cod_muncp"),
+        structure_name=r.get("nom_strct"),
+        route_num=r.get("num_route"),
+        latitude=_safe_float(r.get("geo_lattd")),
+        longitude=_safe_float(r.get("geo_longt")),
+        length=_safe_float(r.get("val_longr")),
+        width=_safe_float(r.get("val_largr_")),
+        structure_type=r.get("cod_type_s"),
+    )
 
 
 async def fetch_bridge_structures(
     route: str | None = None,
     municipality: str | None = None,
-    structure_type: str | None = None,
-    limit: int = 500,
-) -> tuple[list[dict[str, Any]], bool]:
-    """MTQ bridge inventory via WFS CSV (ms:gsq_v_desc_strct_tri) — Plan 03 implements.
+    region: str | None = None,
+    limit: int = 100,
+) -> tuple[list[QuebecBridgeStructure], bool]:
+    """MTQ bridge inventory via WFS CSV (ms:gsq_v_desc_strct_tri).
 
-    ~50K+ structures. At least one filter REQUIRED to avoid unbounded response.
-    Use same guard pattern as bc_get_water_wells.
+    ~50K+ structures. At least one filter REQUIRED (enforced in the @tool layer)
+    to avoid unbounded response. Post-parse filter since MTQ WFS CSV has no
+    server-side filter params.
     """
-    raise NotImplementedError("Plan 03 implements fetch_bridge_structures")
+    cache_key = f"quebec:mtq:bridges:{route}:{municipality}:{region}:{limit}"
+
+    async def _fetch() -> list[QuebecBridgeStructure]:
+        rows, _ = await fetch_and_parse(MTQ_BRIDGES_URL, ttl=CACHE_TTL_META)
+        out: list[QuebecBridgeStructure] = []
+        for r in rows:
+            if route and str(r.get("num_route", "")).strip() != route.strip():
+                continue
+            if municipality and municipality.lower() not in str(
+                r.get("nom_muncp", "")
+            ).lower():
+                continue
+            if region and region.lower() not in str(r.get("nom_route", "")).lower():
+                continue
+            out.append(_flatten_bridge(r))
+            if len(out) >= limit:
+                break
+        return out
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 # ---------------------------------------------------------------------------

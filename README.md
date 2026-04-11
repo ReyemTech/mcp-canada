@@ -17,7 +17,7 @@
 
 ---
 
-**175 tools, ~75 prompts, and ~103 resources** across **9 federal APIs + 2 provincial APIs + 2 municipal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, York Region ArcGIS Hub data, British Columbia CKAN + WFS geospatial data, and persistent local storage. All bilingual (English/French).
+**187 tools, ~75 prompts, and ~103 resources** across **9 federal APIs + 3 provincial APIs + 2 municipal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, York Region ArcGIS Hub data, British Columbia CKAN + WFS geospatial data, and persistent local storage. All bilingual (English/French).
 
 > **First ArcGIS Hub module** — shared infrastructure in `shared/arcgis_hub.py` is reusable for future Canadian municipal modules (BC, Calgary, Edmonton, and other cities publishing via ArcGIS Hub).
 > **First OGC WFS module** — BC introduces WFS 2.0 (OGC) support via `shared/ogc.py`, making WFS the third portal technology alongside CKAN and ArcGIS Hub. See `docs://bc/wfs-query-guide` for the CKAN→WFS two-step workflow.
@@ -550,6 +550,38 @@ Provincial datasets from the [BC Data Catalogue](https://catalogue.data.gov.bc.c
 | `bc_get_road_structures` | Fetch BC road structure (bridge, tunnel, overpass) records from BCGW. | `structure_type`, `max_records`, `include_geometry` |
 | `bc_get_climate_stations` | Fetch BC climate monitoring station locations from BCGW. | `station_name`, `max_records`, `include_geometry` |
 <!-- CATALOG:bc_curated:end -->
+
+---
+
+### 🏛️ Quebec (Données Québec) Open Data — 12 tools
+
+Provincial datasets from [Données Québec](https://www.donneesquebec.ca) — a federated CKAN instance with 1,593 datasets across 139 organizations (provincial ministries, municipalities, and parastatal entities like Hydro-Québec). All metadata is French-primary.
+
+#### Discovery (5)
+
+<!-- CATALOG:quebec_discovery:start -->
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `quebec_search_datasets` | Search the Données Québec open data catalogue (1,593 datasets, 139 orgs). | `q`, `rows`, `start`, `organization`, `group` |
+| `quebec_get_dataset_details` | Get full details for a Données Québec dataset including resources list and datastore_active flags. | `package_id` |
+| `quebec_query_dataset` | Query records from a Données Québec dataset's best resource (CSV > GeoJSON > JSON > XLSX). | `package_id`, `limit` |
+| `quebec_list_organizations` | List all 139 organizations in the Données Québec federated catalog with package counts. | — |
+| `quebec_list_categories` | List the 10 thematic groups (Santé, Environnement, etc.) used to categorize Données Québec datasets. | — |
+<!-- CATALOG:quebec_discovery:end -->
+
+#### Curated (7)
+
+<!-- CATALOG:quebec_curated:start -->
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `quebec_get_health_installations` | Get Quebec health installations (hospitals, CLSCs, CHSLDs, psychiatric) from MSSS datastore. | `instal_type`, `rss_name`, `limit` |
+| `quebec_get_er_wait_times` | Get current Quebec emergency room wait times and stretcher occupancy (hourly refresh from MSSS). | `installation`, `limit` |
+| `quebec_get_population_by_municipality` | Get Quebec municipality population, area, and administrative region from the MAMH municipal registry. | `region`, `limit` |
+| `quebec_get_road_conditions` | Get current Quebec winter road conditions (pavement state, visibility) from MTQ WFS. | — |
+| `quebec_get_road_works` | Get current Quebec road construction zones and work sites from MTQ live WFS CSV. | — |
+| `quebec_get_road_events` | Get current Quebec road events (accidents, incidents, warnings) from MTQ live WFS CSV. | — |
+| `quebec_get_bridge_structures` | Get Quebec bridge, culvert, tunnel, and retaining wall inventory from MTQ structure registry. | `route`, `municipality`, `region`, `limit` |
+<!-- CATALOG:quebec_curated:end -->
 
 ---
 

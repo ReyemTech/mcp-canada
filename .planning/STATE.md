@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 16-02-PLAN.md
-last_updated: "2026-04-11T21:24:35.552Z"
+stopped_at: Completed 16-03-PLAN.md
+last_updated: "2026-04-11T22:41:36.284Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 10
   total_plans: 35
-  completed_plans: 33
+  completed_plans: 34
   percent: 0
 ---
 
@@ -82,6 +82,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 15-british-columbia-government-open-data P04 | 10min | 2 tasks | 7 files |
 | Phase 15-british-columbia-government-open-data P05 | 7min | 2 tasks | 5 files |
 | Phase 16-quebec-government-open-data P01 | 5min | 2 tasks | 15 files |
+| Phase 16-quebec-government-open-data P03 | 39 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -176,6 +177,8 @@ Recent decisions affecting current work:
 - [Phase 16-quebec-government-open-data]: SOPFEU/Hydro-Québec deferred: not on DQ CKAN; replaced by road events + electricity production tools
 - [Phase 16]: _api_get return type is Any (not dict[str, Any]): CKAN org/group list returns lists at result level
 - [Phase 16]: group_list for categories: DQ has 10 thematic groups; tag_list returns 4200+ noisy tags
+- [Phase 16-quebec-government-open-data]: Bridge structures filter guard in tool layer only (not client) — client can be called without filters; tool enforces the guard for safe agent use
+- [Phase 16-quebec-government-open-data]: fetch_road_conditions returns [] on WFS exception (graceful degradation) — LOW-confidence MTQ endpoint; empty list preferred over always-UPSTREAM_ERROR
 
 ### Roadmap Evolution
 
@@ -203,6 +206,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-11T21:24:35.451Z
-Stopped at: Completed 16-02-PLAN.md
+Last session: 2026-04-11T22:41:36.281Z
+Stopped at: Completed 16-03-PLAN.md
 Resume file: None

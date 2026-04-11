@@ -922,6 +922,32 @@ class TestBcGetWaterWells:
         assert "CITY='Kelowna'" in cql
         assert "WELL_CLASS='DOMESTIC'" in cql
 
+    @pytest.mark.asyncio
+    async def test_guard_returns_french_message_when_lang_fr(self):
+        """bc_get_water_wells(lang='fr') guard message is in French — Gap 4 regression."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_water_wells
+
+        result = await bc_get_water_wells(lang="fr")
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_INPUT"
+        assert result["error"]["lang"] == "fr"
+        # French-only substring proves translation
+        assert "au moins un" in result["error"]["message"]
+        # English-only substring must NOT appear
+        assert "at least one" not in result["error"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_guard_returns_english_message_when_lang_en(self):
+        """bc_get_water_wells(lang='en') guard message stays English by default."""
+        from mcp_canada.modules.british_columbia.tools import bc_get_water_wells
+
+        result = await bc_get_water_wells(lang="en")
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_INPUT"
+        assert result["error"]["lang"] == "en"
+        assert "at least one of city" in result["error"]["message"]
+        assert "au moins un" not in result["error"]["message"]
+
 
 class TestBcGetWildfireWeatherStations:
     """Tests for bc_get_wildfire_weather_stations (WHSE_LAND_AND_NATURAL_RESOURCE.PROT_WEATHER_STATIONS_SP)."""

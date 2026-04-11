@@ -698,12 +698,14 @@ async def bc_get_water_wells(
     Keywords: british columbia, bc, water wells, groundwater, aquifer, well class, city, drinking water, domestic, irrigation, environmental
     """
     if city is None and well_class is None and aquifer_id is None:
-        return make_error(
-            "INVALID_INPUT",
+        message = (
             "bc_get_water_wells requires at least one of city, well_class, or aquifer_id "
-            "(dataset has 130K+ records — Pitfall 5).",
-            lang=lang,
+            "(dataset has 130K+ records — Pitfall 5)."
+            if lang == "en"
+            else "bc_get_water_wells exige au moins un des paramètres city, well_class ou "
+                 "aquifer_id (l'ensemble de données contient plus de 130 000 enregistrements — Pitfall 5)."
         )
+        return make_error("INVALID_INPUT", message, lang=lang)
     filters: dict[str, Any] = {}
     if city:
         filters["CITY"] = city

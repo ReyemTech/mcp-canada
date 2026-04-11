@@ -1,6 +1,5 @@
 """Quebec module client — async functions returning (data, was_cached) tuples.
 
-ALL functions are stubs raising NotImplementedError.
 Plans 02/03/04 implement the bodies:
   - Plan 02: _api_get, _datastore_get, fetch_search_datasets, fetch_dataset_details,
              fetch_organizations, fetch_categories, fetch_query_dataset
@@ -21,11 +20,32 @@ CRITICAL (Phase 15 lesson — _api_get MUST follow this contract):
     return envelope.get("result", {})
 """
 
+from __future__ import annotations
+
 from typing import Any
 
-from mcp_canada.shared.http import api_get  # REAL import — do NOT shadow with local alias
+import httpx
 
-from .constants import BASE_URL, DEFAULT_HEADERS  # noqa: F401 — Plan 02 uses these
+from mcp_canada.shared.cache import cached_fetch
+from mcp_canada.shared.http import api_get
+from mcp_canada.shared.parsers import fetch_and_parse
+from mcp_canada.shared.rate_limiter import get_limiter
+
+from .constants import (
+    BASE_URL,
+    CACHE_TTL_META,
+    CACHE_TTL_SEARCH,
+    DEFAULT_HEADERS,
+    RATE_GROUP,
+    RATE_LIMIT,
+)
+from .schemas import (
+    QuebecCategory,
+    QuebecDatasetDetails,
+    QuebecDatasetSummary,
+    QuebecOrganization,
+    QuebecResource,
+)
 
 __all__ = [
     "_api_get",
@@ -50,29 +70,89 @@ __all__ = [
     "fetch_protected_areas",
 ]
 
+_limiter = get_limiter(RATE_GROUP, RATE_LIMIT)
+
+
+# ---------------------------------------------------------------------------
+# Private helpers
+# ---------------------------------------------------------------------------
+
 
 async def _api_get(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
-    """CKAN envelope unwrap helper — Plan 02 implements correctly (parsed-dict contract).
+    """Quebec CKAN envelope unwrap helper.
 
-    Calls BASE_URL + path, passes DEFAULT_HEADERS, unwraps result.
-    Raises httpx.HTTPStatusError on success=False or non-dict return.
+    CRITICAL: shared api_get already returns PARSED JSON (dict). NEVER call
+    .raise_for_status() or .json() on the return value. This is the Phase 15 fix
+    (see debug/resolved/bc-api-get-dict-mismatch.md).
+
+    Args:
+        path: Action API path (e.g. "package_search") relative to BASE_URL.
+        params: Optional query parameters.
+
+    Returns:
+        The unwrapped CKAN result field (dict or list wrapped in a dict).
+
+    Raises:
+        httpx.HTTPStatusError: When CKAN returns success=False or api_get returns non-dict.
     """
-    raise NotImplementedError("Plan 02 implements _api_get")
+    url = BASE_URL + path
+    await _limiter.acquire()
+    envelope = await api_get(url, params or {}, headers=DEFAULT_HEADERS)
+    if not isinstance(envelope, dict) or not envelope.get("success", False):
+        raise httpx.HTTPStatusError(
+            f"CKAN returned success=False for {path}",
+            request=httpx.Request("GET", url),
+            response=httpx.Response(500),
+        )
+    return envelope.get("result", {})
 
 
 async def _datastore_get(
     resource_id: str, params: dict[str, Any] | None = None
 ) -> dict[str, Any]:
-    """Datastore search helper — Plan 02 implements.
+    """Datastore search helper.
 
-    Calls datastore_search with resource_id and optional params.
-    Returns the unwrapped result dict (records, total, fields).
+    Wraps CKAN datastore_search — returns the unwrapped `result` dict with
+    `records`, `total`, and `fields`.
     """
-    raise NotImplementedError("Plan 02 implements _datastore_get")
+    all_params = {"resource_id": resource_id, **(params or {})}
+    return await _api_get("datastore_search", all_params)
+
+
+def _flatten_dataset_summary(raw: dict[str, Any]) -> QuebecDatasetSummary:
+    org = raw.get("organization") or {}
+    return QuebecDatasetSummary(
+        id=raw.get("id", ""),
+        name=raw.get("name", ""),
+        title=raw.get("title", ""),
+        notes=raw.get("notes"),
+        organization_slug=org.get("name") if isinstance(org, dict) else None,
+        organization_title=org.get("title") if isinstance(org, dict) else None,
+        groups=[
+            g.get("name")
+            for g in (raw.get("groups") or [])
+            if isinstance(g, dict) and g.get("name")
+        ],
+        license_id=raw.get("license_id"),
+        update_frequency=raw.get("update_frequency"),
+        num_resources=int(raw.get("num_resources") or 0),
+        num_tags=int(raw.get("num_tags") or 0),
+    )
+
+
+def _flatten_resource(raw: dict[str, Any]) -> QuebecResource:
+    return QuebecResource(
+        id=raw.get("id", ""),
+        name=raw.get("name"),
+        format=raw.get("format"),
+        url=raw.get("url", ""),
+        datastore_active=bool(raw.get("datastore_active") or False),
+        size=raw.get("size"),
+    )
 
 
 # ---------------------------------------------------------------------------
-# Discovery client functions — Plan 02 fills bodies
+# Discovery client functions — Plan 02
 # ---------------------------------------------------------------------------
 
 
@@ -82,43 +162,148 @@ async def fetch_search_datasets(
     start: int = 0,
     organization: str | None = None,
     group: str | None = None,
-) -> tuple[list[dict[str, Any]], bool]:
-    """Search Données Québec CKAN catalogue — Plan 02 implements."""
-    raise NotImplementedError("Plan 02 implements fetch_search_datasets")
+) -> tuple[list[QuebecDatasetSummary], bool]:
+    """Search Données Québec CKAN catalogue (1,593 datasets, 139 orgs)."""
+    cache_key = f"quebec:search:{q}:{rows}:{start}:{organization}:{group}"
+
+    async def _fetch() -> list[QuebecDatasetSummary]:
+        fq_parts: list[str] = []
+        if organization:
+            fq_parts.append(f"organization:{organization}")
+        if group:
+            fq_parts.append(f"groups:{group}")
+        p: dict[str, Any] = {"q": q, "rows": rows, "start": start}
+        if fq_parts:
+            p["fq"] = " ".join(fq_parts)
+        result = await _api_get("package_search", p)
+        return [_flatten_dataset_summary(r) for r in (result.get("results") or [])]
+
+    return await cached_fetch(cache_key, CACHE_TTL_SEARCH, _fetch)
 
 
-async def fetch_dataset_details(package_id: str) -> tuple[dict[str, Any], bool]:
-    """Get full dataset details (package_show) — Plan 02 implements."""
-    raise NotImplementedError("Plan 02 implements fetch_dataset_details")
+async def fetch_dataset_details(package_id: str) -> tuple[QuebecDatasetDetails, bool]:
+    """Get full dataset details including resources list and datastore_active flags."""
+    cache_key = f"quebec:dataset:{package_id}"
+
+    async def _fetch() -> QuebecDatasetDetails:
+        raw = await _api_get("package_show", {"id": package_id})
+        org = raw.get("organization") or {}
+        return QuebecDatasetDetails(
+            id=raw.get("id", ""),
+            name=raw.get("name", ""),
+            title=raw.get("title", ""),
+            notes=raw.get("notes"),
+            organization_slug=org.get("name") if isinstance(org, dict) else None,
+            organization_title=org.get("title") if isinstance(org, dict) else None,
+            update_frequency=raw.get("update_frequency"),
+            license_id=raw.get("license_id"),
+            resources=[_flatten_resource(r) for r in (raw.get("resources") or [])],
+        )
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
-async def fetch_organizations() -> tuple[list[dict[str, Any]], bool]:
-    """Get all 139 Données Québec organizations — Plan 02 implements."""
-    raise NotImplementedError("Plan 02 implements fetch_organizations")
+async def fetch_organizations() -> tuple[list[QuebecOrganization], bool]:
+    """Get all Données Québec organizations (139 orgs in federated catalogue)."""
+    cache_key = "quebec:orgs"
+
+    async def _fetch() -> list[QuebecOrganization]:
+        result = await _api_get("organization_list", {"all_fields": True})
+        if not isinstance(result, list):
+            return []
+        return [
+            QuebecOrganization(
+                name=r.get("name", ""),
+                title=r.get("title") or r.get("display_name") or r.get("name", ""),
+                package_count=int(r.get("package_count") or 0),
+            )
+            for r in result
+        ]
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
-async def fetch_categories() -> tuple[list[dict[str, Any]], bool]:
-    """Get 10 thematic groups via group_list — Plan 02 implements.
+async def fetch_categories() -> tuple[list[QuebecCategory], bool]:
+    """Get 10 thematic groups via group_list.
 
-    Uses group_list (not tag_list) — DQ has 10 meaningful thematic groups.
-    BC returns HTTP 403 on group_list; DQ does not.
+    Phase 16 lesson: DQ has 10 meaningful thematic groups (unlike BC which
+    returns HTTP 403 on group_list). Uses group_list NOT tag_list (tag_list
+    returns ~4,200 noisy tags).
     """
-    raise NotImplementedError("Plan 02 implements fetch_categories")
+    cache_key = "quebec:categories"
+
+    async def _fetch() -> list[QuebecCategory]:
+        result = await _api_get("group_list", {"all_fields": True})
+        if not isinstance(result, list):
+            return []
+        return [
+            QuebecCategory(
+                name=r.get("name", ""),
+                title=r.get("title"),
+                display_name=r.get("display_name"),
+                package_count=int(r.get("package_count") or 0),
+            )
+            for r in result
+        ]
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
+
+
+# Format priority for picking best resource: lower = better
+_FORMAT_PRIORITY = {"CSV": 0, "GEOJSON": 1, "JSON": 2, "XLSX": 3, "XLS": 4}
+
+
+def _pick_best_resource(resources: list[QuebecResource]) -> QuebecResource | None:
+    """Pick the best downloadable resource by format priority (CSV > GeoJSON > JSON > XLSX)."""
+    scored = [
+        (_FORMAT_PRIORITY.get((r.format or "").upper(), 99), r)
+        for r in resources
+        if r.url
+    ]
+    if not scored:
+        return None
+    scored.sort(key=lambda t: t[0])
+    return scored[0][1]
 
 
 async def fetch_query_dataset(
     package_id: str,
-    q: str = "",
     limit: int = 100,
-    offset: int = 0,
-) -> tuple[list[dict[str, Any]], bool]:
-    """Pick best file resource or route to datastore — Plan 02 implements.
+) -> tuple[dict[str, Any], bool]:
+    """Pick best resource and either datastore_search (when active) or fetch_and_parse."""
+    details, _ = await fetch_dataset_details(package_id)
+    picked = _pick_best_resource(details.resources)
+    if picked is None:
+        return ({"records": [], "total": 0, "source": "none"}, False)
 
-    Routing logic: if resource has datastore_active=True, use _datastore_get.
-    Otherwise pick best file resource (CSV > GeoJSON > JSON > XLSX) and
-    delegate to fetch_and_parse().
-    """
-    raise NotImplementedError("Plan 02 implements fetch_query_dataset")
+    if picked.datastore_active:
+        cache_key = f"quebec:query:datastore:{picked.id}:{limit}"
+
+        async def _fetch_ds() -> dict[str, Any]:
+            ds = await _datastore_get(picked.id, {"limit": limit})
+            return {
+                "records": ds.get("records") or [],
+                "total": int(ds.get("total") or 0),
+                "source": "datastore",
+                "resource_id": picked.id,
+                "resource_url": picked.url,
+            }
+
+        return await cached_fetch(cache_key, CACHE_TTL_SEARCH, _fetch_ds)
+
+    cache_key = f"quebec:query:file:{picked.id}"
+    rows, cached = await fetch_and_parse(picked.url, ttl=CACHE_TTL_SEARCH)
+    return (
+        {
+            "records": rows[:limit],
+            "total": len(rows),
+            "source": "file",
+            "resource_id": picked.id,
+            "resource_url": picked.url,
+            "format": picked.format,
+        },
+        cached,
+    )
 
 
 # ---------------------------------------------------------------------------

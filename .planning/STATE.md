@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 15-05-PLAN.md
-last_updated: "2026-04-11T04:26:11.313Z"
+stopped_at: Completed 16-01-PLAN.md
+last_updated: "2026-04-11T20:19:25.099Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 10
-  total_plans: 31
-  completed_plans: 31
+  total_plans: 35
+  completed_plans: 32
   percent: 0
 ---
 
@@ -81,6 +81,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 15-british-columbia-government-open-data P03 | 45min | 2 tasks | 5 files |
 | Phase 15-british-columbia-government-open-data P04 | 10min | 2 tasks | 7 files |
 | Phase 15-british-columbia-government-open-data P05 | 7min | 2 tasks | 5 files |
+| Phase 16-quebec-government-open-data P01 | 5min | 2 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -169,6 +170,10 @@ Recent decisions affecting current work:
 - [Phase Phase 15]: WFS/OGC documented as third portal technology in CLAUDE.md alongside CKAN and ArcGIS Hub — shared/ogc.py reusable for Quebec and other provinces
 - [Phase 15-british-columbia-government-open-data]: BC _api_get fix: treat shared api_get return as parsed dict; drop .raise_for_status()/.json(); check envelope.get('success') directly
 - [Phase 15-british-columbia-government-open-data]: Water wells bilingual guard: inline lang=='en' ternary (not t() import) — matches prompts.py convention, avoids first t() production import for one-off message
+- [Phase 16-quebec-government-open-data]: Quebec module is CKAN-only: no secondary geospatial portal; Géoportail Québec deferred
+- [Phase 16-quebec-government-open-data]: MTQ WFS CSV-only: always outputformat=csv — GeoJSON returns HTTP 400 (MapServer json.tmpl missing)
+- [Phase 16-quebec-government-open-data]: DQ metadata French-primary: title/notes French-only, no title_translated; lang affects error messages only
+- [Phase 16-quebec-government-open-data]: SOPFEU/Hydro-Québec deferred: not on DQ CKAN; replaced by road events + electricity production tools
 
 ### Roadmap Evolution
 
@@ -196,6 +201,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-11T04:26:11.310Z
-Stopped at: Completed 15-05-PLAN.md
+Last session: 2026-04-11T20:19:25.096Z
+Stopped at: Completed 16-01-PLAN.md
 Resume file: None

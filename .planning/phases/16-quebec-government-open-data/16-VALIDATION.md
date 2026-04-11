@@ -3,7 +3,7 @@ phase: 16
 slug: quebec-government-open-data
 status: draft
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-04-11
 ---
 
@@ -40,8 +40,8 @@ created: 2026-04-11
 
 | Task ID | Plan | Wave | Requirement/Concern | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|---------------------|-----------|-------------------|-------------|--------|
-| 16-01-01 | 01 | 1 | quebec module skeleton | unit | `uv run python -c "from mcp_canada.modules import quebec; print(quebec.MODULE_NAME)"` | ❌ W0 | ⬜ pending |
-| 16-01-02 | 01 | 1 | Wave 0 test stubs collect | unit | `uv run pytest src/mcp_canada/modules/quebec/__tests__/ --collect-only -q` | ❌ W0 | ⬜ pending |
+| 16-01-01 | 01 | 1 | quebec module skeleton | unit | `uv run python -c "from mcp_canada.modules import quebec; print(quebec.MODULE_NAME)"` | ✅ | ✅ green |
+| 16-01-02 | 01 | 1 | Wave 0 test stubs collect | unit | `uv run pytest src/mcp_canada/modules/quebec/__tests__/ --collect-only -q` | ✅ | ✅ green |
 | 16-02-01 | 02 | 2 | CKAN client functions | unit | `uv run pytest src/mcp_canada/modules/quebec/__tests__/test_client.py -x` | ❌ W0 | ⬜ pending |
 | 16-02-02 | 02 | 2 | 5 discovery tools | unit | `uv run pytest src/mcp_canada/modules/quebec/__tests__/test_tools.py -x -k "TestQuebecSearch or TestQuebecGet or TestQuebecQuery or TestQuebecList"` | ❌ W0 | ⬜ pending |
 | 16-02-03 | 02 | 2 | TestSharedApiGetContract (Phase 15 lesson) | unit | `uv run pytest src/mcp_canada/modules/quebec/__tests__/test_client.py::TestSharedApiGetContract -x` | ❌ W0 | ⬜ pending |

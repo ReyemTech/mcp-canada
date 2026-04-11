@@ -34,6 +34,13 @@ __all__ = [
     "quebec_query_dataset",
     "quebec_list_organizations",
     "quebec_list_categories",
+    "quebec_get_health_installations",
+    "quebec_get_er_wait_times",
+    "quebec_get_population_by_municipality",
+    "quebec_get_road_conditions",
+    "quebec_get_road_works",
+    "quebec_get_road_events",
+    "quebec_get_bridge_structures",
 ]
 
 
@@ -212,6 +219,238 @@ async def quebec_list_categories(
         data=[c.model_dump() for c in cats],
         api_name=API_NAME,
         api_url=BASE_URL + "group_list",
+        cached=cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Health / MSSS curated tools — Plan 03
+# ---------------------------------------------------------------------------
+
+_VALID_INSTAL_TYPES = ("CLSC", "CHSGS", "CHSLD", "CHPSY")
+_MTQ_WFS_API_URL = "https://ws.mapserver.transports.gouv.qc.ca/swtq"
+_MAMH_CSV_URL = "https://donneesouvertes.affmunqc.net/repertoire/MUN.csv"
+
+
+@tool
+async def quebec_get_health_installations(
+    instal_type: str | None = None,
+    rss_name: str | None = None,
+    limit: int = 200,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Quebec health installations (hospitals, CLSCs, CHSLDs, psychiatric) from MSSS datastore.
+
+    Use for: Finding MSSS health facilities by type (CLSC/CHSGS/CHSLD/CHPSY) or health region (RSS); covers 1,592 installations across Quebec.
+    Keywords: quebec, health, hospital, clsc, chsld, chpsy, installations, msss, sante, etablissement, medical, facilities
+
+    instal_type: One of CLSC (community clinic), CHSGS (hospital), CHSLD (long-term care), CHPSY (psychiatric). Omit for all types.
+    rss_name: Health region (RSS) name filter (French, e.g. "Montréal", "Capitale-Nationale").
+    """
+    if instal_type is not None and instal_type.upper() not in _VALID_INSTAL_TYPES:
+        msg = (
+            f"Invalid instal_type. Valid: {', '.join(_VALID_INSTAL_TYPES)}"
+            if lang == "en"
+            else f"instal_type invalide. Valides: {', '.join(_VALID_INSTAL_TYPES)}"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=list(_VALID_INSTAL_TYPES))
+    try:
+        rows, cached = await _client.fetch_health_installations(
+            instal_type=instal_type.upper() if instal_type else None,
+            rss_name=rss_name,
+            limit=min(max(limit, 1), 2000),
+        )
+    except httpx.HTTPStatusError as exc:
+        msg = f"MSSS datastore error: {exc}" if lang == "en" else f"Erreur datastore MSSS: {exc}"
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=[r.model_dump() for r in rows],
+        api_name=API_NAME,
+        api_url=BASE_URL + "datastore_search",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def quebec_get_er_wait_times(
+    installation: str | None = None,
+    limit: int = 200,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get current Quebec emergency room wait times and stretcher occupancy (hourly refresh from MSSS).
+
+    Use for: Checking real-time ER congestion, stretcher occupancy, patients waiting 24h/48h at any Quebec hospital; 116 EDs updated hourly.
+    Keywords: quebec, emergency, er, wait times, urgence, hospital, civieres, msss, real-time, stretchers, occupancy, temps attente
+
+    installation: Full-text search on installation name (e.g. "Rimouski", "Sainte-Justine").
+    """
+    try:
+        rows, cached = await _client.fetch_er_wait_times(
+            installation=installation,
+            limit=min(max(limit, 1), 500),
+        )
+    except httpx.HTTPStatusError as exc:
+        msg = f"Upstream error: {exc}" if lang == "en" else f"Erreur: {exc}"
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=[r.model_dump() for r in rows],
+        api_name=API_NAME,
+        api_url=BASE_URL + "datastore_search",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def quebec_get_population_by_municipality(
+    region: str | None = None,
+    limit: int = 200,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Quebec municipality population, area, and administrative region from the MAMH municipal registry.
+
+    Use for: Municipal demographics across Quebec's 1,282 municipalities — includes population, area, MRC, admin region, mayor name.
+    Keywords: quebec, population, municipalities, municipalites, mamh, demographics, regions, mrc, registry, census, repertoire, villages
+
+    region: Administrative region code (e.g. "06" for Montreal, "03" for Capitale-Nationale).
+    """
+    try:
+        rows, cached = await _client.fetch_population_by_municipality(
+            region=region,
+            limit=min(max(limit, 1), 2000),
+        )
+    except Exception as exc:
+        msg = f"Upstream error: {exc}" if lang == "en" else f"Erreur: {exc}"
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=[r.model_dump() for r in rows],
+        api_name=API_NAME,
+        api_url=_MAMH_CSV_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Transport / MTQ curated tools — Plan 03
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def quebec_get_road_conditions(
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get current Quebec winter road conditions (pavement state, visibility) from MTQ WFS.
+
+    Use for: Winter driving safety — current pavement status, visibility, snow presence across Quebec's road network. Returns bilingual columns based on lang.
+    Keywords: quebec, road conditions, winter, mtq, pavement, visibility, driving, conditions routieres, hiver, transports, snow, neige
+
+    Note: Winter-season data. May return empty list in summer. WFS endpoint reliability varies — research flagged LOW confidence.
+    """
+    try:
+        rows, cached = await _client.fetch_road_conditions(lang=lang)
+    except Exception as exc:
+        msg = f"MTQ WFS error: {exc}" if lang == "en" else f"Erreur WFS MTQ: {exc}"
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=rows,
+        api_name=API_NAME,
+        api_url=_MTQ_WFS_API_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def quebec_get_road_works(
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get current Quebec road construction zones and work sites from MTQ live WFS CSV.
+
+    Use for: Active construction zones, road closures, lane restrictions on Quebec provincial roads; continuous updates. Returns bilingual descriptions based on lang.
+    Keywords: quebec, road works, construction, chantiers, mtq, detours, closures, lanes, travaux routiers, transports, zones, infrastructure
+
+    Note: Live data, ~5min cache. Returns both French and English description columns via the `description` field selected by lang.
+    """
+    try:
+        rows, cached = await _client.fetch_road_works(lang=lang)
+    except Exception as exc:
+        msg = f"MTQ WFS error: {exc}" if lang == "en" else f"Erreur WFS MTQ: {exc}"
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=[r.model_dump() for r in rows],
+        api_name=API_NAME,
+        api_url=_MTQ_WFS_API_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def quebec_get_road_events(
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get current Quebec road events (accidents, incidents, warnings) from MTQ live WFS CSV.
+
+    Use for: Real-time road events affecting traffic — accidents, incidents, temporary warnings across Quebec provincial roads. French-only fields.
+    Keywords: quebec, road events, accidents, incidents, warnings, mtq, evenements, traffic, avertissements, routiers, transports, live
+
+    Note: Fields are French-only (no English equivalent in MTQ CSV). `lang` parameter affects error messages only.
+    """
+    try:
+        rows, cached = await _client.fetch_road_events()
+    except Exception as exc:
+        msg = f"MTQ WFS error: {exc}" if lang == "en" else f"Erreur WFS MTQ: {exc}"
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=[r.model_dump() for r in rows],
+        api_name=API_NAME,
+        api_url=_MTQ_WFS_API_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def quebec_get_bridge_structures(
+    route: str | None = None,
+    municipality: str | None = None,
+    region: str | None = None,
+    limit: int = 100,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Quebec bridge, culvert, tunnel, and retaining wall inventory from MTQ structure registry.
+
+    Use for: Bridge and structure inventory — 50K+ structures statewide. Returns location, year, type, dimensions. REQUIRES at least one filter (route/municipality/region).
+    Keywords: quebec, bridges, culverts, tunnels, structures, mtq, ponts, infrastructure, inventory, engineering, walls, civil
+
+    Note: At least one of `route`, `municipality`, or `region` is required to avoid unbounded response. Mimics the BC water wells filter guard pattern.
+    """
+    if not any([route, municipality, region]):
+        msg = (
+            "quebec_get_bridge_structures requires at least one of route, municipality, or region "
+            "to avoid returning the full 50K+ structure inventory"
+            if lang == "en"
+            else "quebec_get_bridge_structures nécessite au moins un des paramètres route, "
+            "municipality ou region pour éviter de retourner l'inventaire complet de 50K+ structures"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang)
+    try:
+        rows, cached = await _client.fetch_bridge_structures(
+            route=route,
+            municipality=municipality,
+            region=region,
+            limit=min(max(limit, 1), 1000),
+        )
+    except Exception as exc:
+        msg = f"MTQ WFS error: {exc}" if lang == "en" else f"Erreur WFS MTQ: {exc}"
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=[r.model_dump() for r in rows],
+        api_name=API_NAME,
+        api_url=_MTQ_WFS_API_URL,
         cached=cached,
         lang=lang,
     )

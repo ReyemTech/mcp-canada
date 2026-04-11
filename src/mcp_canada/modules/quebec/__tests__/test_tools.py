@@ -327,41 +327,161 @@ class TestQuebecListCategories:
 
 class TestQuebecGetHealthInstallations:
     async def test_happy_path(self):
-        pytest.skip("Plan 03")
+        from mcp_canada.modules.quebec.schemas import QuebecHealthInstallation
+        row = QuebecHealthInstallation(
+            instal_code="12345",
+            instal_name="Hôpital de Chicoutimi",
+            rss_name="Saguenay-Lac-Saint-Jean",
+            is_chsgs=True,
+        )
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_health_installations",
+            new=AsyncMock(return_value=([row], False)),
+        ):
+            result = await q_tools.quebec_get_health_installations()
+        assert "_meta" in result
+        assert isinstance(result["data"], list)
+        assert result["data"][0]["instal_name"] == "Hôpital de Chicoutimi"
 
     async def test_filter_by_type_clsc(self):
-        pytest.skip("Plan 03")
+        from mcp_canada.modules.quebec.schemas import QuebecHealthInstallation
+        row = QuebecHealthInstallation(instal_code="99", instal_name="CLSC Test", is_clsc=True)
+        mock = AsyncMock(return_value=([row], False))
+        with patch("mcp_canada.modules.quebec.tools._client.fetch_health_installations", new=mock):
+            result = await q_tools.quebec_get_health_installations(instal_type="CLSC")
+        assert "_meta" in result
+        mock.assert_called_once()
+        assert mock.call_args.kwargs.get("instal_type") == "CLSC"
 
     async def test_filter_by_type_hospital(self):
-        pytest.skip("Plan 03")
+        mock = AsyncMock(return_value=([], False))
+        with patch("mcp_canada.modules.quebec.tools._client.fetch_health_installations", new=mock):
+            result = await q_tools.quebec_get_health_installations(instal_type="CHSGS")
+        assert "_meta" in result
+        assert mock.call_args.kwargs.get("instal_type") == "CHSGS"
 
     async def test_lang_fr_error(self):
-        pytest.skip("Plan 03")
+        result = await q_tools.quebec_get_health_installations(instal_type="BOGUS", lang="fr")
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_INPUT"
+        assert "invalide" in result["error"]["message"]
 
     async def test_meta_envelope_shape(self):
-        pytest.skip("Plan 03")
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_health_installations",
+            new=AsyncMock(return_value=([], True)),
+        ):
+            result = await q_tools.quebec_get_health_installations()
+        assert "_meta" in result
+        assert result["_meta"]["cached"] is True
+        assert result["_meta"]["source"]["api"] == "donnees-quebec"
+
+    async def test_invalid_instal_type_en_error(self):
+        result = await q_tools.quebec_get_health_installations(instal_type="INVALID")
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_INPUT"
+        assert "Invalid" in result["error"]["message"]
+
+    async def test_upstream_error(self):
+        import httpx
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_health_installations",
+            new=AsyncMock(side_effect=httpx.HTTPStatusError(
+                "Server error",
+                request=httpx.Request("GET", "https://example.com"),
+                response=httpx.Response(500),
+            )),
+        ):
+            result = await q_tools.quebec_get_health_installations()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestQuebecGetErWaitTimes:
     async def test_happy_path(self):
-        pytest.skip("Plan 03")
+        from mcp_canada.modules.quebec.schemas import QuebecErWaitRow
+        row = QuebecErWaitRow(
+            installation="Hôpital de Rimouski",
+            functional_stretchers=20,
+            occupied_stretchers=25,
+        )
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_er_wait_times",
+            new=AsyncMock(return_value=([row], False)),
+        ):
+            result = await q_tools.quebec_get_er_wait_times()
+        assert "_meta" in result
+        assert result["data"][0]["installation"] == "Hôpital de Rimouski"
 
     async def test_meta_envelope_shape(self):
-        pytest.skip("Plan 03")
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_er_wait_times",
+            new=AsyncMock(return_value=([], False)),
+        ):
+            result = await q_tools.quebec_get_er_wait_times()
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "donnees-quebec"
+        assert "datastore_search" in result["_meta"]["source"]["url"]
 
     async def test_q_filter(self):
-        pytest.skip("Plan 03")
+        mock = AsyncMock(return_value=([], False))
+        with patch("mcp_canada.modules.quebec.tools._client.fetch_er_wait_times", new=mock):
+            await q_tools.quebec_get_er_wait_times(installation="Rimouski")
+        assert mock.call_args.kwargs.get("installation") == "Rimouski"
+
+    async def test_upstream_error(self):
+        import httpx
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_er_wait_times",
+            new=AsyncMock(side_effect=httpx.HTTPStatusError(
+                "error",
+                request=httpx.Request("GET", "https://example.com"),
+                response=httpx.Response(500),
+            )),
+        ):
+            result = await q_tools.quebec_get_er_wait_times()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestQuebecGetPopulationByMunicipality:
     async def test_happy_path(self):
-        pytest.skip("Plan 03")
+        from mcp_canada.modules.quebec.schemas import QuebecPopulationRow
+        row = QuebecPopulationRow(municipality="Montréal", admin_region="06", population=1762949)
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_population_by_municipality",
+            new=AsyncMock(return_value=([row], False)),
+        ):
+            result = await q_tools.quebec_get_population_by_municipality()
+        assert "_meta" in result
+        assert result["data"][0]["municipality"] == "Montréal"
 
     async def test_region_filter(self):
-        pytest.skip("Plan 03")
+        mock = AsyncMock(return_value=([], False))
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_population_by_municipality",
+            new=mock,
+        ):
+            await q_tools.quebec_get_population_by_municipality(region="06")
+        assert mock.call_args.kwargs.get("region") == "06"
 
     async def test_meta_envelope_shape(self):
-        pytest.skip("Plan 03")
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_population_by_municipality",
+            new=AsyncMock(return_value=([], False)),
+        ):
+            result = await q_tools.quebec_get_population_by_municipality()
+        assert "_meta" in result
+        assert "MUN.csv" in result["_meta"]["source"]["url"]
+
+    async def test_upstream_error(self):
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_population_by_municipality",
+            new=AsyncMock(side_effect=Exception("CSV unavailable")),
+        ):
+            result = await q_tools.quebec_get_population_by_municipality()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 # ---------------------------------------------------------------------------
@@ -371,49 +491,145 @@ class TestQuebecGetPopulationByMunicipality:
 
 class TestQuebecGetRoadConditions:
     async def test_happy_path(self):
-        pytest.skip("Plan 03")
+        rows = [{"segment_id": "1", "route_num": "40", "pavement_status": "Good"}]
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_road_conditions",
+            new=AsyncMock(return_value=(rows, False)),
+        ):
+            result = await q_tools.quebec_get_road_conditions()
+        assert "_meta" in result
+        assert result["data"][0]["pavement_status"] == "Good"
 
     async def test_bilingual_column_selection_en(self):
-        pytest.skip("Plan 03")
+        mock = AsyncMock(return_value=([], False))
+        with patch("mcp_canada.modules.quebec.tools._client.fetch_road_conditions", new=mock):
+            await q_tools.quebec_get_road_conditions(lang="en")
+        assert mock.call_args.kwargs.get("lang") == "en"
 
     async def test_bilingual_column_selection_fr(self):
-        pytest.skip("Plan 03")
+        mock = AsyncMock(return_value=([], False))
+        with patch("mcp_canada.modules.quebec.tools._client.fetch_road_conditions", new=mock):
+            await q_tools.quebec_get_road_conditions(lang="fr")
+        assert mock.call_args.kwargs.get("lang") == "fr"
+
+    async def test_upstream_error(self):
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_road_conditions",
+            new=AsyncMock(side_effect=Exception("WFS down")),
+        ):
+            result = await q_tools.quebec_get_road_conditions()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestQuebecGetRoadWorks:
     async def test_happy_path(self):
-        pytest.skip("Plan 03")
+        from mcp_canada.modules.quebec.schemas import QuebecRoadWork
+        row = QuebecRoadWork(route="A-25", description="One lane closed", location="km 8")
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_road_works",
+            new=AsyncMock(return_value=([row], False)),
+        ):
+            result = await q_tools.quebec_get_road_works()
+        assert "_meta" in result
+        assert result["data"][0]["route"] == "A-25"
 
     async def test_bilingual_description_en(self):
-        pytest.skip("Plan 03")
+        mock = AsyncMock(return_value=([], False))
+        with patch("mcp_canada.modules.quebec.tools._client.fetch_road_works", new=mock):
+            await q_tools.quebec_get_road_works(lang="en")
+        assert mock.call_args.kwargs.get("lang") == "en"
 
     async def test_bilingual_description_fr(self):
-        pytest.skip("Plan 03")
+        mock = AsyncMock(return_value=([], False))
+        with patch("mcp_canada.modules.quebec.tools._client.fetch_road_works", new=mock):
+            await q_tools.quebec_get_road_works(lang="fr")
+        assert mock.call_args.kwargs.get("lang") == "fr"
 
-    async def test_route_filter(self):
-        pytest.skip("Plan 03")
+    async def test_upstream_error(self):
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_road_works",
+            new=AsyncMock(side_effect=Exception("WFS error")),
+        ):
+            result = await q_tools.quebec_get_road_works()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestQuebecGetRoadEvents:
     async def test_happy_path(self):
-        pytest.skip("Plan 03")
+        from mcp_canada.modules.quebec.schemas import QuebecRoadEvent
+        row = QuebecRoadEvent(route="A-40", cause="Collision", municipality="Montréal")
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_road_events",
+            new=AsyncMock(return_value=([row], False)),
+        ):
+            result = await q_tools.quebec_get_road_events()
+        assert "_meta" in result
+        assert result["data"][0]["route"] == "A-40"
 
     async def test_meta_envelope_shape(self):
-        pytest.skip("Plan 03")
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_road_events",
+            new=AsyncMock(return_value=([], False)),
+        ):
+            result = await q_tools.quebec_get_road_events()
+        assert "_meta" in result
+        assert "mapserver" in result["_meta"]["source"]["url"]
+
+    async def test_upstream_error(self):
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_road_events",
+            new=AsyncMock(side_effect=Exception("WFS error")),
+        ):
+            result = await q_tools.quebec_get_road_events()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestQuebecGetBridgeStructures:
     async def test_requires_filter_error(self):
-        pytest.skip("Plan 03")
+        result = await q_tools.quebec_get_bridge_structures()
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_INPUT"
+        assert "route" in result["error"]["message"].lower() or "filter" in result["error"]["message"].lower()
 
     async def test_lang_fr_error_message(self):
-        pytest.skip("Plan 03")
+        result = await q_tools.quebec_get_bridge_structures(lang="fr")
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_INPUT"
+        assert "au moins un" in result["error"]["message"]
 
     async def test_route_filter(self):
-        pytest.skip("Plan 03")
+        from mcp_canada.modules.quebec.schemas import QuebecBridgeStructure
+        row = QuebecBridgeStructure(structure_id="S-1", route_num="10", municipality="Granby")
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_bridge_structures",
+            new=AsyncMock(return_value=([row], False)),
+        ):
+            result = await q_tools.quebec_get_bridge_structures(route="10")
+        assert "_meta" in result
+        assert result["data"][0]["route_num"] == "10"
 
     async def test_municipality_filter(self):
-        pytest.skip("Plan 03")
+        from mcp_canada.modules.quebec.schemas import QuebecBridgeStructure
+        row = QuebecBridgeStructure(structure_id="S-1", municipality="Granby")
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_bridge_structures",
+            new=AsyncMock(return_value=([row], False)),
+        ):
+            result = await q_tools.quebec_get_bridge_structures(municipality="Granby")
+        assert "_meta" in result
+        assert result["data"][0]["structure_id"] == "S-1"
+
+    async def test_upstream_error(self):
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_bridge_structures",
+            new=AsyncMock(side_effect=Exception("WFS error")),
+        ):
+            result = await q_tools.quebec_get_bridge_structures(municipality="Granby")
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 # ---------------------------------------------------------------------------

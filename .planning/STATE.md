@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 16-03-PLAN.md
-last_updated: "2026-04-11T22:41:36.284Z"
+stopped_at: Completed 16-04-PLAN.md
+last_updated: "2026-04-11T23:47:20.125Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
-  completed_phases: 10
+  completed_phases: 11
   total_plans: 35
-  completed_plans: 34
+  completed_plans: 35
   percent: 0
 ---
 
@@ -83,6 +83,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 15-british-columbia-government-open-data P05 | 7min | 2 tasks | 5 files |
 | Phase 16-quebec-government-open-data P01 | 5min | 2 tasks | 15 files |
 | Phase 16-quebec-government-open-data P03 | 39 | 2 tasks | 6 files |
+| Phase 16-quebec-government-open-data P04 | 28 | 4 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -179,6 +180,10 @@ Recent decisions affecting current work:
 - [Phase 16]: group_list for categories: DQ has 10 thematic groups; tag_list returns 4200+ noisy tags
 - [Phase 16-quebec-government-open-data]: Bridge structures filter guard in tool layer only (not client) — client can be called without filters; tool enforces the guard for safe agent use
 - [Phase 16-quebec-government-open-data]: fetch_road_conditions returns [] on WFS exception (graceful degradation) — LOW-confidence MTQ endpoint; empty list preferred over always-UPSTREAM_ERROR
+- [Phase 16-quebec-government-open-data]: ArcGIS REST for IQA calls api_get directly (not shared/arcgis_hub.py) — simple GET endpoint, no pagination or FeatureServer-specific handling needed
+- [Phase 16-quebec-government-open-data]: Metadata-only tools return model_dump() directly — no additional parsing layer for SHP/GPKG archives that fetch_and_parse cannot handle
+- [Phase 16-quebec-government-open-data]: quebec_active_fires_now prompt explicitly redirects to sopfeu.qc.ca — SOPFEU confirmed not registered on Données Québec
+- [Phase 16-quebec-government-open-data]: Resource tests converted from sync+asyncio.get_event_loop() to async def — Python 3.14 raises RuntimeError for get_event_loop() without a running loop in main thread
 
 ### Roadmap Evolution
 
@@ -206,6 +211,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-11T22:41:36.281Z
-Stopped at: Completed 16-03-PLAN.md
+Last session: 2026-04-11T23:47:20.121Z
+Stopped at: Completed 16-04-PLAN.md
 Resume file: None

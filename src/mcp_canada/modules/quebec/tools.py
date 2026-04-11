@@ -23,7 +23,7 @@ from fastmcp.tools import tool
 from mcp_canada.shared.envelope import make_error, make_response
 
 from . import client as _client
-from .constants import BASE_URL
+from .constants import AQ_INDEX_URL, BASE_URL
 
 # Source identifier for the _meta envelope
 API_NAME = "donnees-quebec"
@@ -41,6 +41,12 @@ __all__ = [
     "quebec_get_road_works",
     "quebec_get_road_events",
     "quebec_get_bridge_structures",
+    "quebec_get_forest_fires_history",
+    "quebec_get_air_quality_stations",
+    "quebec_get_air_quality_index",
+    "quebec_get_water_quality_monitoring",
+    "quebec_get_electricity_data",
+    "quebec_get_protected_areas",
 ]
 
 
@@ -451,6 +457,187 @@ async def quebec_get_bridge_structures(
         data=[r.model_dump() for r in rows],
         api_name=API_NAME,
         api_url=_MTQ_WFS_API_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Environment / Demographics / Energy — Plan 04
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def quebec_get_forest_fires_history(
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get the MFFP/MRN historical forest fire archive metadata and download URLs from Données Québec.
+
+    Use for: Discovering the historical Quebec forest fire perimeter archive — returns metadata and download links for SHP/GPKG files (external download required for geometric data). Not a live SOPFEU feed.
+    Keywords: quebec, forest fires, feux foret, mffp, mrn, historical, perimeters, wildfire, archive, incendies, shapefile, download, ressources naturelles
+
+    Note: The underlying data is SHP/GPKG format only — not directly parseable via query tools.
+    Download URLs are provided in the resources list. For real-time active fire data, visit sopfeu.qc.ca directly.
+    """
+    try:
+        metadata, cached = await _client.fetch_forest_fires_history()
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"CKAN error fetching forest fires dataset: {exc}"
+            if lang == "en"
+            else f"Erreur CKAN pour le jeu de données feux de forêt: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=metadata,
+        api_name=API_NAME,
+        api_url=BASE_URL + "package_show",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def quebec_get_air_quality_stations(
+    active_only: bool = True,
+    limit: int = 500,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get the RSQAQ air quality monitoring station network across Quebec (MELCCFP).
+
+    Use for: Locating Quebec air quality stations by municipality, region, or environment type (urban/rural/industrial); 245 total stations including historical closed stations.
+    Keywords: quebec, air quality, rsqaq, stations, monitoring, melccfp, pollution, qualite air, environnement, surveillance, network, reseau, atmospheric
+
+    active_only: When True (default), returns only stations without a closure date. Set False for all 245 including historical stations.
+    """
+    try:
+        rows, cached = await _client.fetch_air_quality_stations(
+            active_only=active_only,
+            limit=min(max(limit, 1), 1000),
+        )
+    except httpx.HTTPStatusError as exc:
+        msg = f"Upstream error: {exc}" if lang == "en" else f"Erreur: {exc}"
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=[r.model_dump() for r in rows],
+        api_name=API_NAME,
+        api_url=BASE_URL + "datastore_search",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def quebec_get_air_quality_index(
+    limit: int = 200,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get current Quebec air quality index (IQA) readings from the MELCCFP ArcGIS FeatureServer.
+
+    Use for: Real-time air quality index readings across Quebec monitoring stations; includes IQA score, cote (rating), pollutant levels, station location.
+    Keywords: quebec, air quality index, iqa, melccfp, rsqaq, real-time, pollution, air quality, indice qualite air, arcgis, monitoring, atmosphere, pm25, ozone
+
+    Note: Data is sourced from ArcGIS REST FeatureServer, not CKAN datastore. Hourly refresh.
+    """
+    try:
+        measurements, cached = await _client.fetch_air_quality_index(
+            limit=min(max(limit, 1), 500),
+        )
+    except httpx.HTTPStatusError as exc:
+        msg = f"ArcGIS error: {exc}" if lang == "en" else f"Erreur ArcGIS: {exc}"
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    except Exception as exc:
+        msg = f"Unexpected error: {exc}" if lang == "en" else f"Erreur inattendue: {exc}"
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=measurements,
+        api_name=API_NAME,
+        api_url=AQ_INDEX_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def quebec_get_water_quality_monitoring(
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get the MELCCFP physicochemical water quality monitoring dataset metadata and download URLs.
+
+    Use for: Discovering Quebec river and fleuve water quality data — returns metadata and download links for GeoJSON/ZIP archives (external download required); covers physicochemical monitoring of rivers and the St. Lawrence.
+    Keywords: quebec, water quality, rivers, fleuve, melccfp, physicochemical, monitoring, qualite eau, rivieres, st-lawrence, physicochimique, download, environnement
+
+    Note: The underlying data is GeoJSON ZIP format — not directly parseable via this tool.
+    Download URLs are in the resources list for external processing.
+    """
+    try:
+        metadata, cached = await _client.fetch_water_quality_monitoring()
+    except httpx.HTTPStatusError as exc:
+        msg = f"CKAN error: {exc}" if lang == "en" else f"Erreur CKAN: {exc}"
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=metadata,
+        api_name=API_NAME,
+        api_url=BASE_URL + "package_show",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def quebec_get_electricity_data(
+    limit: int = 500,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get historical Quebec electricity production and consumption data from Hydro-Québec (via Données Québec CSV).
+
+    Use for: Historical electricity generation and consumption statistics for Quebec — annual production/consumption totals by source, published by Hydro-Québec on Données Québec.
+    Keywords: quebec, electricity, hydro-quebec, production, consommation, energy, power, energie, historique, generation, kwh, twh, renewable, electricite
+
+    Note: This is historical production/consumption data — NOT current outage data.
+    For current power outages, visit hydroquebec.com/pannes/ directly.
+    """
+    try:
+        rows, cached = await _client.fetch_electricity_data(
+            limit=min(max(limit, 1), 5000),
+        )
+    except Exception as exc:
+        msg = (
+            f"Error fetching electricity data: {exc}"
+            if lang == "en"
+            else f"Erreur lors de la récupération des données électriques: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=rows,
+        api_name=API_NAME,
+        api_url=BASE_URL + "package_show",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def quebec_get_protected_areas(
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get the MELCCFP protected areas registry (Registre des aires protégées) metadata and download URLs.
+
+    Use for: Discovering Quebec protected areas — national parks, wildlife reserves, ecological areas; returns metadata and download links for SHP/GPKG/FGDB archives (~10K+ protected areas).
+    Keywords: quebec, protected areas, aires protegees, melccfp, sepaq, parks, wildlife, reserves, ecological, parc national, biodiversity, conservation, download
+
+    Note: The underlying data is SHP/GPKG/FGDB format only — not directly parseable via query tools.
+    Download URLs are in the resources list for external GIS processing.
+    """
+    try:
+        metadata, cached = await _client.fetch_protected_areas()
+    except httpx.HTTPStatusError as exc:
+        msg = f"CKAN error: {exc}" if lang == "en" else f"Erreur CKAN: {exc}"
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=metadata,
+        api_name=API_NAME,
+        api_url=BASE_URL + "package_show",
         cached=cached,
         lang=lang,
     )

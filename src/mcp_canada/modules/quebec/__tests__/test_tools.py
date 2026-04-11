@@ -7,6 +7,7 @@ Total: 18 tools (5 discovery + 13 curated).
 """
 
 import pytest
+import httpx
 from unittest.mock import AsyncMock, patch
 
 from mcp_canada.modules.quebec import tools as q_tools
@@ -639,44 +640,245 @@ class TestQuebecGetBridgeStructures:
 
 class TestQuebecGetForestFiresHistory:
     async def test_returns_metadata(self):
-        pytest.skip("Plan 04")
+        """quebec_get_forest_fires_history returns metadata dict with _meta envelope."""
+        metadata = {
+            "id": "fires-uuid",
+            "name": "feux-de-foret",
+            "title": "Feux de forêt",
+            "notes": "Données historiques...",
+            "organization_slug": "mrn",
+            "organization_title": "MRN",
+            "update_frequency": "annuel",
+            "license_id": "cc-by",
+            "resources": [
+                {"id": "shp-001", "name": "Feux SHP", "format": "SHP",
+                 "url": "https://example.com/feux.shp", "datastore_active": False, "size": None},
+            ],
+        }
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_forest_fires_history",
+            new=AsyncMock(return_value=(metadata, False)),
+        ):
+            result = await q_tools.quebec_get_forest_fires_history()
+        assert "_meta" in result
+        assert result["data"]["name"] == "feux-de-foret"
 
     async def test_includes_download_urls(self):
-        pytest.skip("Plan 04")
+        """Resources list in response includes SHP/GPKG download URLs."""
+        metadata = {
+            "id": "fires-uuid",
+            "name": "feux-de-foret",
+            "title": "Feux de forêt",
+            "notes": None,
+            "organization_slug": "mrn",
+            "organization_title": "MRN",
+            "update_frequency": "annuel",
+            "license_id": "cc-by",
+            "resources": [
+                {"id": "shp-001", "name": "Feux SHP", "format": "SHP",
+                 "url": "https://example.com/feux.shp", "datastore_active": False, "size": None},
+                {"id": "gpkg-001", "name": "Feux GPKG", "format": "GPKG",
+                 "url": "https://example.com/feux.gpkg", "datastore_active": False, "size": None},
+            ],
+        }
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_forest_fires_history",
+            new=AsyncMock(return_value=(metadata, False)),
+        ):
+            result = await q_tools.quebec_get_forest_fires_history()
+        assert "_meta" in result
+        resources = result["data"]["resources"]
+        assert len(resources) == 2
+        formats = {r["format"] for r in resources}
+        assert "SHP" in formats
 
 
 class TestQuebecGetAirQualityStations:
     async def test_happy_path(self):
-        pytest.skip("Plan 04")
+        """quebec_get_air_quality_stations returns station list with _meta envelope."""
+        from mcp_canada.modules.quebec.schemas import QuebecAirQualityStation
+        station = QuebecAirQualityStation(
+            station_id="06033",
+            station_name="Montréal - Anjou",
+            admin_region="06",
+            municipality="Montréal",
+            milieu_type="Urbain",
+            latitude=45.6041,
+            longitude=-73.5626,
+        )
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_air_quality_stations",
+            new=AsyncMock(return_value=([station], False)),
+        ):
+            result = await q_tools.quebec_get_air_quality_stations()
+        assert "_meta" in result
+        assert len(result["data"]) == 1
+        assert result["data"][0]["station_id"] == "06033"
 
     async def test_active_only_filter(self):
-        pytest.skip("Plan 04")
+        """active_only param is passed through to client."""
+        mock = AsyncMock(return_value=([], False))
+        with patch("mcp_canada.modules.quebec.tools._client.fetch_air_quality_stations", new=mock):
+            await q_tools.quebec_get_air_quality_stations(active_only=False)
+        assert mock.call_args.kwargs.get("active_only") is False
+
+    async def test_upstream_error(self):
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_air_quality_stations",
+            new=AsyncMock(side_effect=httpx.HTTPStatusError(
+                "error",
+                request=httpx.Request("GET", "https://example.com"),
+                response=httpx.Response(500),
+            )),
+        ):
+            result = await q_tools.quebec_get_air_quality_stations()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestQuebecGetAirQualityIndex:
     async def test_happy_path(self):
-        pytest.skip("Plan 04")
+        """quebec_get_air_quality_index returns measurements list with _meta envelope."""
+        measurements = [
+            {"NOM_STATION": "Montréal - Anjou", "IQA": 25, "COTE": "Bon",
+             "longitude": -73.5626, "latitude": 45.6041}
+        ]
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_air_quality_index",
+            new=AsyncMock(return_value=(measurements, False)),
+        ):
+            result = await q_tools.quebec_get_air_quality_index()
+        assert "_meta" in result
+        assert len(result["data"]) == 1
+        assert result["data"][0]["NOM_STATION"] == "Montréal - Anjou"
 
     async def test_meta_envelope_shape(self):
-        pytest.skip("Plan 04")
+        """_meta must include api and url fields pointing to ArcGIS FeatureServer."""
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_air_quality_index",
+            new=AsyncMock(return_value=([], False)),
+        ):
+            result = await q_tools.quebec_get_air_quality_index()
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "donnees-quebec"
+        assert "arcgis" in result["_meta"]["source"]["url"].lower() or "IQA" in result["_meta"]["source"]["url"]
+
+    async def test_upstream_error(self):
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_air_quality_index",
+            new=AsyncMock(side_effect=httpx.HTTPStatusError(
+                "error",
+                request=httpx.Request("GET", "https://example.com"),
+                response=httpx.Response(500),
+            )),
+        ):
+            result = await q_tools.quebec_get_air_quality_index()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestQuebecGetWaterQualityMonitoring:
     async def test_returns_metadata(self):
-        pytest.skip("Plan 04")
+        """quebec_get_water_quality_monitoring returns dataset metadata with _meta envelope."""
+        metadata = {
+            "id": "wq-uuid",
+            "name": "suivi-physicochimique-des-rivieres-et-du-fleuve",
+            "title": "Suivi physicochimique des rivières et du fleuve",
+            "notes": "Données sur la qualité...",
+            "organization_slug": "developpement-durable-environnement-et-lutte-contre-les-changements-climatiques",
+            "organization_title": "MELCCFP",
+            "update_frequency": "annuel",
+            "license_id": "cc-by",
+            "resources": [],
+        }
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_water_quality_monitoring",
+            new=AsyncMock(return_value=(metadata, False)),
+        ):
+            result = await q_tools.quebec_get_water_quality_monitoring()
+        assert "_meta" in result
+        assert result["data"]["name"] == "suivi-physicochimique-des-rivieres-et-du-fleuve"
 
 
 class TestQuebecGetElectricityData:
     async def test_happy_path(self):
-        pytest.skip("Plan 04")
+        """quebec_get_electricity_data returns CSV rows with _meta envelope."""
+        rows = [{"annee": "2023", "production_twh": "200.5"}]
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_electricity_data",
+            new=AsyncMock(return_value=(rows, False)),
+        ):
+            result = await q_tools.quebec_get_electricity_data()
+        assert "_meta" in result
+        assert result["data"] == rows
 
     async def test_meta_envelope_shape(self):
-        pytest.skip("Plan 04")
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_electricity_data",
+            new=AsyncMock(return_value=([], False)),
+        ):
+            result = await q_tools.quebec_get_electricity_data()
+        assert "_meta" in result
+        assert result["_meta"]["source"]["api"] == "donnees-quebec"
+
+    async def test_upstream_error(self):
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_electricity_data",
+            new=AsyncMock(side_effect=Exception("CSV unavailable")),
+        ):
+            result = await q_tools.quebec_get_electricity_data()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestQuebecGetProtectedAreas:
     async def test_returns_metadata(self):
-        pytest.skip("Plan 04")
+        """quebec_get_protected_areas returns dataset metadata with _meta envelope."""
+        metadata = {
+            "id": "pa-uuid",
+            "name": "aires-protegees-au-quebec",
+            "title": "Aires protégées au Québec",
+            "notes": "Registre...",
+            "organization_slug": "developpement-durable-environnement-et-lutte-contre-les-changements-climatiques",
+            "organization_title": "MELCCFP",
+            "update_frequency": "semiannuel",
+            "license_id": "cc-by",
+            "resources": [
+                {"id": "gpkg-001", "name": "Aires GPKG", "format": "GPKG",
+                 "url": "https://example.com/aires.gpkg", "datastore_active": False, "size": None},
+            ],
+        }
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_protected_areas",
+            new=AsyncMock(return_value=(metadata, False)),
+        ):
+            result = await q_tools.quebec_get_protected_areas()
+        assert "_meta" in result
+        assert result["data"]["name"] == "aires-protegees-au-quebec"
 
     async def test_includes_download_urls(self):
-        pytest.skip("Plan 04")
+        """Resources list includes format and URL for each download resource."""
+        metadata = {
+            "id": "pa-uuid",
+            "name": "aires-protegees-au-quebec",
+            "title": "Aires protégées au Québec",
+            "notes": None,
+            "organization_slug": "developpement-durable-environnement-et-lutte-contre-les-changements-climatiques",
+            "organization_title": "MELCCFP",
+            "update_frequency": "semiannuel",
+            "license_id": "cc-by",
+            "resources": [
+                {"id": "gpkg-001", "name": "Aires GPKG", "format": "GPKG",
+                 "url": "https://example.com/aires.gpkg", "datastore_active": False, "size": None},
+                {"id": "shp-001", "name": "Aires SHP", "format": "SHP",
+                 "url": "https://example.com/aires.shp", "datastore_active": False, "size": None},
+            ],
+        }
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_protected_areas",
+            new=AsyncMock(return_value=(metadata, False)),
+        ):
+            result = await q_tools.quebec_get_protected_areas()
+        resources = result["data"]["resources"]
+        assert len(resources) == 2
+        assert any(r["format"] == "GPKG" for r in resources)

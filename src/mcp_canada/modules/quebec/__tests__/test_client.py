@@ -502,36 +502,172 @@ class TestFetchBridgeStructures:
 
 
 class TestFetchForestFiresHistory:
-    async def test_returns_package_metadata_only(self):
-        pytest.skip("Plan 04")
+    async def test_returns_package_metadata_only(self, sample_ckan_package_show_csv_only_response):
+        """fetch_forest_fires_history returns dataset details dict (metadata only)."""
+        with patch(
+            "mcp_canada.modules.quebec.client.api_get",
+            new=AsyncMock(return_value=sample_ckan_package_show_csv_only_response),
+        ):
+            result, _ = await q_client.fetch_forest_fires_history()
+        assert isinstance(result, dict)
+        assert "name" in result
+        assert result["name"] == "feux-de-foret"
 
 
 class TestFetchAirQualityStations:
-    async def test_returns_station_list(self):
-        pytest.skip("Plan 04")
+    async def test_returns_station_list(self, sample_datastore_aq_stations_response):
+        """fetch_air_quality_stations returns list of QuebecAirQualityStation objects."""
+        from mcp_canada.modules.quebec.schemas import QuebecAirQualityStation
+        with patch(
+            "mcp_canada.modules.quebec.client._datastore_get",
+            new=AsyncMock(return_value=sample_datastore_aq_stations_response["result"]),
+        ):
+            result, was_cached = await q_client.fetch_air_quality_stations(active_only=False)
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert isinstance(result[0], QuebecAirQualityStation)
+        assert result[0].station_id == "06033"
+        assert result[0].station_name == "Montréal - Anjou"
 
-    async def test_filters_active_stations(self):
-        pytest.skip("Plan 04")
+    async def test_filters_active_stations(self, sample_datastore_aq_stations_response):
+        """active_only=True excludes rows with DATE_FERMETURE set."""
+        records = sample_datastore_aq_stations_response["result"]["records"]
+        records[0]["DATE_FERMETURE"] = "2020-12-31"  # closed station
+        with patch(
+            "mcp_canada.modules.quebec.client._datastore_get",
+            new=AsyncMock(return_value={"records": records, "total": 2, "fields": []}),
+        ):
+            result, _ = await q_client.fetch_air_quality_stations(active_only=True)
+        # Only the second station (no DATE_FERMETURE) should be returned
+        assert len(result) == 1
+        assert result[0].station_id == "03002"
 
 
 class TestFetchAirQualityIndex:
     async def test_calls_arcgis_rest(self):
-        pytest.skip("Plan 04")
+        """fetch_air_quality_index calls api_get with AQ_INDEX_URL and ?f=json."""
+        arcgis_response = {
+            "features": [
+                {
+                    "attributes": {"NOM_STATION": "Montréal - Anjou", "IQA": 25, "COTE": "Bon"},
+                    "geometry": {"x": -73.5626, "y": 45.6041},
+                }
+            ]
+        }
+        mock_api = AsyncMock(return_value=arcgis_response)
+        with patch("mcp_canada.modules.quebec.client.api_get", new=mock_api):
+            result, _ = await q_client.fetch_air_quality_index(limit=1)
+        assert mock_api.call_count == 1
+        call_url = mock_api.call_args.args[0]
+        from mcp_canada.modules.quebec.constants import AQ_INDEX_URL
+        assert call_url == AQ_INDEX_URL
+        params = mock_api.call_args.args[1]
+        assert params.get("f") == "json"
 
     async def test_returns_measurements(self):
-        pytest.skip("Plan 04")
+        """fetch_air_quality_index returns list of dicts with merged attributes + lat/lon."""
+        arcgis_response = {
+            "features": [
+                {
+                    "attributes": {"NOM_STATION": "Montréal - Anjou", "IQA": 25},
+                    "geometry": {"x": -73.5626, "y": 45.6041},
+                }
+            ]
+        }
+        with patch("mcp_canada.modules.quebec.client.api_get", new=AsyncMock(return_value=arcgis_response)):
+            result, _ = await q_client.fetch_air_quality_index()
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["NOM_STATION"] == "Montréal - Anjou"
+        assert result[0]["longitude"] == -73.5626
+        assert result[0]["latitude"] == 45.6041
 
 
 class TestFetchWaterQualityMonitoring:
-    async def test_returns_package_metadata(self):
-        pytest.skip("Plan 04")
+    async def test_returns_package_metadata(self, sample_ckan_package_show_csv_only_response):
+        """fetch_water_quality_monitoring returns metadata dict from package_show."""
+        # Reuse a different package show fixture style
+        pkg_response = {
+            "success": True,
+            "result": {
+                "id": "wq-uuid",
+                "name": "suivi-physicochimique-des-rivieres-et-du-fleuve",
+                "title": "Suivi physicochimique des rivières et du fleuve",
+                "notes": "Données sur la qualité de l'eau...",
+                "organization": {"name": "developpement-durable-environnement-et-lutte-contre-les-changements-climatiques", "title": "MELCCFP"},
+                "resources": [],
+            },
+        }
+        with patch(
+            "mcp_canada.modules.quebec.client.api_get",
+            new=AsyncMock(return_value=pkg_response),
+        ):
+            result, _ = await q_client.fetch_water_quality_monitoring()
+        assert isinstance(result, dict)
+        assert result["name"] == "suivi-physicochimique-des-rivieres-et-du-fleuve"
 
 
 class TestFetchElectricityData:
     async def test_parses_hydro_quebec_csv(self):
-        pytest.skip("Plan 04")
+        """fetch_electricity_data finds CSV resource then calls fetch_and_parse."""
+        hydro_pkg = {
+            "success": True,
+            "result": {
+                "id": "hydro-uuid",
+                "name": "historique-production-consommation",
+                "title": "Historique de production et consommation",
+                "notes": "Données historiques...",
+                "organization": {"name": "hydro-quebec", "title": "Hydro-Québec"},
+                "resources": [
+                    {
+                        "id": "csv-001",
+                        "name": "Historique CSV",
+                        "format": "CSV",
+                        "url": "https://hydroquebec.com/data/historique.csv",
+                        "datastore_active": False,
+                    }
+                ],
+            },
+        }
+        sample_rows = [{"annee": "2023", "production_twh": "200.5", "consommation_twh": "195.0"}]
+        with patch("mcp_canada.modules.quebec.client.api_get", new=AsyncMock(return_value=hydro_pkg)):
+            with patch(
+                "mcp_canada.modules.quebec.client.fetch_and_parse",
+                new=AsyncMock(return_value=(sample_rows, False)),
+            ):
+                result, _ = await q_client.fetch_electricity_data()
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["annee"] == "2023"
 
 
 class TestFetchProtectedAreas:
     async def test_returns_package_metadata(self):
-        pytest.skip("Plan 04")
+        """fetch_protected_areas returns metadata dict from package_show."""
+        pa_pkg = {
+            "success": True,
+            "result": {
+                "id": "pa-uuid",
+                "name": "aires-protegees-au-quebec",
+                "title": "Aires protégées au Québec",
+                "notes": "Registre des aires protégées...",
+                "organization": {"name": "developpement-durable-environnement-et-lutte-contre-les-changements-climatiques", "title": "MELCCFP"},
+                "resources": [
+                    {
+                        "id": "gpkg-001",
+                        "name": "Aires protégées GPKG",
+                        "format": "GPKG",
+                        "url": "https://blob.core.windows.net/aires-protegees.gpkg",
+                        "datastore_active": False,
+                    }
+                ],
+            },
+        }
+        with patch(
+            "mcp_canada.modules.quebec.client.api_get",
+            new=AsyncMock(return_value=pa_pkg),
+        ):
+            result, _ = await q_client.fetch_protected_areas()
+        assert isinstance(result, dict)
+        assert result["name"] == "aires-protegees-au-quebec"
+        assert len(result["resources"]) == 1

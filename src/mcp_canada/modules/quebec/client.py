@@ -32,6 +32,7 @@ from mcp_canada.shared.parsers import fetch_and_parse
 from mcp_canada.shared.rate_limiter import get_limiter
 
 from .constants import (
+    AQ_INDEX_URL,
     BASE_URL,
     CACHE_TTL_ACTIVE,
     CACHE_TTL_DAILY,
@@ -47,8 +48,10 @@ from .constants import (
     MTQ_ROAD_WORKS_URL,
     RATE_GROUP,
     RATE_LIMIT,
+    RSQAQ_STATIONS_RESOURCE_ID,
 )
 from .schemas import (
+    QuebecAirQualityStation,
     QuebecBridgeStructure,
     QuebecCategory,
     QuebecDatasetDetails,
@@ -643,57 +646,129 @@ async def fetch_bridge_structures(
 
 
 async def fetch_forest_fires_history() -> tuple[dict[str, Any], bool]:
-    """MFFP/MRN forest fire archive metadata — Plan 04 implements.
+    """MFFP/MRN forest fire archive metadata (package_show only).
 
-    Returns CKAN package metadata + resource URLs (SHP/GPKG only — not parseable
-    by fetch_and_parse). Metadata/discovery tool, not data extraction tool.
+    Returns CKAN package metadata + resource download URLs (SHP/GPKG format only —
+    not parseable by fetch_and_parse). This is a metadata/discovery tool.
+    Agents should download the SHP/GPKG archives externally for geometric data.
     """
-    raise NotImplementedError("Plan 04 implements fetch_forest_fires_history")
+    details, cached = await fetch_dataset_details("feux-de-foret")
+    return (details.model_dump(), cached)
 
 
 async def fetch_air_quality_stations(
     active_only: bool = True,
-) -> tuple[list[dict[str, Any]], bool]:
-    """RSQAQ air quality stations via datastore_search — Plan 04 implements.
+    limit: int = 500,
+) -> tuple[list[QuebecAirQualityStation], bool]:
+    """RSQAQ air quality stations via datastore_search.
 
-    245 rows total (active + closed). active_only=True filters DATE_FERMETURE=None.
+    245 rows total (active + historical closed stations).
+    active_only=True (default) filters out stations where DATE_FERMETURE is not None.
     """
-    raise NotImplementedError("Plan 04 implements fetch_air_quality_stations")
+    cache_key = f"quebec:rsqaq:stations:{active_only}:{limit}"
+
+    async def _fetch() -> list[QuebecAirQualityStation]:
+        params: dict[str, Any] = {"limit": limit}
+        result = await _datastore_get(RSQAQ_STATIONS_RESOURCE_ID, params)
+        out: list[QuebecAirQualityStation] = []
+        for r in (result.get("records") or []):
+            if active_only and r.get("DATE_FERMETURE"):
+                continue
+            out.append(QuebecAirQualityStation(
+                station_id=r.get("ID_STATION"),
+                station_name=r.get("NOM_STATION"),
+                admin_region=r.get("RA"),
+                address=r.get("ADRESSE"),
+                municipality=r.get("MUNICIPALITE"),
+                milieu_type=r.get("TYPE_MILIEU"),
+                date_opened=r.get("DATE_OUVERTURE"),
+                date_closed=r.get("DATE_FERMETURE"),
+                latitude=_safe_float(r.get("LATITUDE")),
+                longitude=_safe_float(r.get("LONGITUDE")),
+            ))
+        return out
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 async def fetch_air_quality_index(
     limit: int = 200,
 ) -> tuple[list[dict[str, Any]], bool]:
-    """MELCCFP air quality index via ArcGIS FeatureServer — Plan 04 implements.
+    """MELCCFP air quality index via ArcGIS REST FeatureServer.
 
     Source: AQ_INDEX_URL (ArcGIS REST, not CKAN datastore).
-    Use api_get with ?f=json&where=1=1&outFields=*&resultRecordCount={limit}.
+    Calls api_get with ?f=json&where=1=1&outFields=*&resultRecordCount={limit}.
+    Returns flattened feature list with attributes merged with lat/lon from geometry.
     """
-    raise NotImplementedError("Plan 04 implements fetch_air_quality_index")
+    cache_key = f"quebec:rsqaq:index:{limit}"
+
+    async def _fetch() -> list[dict[str, Any]]:
+        params: dict[str, Any] = {
+            "f": "json",
+            "where": "1=1",
+            "outFields": "*",
+            "resultRecordCount": limit,
+        }
+        await _limiter.acquire()
+        envelope = await api_get(AQ_INDEX_URL, params, headers=DEFAULT_HEADERS)
+        if not isinstance(envelope, dict):
+            return []
+        features = envelope.get("features") or []
+        out: list[dict[str, Any]] = []
+        for f in features:
+            attrs = f.get("attributes") or {}
+            geom = f.get("geometry") or {}
+            out.append({**attrs, "longitude": geom.get("x"), "latitude": geom.get("y")})
+        return out
+
+    return await cached_fetch(cache_key, CACHE_TTL_ACTIVE, _fetch)
 
 
 async def fetch_water_quality_monitoring() -> tuple[dict[str, Any], bool]:
-    """MELCCFP water quality monitoring metadata — Plan 04 implements.
+    """MELCCFP water quality monitoring metadata (package_show only).
 
-    Returns CKAN package metadata + download URLs (GeoJSON ZIP — not directly
-    parseable by fetch_and_parse). Metadata/discovery tool.
+    Returns CKAN package metadata + download URLs (GeoJSON ZIP at Azure Blob —
+    not directly parseable by fetch_and_parse). Metadata/discovery tool.
     """
-    raise NotImplementedError("Plan 04 implements fetch_water_quality_monitoring")
+    details, cached = await fetch_dataset_details(
+        "suivi-physicochimique-des-rivieres-et-du-fleuve"
+    )
+    return (details.model_dump(), cached)
 
 
-async def fetch_electricity_data() -> tuple[list[dict[str, Any]], bool]:
-    """Hydro-Québec historical electricity production/consumption — Plan 04 implements.
+async def fetch_electricity_data(
+    limit: int = 500,
+) -> tuple[list[dict[str, Any]], bool]:
+    """Hydro-Québec historical electricity production/consumption CSV.
 
-    Source: historique-production-consommation (CSV via fetch_and_parse).
+    Picks the first CSV resource from the historique-production-consommation package
+    and parses it via fetch_and_parse. Returns rows up to limit.
+
     Note: Current outages are NOT on DQ CKAN — redirect agents to hydroquebec.com/pannes/.
     """
-    raise NotImplementedError("Plan 04 implements fetch_electricity_data")
+    cache_key = f"quebec:hydro:electricity:{limit}"
+
+    async def _fetch() -> list[dict[str, Any]]:
+        details, _ = await fetch_dataset_details("historique-production-consommation")
+        csv_url: str | None = None
+        for r in details.resources:
+            if (r.format or "").upper() == "CSV" and r.url:
+                csv_url = r.url
+                break
+        if csv_url is None:
+            return []
+        rows, _ = await fetch_and_parse(csv_url, ttl=CACHE_TTL_META)
+        return rows[:limit]
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 async def fetch_protected_areas() -> tuple[dict[str, Any], bool]:
-    """MELCCFP protected areas metadata — Plan 04 implements.
+    """MELCCFP protected areas metadata (package_show only).
 
-    Returns CKAN package metadata + resource URLs (SHP/GPKG/FGDB — not parseable
-    by fetch_and_parse). Metadata/discovery tool.
+    Returns CKAN package metadata + resource download URLs (SHP/GPKG/FGDB format —
+    not parseable by fetch_and_parse). Metadata/discovery tool.
+    ~10,000+ protected areas in the Registre des aires protégées et des AMCE.
     """
-    raise NotImplementedError("Plan 04 implements fetch_protected_areas")
+    details, cached = await fetch_dataset_details("aires-protegees-au-quebec")
+    return (details.model_dump(), cached)

@@ -1566,3 +1566,58 @@ class TestBcToolScenarios:
         # Verify structure — the tool should return _meta or error, not raise an exception
         assert csv_dataset.get("queryable_via_wfs") is False
         assert isinstance(csv_dataset.get("resources", []), list)
+
+
+# ─── Quebec Government Open Data scenarios ───────────────────────────────────
+
+
+class TestQuebecToolScenarios:
+    """Live Données Québec + MTQ WFS CSV integration tests (Plan 04 fills)."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_search_datasets_live(self, mcp_server):
+        """'Search for health datasets on Données Québec.'"""
+        pytest.xfail("Plan 04 implements integration test")
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_list_organizations_live(self, mcp_server):
+        """'List all organizations on Données Québec.'"""
+        pytest.xfail("Plan 04 implements integration test")
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_list_categories_groups_not_tags(self, mcp_server):
+        """'What thematic categories exist on Données Québec?' — must use groups not tags."""
+        pytest.xfail("Plan 04 implements integration test")
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_get_er_wait_times_live(self, mcp_server):
+        """'What are the current ER wait times in Quebec hospitals?'"""
+        pytest.xfail("Plan 04 implements integration test")
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_get_health_installations_live(self, mcp_server):
+        """'Show me CLSCs in the Saguenay region.'"""
+        pytest.xfail("Plan 04 implements integration test")
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_get_road_works_wfs_csv(self, mcp_server):
+        """'What road construction zones are currently active on A-25?'"""
+        pytest.xfail("Plan 04 implements integration test")
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_get_bridge_structures_requires_filter(self, mcp_server):
+        """'List bridges in Granby.' — must require at least one filter."""
+        pytest.xfail("Plan 04 implements integration test")
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_discover_tools_finds_quebec(self, mcp_server):
+        """'Find tools for Quebec health data.' — BM25 must surface quebec_ tools."""
+        pytest.xfail("Plan 04 implements integration test")

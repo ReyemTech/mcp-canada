@@ -573,3 +573,28 @@ class TestBcPromptsResources:
         assert "WFS" in content, "WFS query guide must mention WFS"
         assert "bc_query_features" in content, "WFS query guide must reference bc_query_features"
         assert "#" in content, "WFS query guide must be markdown with headings"
+
+
+# ─── Quebec prompts and resources scenarios ───────────────────────────────────
+
+
+class TestQuebecPromptsResources:
+    """Integration tests for Quebec prompts and resources (Plan 04 fills)."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_prompts_discoverable(self, mcp_server):
+        """Quebec prompts appear in prompts/list."""
+        pytest.xfail("Plan 04 implements")
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_resources_discoverable(self, mcp_server):
+        """Quebec resources (data://quebec/*, docs://quebec/*, template://quebec/*) appear in resources/list."""
+        pytest.xfail("Plan 04 implements")
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_ministries_resource_valid_json(self, mcp_server):
+        """data://quebec/ministries returns valid JSON with ministry entries."""
+        pytest.xfail("Plan 04 implements")

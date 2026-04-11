@@ -67,10 +67,10 @@ updated: 2026-04-10
 | 15-03-14 | 03 | 3 | bc_get_road_structures | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetRoadStructures -x` | ✅ | ✅ green |
 | 15-03-15 | 03 | 3 | bc_get_climate_stations | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_tools.py::TestBcGetClimateStations -x` | ✅ | ✅ green |
 | 15-03-16 | 03 | 3 | _wfs_fetch shared helper | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_client.py::TestWfsFetchShared -x` | ✅ | ✅ green |
-| 15-04-01 | 04 | 4 | bc prompts (6) | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_prompts_resources.py::TestBcPrompts -x` | ✅ | ⬜ pending |
-| 15-04-02 | 04 | 4 | bc resources (7) | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_prompts_resources.py::TestBcResources -x` | ✅ | ⬜ pending |
-| 15-04-03 | 04 | 4 | bc integration scenarios | integration | `uv run pytest tests/integration/test_tool_scenarios.py::TestBcToolScenarios -m integration --timeout=120` | ✅ | ⬜ pending |
-| 15-04-04 | 04 | 4 | bc prompts/resources integration | integration | `uv run pytest tests/integration/test_prompts_resources_scenarios.py::TestBcPromptsResources -m integration --timeout=120` | ✅ | ⬜ pending |
+| 15-04-01 | 04 | 4 | bc prompts (6) | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_prompts_resources.py::TestBcPrompts -x` | ✅ | ✅ green |
+| 15-04-02 | 04 | 4 | bc resources (7) | unit | `uv run pytest src/mcp_canada/modules/british_columbia/__tests__/test_prompts_resources.py::TestBcResources -x` | ✅ | ✅ green |
+| 15-04-03 | 04 | 4 | bc integration scenarios | integration | `uv run pytest tests/integration/test_tool_scenarios.py::TestBcToolScenarios -m integration --timeout=120` | ✅ | ✅ green |
+| 15-04-04 | 04 | 4 | bc prompts/resources integration | integration | `uv run pytest tests/integration/test_prompts_resources_scenarios.py::TestBcPromptsResources -m integration --timeout=120` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 

@@ -578,23 +578,67 @@ class TestBcPromptsResources:
 # ─── Quebec prompts and resources scenarios ───────────────────────────────────
 
 
+@pytest.mark.asyncio
 class TestQuebecPromptsResources:
-    """Integration tests for Quebec prompts and resources (Plan 04 fills)."""
+    """Integration tests for Quebec prompts and resources."""
 
     @pytest.mark.asyncio
     @pytest.mark.integration
+    @pytest.mark.timeout(30)
     async def test_prompts_discoverable(self, mcp_server):
         """Quebec prompts appear in prompts/list."""
-        pytest.xfail("Plan 04 implements")
+        prompts = await list_prompts(mcp_server)
+        prompt_names = [p.name for p in prompts]
+        quebec_prompts = [n for n in prompt_names if n.startswith("quebec_")]
+        assert len(quebec_prompts) >= 6, (
+            f"Expected >= 6 quebec_ prompts, got {len(quebec_prompts)}: {sorted(quebec_prompts)}"
+        )
+        expected = {
+            "quebec_explore_health",
+            "quebec_explore_transport_conditions",
+            "quebec_explore_environment",
+            "quebec_quick_dataset_search",
+            "quebec_check_road_conditions",
+            "quebec_active_fires_now",
+        }
+        for p in expected:
+            assert p in prompt_names, f"Missing Quebec prompt: {p}"
 
     @pytest.mark.asyncio
     @pytest.mark.integration
+    @pytest.mark.timeout(30)
     async def test_resources_discoverable(self, mcp_server):
         """Quebec resources (data://quebec/*, docs://quebec/*, template://quebec/*) appear in resources/list."""
-        pytest.xfail("Plan 04 implements")
+        resources = await list_resources(mcp_server)
+        quebec_resources = [r for r in resources if "/quebec/" in str(r.uri)]
+        assert len(quebec_resources) >= 7, (
+            f"Expected >= 7 quebec/ resources, got {len(quebec_resources)}: "
+            f"{[str(r.uri) for r in quebec_resources]}"
+        )
+        uris = {str(r.uri) for r in quebec_resources}
+        expected_uris = {
+            "data://quebec/ministries",
+            "data://quebec/regions",
+            "data://quebec/mrcs",
+            "docs://quebec/catalog-federation-quirks",
+            "docs://quebec/bilingual-metadata-guide",
+            "template://quebec/dataset-report",
+            "template://quebec/road-conditions-report",
+        }
+        for uri in expected_uris:
+            assert uri in uris, f"Missing Quebec resource URI: {uri}"
 
     @pytest.mark.asyncio
     @pytest.mark.integration
+    @pytest.mark.timeout(30)
     async def test_ministries_resource_valid_json(self, mcp_server):
         """data://quebec/ministries returns valid JSON with ministry entries."""
-        pytest.xfail("Plan 04 implements")
+        import json
+        content = await read_resource(mcp_server, "data://quebec/ministries")
+        assert content, "data://quebec/ministries returned empty content"
+        parsed = json.loads(content)
+        assert isinstance(parsed, list)
+        assert len(parsed) >= 5
+        slugs = [entry["slug"] for entry in parsed]
+        assert "msss" in slugs
+        assert "mtq" in slugs

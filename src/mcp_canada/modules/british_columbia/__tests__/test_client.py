@@ -6,6 +6,7 @@ All HTTP calls are patched at the client module namespace.
 
 from __future__ import annotations
 
+import httpx
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -19,16 +20,8 @@ from mcp_canada.modules.british_columbia.client import (
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# (No Response mock helper needed — api_get returns parsed JSON dicts directly)
 # ---------------------------------------------------------------------------
-
-def _make_http_response(json_data: dict, status_code: int = 200):
-    """Build a mock httpx.Response-like object."""
-    resp = MagicMock()
-    resp.status_code = status_code
-    resp.json.return_value = json_data
-    resp.raise_for_status = MagicMock()
-    return resp
 
 
 # ---------------------------------------------------------------------------
@@ -42,8 +35,7 @@ class TestFetchSearchDatasets:
     @pytest.mark.asyncio
     async def test_returns_shaped_summaries(self, sample_ckan_package_search_response):
         """fetch_search_datasets returns list of flat summary dicts."""
-        mock_resp = _make_http_response(sample_ckan_package_search_response)
-        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=sample_ckan_package_search_response)):
             results, was_cached = await fetch_search_datasets(q="wildfire")
         assert isinstance(results, list)
         assert len(results) == 2
@@ -59,8 +51,7 @@ class TestFetchSearchDatasets:
     @pytest.mark.asyncio
     async def test_passes_rows_and_start_pagination_params(self, sample_ckan_package_search_response):
         """fetch_search_datasets forwards rows and start to api_get."""
-        mock_resp = _make_http_response(sample_ckan_package_search_response)
-        mock_api_get = AsyncMock(return_value=mock_resp)
+        mock_api_get = AsyncMock(return_value=sample_ckan_package_search_response)
         with patch("mcp_canada.modules.british_columbia.client.api_get", new=mock_api_get):
             await fetch_search_datasets(q="test", rows=5, start=10)
         call_kwargs = mock_api_get.call_args
@@ -72,8 +63,7 @@ class TestFetchSearchDatasets:
     @pytest.mark.asyncio
     async def test_passes_fq_filter_when_provided(self, sample_ckan_package_search_response):
         """fetch_search_datasets includes fq in CKAN params when provided."""
-        mock_resp = _make_http_response(sample_ckan_package_search_response)
-        mock_api_get = AsyncMock(return_value=mock_resp)
+        mock_api_get = AsyncMock(return_value=sample_ckan_package_search_response)
         with patch("mcp_canada.modules.british_columbia.client.api_get", new=mock_api_get):
             await fetch_search_datasets(q="fire", fq="organization:bc-wildfire-service")
         call_kwargs = mock_api_get.call_args
@@ -97,8 +87,7 @@ class TestFetchSearchDatasets:
             "mcp_canada.modules.british_columbia.client.cached_fetch",
             fake_cached_fetch_with_hit,
         )
-        mock_resp = _make_http_response(sample_ckan_package_search_response)
-        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=sample_ckan_package_search_response)):
             _, first_cached = await fetch_search_datasets(q="fire")
             _, second_cached = await fetch_search_datasets(q="fire")
         assert first_cached is False
@@ -122,8 +111,7 @@ class TestFetchSearchDatasets:
             "mcp_canada.modules.british_columbia.client.get_limiter",
             fake_get_limiter,
         )
-        mock_resp = _make_http_response(sample_ckan_package_search_response)
-        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=sample_ckan_package_search_response)):
             await fetch_search_datasets(q="fire")
         assert captured["source"] == RATE_GROUP_CKAN
         assert captured["rate"] == RATE_LIMIT_CKAN
@@ -140,8 +128,7 @@ class TestFetchDatasetDetails:
     @pytest.mark.asyncio
     async def test_returns_dataset_with_resources(self, sample_ckan_package_show_wfs_response):
         """fetch_dataset_details returns dict with resources list."""
-        mock_resp = _make_http_response(sample_ckan_package_show_wfs_response)
-        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=sample_ckan_package_show_wfs_response)):
             result, _ = await fetch_dataset_details("pkg-fire-001")
         assert "resources" in result
         assert isinstance(result["resources"], list)
@@ -151,8 +138,7 @@ class TestFetchDatasetDetails:
         self, sample_ckan_package_show_wfs_response
     ):
         """WFS dataset with bc geographic warehouse storage gets queryable_via_wfs=True."""
-        mock_resp = _make_http_response(sample_ckan_package_show_wfs_response)
-        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=sample_ckan_package_show_wfs_response)):
             result, _ = await fetch_dataset_details("pkg-fire-001")
         assert result["queryable_via_wfs"] is True
 
@@ -161,8 +147,7 @@ class TestFetchDatasetDetails:
         self, sample_ckan_package_show_file_response
     ):
         """File-only dataset gets queryable_via_wfs=False."""
-        mock_resp = _make_http_response(sample_ckan_package_show_file_response)
-        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=sample_ckan_package_show_file_response)):
             result, _ = await fetch_dataset_details("pkg-fire-002")
         assert result["queryable_via_wfs"] is False
 
@@ -171,8 +156,7 @@ class TestFetchDatasetDetails:
         self, sample_ckan_package_show_wfs_response
     ):
         """fetch_dataset_details surfaces object_name from the first WFS-queryable resource."""
-        mock_resp = _make_http_response(sample_ckan_package_show_wfs_response)
-        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=sample_ckan_package_show_wfs_response)):
             result, _ = await fetch_dataset_details("pkg-fire-001")
         assert result["object_name"] == "WHSE_LAND_AND_NATURAL_RESOURCE.PROT_HISTORICAL_FIRE_POLYS_SP"
 
@@ -181,22 +165,16 @@ class TestFetchDatasetDetails:
         self, sample_ckan_package_show_file_response
     ):
         """File-only dataset has object_name=None."""
-        mock_resp = _make_http_response(sample_ckan_package_show_file_response)
-        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=sample_ckan_package_show_file_response)):
             result, _ = await fetch_dataset_details("pkg-fire-002")
         assert result["object_name"] is None
 
     @pytest.mark.asyncio
     async def test_raises_not_found_for_missing_package(self):
-        """fetch_dataset_details raises httpx.HTTPStatusError on 404."""
-        import httpx
-
-        mock_resp = MagicMock()
-        mock_resp.status_code = 404
-        mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError(
-            "Not Found", request=MagicMock(), response=mock_resp
-        )
-        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+        """fetch_dataset_details raises httpx.HTTPStatusError on CKAN success=False envelope."""
+        # Simulate CKAN returning success=False (e.g. package not found)
+        failure_envelope = {"success": False, "error": {"message": "Not found"}}
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=failure_envelope)):
             with pytest.raises(httpx.HTTPStatusError):
                 await fetch_dataset_details("nonexistent-package")
 
@@ -216,8 +194,7 @@ class TestFetchDatasetDetails:
             "mcp_canada.modules.british_columbia.client.cached_fetch",
             fake_cached_fetch_with_hit,
         )
-        mock_resp = _make_http_response(sample_ckan_package_show_wfs_response)
-        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=sample_ckan_package_show_wfs_response)):
             _, first_cached = await fetch_dataset_details("pkg-fire-001")
             _, second_cached = await fetch_dataset_details("pkg-fire-001")
         assert first_cached is False
@@ -235,8 +212,7 @@ class TestFetchOrganizations:
     @pytest.mark.asyncio
     async def test_returns_list_of_org_dicts(self, sample_ckan_organization_list_response):
         """fetch_organizations returns list of organization dicts."""
-        mock_resp = _make_http_response(sample_ckan_organization_list_response)
-        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=sample_ckan_organization_list_response)):
             result, was_cached = await fetch_organizations()
         assert isinstance(result, list)
         assert len(result) > 0
@@ -256,8 +232,7 @@ class TestFetchOrganizations:
             "mcp_canada.modules.british_columbia.client.cached_fetch",
             fake_cached_fetch_capture,
         )
-        mock_resp = _make_http_response(sample_ckan_organization_list_response)
-        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=sample_ckan_organization_list_response)):
             await fetch_organizations()
         assert captured_ttl["ttl"] == CACHE_TTL_META
 
@@ -273,8 +248,7 @@ class TestFetchTags:
     @pytest.mark.asyncio
     async def test_returns_list_of_tag_strings(self, sample_ckan_tag_list_response):
         """fetch_tags returns a list of tag name strings."""
-        mock_resp = _make_http_response(sample_ckan_tag_list_response)
-        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=sample_ckan_tag_list_response)):
             result, was_cached = await fetch_tags()
         assert isinstance(result, list)
         assert all(isinstance(t, str) for t in result)
@@ -295,8 +269,7 @@ class TestFetchTags:
             "mcp_canada.modules.british_columbia.client.cached_fetch",
             fake_cached_fetch_capture,
         )
-        mock_resp = _make_http_response(sample_ckan_tag_list_response)
-        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=mock_resp)):
+        with patch("mcp_canada.modules.british_columbia.client.api_get", new=AsyncMock(return_value=sample_ckan_tag_list_response)):
             await fetch_tags()
         assert captured_ttl["ttl"] == CACHE_TTL_META
 
@@ -657,3 +630,63 @@ class TestQueryableViaWfsDetection:
         queryable, object_name = _compute_queryable_via_wfs(resources)
         assert queryable is True
         assert object_name == "WHSE_FOREST_TENURE.FTEN_MANAGED_LICENCE_POLY_SVW"
+
+
+# ---------------------------------------------------------------------------
+# TestSharedApiGetContract — Contract tests patching shared/http.py:api_get
+# ---------------------------------------------------------------------------
+
+
+class TestSharedApiGetContract:
+    """Contract tests — api_get returns raw dicts (parsed JSON), never an httpx.Response.
+
+    These verify the module handles the REAL shared api_get contract (parsed JSON dict),
+    not the MagicMock Response wrapper that the other tests use. This is the bug class
+    that caused the phase 15 UAT blocker (gaps 1/2/3/5).
+
+    The patch path is `mcp_canada.modules.british_columbia.client.api_get` — the local
+    binding in the client module — with return_value set to a raw dict (the real
+    shared/http.py:api_get contract). These tests would have caught the original bug
+    because the old _api_get called .raise_for_status() on the dict and raised AttributeError.
+    """
+
+    @pytest.mark.asyncio
+    async def test_fetch_search_datasets_with_real_shared_contract(
+        self, sample_ckan_package_search_response
+    ):
+        """fetch_search_datasets works when api_get returns a raw dict (not a Response)."""
+        with patch(
+            "mcp_canada.modules.british_columbia.client.api_get",
+            new=AsyncMock(return_value=sample_ckan_package_search_response),
+        ):
+            results, _ = await fetch_search_datasets(q="fire")
+        assert isinstance(results, list)
+        assert len(results) >= 1
+        assert "id" in results[0]
+        assert "title" in results[0]
+
+    @pytest.mark.asyncio
+    async def test_fetch_dataset_details_with_real_shared_contract(
+        self, sample_ckan_package_show_wfs_response
+    ):
+        """fetch_dataset_details works when api_get returns a raw dict (not a Response)."""
+        with patch(
+            "mcp_canada.modules.british_columbia.client.api_get",
+            new=AsyncMock(return_value=sample_ckan_package_show_wfs_response),
+        ):
+            details, _ = await fetch_dataset_details(package_id="abc")
+        assert isinstance(details, dict)
+        assert "id" in details or "name" in details
+
+    @pytest.mark.asyncio
+    async def test_api_get_raises_on_ckan_success_false(self):
+        """_api_get raises when CKAN envelope is success=False."""
+        from mcp_canada.modules.british_columbia import client as bc_client
+
+        failure_envelope = {"success": False, "error": {"message": "Not found"}}
+        with patch(
+            "mcp_canada.modules.british_columbia.client.api_get",
+            new=AsyncMock(return_value=failure_envelope),
+        ):
+            with pytest.raises(httpx.HTTPStatusError):
+                await bc_client._api_get("package_search", {"q": "fire"})

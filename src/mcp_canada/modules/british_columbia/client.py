@@ -55,25 +55,24 @@ __all__ = [
 async def _api_get(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
     """Fetch from BC Data Catalogue CKAN API and unwrap the CKAN success envelope.
 
-    CKAN always returns {"success": true, "result": ...}. Raises
-    httpx.HTTPStatusError on non-200 responses or on CKAN success=False.
+    shared/http.py:api_get already returns parsed JSON (dict) — never a Response.
+    HTTP-level errors (4xx/5xx) are raised inside shared api_get's internal _fetch().
+    This helper only checks CKAN's application-level `success: false` envelope.
 
     Args:
         path: Action API path (e.g. "package_search") relative to BASE_URL.
         params: Optional query parameters.
 
     Returns:
-        The unwrapped CKAN result field.
+        The unwrapped CKAN result field (dict or list wrapped in a dict).
     """
     url = BASE_URL + path
-    response = await api_get(url, params or {})
-    response.raise_for_status()
-    envelope = response.json()
-    if not envelope.get("success", False):
+    envelope = await api_get(url, params or {})
+    if not isinstance(envelope, dict) or not envelope.get("success", False):
         raise httpx.HTTPStatusError(
             f"CKAN returned success=False for {path}",
-            request=response.request,
-            response=response,
+            request=httpx.Request("GET", url),
+            response=httpx.Response(500),
         )
     return envelope.get("result", {})
 

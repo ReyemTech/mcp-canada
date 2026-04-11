@@ -1436,24 +1436,28 @@ class TestBcToolScenarios:
         if "_meta" in data:
             assert data["_meta"]["source"]["api"] == "bc-wfs"
             assert "data" in data
-            assert isinstance(data["data"], list)
-            # Shape check: features list has truncated field
-            assert "truncated" in data
+            # data is {"features": [...], "truncated": bool}
+            assert isinstance(data["data"], dict)
+            assert "features" in data["data"]
+            assert isinstance(data["data"]["features"], list)
+            assert "truncated" in data["data"]
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(90)
     async def test_fire_perimeters_by_year(self, mcp_server):
         """'Get historical fire perimeters for 2023 in BC'"""
         data = await call_tool(mcp_server, "bc_get_fire_perimeters", {
-            "fire_year": 2023,
+            "year": 2023,
             "max_records": 10,
         })
         assert "_meta" in data or "error" in data
         if "_meta" in data:
             assert data["_meta"]["source"]["api"] == "bc-wfs"
-            assert isinstance(data["data"], list)
-            # 2023 had 676+ perimeters — with max_records=10 we get 10 or truncated=true
-            assert len(data["data"]) >= 1 or data.get("truncated") is True
+            # data is {"features": [...], "truncated": bool}
+            assert isinstance(data["data"], dict)
+            assert "features" in data["data"]
+            features = data["data"]["features"]
+            assert len(features) >= 1 or data["data"].get("truncated") is True
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(60)
@@ -1466,10 +1470,13 @@ class TestBcToolScenarios:
         assert "_meta" in data or "error" in data
         if "_meta" in data:
             assert data["_meta"]["source"]["api"] == "bc-wfs"
-            assert isinstance(data["data"], list)
-            if data["data"]:
+            # data is {"features": [...], "truncated": bool}
+            assert isinstance(data["data"], dict)
+            assert "features" in data["data"]
+            features = data["data"]["features"]
+            if features:
                 # Verify known field names are present
-                sample = data["data"][0]
+                sample = features[0]
                 assert any(
                     k in sample for k in ("PROTECTED_LANDS_NAME", "PROTECTED_LANDS_DESIGNATION", "PROT_LANDS_NAME")
                 ), f"Expected park field names not found: {list(sample.keys())[:10]}"
@@ -1485,7 +1492,9 @@ class TestBcToolScenarios:
         assert "_meta" in data or "error" in data
         if "_meta" in data:
             assert data["_meta"]["source"]["api"] == "bc-wfs"
-            assert isinstance(data["data"], list)
+            # data is {"features": [...], "truncated": bool}
+            assert isinstance(data["data"], dict)
+            assert "features" in data["data"]
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(60)
@@ -1519,12 +1528,12 @@ class TestBcToolScenarios:
                 break
         if wfs_dataset is None:
             pytest.skip("No WFS-queryable dataset found in search results")
-        # Step 3: query via bc_query_features
-        obj_name = wfs_dataset.get("object_name")
-        if not obj_name:
-            pytest.skip("Dataset has no object_name")
+        # Step 3: query via bc_query_features (requires package_id, not object_name)
+        pkg_id = wfs_dataset.get("id")
+        if not pkg_id:
+            pytest.skip("Dataset has no id")
         result = await call_tool(mcp_server, "bc_query_features", {
-            "object_name": obj_name,
+            "package_id": pkg_id,
             "max_records": 3,
         })
         assert "_meta" in result or "error" in result

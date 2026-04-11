@@ -17,7 +17,7 @@
 
 ---
 
-**187 tools, ~75 prompts, and ~103 resources** across **9 federal APIs + 3 provincial APIs + 2 municipal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, York Region ArcGIS Hub data, British Columbia CKAN + WFS geospatial data, and persistent local storage. All bilingual (English/French).
+**193 tools, ~81 prompts, and ~110 resources** across **9 federal APIs + 4 provincial APIs + 2 municipal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, York Region ArcGIS Hub data, British Columbia CKAN + WFS geospatial data, Quebec Données Québec CKAN + ArcGIS IQA data, and persistent local storage. All bilingual (English/French).
 
 > **First ArcGIS Hub module** — shared infrastructure in `shared/arcgis_hub.py` is reusable for future Canadian municipal modules (BC, Calgary, Edmonton, and other cities publishing via ArcGIS Hub).
 > **First OGC WFS module** — BC introduces WFS 2.0 (OGC) support via `shared/ogc.py`, making WFS the third portal technology alongside CKAN and ArcGIS Hub. See `docs://bc/wfs-query-guide` for the CKAN→WFS two-step workflow.
@@ -553,7 +553,7 @@ Provincial datasets from the [BC Data Catalogue](https://catalogue.data.gov.bc.c
 
 ---
 
-### 🏛️ Quebec (Données Québec) Open Data — 12 tools
+### 🏛️ Quebec (Données Québec) Open Data — 18 tools
 
 Provincial datasets from [Données Québec](https://www.donneesquebec.ca) — a federated CKAN instance with 1,593 datasets across 139 organizations (provincial ministries, municipalities, and parastatal entities like Hydro-Québec). All metadata is French-primary.
 
@@ -569,7 +569,7 @@ Provincial datasets from [Données Québec](https://www.donneesquebec.ca) — a 
 | `quebec_list_categories` | List the 10 thematic groups (Santé, Environnement, etc.) used to categorize Données Québec datasets. | — |
 <!-- CATALOG:quebec_discovery:end -->
 
-#### Curated (7)
+#### Curated (13)
 
 <!-- CATALOG:quebec_curated:start -->
 | Tool | Description | Key Parameters |
@@ -581,6 +581,12 @@ Provincial datasets from [Données Québec](https://www.donneesquebec.ca) — a 
 | `quebec_get_road_works` | Get current Quebec road construction zones and work sites from MTQ live WFS CSV. | — |
 | `quebec_get_road_events` | Get current Quebec road events (accidents, incidents, warnings) from MTQ live WFS CSV. | — |
 | `quebec_get_bridge_structures` | Get Quebec bridge, culvert, tunnel, and retaining wall inventory from MTQ structure registry. | `route`, `municipality`, `region`, `limit` |
+| `quebec_get_forest_fires_history` | Get the MFFP/MRN historical forest fire archive metadata and download URLs from Données Québec. | — |
+| `quebec_get_air_quality_stations` | Get the RSQAQ air quality monitoring station network across Quebec (MELCCFP). | `active_only`, `limit` |
+| `quebec_get_air_quality_index` | Get current Quebec air quality index (IQA) readings from the MELCCFP ArcGIS FeatureServer. | `limit` |
+| `quebec_get_water_quality_monitoring` | Get the MELCCFP physicochemical water quality monitoring dataset metadata and download URLs. | — |
+| `quebec_get_electricity_data` | Get historical Quebec electricity production and consumption data from Hydro-Québec (via Données Québec CSV). | `limit` |
+| `quebec_get_protected_areas` | Get the MELCCFP protected areas registry (Registre des aires protégées) metadata and download URLs. | — |
 <!-- CATALOG:quebec_curated:end -->
 
 ---

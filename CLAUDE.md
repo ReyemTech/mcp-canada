@@ -68,7 +68,7 @@ Every module in `src/mcp_canada/modules/{name}/`:
 
 | Technology | Client | First used | Pattern |
 |-----------|--------|------------|---------|
-| **CKAN** | `shared/http.py` + per-module `_api_get` | Federal CKAN, Ontario, Toronto, BC CKAN | `BASE_URL + /api/3/action/` |
+| **CKAN** | `shared/http.py` + per-module `_api_get` | Federal CKAN, Ontario, Toronto, BC CKAN, Quebec (Données Québec) | `BASE_URL + /api/3/action/` |
 | **ArcGIS Hub** | `shared/arcgis_hub.py` | Phase 14: York Region | FeatureServer `query` endpoint |
 | **OGC WFS 2.0** | `shared/ogc.py` | Phase 15: British Columbia | `GetFeature` with CQL_FILTER; two-step CKAN→WFS workflow |
 

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 16-07-PLAN.md
-last_updated: "2026-04-12T03:53:43.118Z"
+stopped_at: Completed 16-08-PLAN.md
+last_updated: "2026-04-12T04:16:04.151Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 11
-  total_plans: 38
-  completed_plans: 38
+  total_plans: 39
+  completed_plans: 39
   percent: 0
 ---
 
@@ -87,6 +87,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 16-quebec-government-open-data P05 | 8min | 3 tasks | 7 files |
 | Phase 16-quebec-government-open-data P06 | 9min | 3 tasks | 5 files |
 | Phase 16-quebec-government-open-data P07 | 8min | 3 tasks | 3 files |
+| Phase 16-quebec-government-open-data P08 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -197,6 +198,7 @@ Recent decisions affecting current work:
 - [Phase 16-quebec-government-open-data]: _flatten_bridge emits _normalize_route(str(num_route)) so post-parse filter and emitted route_num both use zero-padded form
 - [Phase 16-quebec-government-open-data]: _is_real_electricity_row lives in quebec/client.py caller — domain-specific XLSX legend row filter, no shared/parsers.py edit
 - [Phase 16-quebec-government-open-data]: Replicate int->str fix: _flatten_population_row.mcode + _flatten_road_work.identifier/chantier_id + _flatten_road_event.identifier (latent same-root-cause bugs)
+- [Phase 16]: Removed nom_route substring fallback entirely — exact num_route match is only reliable filter path
 
 ### Roadmap Evolution
 
@@ -224,6 +226,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-12T03:46:25.399Z
-Stopped at: Completed 16-07-PLAN.md
+Last session: 2026-04-12T04:16:04.147Z
+Stopped at: Completed 16-08-PLAN.md
 Resume file: None

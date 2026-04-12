@@ -219,12 +219,31 @@ retest_2026-04-11:
   test: 8
   retest_of: 8
   discovered: 2026-04-11
-  root_cause: "UNDIAGNOSED — hypothesis: either (a) the CSV column holding route number has a different name than the filter matcher expects in fetch_bridge_structures, or (b) the MTQ_BRIDGES_URL is missing WFS query params (service=WFS&typename=...) and swtq is returning a capabilities/layer-list doc rather than the feature CSV, so fetch_and_parse successfully parses a CSV that has no route rows at all. Needs live curl of the URL to inspect payload shape."
-  artifacts: []
+  root_cause: |
+    CONFIRMED 2026-04-11 (live curl investigation):
+    TWO distinct issues:
+    (1) WFS server default page cap: MTQ bridge WFS endpoint returns only 30 rows by default (maxFeatures
+        server-side limit). Total dataset is 11,696 structures. Without count+startIndex paging, fetch_and_parse
+        downloads only the first 30 records — Autoroute 20 structures don't appear until row 30+. Server
+        IGNORES CQL_FILTER parameter entirely (tested: CQL_FILTER=num_route='00020' returns all 11,696 rows
+        unfiltered). WFS 2.0 count+startIndex pagination works (verified: startIndex=30 returns next page
+        including Autoroute 20 entries).
+    (2) Route format mismatch: Live CSV stores num_route as zero-padded 5-digit codes: '00020' for Autoroute 20,
+        '00132' for Route 132, etc. User-facing filter route='A-20' never matches '00020'. Fix needs a route
+        normalizer: 'A-20' -> '00020', 'Route 132' -> '00132', or match on nom_route column (contains
+        'Autoroute 20 Ouest'/'Autoroute 20 Est') rather than exact num_route match.
+    Column names: CORRECT — fetch_bridge_structures uses r.get('num_route'), r.get('nom_muncp') etc. which
+    all survive _normalize_key unchanged (already snake_case with underscores). The mapper is not the bug.
+  artifacts:
+    - path: "src/mcp_canada/modules/quebec/client.py:fetch_bridge_structures"
+      issue: "Calls fetch_and_parse(MTQ_BRIDGES_URL) without count/startIndex — downloads only 30/11696 rows. Server CQL_FILTER unsupported. Post-parse filter on num_route uses user format 'A-20' which never matches WFS zero-padded code '00020'."
+    - path: "src/mcp_canada/modules/quebec/constants.py:MTQ_BRIDGES_URL"
+      issue: "URL has no count/startIndex — needs WFS paging params injected per-request, not hardcoded in constant"
   missing:
-    - "curl MTQ_BRIDGES_URL and inspect response (is it feature data or layer list?)"
-    - "If feature data: compare CSV column names to the filter matcher in fetch_bridge_structures"
-    - "If layer list: add missing WFS query params (service=WFS, version=2.0.0, request=GetFeature, typename=<bridges_layer>)"
+    - "Implement WFS paging in fetch_bridge_structures: loop with count=500+startIndex until no more rows, collecting all records before post-parse filtering"
+    - "Add route normalizer: map user-friendly strings ('A-20', 'Route 132', '20') to WFS zero-padded num_route codes ('00020', '00132') OR switch to nom_route ILIKE match"
+    - "Unit test: fixture CSV with BOM-stripped headers (nom_route, num_route, nom_muncp), verify A-20 filter returns only Autoroute 20 rows"
+    - "Integration test test_bridges_route_filter_returns_rows: call quebec_get_bridge_structures(route='A-20') and assert len(data['data']) > 0"
   debug_session: ""
 
 - truth: "quebec_get_road_conditions returns rows with populated fields (route/region/pavement/visibility/snow/timestamp)"
@@ -234,15 +253,33 @@ retest_2026-04-11:
   test: 9
   retest_of: 9
   discovered: 2026-04-11
-  root_cause: "UNDIAGNOSED — the schema-mapping layer in fetch_road_conditions uses column names that don't match the real MTQ conditions_routieres CSV headers. The transform dict/mapper references columns like 'SegmentId', 'RouteNum', 'Region' but the live CSV likely uses different casing or French names (e.g., 'id_segment', 'numero_route', 'NomRegion'). Needs live curl to enumerate actual headers."
+  root_cause: |
+    CONFIRMED 2026-04-11 (live curl + _normalize_key analysis):
+    The MTQ conditions_routieres CSV uses PascalCase column names (NumeroSegment, NumeroRoute, NomRoute,
+    NomRegion, DescriptionEtatChausseeFR, DescriptionEtatChausseeEN, DescriptionVisibiliteFR,
+    DescriptionVisibiliteEN, IndicateurPresenceLamesNeige, EnVigueurDepuis).
+    fetch_and_parse routes to _parse_csv which applies _normalize_key to ALL column headers.
+    _normalize_key lowercases and strips all non-alnum chars: 'NumeroSegment' -> 'numerosegment',
+    'DescriptionEtatChausseeFR' -> 'descriptionetatchausseefr', 'EnVigueurDepuis' -> 'envigueurdepuis'.
+    But fetch_road_conditions mapper uses the ORIGINAL PascalCase names:
+      r.get('NumeroSegment') -> None  (key is 'numerosegment')
+      r.get('NumeroRoute') -> None    (key is 'numeroroute')
+      r.get('NomRoute') -> None       (key is 'nomroute')
+      r.get('NomRegion') -> None      (key is 'nomregion')
+      r.get('DescriptionEtatChausseeFR') -> None  (key is 'descriptionetatchausseefr')
+      r.get('DateEtHeureCondition') -> None  (no such column; actual is 'EnVigueurDepuis' -> 'envigueurdepuis')
+    Bridge columns (num_route, nom_muncp etc.) are already snake_case so _normalize_key preserves them —
+    that's why bridge mapper works fine and road conditions mapper does not.
+    The unit test fixture uses synthetic headers matching the ORIGINAL names, masking the mismatch.
   artifacts:
-    - path: "src/mcp_canada/modules/quebec/client.py:fetch_road_conditions"
-      issue: "Row-to-schema mapper references column names that don't exist in the live CSV; every field null-coalesces"
+    - path: "src/mcp_canada/modules/quebec/client.py:fetch_road_conditions (lines ~502-516)"
+      issue: "Mapper keys are PascalCase originals; after _parse_csv normalizes all headers to snake_case the lookups all return None. Also 'DateEtHeureCondition' key does not exist in live CSV (actual field is 'EnVigueurDepuis' -> normalized 'envigueurdepuis')."
+    - path: "src/mcp_canada/modules/quebec/__tests__/test_client.py"
+      issue: "Road conditions fixture CSV uses synthetic PascalCase headers that match the (wrong) mapper — test passes on fake data and masks the live failure."
   missing:
-    - "curl MTQ_ROAD_CONDITIONS_URL, inspect header row"
-    - "Align fetch_road_conditions column-mapper keys with actual CSV headers"
-    - "Apply same alignment audit to fetch_bridge_structures, fetch_road_works, fetch_road_events (same family)"
-    - "Add a unit test with a fixture CSV that matches the live header shape, not the synthetic one"
+    - "Replace mapper keys with normalized snake_case equivalents: 'NumeroSegment'->'numerosegment', 'NumeroRoute'->'numeroroute', 'NomRoute'->'nomroute', 'NomRegion'->'nomregion', 'DescriptionEtatChausseeFR'->'descriptionetatchausseefr', 'DescriptionEtatChausseeEN'->'descriptionetatchausseeen', 'DescriptionVisibiliteFR'->'descriptionvisibilitefr', 'DescriptionVisibiliteEN'->'descriptionvisibiliteen', 'IndicateurPresenceLamesNeige'->'indicateurpresencelamesneige', 'EnVigueurDepuis' (timestamp, not 'DateEtHeureCondition') -> 'envigueurdepuis'"
+    - "Update unit test fixture CSV to use the real live CSV header names so the test exercises the actual normalizer path"
+    - "Integration test asserting non-null route/region/pavement_status on at least one row"
   debug_session: ""
 
 - truth: "quebec_get_electricity_data returns non-empty Hydro-Québec historical rows"
@@ -252,16 +289,27 @@ retest_2026-04-11:
   test: 11
   retest_of: 11
   discovered: 2026-04-11
-  root_cause: "UNDIAGNOSED — the Hydro-Québec origin server (hydroquebec.com) rejects httpx's default TLS handshake. Likely OpenSSL 3.x default SECLEVEL=2 excluding weak ciphers/protocols the server still uses. Either (a) the server supports only legacy cipher suites, or (b) needs SNI-specific config, or (c) cert chain issue. Now that the XLSX matcher fix landed, the tool actually reaches the fetch step and surfaces the real upstream error instead of returning empty."
+  root_cause: |
+    CONFIRMED 2026-04-11 (live curl + uv run python SSL test):
+    The Hydro-Québec XLSX URLs (e.g. https://www.hydroquebec.com/data/documents-donnees/xls/suivi-2021-de-l-entente-globale-cadre.xlsx)
+    use TLSv1.2 with cipher AES128-GCM-SHA256, which curl handles fine but Python's ssl module with
+    OpenSSL 3.x SECLEVEL=2 (the default) rejects as insufficiently secure.
+    Confirmed fix: ssl.create_default_context() + ctx.set_ciphers('DEFAULT:@SECLEVEL=1') passed as
+    verify=ctx to httpx.AsyncClient resolves the handshake and returns HTTP 200 with 3.05MB XLSX content.
+    No donneesquebec.ca mirror exists for these files — all 4 resources point to hydroquebec.com directly
+    (2020 resource has an empty URL and must be skipped).
+    The fix MUST be scoped to fetch_and_parse callers for hydroquebec.com only — not a global ssl change in shared/http.py.
+    Implementation path: add optional ssl_context parameter to fetch_and_parse, pass it through to httpx.AsyncClient.
+    The fetch_electricity_data client function builds the SSLContext for hydroquebec.com URLs and passes it to fetch_and_parse.
   artifacts:
-    - path: "src/mcp_canada/shared/http.py"
-      issue: "Default httpx.AsyncClient lacks SSL context override for legacy hydroquebec.com TLS config"
+    - path: "src/mcp_canada/shared/parsers.py:fetch_and_parse"
+      issue: "httpx.AsyncClient uses default SSL verify=True — no way to pass custom SSLContext. Needs optional ssl_context parameter."
     - path: "src/mcp_canada/modules/quebec/client.py:fetch_electricity_data"
-      issue: "Selects the first XLSX resource URL (hydroquebec.com) without checking for alternate mirror URLs in the package_show response"
+      issue: "Does not build custom SSLContext for hydroquebec.com; relies on default httpx SSL config which fails with SECLEVEL=2."
   missing:
-    - "Try `curl -v` on the XLSX URL to confirm the handshake failure and identify the server's preferred ciphers"
-    - "Option A: Build a custom ssl.SSLContext (set_ciphers('DEFAULT:@SECLEVEL=1')) scoped only to hydroquebec.com fetches"
-    - "Option B: Check package_show for a donneesquebec.ca-hosted mirror of the same XLSX and prefer it"
-    - "Option C: Document as known upstream limitation and return a bilingual 'external service unavailable' error"
-    - "Add an integration test that asserts either non-empty data OR this specific SSL error (not a silent empty)"
+    - "Add ssl_context: ssl.SSLContext | None = None parameter to fetch_and_parse — passed as verify=ssl_context to httpx.AsyncClient when not None"
+    - "In fetch_electricity_data: detect when file_url is from hydroquebec.com and build ssl.create_default_context() with set_ciphers('DEFAULT:@SECLEVEL=1') before calling fetch_and_parse"
+    - "Unit test: mock fetch_and_parse to assert ssl_context is passed when url is hydroquebec.com"
+    - "Integration test asserting either len(data['data']) > 0 OR a structured UPSTREAM_ERROR (not a silent empty)"
+    - "Update shared/__tests__/test_parsers.py to cover ssl_context passthrough (mock httpx.AsyncClient and assert verify=ctx)"
   debug_session: ""

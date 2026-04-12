@@ -1719,6 +1719,49 @@ class TestQuebecToolScenarios:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
+    @pytest.mark.timeout(120)
+    async def test_bridges_route_filter_row_types(self, mcp_server):
+        """'Show bridges on Autoroute 20 with strict type assertions.' — 16-07 gap closure.
+
+        After shared/parsers.py:_mask_privacy turns digit-only CSV cells into int,
+        _flatten_bridge must re-stringify ID columns so QuebecBridgeStructure
+        validates. route_num must be zero-padded to match the normalizer output.
+        """
+        data = await call_tool(mcp_server, "quebec_get_bridge_structures", {
+            "route": "A-20",
+            "limit": 5,
+        })
+        assert "_meta" in data, f"Expected _meta envelope, got: {data}"
+        assert len(data["data"]) > 0, (
+            f"Expected non-empty A-20 bridge list, got: {data}"
+        )
+        for row in data["data"]:
+            assert isinstance(row["structure_id"], str), (
+                f"structure_id must be str, got "
+                f"{type(row['structure_id']).__name__}={row['structure_id']}"
+            )
+            assert isinstance(row["dossier_num"], str), (
+                f"dossier_num must be str, got "
+                f"{type(row['dossier_num']).__name__}={row['dossier_num']}"
+            )
+            assert isinstance(row["municipality_code"], str), (
+                f"municipality_code must be str, got "
+                f"{type(row['municipality_code']).__name__}={row['municipality_code']}"
+            )
+            assert isinstance(row["route_num"], str), (
+                f"route_num must be str, got "
+                f"{type(row['route_num']).__name__}={row['route_num']}"
+            )
+            assert "0020" in row["route_num"] or row["route_num"] == "00020", (
+                f"route_num should be zero-padded form '00020', got {row['route_num']}"
+            )
+            assert isinstance(row["structure_type"], str), (
+                f"structure_type must be str, got "
+                f"{type(row['structure_type']).__name__}={row['structure_type']}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
     @pytest.mark.timeout(30)
     async def test_discover_tools_finds_quebec(self, mcp_server):
         """'Find tools for Quebec health data.' — BM25 must surface quebec_ tools."""

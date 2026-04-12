@@ -531,7 +531,9 @@ class TestFetchBridgeStructures:
         assert isinstance(result, list)
         assert len(result) == 1
         assert result[0].structure_id == "S-12345"
-        assert result[0].route_num == "10"
+        # 16-07: _flatten_bridge normalizes route_num via _normalize_route so
+        # the emitted value matches the filter normalization. "10" -> "00010".
+        assert result[0].route_num == "00010"
         assert result[0].municipality == "Granby"
 
     async def test_requires_at_least_one_filter(self):
@@ -722,6 +724,288 @@ class TestFetchBridgeStructuresPaging:
 
         assert len(result) == 1
         assert result[0].municipality == "Granby"
+
+
+class TestQuebecBridgeStructuresTypeCoercion:
+    """Tests for 16-07 gap closure: int→str coercion in _flatten_bridge.
+
+    Background: shared/parsers.py:_mask_privacy auto-coerces digit-only CSV cells
+    to int (e.g. "00020" -> 20, "200645" -> 200645). QuebecBridgeStructure
+    declares structure_id/dossier_num/municipality_code/route_num/structure_type
+    as `str | None`. Pydantic v2 does NOT coerce int -> str, so every row fails
+    validation. Fix: stringify in the Quebec mapper only (no shared parser edit).
+    """
+
+    async def test_int_csv_values_produce_string_schema_fields(self) -> None:
+        """Fixture simulates _parse_csv+_mask_privacy output with int ID cells.
+
+        Every str-typed ID field on the Pydantic model must end up a string
+        after _flatten_bridge runs. Must FAIL before the mapper fix.
+        """
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        # Values match what _parse_csv + _mask_privacy produces on the live bridge CSV:
+        # ide_strct / num_dossr / cod_muncp / num_route / cod_type_s all become int.
+        page_rows = [
+            {
+                "ide_strct":  200645,              # int — post-_mask_privacy
+                "num_dossr":  4116,                # int
+                "val_annee_": 1985,                # int (year, schema already int — OK)
+                "code_des_s": "Bon",               # str (alpha code)
+                "nom_route":  "Autoroute 20 Ouest",
+                "nom_obstc":  "Rivière",
+                "nom_muncp":  "Saint-Hyacinthe",
+                "cod_muncp":  17010,               # int
+                "nom_strct":  "Pont A-20",
+                "num_route":  20,                  # int — zero-padding lost
+                "geo_lattd":  45.5,
+                "geo_longt": -73.0,
+                "val_longr":  42.5,
+                "val_largr_": 12.0,
+                "cod_type_s": 1,                   # int — post-_mask_privacy
+            },
+        ]
+
+        async def fake_fetch_and_parse(url, **kwargs):
+            return page_rows, False
+
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.fetch_and_parse",
+                side_effect=fake_fetch_and_parse,
+            ):
+                result, _ = await q_client.fetch_bridge_structures(route="A-20", limit=10)
+
+        assert len(result) == 1
+        row = result[0]
+        assert isinstance(row.structure_id, str) and row.structure_id == "200645"
+        assert isinstance(row.dossier_num, str) and row.dossier_num == "4116"
+        assert isinstance(row.municipality_code, str) and row.municipality_code == "17010"
+        assert isinstance(row.route_num, str) and row.route_num == "00020"
+        assert isinstance(row.structure_type, str) and row.structure_type == "1"
+
+    async def test_float_integer_value_produces_string_without_decimal(self) -> None:
+        """Defensive: if a CSV numeric cell is parsed as float whose value is an
+        integer (e.g. 20.0), the mapper must emit '20' not '20.0'."""
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        page_rows = [
+            {
+                "ide_strct":  200645.0,            # float whole number
+                "num_dossr":  4116,
+                "val_annee_": 1985,
+                "code_des_s": "Bon",
+                "nom_route":  "Autoroute 20 Ouest",
+                "nom_obstc":  "Rivière",
+                "nom_muncp":  "Saint-Hyacinthe",
+                "cod_muncp":  17010,
+                "nom_strct":  "Pont A-20",
+                "num_route":  20,
+                "geo_lattd":  45.5,
+                "geo_longt": -73.0,
+                "val_longr":  42.5,
+                "val_largr_": 12.0,
+                "cod_type_s": 1,
+            },
+        ]
+
+        async def fake_fetch_and_parse(url, **kwargs):
+            return page_rows, False
+
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.fetch_and_parse",
+                side_effect=fake_fetch_and_parse,
+            ):
+                result, _ = await q_client.fetch_bridge_structures(route="A-20", limit=10)
+
+        assert len(result) == 1
+        assert result[0].structure_id == "200645"
+
+
+class TestQuebecBridgeStructuresIntFilter:
+    """Regression: post-parse route filter must handle int num_route after _mask_privacy.
+
+    Before fix 1B, the filter compared str(20) == "00020" (always false) and
+    silently fell back to a nom_route substring match — brittle if nom_route
+    lacks the raw digits.
+    """
+
+    async def test_int_num_route_matches_via_normalizer_roundtrip(self) -> None:
+        """route='A-20' should match int num_route=20 via _normalize_route roundtrip,
+        and reject int num_route=132 (raw_digits '20' is not a substring of nom_route)."""
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        page_rows = [
+            {
+                "ide_strct":  200645,
+                "num_dossr":  4116,
+                "val_annee_": 1985,
+                "code_des_s": "Bon",
+                # Note: nom_route intentionally contains NO digits so we know the
+                # match came from num_route normalization, not the substring fallback.
+                "nom_route":  "Autoroute Jean-Lesage",
+                "nom_obstc":  "Rivière",
+                "nom_muncp":  "Saint-Hyacinthe",
+                "cod_muncp":  17010,
+                "nom_strct":  "Pont Jean-Lesage",
+                "num_route":  20,              # int — must be recognized as A-20
+                "geo_lattd":  45.5,
+                "geo_longt": -73.0,
+                "val_longr":  42.5,
+                "val_largr_": 12.0,
+                "cod_type_s": 1,
+            },
+            {
+                "ide_strct":  300001,
+                "num_dossr":  5000,
+                "val_annee_": 1990,
+                "code_des_s": "Bon",
+                # Same: nom_route with no digits, so no substring crutch.
+                "nom_route":  "Route Rive-Sud",
+                "nom_obstc":  "Fleuve",
+                "nom_muncp":  "Levis",
+                "cod_muncp":  25213,
+                "nom_strct":  "Pont Rive-Sud",
+                "num_route":  132,             # int — must NOT be returned for A-20
+                "geo_lattd":  46.8,
+                "geo_longt": -71.2,
+                "val_longr":  100.0,
+                "val_largr_": 15.0,
+                "cod_type_s": 1,
+            },
+        ]
+
+        async def fake_fetch_and_parse(url, **kwargs):
+            return page_rows, False
+
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.fetch_and_parse",
+                side_effect=fake_fetch_and_parse,
+            ):
+                result, _ = await q_client.fetch_bridge_structures(route="A-20", limit=10)
+
+        assert len(result) == 1, (
+            f"Expected only the A-20 row (num_route=20), got {len(result)}: {result}"
+        )
+        assert result[0].structure_id == "200645"
+        assert result[0].route_num == "00020"
+
+
+class TestQuebecPopulationIntCoercion:
+    """Latent replicate-check: MAMH mcode is digit-only → int after _mask_privacy."""
+
+    async def test_int_mcode_becomes_string(self) -> None:
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        fixture_rows = [
+            {
+                "mcode": 80005,          # int — post-_mask_privacy
+                "munnom": "Montréal",
+                "regadm": "06",
+                "mrc": "Communauté métropolitaine",
+                "mpopul": 1780000,
+                "msuperf": 365.13,
+                "mcodedesi": "Ville",
+                "mayor": "Mayor Name",
+            }
+        ]
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.fetch_and_parse",
+                new=AsyncMock(return_value=(fixture_rows, False)),
+            ):
+                result, _ = await q_client.fetch_population_by_municipality()
+        assert len(result) == 1
+        assert isinstance(result[0].mcode, str)
+        assert result[0].mcode == "80005"
+
+
+class TestQuebecRoadWorkIntCoercion:
+    """Latent replicate-check: MTQ chantiers identifiant / identifiantChantier int coercion."""
+
+    async def test_int_identifiants_become_strings(self) -> None:
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        fixture_rows = [
+            {
+                "identifiant": 12345,                # int
+                "identifiantChantier": 67890,        # int
+                "routeAutoroute": "A-25",
+                "entraveType": "Fermeture",
+                "debut": "2026-04-10",
+                "fin": "2026-04-15",
+                "miseAJour": "2026-04-11 06:00",
+                "identificationDesTravaux": "Réfection",
+                "localisation": "km 8",
+                "direction": "Nord",
+                "descriptionFrancais": "Travaux routiers",
+                "descriptionAnglais": "Road works",
+            }
+        ]
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.fetch_and_parse",
+                new=AsyncMock(return_value=(fixture_rows, False)),
+            ):
+                result, _ = await q_client.fetch_road_works(lang="en")
+        assert len(result) == 1
+        assert isinstance(result[0].identifier, str)
+        assert result[0].identifier == "12345"
+        assert isinstance(result[0].chantier_id, str)
+        assert result[0].chantier_id == "67890"
+
+
+class TestQuebecRoadEventIntCoercion:
+    """Latent replicate-check: MTQ evenements identifiant int coercion."""
+
+    async def test_int_identifiant_becomes_string(self) -> None:
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        fixture_rows = [
+            {
+                "identifiant": 202601,              # int — post-_mask_privacy
+                "entrave": "Accident",
+                "numeroRoute": "A-40",
+                "localisation": "km 20",
+                "direction": "Est",
+                "municipalite": "Montréal",
+                "duree": "2h",
+                "cause": "Collision",
+                "consequence": "Ralentissement",
+                "detour": "Aucun",
+                "regions": "Montréal",
+                "enVigueurDepuis": "2026-04-11 08:00",
+            }
+        ]
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.fetch_and_parse",
+                new=AsyncMock(return_value=(fixture_rows, False)),
+            ):
+                result, _ = await q_client.fetch_road_events()
+        assert len(result) == 1
+        assert isinstance(result[0].identifier, str)
+        assert result[0].identifier == "202601"
 
 
 # ---------------------------------------------------------------------------

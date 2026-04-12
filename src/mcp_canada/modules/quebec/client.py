@@ -353,6 +353,26 @@ def _safe_int(v: Any) -> int | None:
         return None
 
 
+def _str_or_none(v: Any) -> str | None:
+    """Coerce int/float ID values back to string for schema compliance.
+
+    `shared/parsers.py:_mask_privacy` auto-coerces digit-only CSV cells to int
+    (e.g. '00020' -> 20, '200645' -> 200645). For fields that are semantically
+    ID codes (not numeric values), we must re-stringify before Pydantic
+    validation against `str | None` schema fields. Pydantic v2 does NOT coerce
+    int -> str, so this helper runs inside each Quebec mapper that has a
+    schema-declared str field sourced from a digit-only CSV column.
+
+    Phase 16-07 gap closure — scoped to Quebec module only (no shared parser change).
+    """
+    if v is None:
+        return None
+    if isinstance(v, float):
+        # Defensive: whole-number floats (e.g. 20.0) should emit "20", not "20.0".
+        return str(int(v)) if v.is_integer() else str(v)
+    return str(v)
+
+
 def _yes_no_to_bool(v: Any) -> bool:
     return str(v).strip().lower() == "oui"
 
@@ -449,7 +469,9 @@ async def fetch_er_wait_times(
 
 def _flatten_population_row(r: dict[str, Any]) -> QuebecPopulationRow:
     return QuebecPopulationRow(
-        mcode=r.get("mcode"),
+        # mcode is digit-only in MAMH CSV; _mask_privacy coerces it to int.
+        # Re-stringify for the `str | None` schema field (Phase 16-07).
+        mcode=_str_or_none(r.get("mcode")),
         municipality=r.get("munnom"),
         admin_region=r.get("regadm"),
         mrc=r.get("mrc"),
@@ -527,8 +549,10 @@ async def fetch_road_conditions(
 def _flatten_road_work(r: dict[str, Any], lang: str) -> QuebecRoadWork:
     desc = r.get("descriptionFrancais") if lang == "fr" else r.get("descriptionAnglais")
     return QuebecRoadWork(
-        identifier=r.get("identifiant"),
-        chantier_id=r.get("identifiantChantier"),
+        # identifiant / identifiantChantier are digit-only in MTQ CSV;
+        # _mask_privacy coerces to int. Re-stringify for the schema (16-07).
+        identifier=_str_or_none(r.get("identifiant")),
+        chantier_id=_str_or_none(r.get("identifiantChantier")),
         route=r.get("routeAutoroute"),
         obstruction_type=r.get("entraveType"),
         start=r.get("debut"),
@@ -559,7 +583,9 @@ async def fetch_road_works(
 
 def _flatten_road_event(r: dict[str, Any]) -> QuebecRoadEvent:
     return QuebecRoadEvent(
-        identifier=r.get("identifiant"),
+        # identifiant is digit-only in MTQ evenements CSV; _mask_privacy
+        # coerces to int. Re-stringify for the schema (16-07).
+        identifier=_str_or_none(r.get("identifiant")),
         obstruction=r.get("entrave"),
         route=r.get("numeroRoute"),
         location=r.get("localisation"),
@@ -605,22 +631,30 @@ def _normalize_route(route: str) -> str:
 
 
 def _flatten_bridge(r: dict[str, Any]) -> QuebecBridgeStructure:
+    # _mask_privacy strips leading zeros from num_route ('00020' -> 20). Re-pad
+    # via _normalize_route so the emitted value matches the filter's normalized
+    # form. Keeps filter and output consistent per the Phase 16-07 UAT decision.
+    raw_num_route = r.get("num_route")
+    route_num_value: str | None = None
+    if raw_num_route is not None:
+        route_num_value = _normalize_route(str(raw_num_route))
+
     return QuebecBridgeStructure(
-        structure_id=r.get("ide_strct"),
-        dossier_num=r.get("num_dossr"),
+        structure_id=_str_or_none(r.get("ide_strct")),
+        dossier_num=_str_or_none(r.get("num_dossr")),
         year=_safe_int(r.get("val_annee_")),
         status_code=r.get("code_des_s"),
         route_name=r.get("nom_route"),
         obstacle=r.get("nom_obstc"),
         municipality=r.get("nom_muncp"),
-        municipality_code=r.get("cod_muncp"),
+        municipality_code=_str_or_none(r.get("cod_muncp")),
         structure_name=r.get("nom_strct"),
-        route_num=r.get("num_route"),
+        route_num=route_num_value,
         latitude=_safe_float(r.get("geo_lattd")),
         longitude=_safe_float(r.get("geo_longt")),
         length=_safe_float(r.get("val_longr")),
         width=_safe_float(r.get("val_largr_")),
-        structure_type=r.get("cod_type_s"),
+        structure_type=_str_or_none(r.get("cod_type_s")),
     )
 
 
@@ -659,7 +693,11 @@ async def fetch_bridge_structures(
         out: list[QuebecBridgeStructure] = []
         for r in all_rows:
             if norm is not None:
-                num = str(r.get("num_route") or "").strip()
+                # _mask_privacy may have turned '00020' into int 20; normalize
+                # back to the zero-padded form so exact-match succeeds without
+                # relying on the nom_route substring fallback.
+                num_raw = r.get("num_route")
+                num = _normalize_route(str(num_raw)) if num_raw is not None else ""
                 nom = str(r.get("nom_route") or "").lower()
                 # Match zero-padded num_route OR nom_route contains the raw digits
                 raw_digits = norm.lstrip("0") or "0"

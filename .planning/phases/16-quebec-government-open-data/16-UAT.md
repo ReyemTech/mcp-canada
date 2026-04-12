@@ -213,7 +213,8 @@ retest_2026-04-11:
 # ═══════════════════════════════════════════════════════════════════
 
 - truth: "quebec_get_bridge_structures(route='A-20') returns non-empty bridge features"
-  status: failed
+  status: resolved
+  resolved_by: "16-06 commit 970a93a — WFS paging loop + _normalize_route helper"
   reason: "User reported: envelope well-formed with _meta.source.url=https://ws.mapserver.transports.gouv.qc.ca/swtq but data=[] — route filter returns zero rows"
   severity: major
   test: 8
@@ -247,7 +248,8 @@ retest_2026-04-11:
   debug_session: ""
 
 - truth: "quebec_get_road_conditions returns rows with populated fields (route/region/pavement/visibility/snow/timestamp)"
-  status: failed
+  status: resolved
+  resolved_by: "16-06 commit 6979468 — mapper keys aligned to _normalize_key snake_case output"
   reason: "User reported: rows ARE returned (error propagation fix confirmed) but every field is null — {segment_id: null, route_num: null, route_name: null, region: null, pavement_status: null, visibility: null, has_snow_presence: null, timestamp: null}"
   severity: major
   test: 9
@@ -283,7 +285,8 @@ retest_2026-04-11:
   debug_session: ""
 
 - truth: "quebec_get_electricity_data returns non-empty Hydro-Québec historical rows"
-  status: failed
+  status: resolved
+  resolved_by: "16-06 commit 23b7a33 — scoped SECLEVEL=1 SSLContext for hydroquebec.com"
   reason: "User reported: {'error':{'code':'UPSTREAM_ERROR','message':'Error fetching electricity data: [SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] ssl/tls alert handshake failure (_ssl.c:1081)','lang':'en'}}"
   severity: major
   test: 11

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 16-05-PLAN.md
-last_updated: "2026-04-12T02:32:05.354Z"
+stopped_at: Completed 16-06-PLAN.md
+last_updated: "2026-04-12T03:05:08.288Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 11
-  total_plans: 36
-  completed_plans: 36
+  total_plans: 37
+  completed_plans: 37
   percent: 0
 ---
 
@@ -85,6 +85,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 16-quebec-government-open-data P03 | 39 | 2 tasks | 6 files |
 | Phase 16-quebec-government-open-data P04 | 28 | 4 tasks | 12 files |
 | Phase 16-quebec-government-open-data P05 | 8min | 3 tasks | 7 files |
+| Phase 16-quebec-government-open-data P06 | 9min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -188,6 +189,9 @@ Recent decisions affecting current work:
 - [Phase 16-quebec-government-open-data]: fetch_and_parse query-string format detection: urllib.parse.parse_qs with case-insensitive key normalization — zero new deps, backward-compatible with path-suffix detection
 - [Phase 16-quebec-government-open-data]: fetch_electricity_data 3-tuple (rows, source_url, was_cached): bundled in _fetch() tuple so single cache entry holds both; cache key uses v2 suffix to invalidate stale entries
 - [Phase 16-quebec-government-open-data]: Hydro-Québec historique-production-consommation package is XLSX-only (years 2018-2021; 2020 empty URL): format matcher expanded from CSV-only to (CSV, XLSX, XLS)
+- [Phase 16-quebec-government-open-data]: _normalize_route zfill(5): 'A-20' -> '00020'; nom_route digit-substring fallback for WFS data mismatch
+- [Phase 16-quebec-government-open-data]: fetch_road_conditions mapper uses _normalize_key output: 'numerosegment' not 'NumeroSegment'; 'envigueurdepuis' not 'DateEtHeureCondition'
+- [Phase 16-quebec-government-open-data]: SECLEVEL=1 SSLContext scoped to hydroquebec.com in fetch_electricity_data; fetch_and_parse ssl_context param with ssl_flag in cache key
 
 ### Roadmap Evolution
 
@@ -215,6 +219,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-12T02:32:05.348Z
-Stopped at: Completed 16-05-PLAN.md
+Last session: 2026-04-12T03:05:08.281Z
+Stopped at: Completed 16-06-PLAN.md
 Resume file: None

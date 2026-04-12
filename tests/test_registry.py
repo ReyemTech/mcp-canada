@@ -5,11 +5,19 @@ from pathlib import Path
 
 
 def test_filesystem_provider_discovers_tools():
-    """FileSystemProvider should discover example_echo tool from _example module."""
+    """FileSystemProvider should discover example_echo tool from _example fixture.
+
+    _example is a private test fixture (underscore-prefixed) that is excluded
+    from production registration in server._build_providers. This test points
+    a provider directly at the fixture to verify auto-discovery mechanics.
+    """
     from fastmcp.server.providers import FileSystemProvider
 
-    modules_dir = Path(__file__).parent.parent / "src" / "mcp_canada" / "modules"
-    provider = FileSystemProvider(root=modules_dir)
+    example_dir = (
+        Path(__file__).parent.parent
+        / "src" / "mcp_canada" / "modules" / "_example"
+    )
+    provider = FileSystemProvider(root=example_dir)
 
     # Use the proper async API to list tools
     tools = asyncio.run(provider._list_tools())

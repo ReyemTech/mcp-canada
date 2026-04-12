@@ -41,20 +41,33 @@ async def lifespan(app: Any) -> AsyncGenerator[dict[str, Any], None]:
 def _build_providers(modules_filter: str) -> list[FileSystemProvider]:
     """Build FileSystemProvider(s) based on optional --modules filter.
 
+    Module directories whose names start with ``_`` are treated as private
+    (test fixtures, scaffolds) and are excluded from production registration.
+    Tests that need those modules must instantiate a FileSystemProvider
+    pointing directly at the fixture directory.
+
     Args:
         modules_filter: Comma-separated module names to load.
-            If empty, all subdirectories under modules/ are loaded.
+            If empty, all non-private subdirectories under modules/ are loaded.
 
     Returns:
         List of FileSystemProvider instances.
     """
     if not modules_filter:
-        # Load all modules — single provider pointing at modules/
+        # Load all public modules — one provider per module subdirectory so
+        # underscore-prefixed fixtures (e.g. _example) can be skipped cleanly.
         logger.info(
             "Loading all modules. Consider using --modules to load only what you need "
             "(e.g. --modules weather,recalls)"
         )
-        return [FileSystemProvider(root=_MODULES_DIR)]
+        providers = []
+        for mod_path in sorted(_MODULES_DIR.iterdir()):
+            if not mod_path.is_dir():
+                continue
+            if mod_path.name.startswith("_"):
+                continue
+            providers.append(FileSystemProvider(root=mod_path))
+        return providers
 
     # Selective loading: one provider per named module subdirectory
     selected = [m.strip() for m in modules_filter.split(",") if m.strip()]

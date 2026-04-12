@@ -40,8 +40,14 @@ async def test_discover_tools_ranks_by_relevance():
     from fastmcp.server.providers import FileSystemProvider
     from fastmcp.server.transforms.search import BM25SearchTransform
 
-    modules_dir = Path(__file__).parent.parent / "src" / "mcp_canada" / "modules"
-    provider = FileSystemProvider(root=modules_dir)
+    # _example is a private test fixture (underscore-prefixed) that is excluded
+    # from production registration in server._build_providers. Point the
+    # provider directly at the fixture so BM25 can rank example_echo.
+    example_dir = (
+        Path(__file__).parent.parent
+        / "src" / "mcp_canada" / "modules" / "_example"
+    )
+    provider = FileSystemProvider(root=example_dir)
 
     test_mcp = FastMCP("test-rank", providers=[provider])
     bm25 = BM25SearchTransform(

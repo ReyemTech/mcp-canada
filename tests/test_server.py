@@ -110,23 +110,40 @@ def test_main_http_transport():
 
 
 def test_selective_module_loading():
-    """--modules flag should filter which modules are registered in FileSystemProvider."""
+    """`_build_providers` should exclude underscore-prefixed fixtures from production loads."""
     import asyncio
     from pathlib import Path
     from fastmcp.server.providers import FileSystemProvider
+    from mcp_canada.server import _build_providers
 
-    modules_dir = Path(__file__).parent.parent / "src" / "mcp_canada" / "modules"
+    # With no filter: all PUBLIC modules discovered, underscore-prefixed fixtures excluded.
+    # example_echo lives in _example/ and must NOT leak into production tool catalogs.
+    providers = _build_providers("")
+    all_tool_names: list[str] = []
+    for p in providers:
+        tools = asyncio.run(p._list_tools())
+        all_tool_names.extend(t.name for t in tools)
+    assert "example_echo" not in all_tool_names, (
+        f"No-filter load must exclude _example/ fixture. Got example_echo in: {all_tool_names}"
+    )
+    # Sanity: real modules should still be present.
+    assert any(n.startswith("boc_") for n in all_tool_names), (
+        f"Expected bank_of_canada tools to be loaded. Got: {all_tool_names}"
+    )
 
-    # With no filter: all modules discovered (including _example)
-    provider_all = FileSystemProvider(root=modules_dir)
-    all_tools = asyncio.run(provider_all._list_tools())
-    all_tool_names = [t.name for t in all_tools]
-    assert "example_echo" in all_tool_names, (
-        f"All-modules load should find example_echo. Got: {all_tool_names}"
+    # The _example fixture itself is still loadable by pointing a provider directly at it
+    # (tests that exercise auto-discovery mechanics do this).
+    example_dir = (
+        Path(__file__).parent.parent
+        / "src" / "mcp_canada" / "modules" / "_example"
+    )
+    example_provider = FileSystemProvider(root=example_dir)
+    example_tools = asyncio.run(example_provider._list_tools())
+    assert "example_echo" in [t.name for t in example_tools], (
+        "Directly loading _example/ should still find example_echo for fixture tests"
     )
 
     # With modules filter: only load specified subdirectory names
-    # Since _example exists, specifying only a non-existing module should yield 0 tools
     import tempfile
     import os
     with tempfile.TemporaryDirectory() as tmpdir:

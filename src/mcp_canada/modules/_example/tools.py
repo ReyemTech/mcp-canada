@@ -1,10 +1,14 @@
-"""Tools for the example module — demonstrates the 5-file pattern.
+"""Tools for the example module — demonstrates the 7-file pattern.
 
-This module shows how Phase 2-4 API modules are structured:
-- Standalone @tool decorator (NOT @mcp.tool)
-- Bilingual lang: en|fr parameter (I18N-01)
+Private fixture — see ``__init__.py`` for why this module is underscore-prefixed
+and excluded from production registration.
+
+This file shows how production modules structure their @tool functions:
+- Standalone @tool decorator from ``fastmcp.tools`` (NEVER @mcp.tool)
+- Bilingual lang: Literal["en", "fr"] = "en" parameter
 - make_response envelope (standard _meta wrapper)
-- Keywords line in docstring for BM25 indexing (DISC-04)
+- ``Use for:`` + ``Keywords:`` lines in docstring for BM25 indexing (minimum 8 keywords)
+- Module prefix on the tool name (example_, boc_, quebec_, etc.)
 """
 
 from typing import Literal

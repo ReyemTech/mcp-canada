@@ -441,14 +441,19 @@ retest3_2026-04-12:
   retest_of: 8
   discovered: 2026-04-12
   cycle: 4
-  root_cause: ""
+  root_cause: |
+    CONFIRMED 2026-04-12 (code inspection):
+    Line 704 in client.py: the nom_route fallback uses `raw_digits not in nom` to skip non-matching rows.
+    raw_digits="20" (extracted from "A-20") and nom="route 204" — since "20" IS a substring of "route 204",
+    the `in` check passes and Route 204 rows are NOT skipped. This is a substring match bug.
+    The primary num_route exact match (`if num != norm: continue`) at line ~700 correctly rejects these rows,
+    but the nom_route fallback at line 704 overrides it by letting them through.
+    Fix: remove the nom_route fallback entirely (rely on exact num_route match only) OR use word-boundary regex.
   artifacts:
-    - path: "src/mcp_canada/modules/quebec/client.py:fetch_bridge_structures"
-      issue: "Post-parse filter route matching logic: _normalize_route('A-20') produces '00020' but returned rows have route_num='00204'. Either (a) the num_route comparison is wrong (matching '0002' as prefix of '00204'?), or (b) the nom_route fallback does substring match where '20' matches inside 'Route 204'"
+    - path: "src/mcp_canada/modules/quebec/client.py:704"
+      issue: "nom_route fallback uses `raw_digits not in nom` — '20' in 'route 204' is True, so Route 204 rows pass the filter when searching for Autoroute 20"
   missing:
-    - "Inspect fetch_bridge_structures post-parse filter logic to identify exact comparison semantics"
-    - "Fix to use EXACT match on normalized route_num (not startswith/in/substring)"
-    - "If nom_route fallback exists, use word-boundary or exact-after-prefix match (e.g. 'Autoroute 20' not 'Route 204')"
+    - "Remove or tighten the nom_route fallback at line 704 — simplest fix is to rely solely on exact num_route match"
     - "Unit test: fixture with both route_num='00020' (Autoroute 20) and route_num='00204' (Route 204) rows — assert route='A-20' returns ONLY Autoroute 20 rows"
     - "Integration test: assert returned rows have route_num='00020' or route_name containing 'Autoroute 20'"
   debug_session: ""

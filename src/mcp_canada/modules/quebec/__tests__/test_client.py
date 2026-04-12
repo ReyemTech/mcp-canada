@@ -354,19 +354,30 @@ class TestFetchPopulationByMunicipality:
 
 
 class TestFetchRoadConditions:
-    async def test_parses_conditions_csv(self):
+    """Tests for fetch_road_conditions — updated with REAL live CSV header fixture (16-06).
+
+    The MTQ conditions_routieres CSV uses PascalCase headers (NumeroSegment, NumeroRoute…).
+    _parse_csv normalizes them to snake_case via _normalize_key (e.g. 'numerosegment').
+    The mapper MUST use the normalized keys — old tests used synthetic PascalCase rows
+    that masked the bug (both fixture and mapper were wrong in the same direction).
+    """
+
+    async def test_parses_conditions_csv_with_real_headers(self):
+        """Real normalized keys from live MTQ CSV — segment_id/route_num must be non-null."""
+        # These rows mirror what _parse_csv returns after applying _normalize_key
+        # to the real live CSV headers (PascalCase -> lowercase, accents stripped)
         sample_rows = [
             {
-                "NumeroSegment": "12345",
-                "NumeroRoute": "40",
-                "NomRoute": "Autoroute 40",
-                "NomRegion": "Montréal",
-                "DescriptionEtatChausseeEN": "Good",
-                "DescriptionEtatChausseeFR": "Bon",
-                "DescriptionVisibiliteEN": "Clear",
-                "DescriptionVisibiliteFR": "Dégagé",
-                "IndicateurPresenceLamesNeige": "Non",
-                "DateEtHeureCondition": "2026-04-11 08:00",
+                "numerosegment": "3201",
+                "numeroroute": "117",
+                "nomroute": "route 117",
+                "nomregion": "abitibi-temiscamingue",
+                "descriptionetatchausseeen": "Bare and Dry",
+                "descriptionetatchausseefr": "Degagee et seche",
+                "descriptionvisibiliteen": "Good",
+                "descriptionvisibilitefr": "Bonne",
+                "indicateurpresencelamesneige": "N",
+                "envigueurdepuis": "2026/04/11 05:02:04",
             }
         ]
         with patch(
@@ -376,22 +387,25 @@ class TestFetchRoadConditions:
             result, _ = await q_client.fetch_road_conditions(lang="en")
         assert isinstance(result, list)
         assert len(result) == 1
-        assert result[0]["pavement_status"] == "Good"
-        assert result[0]["route_num"] == "40"
+        assert result[0]["segment_id"] == "3201", f"segment_id was None — mapper uses wrong key"
+        assert result[0]["route_num"] == "117", f"route_num was None — mapper uses wrong key"
+        assert result[0]["region"] == "abitibi-temiscamingue"
+        assert result[0]["pavement_status"] == "Bare and Dry"
+        assert result[0]["timestamp"] == "2026/04/11 05:02:04"
 
     async def test_bilingual_column_fr(self):
         sample_rows = [
             {
-                "NumeroSegment": "12345",
-                "NumeroRoute": "40",
-                "NomRoute": "Autoroute 40",
-                "NomRegion": "Montréal",
-                "DescriptionEtatChausseeEN": "Good",
-                "DescriptionEtatChausseeFR": "Bon",
-                "DescriptionVisibiliteEN": "Clear",
-                "DescriptionVisibiliteFR": "Dégagé",
-                "IndicateurPresenceLamesNeige": "Non",
-                "DateEtHeureCondition": "2026-04-11 08:00",
+                "numerosegment": "3201",
+                "numeroroute": "117",
+                "nomroute": "route 117",
+                "nomregion": "abitibi-temiscamingue",
+                "descriptionetatchausseeen": "Bare and Dry",
+                "descriptionetatchausseefr": "Degagee et seche",
+                "descriptionvisibiliteen": "Good",
+                "descriptionvisibilitefr": "Bonne",
+                "indicateurpresencelamesneige": "N",
+                "envigueurdepuis": "2026/04/11 05:02:04",
             }
         ]
         with patch(
@@ -399,7 +413,39 @@ class TestFetchRoadConditions:
             new=AsyncMock(return_value=(sample_rows, False)),
         ):
             result, _ = await q_client.fetch_road_conditions(lang="fr")
-        assert result[0]["pavement_status"] == "Bon"
+        assert result[0]["pavement_status"] == "Degagee et seche"
+        assert result[0]["visibility"] == "Bonne"
+
+    async def test_timestamp_maps_to_envigueurdepuis(self):
+        """timestamp field must map to 'envigueurdepuis', NOT the non-existent 'DateEtHeureCondition'."""
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        sample_rows = [
+            {
+                "numerosegment": "9999",
+                "numeroroute": "20",
+                "nomroute": "autoroute 20",
+                "nomregion": "monteregie",
+                "descriptionetatchausseeen": "Wet",
+                "descriptionetatchausseefr": "Mouille",
+                "descriptionvisibiliteen": "Good",
+                "descriptionvisibilitefr": "Bonne",
+                "indicateurpresencelamesneige": "N",
+                "envigueurdepuis": "2026/01/15 12:00:00",
+            }
+        ]
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.fetch_and_parse",
+                new=AsyncMock(return_value=(sample_rows, False)),
+            ):
+                result, _ = await q_client.fetch_road_conditions(lang="en")
+        assert result[0]["timestamp"] == "2026/01/15 12:00:00", (
+            "timestamp must map to 'envigueurdepuis', not 'DateEtHeureCondition' (column doesn't exist)"
+        )
 
     async def test_returns_empty_on_parse_error(self):
         # NOTE: This test is updated as part of phase 16-05 gap closure.

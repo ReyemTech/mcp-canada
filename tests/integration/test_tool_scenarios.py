@@ -1669,6 +1669,25 @@ class TestQuebecToolScenarios:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
+    @pytest.mark.timeout(60)
+    async def test_road_conditions_fields_populated(self, mcp_server):
+        """'What are current road conditions in Quebec?' — rows must have non-null route/region/status."""
+        data = await call_tool(mcp_server, "quebec_get_road_conditions", {})
+        assert "_meta" in data, f"Expected _meta envelope, got: {data}"
+        if data["data"]:
+            row = data["data"][0]
+            assert row.get("route_num") is not None, (
+                "route_num is None — mapper still uses PascalCase keys (expected 'numeroroute')"
+            )
+            assert row.get("region") is not None, (
+                "region is None — mapper still uses PascalCase keys (expected 'nomregion')"
+            )
+            assert row.get("pavement_status") is not None, (
+                "pavement_status is None — mapper uses wrong bilingual column key"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
     @pytest.mark.timeout(30)
     async def test_get_bridge_structures_requires_filter(self, mcp_server):
         """'List bridges in Granby.' — must require at least one filter."""

@@ -501,19 +501,22 @@ async def fetch_road_conditions(
 
     async def _fetch() -> list[dict[str, Any]]:
         rows, _ = await fetch_and_parse(MTQ_ROAD_CONDITIONS_URL, ttl=CACHE_TTL_ACTIVE)
-        desc_col = "DescriptionEtatChausseeFR" if lang == "fr" else "DescriptionEtatChausseeEN"
-        vis_col = "DescriptionVisibiliteFR" if lang == "fr" else "DescriptionVisibiliteEN"
+        # _parse_csv applies _normalize_key to ALL headers: PascalCase -> lowercase, accents stripped.
+        # 'NumeroSegment' -> 'numerosegment', 'DescriptionEtatChausseeFR' -> 'descriptionetatchausseefr'
+        # 'EnVigueurDepuis' -> 'envigueurdepuis'  (NOT 'DateEtHeureCondition' — column doesn't exist)
+        desc_col = "descriptionetatchausseefr" if lang == "fr" else "descriptionetatchausseeen"
+        vis_col = "descriptionvisibilitefr" if lang == "fr" else "descriptionvisibiliteen"
         out = []
         for r in rows:
             out.append({
-                "segment_id": r.get("NumeroSegment"),
-                "route_num": r.get("NumeroRoute"),
-                "route_name": r.get("NomRoute"),
-                "region": r.get("NomRegion"),
-                "pavement_status": r.get(desc_col),
-                "visibility": r.get(vis_col),
-                "has_snow_presence": r.get("IndicateurPresenceLamesNeige"),
-                "timestamp": r.get("DateEtHeureCondition"),
+                "segment_id":        r.get("numerosegment"),
+                "route_num":         r.get("numeroroute"),
+                "route_name":        r.get("nomroute"),
+                "region":            r.get("nomregion"),
+                "pavement_status":   r.get(desc_col),
+                "visibility":        r.get(vis_col),
+                "has_snow_presence": r.get("indicateurpresencelamesneige"),
+                "timestamp":         r.get("envigueurdepuis"),
             })
         return out
 

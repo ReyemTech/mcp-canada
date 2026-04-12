@@ -1,5 +1,5 @@
 ---
-status: testing
+status: complete
 phase: 16-quebec-government-open-data
 source:
   - 16-01-SUMMARY.md
@@ -9,6 +9,7 @@ source:
   - 16-05-SUMMARY.md
   - 16-06-SUMMARY.md
   - 16-07-SUMMARY.md
+  - 16-08-SUMMARY.md
 started: 2026-04-11T00:00:00Z
 updated: 2026-04-12T00:00:00Z
 gaps_resolved: 2026-04-11T00:00:00Z
@@ -21,11 +22,14 @@ retest2_scope: "Tests 8, 9, 11 — post-16-06 gap closure re-verification (cycle
 retest3_started: 2026-04-12T00:00:00Z
 retest3_completed: 2026-04-12T00:00:00Z
 retest3_scope: "Tests 8, 11 — post-16-07 gap closure re-verification (cycle 3)"
+retest4_started: 2026-04-12T00:00:00Z
+retest4_completed: 2026-04-12T00:00:00Z
+retest4_scope: "Test 8 — post-16-08 route filter exact match fix (cycle 4)"
 ---
 
 ## Current Test
 
-[retest 3 complete]
+[retest 4 complete — all tests passed]
 
 ## Tests
 
@@ -72,6 +76,9 @@ retest3: 2026-04-12
 retest3_result: issue
 retest3_reported: "Int→str coercion CONFIRMED WORKING — all ID fields are strings (structure_id='200645', route_num='00204', structure_type='1'). route_num zero-padded correctly. BUT route FILTER is returning WRONG routes: route='A-20' should match Autoroute 20 (route_num='00020') but returns Route 204 bridges (route_num='00204', route_name='Route 204'). Likely the nom_route fallback is doing a substring match where '20' matches inside 'Route 204'."
 retest3_severity: major
+retest4: 2026-04-12
+retest4_result: pass
+retest4_notes: "CONFIRMED FIXED — 16-08 commit 2768478. route='A-20' now returns only Autoroute 20 bridges (route_num='00020'). Route 204 no longer leaks through. All ID fields still strings (int→str regression-free)."
 
 ### 9. Road conditions (MTQ WFS CSV, active TTL)
 expected: Call `quebec_get_road_conditions()` — returns current Quebec road condition data from the MTQ WFS CSV endpoint. Bilingual columns — EN vs FR descriptions selected by `lang` param. `_meta.cached` uses short TTL (active data). Graceful empty list if the WFS endpoint fails (research flagged low-confidence endpoint).
@@ -159,6 +166,13 @@ retest3_2026-04-12:
   passed: 1    # Test 11 (legend row skip + TLS still working)
   issues: 1    # Test 8 — int→str coercion WORKS but route filter returns wrong routes (Route 204 instead of Autoroute 20; nom_route substring match bug)
   status: "16-07 confirmed landed (int→str coercion + legend row skip both verified). Test 11 CLOSED. Test 8 has a NEW downstream issue: route filter substring match returns wrong routes. Requires cycle 4 (16-08)."
+
+retest4_2026-04-12:
+  scope: "Test 8 — post-16-08 route filter exact match fix (cycle 4)"
+  total: 1
+  passed: 1    # Test 8 (route filter returns correct Autoroute 20 bridges)
+  issues: 0
+  status: "16-08 confirmed landed. All 16 UAT tests now pass. Phase 16 Quebec module DONE."
 
 ## Gaps
 
@@ -434,7 +448,8 @@ retest3_2026-04-12:
 # ═══════════════════════════════════════════════════════════════════
 
 - truth: "quebec_get_bridge_structures(route='A-20') returns Autoroute 20 bridges (not Route 204)"
-  status: failed
+  status: resolved
+  resolved_by: "16-08 commit 2768478 — removed nom_route substring fallback, exact num_route match only (confirmed by retest 4)"
   reason: "User reported: int→str coercion CONFIRMED WORKING (all ID fields are strings, route_num zero-padded). But route filter returns WRONG routes: route='A-20' should match Autoroute 20 (route_num='00020') but returns Route 204 bridges (route_num='00204', route_name='Route 204'). The nom_route fallback is likely doing a substring match where '20' matches inside 'Route 204'."
   severity: major
   test: 8

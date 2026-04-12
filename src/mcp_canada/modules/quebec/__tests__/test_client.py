@@ -1153,7 +1153,13 @@ class TestFetchElectricityData:
                 ],
             },
         }
-        sample_rows = [{"annee": "2023", "production_twh": "200.5", "consommation_twh": "195.0"}]
+        # 16-07: fetch_electricity_data now applies _is_real_electricity_row to
+        # strip the XLSX legend row. Fixture rows must include the indexing
+        # cells (rang/mois/jour/heure) so they pass the filter.
+        sample_rows = [{
+            "rang": 1, "mois": 1, "jour": 1, "heure": 1,
+            "annee": "2023", "production_twh": "200.5", "consommation_twh": "195.0",
+        }]
         with patch.object(_mod, "cached_fetch", side_effect=passthrough):
             with patch("mcp_canada.modules.quebec.client.api_get", new=AsyncMock(return_value=hydro_pkg)):
                 with patch(
@@ -1199,7 +1205,11 @@ class TestFetchElectricityData:
                 ],
             },
         }
-        sample_rows = [{"year": 2021, "production": 100}]
+        # 16-07: include indexing cells so the row survives _is_real_electricity_row.
+        sample_rows = [{
+            "rang": 1, "mois": 1, "jour": 1, "heure": 1,
+            "year": 2021, "production": 100,
+        }]
         with patch.object(_mod, "cached_fetch", side_effect=passthrough):
             with patch("mcp_canada.modules.quebec.client.api_get", new=AsyncMock(return_value=hydro_pkg)):
                 with patch(
@@ -1244,7 +1254,11 @@ class TestFetchElectricityData:
                 ],
             },
         }
-        sample_rows = [{"year": 2019, "production": 90}]
+        # 16-07: include indexing cells so the row survives _is_real_electricity_row.
+        sample_rows = [{
+            "rang": 1, "mois": 1, "jour": 1, "heure": 1,
+            "year": 2019, "production": 90,
+        }]
         with patch.object(_mod, "cached_fetch", side_effect=passthrough):
             with patch("mcp_canada.modules.quebec.client.api_get", new=AsyncMock(return_value=hydro_pkg)):
                 with patch(
@@ -1286,7 +1300,10 @@ class TestFetchElectricityData:
 
         async def capture_fetch_and_parse(url, **kwargs):
             captured_kwargs.update(kwargs)
-            return [{"year": 2021}], False
+            return [{
+                "rang": 1, "mois": 1, "jour": 1, "heure": 1,
+                "year": 2021,
+            }], False
 
         with patch.object(_mod, "cached_fetch", side_effect=passthrough):
             with patch("mcp_canada.modules.quebec.client.api_get", new=AsyncMock(return_value=hydro_pkg)):
@@ -1334,7 +1351,10 @@ class TestFetchElectricityData:
 
         async def capture_fetch_and_parse(url, **kwargs):
             captured_kwargs.update(kwargs)
-            return [{"year": 2020}], False
+            return [{
+                "rang": 1, "mois": 1, "jour": 1, "heure": 1,
+                "year": 2020,
+            }], False
 
         with patch.object(_mod, "cached_fetch", side_effect=passthrough):
             with patch("mcp_canada.modules.quebec.client.api_get", new=AsyncMock(return_value=hydro_pkg)):
@@ -1385,6 +1405,179 @@ class TestFetchElectricityData:
             with patch("mcp_canada.modules.quebec.client.api_get", new=AsyncMock(return_value=hydro_pkg)):
                 with pytest.raises(ValueError, match="No parseable"):
                     await q_client.fetch_electricity_data(limit=100)
+
+    async def test_skips_legend_formula_row(self) -> None:
+        """Hydro-Québec XLSX legend/formula row (first data row) must be filtered out.
+
+        The real Hydro-Québec historique XLSX files document column formulas
+        in the FIRST row after the header: cells like '5=1-2+3+4', '7=5-6',
+        '9=7-8', '13=11x12' with null indexing cells (rang/mois/jour/heure).
+        Phase 16-07 adds _is_real_electricity_row to strip this row so that
+        data[0] is always real data. Must FAIL before the filter exists.
+        """
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        hydro_pkg = {
+            "success": True,
+            "result": {
+                "id": "hydro-uuid",
+                "name": "historique-production-consommation",
+                "title": "Historique",
+                "notes": "",
+                "organization": {"name": "hydro-quebec", "title": "Hydro-Québec"},
+                "resources": [
+                    {
+                        "id": "xlsx-2021",
+                        "name": "2021",
+                        "format": "XLSX",
+                        "url": "https://www.hydroquebec.com/data/suivi-2021.xlsx",
+                        "datastore_active": False,
+                    },
+                ],
+            },
+        }
+        # Row 0 = legend (indexing cells None, formula strings in computed columns)
+        # Row 1, 2 = real data
+        mock_parsed_rows = [
+            {
+                "rang": None, "mois": None, "jour": None, "heure": None,
+                "prod_1": None, "prod_2": None, "prod_3": None, "prod_4": None,
+                "prod_5": "5=1-2+3+4", "cons_6": None, "cons_7": "7=5-6",
+                "cons_8": None, "cons_9": "9=7-8", "cons_13": "13=11x12",
+            },
+            {
+                "rang": 1, "mois": 1, "jour": 1, "heure": 1,
+                "prod_1": 21065.13, "prod_2": 0.0, "prod_3": 0.0, "prod_4": 0.0,
+                "prod_5": 21065.13, "cons_6": 1200.0, "cons_7": 19865.13,
+                "cons_8": 0.0, "cons_9": 19865.13, "cons_13": 4000.0,
+            },
+            {
+                "rang": 2, "mois": 1, "jour": 1, "heure": 2,
+                "prod_1": 20500.0, "prod_2": 0.0, "prod_3": 0.0, "prod_4": 0.0,
+                "prod_5": 20500.0, "cons_6": 1150.0, "cons_7": 19350.0,
+                "cons_8": 0.0, "cons_9": 19350.0, "cons_13": 3900.0,
+            },
+        ]
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.api_get",
+                new=AsyncMock(return_value=hydro_pkg),
+            ):
+                with patch(
+                    "mcp_canada.modules.quebec.client.fetch_and_parse",
+                    new=AsyncMock(return_value=(mock_parsed_rows, False)),
+                ):
+                    rows, source_url, was_cached = await q_client.fetch_electricity_data()
+        assert len(rows) == 2, (
+            f"Expected 2 real rows (legend stripped), got {len(rows)}: {rows}"
+        )
+        assert rows[0]["rang"] == 1, (
+            f"First row should be real data (rang=1), got: {rows[0]}"
+        )
+        assert rows[1]["rang"] == 2
+        # No formula strings in any returned cell
+        for row in rows:
+            for v in row.values():
+                assert not (
+                    isinstance(v, str) and "=" in v and any(ch.isdigit() for ch in v)
+                ), f"Formula string leaked through filter: {row}"
+
+    async def test_skips_row_with_null_indexing_cell(self) -> None:
+        """Defensive: rows with any null indexing cell are filtered, not just legend.
+
+        This protects against other sparse/fill-blank rows that may appear in
+        future Hydro-Québec XLSX revisions.
+        """
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        hydro_pkg = {
+            "success": True,
+            "result": {
+                "id": "hydro-uuid",
+                "name": "historique-production-consommation",
+                "title": "Historique",
+                "notes": "",
+                "organization": {"name": "hydro-quebec", "title": "Hydro-Québec"},
+                "resources": [
+                    {
+                        "id": "xlsx-2021",
+                        "name": "2021",
+                        "format": "XLSX",
+                        "url": "https://www.hydroquebec.com/data/suivi-2021.xlsx",
+                        "datastore_active": False,
+                    },
+                ],
+            },
+        }
+        mock_parsed_rows = [
+            {"rang": None, "mois": 1, "jour": 1, "heure": 1, "prod_1": 100.0},
+            {"rang": 1, "mois": 1, "jour": 1, "heure": 1, "prod_1": 200.0},
+        ]
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.api_get",
+                new=AsyncMock(return_value=hydro_pkg),
+            ):
+                with patch(
+                    "mcp_canada.modules.quebec.client.fetch_and_parse",
+                    new=AsyncMock(return_value=(mock_parsed_rows, False)),
+                ):
+                    rows, _source, _cached = await q_client.fetch_electricity_data()
+        assert len(rows) == 1
+        assert rows[0]["rang"] == 1
+        assert rows[0]["prod_1"] == 200.0
+
+    async def test_keeps_real_row_with_populated_indexing_cells(self) -> None:
+        """Rows with all four indexing cells populated AND no formula strings are kept."""
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        hydro_pkg = {
+            "success": True,
+            "result": {
+                "id": "hydro-uuid",
+                "name": "historique-production-consommation",
+                "title": "Historique",
+                "notes": "",
+                "organization": {"name": "hydro-quebec", "title": "Hydro-Québec"},
+                "resources": [
+                    {
+                        "id": "xlsx-2021",
+                        "name": "2021",
+                        "format": "XLSX",
+                        "url": "https://www.hydroquebec.com/data/suivi-2021.xlsx",
+                        "datastore_active": False,
+                    },
+                ],
+            },
+        }
+        mock_parsed_rows = [
+            {
+                "rang": 1, "mois": 1, "jour": 1, "heure": 1,
+                "production_brute": 20000.0, "consommation": 19000.0,
+            },
+        ]
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.api_get",
+                new=AsyncMock(return_value=hydro_pkg),
+            ):
+                with patch(
+                    "mcp_canada.modules.quebec.client.fetch_and_parse",
+                    new=AsyncMock(return_value=(mock_parsed_rows, False)),
+                ):
+                    rows, _source, _cached = await q_client.fetch_electricity_data()
+        assert len(rows) == 1
+        assert rows[0]["rang"] == 1
+        assert rows[0]["production_brute"] == 20000.0
 
 
 class TestFetchProtectedAreas:

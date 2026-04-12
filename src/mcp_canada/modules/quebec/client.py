@@ -813,6 +813,28 @@ async def fetch_water_quality_monitoring() -> tuple[dict[str, Any], bool]:
     return (details.model_dump(), cached)
 
 
+def _is_real_electricity_row(r: dict[str, Any]) -> bool:
+    """Skip the Hydro-Québec XLSX legend/formula row.
+
+    The historique-production-consommation XLSX files document column formulas
+    in the first data row (cells like '5=1-2+3+4', '7=5-6', '9=7-8', '13=11x12'
+    in computed columns; indexing cells rang/mois/jour/heure are all null).
+    Real data rows always have populated rang/mois/jour/heure.
+
+    Phase 16-07 gap closure — domain-specific caller filter, no shared parser edit.
+    """
+    # Skip if any indexing cell is null (formula legend row or sparse fill)
+    for idx_col in ("rang", "mois", "jour", "heure"):
+        if r.get(idx_col) is None:
+            return False
+    # Defensive: reject rows where any cell value is a formula string
+    # (e.g. '5=1-2+3+4') — the '='-with-digit signature is the reliable tell.
+    for v in r.values():
+        if isinstance(v, str) and "=" in v and any(ch.isdigit() for ch in v):
+            return False
+    return True
+
+
 async def fetch_electricity_data(
     limit: int = 500,
 ) -> tuple[list[dict[str, Any]], str, bool]:
@@ -850,7 +872,10 @@ async def fetch_electricity_data(
             ssl_ctx = ssl.create_default_context()
             ssl_ctx.set_ciphers("DEFAULT:@SECLEVEL=1")
         rows, _ = await fetch_and_parse(file_url, ttl=CACHE_TTL_META, ssl_context=ssl_ctx)
-        return rows[:limit], file_url
+        # Strip the XLSX legend/formula row and any sparse rows with null
+        # indexing cells. See Phase 16-07 gap closure.
+        real_rows = [r for r in rows if _is_real_electricity_row(r)]
+        return real_rows[:limit], file_url
 
     bundled, was_cached = await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
     rows, source_url = bundled

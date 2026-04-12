@@ -1793,3 +1793,27 @@ class TestQuebecToolScenarios:
             "Expected non-empty electricity data — SSL handshake to hydroquebec.com failed or "
             "no XLSX resource found. Check fetch_and_parse ssl_context and SECLEVEL=1 fix."
         )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(120)
+    async def test_electricity_first_row_is_real(self, mcp_server):
+        """'First row of electricity data must be real, not the XLSX legend.' — 16-07 gap closure.
+
+        Hydro-Québec XLSX files document column formulas in the first data row
+        (null indexing cells, cells like '5=1-2+3+4'). fetch_electricity_data
+        filters this out so data[0]['rang'] == 1 (the real first hour).
+        """
+        data = await call_tool(mcp_server, "quebec_get_electricity_data", {"limit": 5})
+        assert "_meta" in data, f"Expected _meta envelope, got: {data}"
+        assert len(data["data"]) > 0, "Expected non-empty electricity rows"
+        first = data["data"][0]
+        assert first.get("rang") == 1, (
+            "First row should be real data with rang=1 (legend row should be "
+            f"filtered out). Got: {first}"
+        )
+        # Defensive: no formula strings should leak
+        for k, v in first.items():
+            assert not (
+                isinstance(v, str) and "=" in v and any(ch.isdigit() for ch in v)
+            ), f"Formula string leaked into first row [{k}]={v!r}"

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 16-06-PLAN.md
-last_updated: "2026-04-12T03:05:08.288Z"
+stopped_at: Completed 16-07-PLAN.md
+last_updated: "2026-04-12T03:46:25.403Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 11
-  total_plans: 37
-  completed_plans: 37
+  total_plans: 38
+  completed_plans: 38
   percent: 0
 ---
 
@@ -86,6 +86,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 16-quebec-government-open-data P04 | 28 | 4 tasks | 12 files |
 | Phase 16-quebec-government-open-data P05 | 8min | 3 tasks | 7 files |
 | Phase 16-quebec-government-open-data P06 | 9min | 3 tasks | 5 files |
+| Phase 16-quebec-government-open-data P07 | 8min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -192,6 +193,10 @@ Recent decisions affecting current work:
 - [Phase 16-quebec-government-open-data]: _normalize_route zfill(5): 'A-20' -> '00020'; nom_route digit-substring fallback for WFS data mismatch
 - [Phase 16-quebec-government-open-data]: fetch_road_conditions mapper uses _normalize_key output: 'numerosegment' not 'NumeroSegment'; 'envigueurdepuis' not 'DateEtHeureCondition'
 - [Phase 16-quebec-government-open-data]: SECLEVEL=1 SSLContext scoped to hydroquebec.com in fetch_electricity_data; fetch_and_parse ssl_context param with ssl_flag in cache key
+- [Phase 16-quebec-government-open-data]: Quebec int->str coercion: _str_or_none helper lives in quebec/client.py per-mapper; shared _mask_privacy untouched
+- [Phase 16-quebec-government-open-data]: _flatten_bridge emits _normalize_route(str(num_route)) so post-parse filter and emitted route_num both use zero-padded form
+- [Phase 16-quebec-government-open-data]: _is_real_electricity_row lives in quebec/client.py caller — domain-specific XLSX legend row filter, no shared/parsers.py edit
+- [Phase 16-quebec-government-open-data]: Replicate int->str fix: _flatten_population_row.mcode + _flatten_road_work.identifier/chantier_id + _flatten_road_event.identifier (latent same-root-cause bugs)
 
 ### Roadmap Evolution
 
@@ -219,6 +224,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-12T03:05:08.281Z
-Stopped at: Completed 16-06-PLAN.md
+Last session: 2026-04-12T03:46:25.399Z
+Stopped at: Completed 16-07-PLAN.md
 Resume file: None

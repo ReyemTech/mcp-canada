@@ -193,13 +193,16 @@ Plans:
 **Goal:** Agents can search the Données Québec CKAN catalogue (1,593 datasets, 139 orgs, 10 thematic groups) and access curated MSSS health, MTQ transport, environment, demographics, and energy data via 18 `quebec_` tools (5 discovery + 13 curated), reusing the post-15-05 `_api_get` parsed-dict pattern and Phase 15 `TestSharedApiGetContract` test class from day 1.
 **Requirements**: TBD (no explicit REQ IDs yet — delivers on milestone provincial coverage goal)
 **Depends on:** Phase 15
-**Plans:** 6/6 plans complete
+**Plans:** 7/7 plans complete
 
 Plans:
-- [ ] 16-01-PLAN.md — Quebec module skeleton + Wave 0 test scaffolds
-- [ ] 16-02-PLAN.md — CKAN client + 5 discovery tools + TestSharedApiGetContract
-- [ ] 16-03-PLAN.md — Health (MSSS) + Transport (MTQ) curated tools (7)
-- [ ] 16-04-PLAN.md — Environment/Demographics/Energy tools (6) + prompts + resources + integration + docs
+- [x] 16-01-PLAN.md — Quebec module skeleton + Wave 0 test scaffolds
+- [x] 16-02-PLAN.md — CKAN client + 5 discovery tools + TestSharedApiGetContract
+- [x] 16-03-PLAN.md — Health (MSSS) + Transport (MTQ) curated tools (7)
+- [x] 16-04-PLAN.md — Environment/Demographics/Energy tools (6) + prompts + resources + integration + docs
+- [x] 16-05-PLAN.md — Gap closure cycle 1 (post-UAT)
+- [x] 16-06-PLAN.md — Gap closure cycle 2 (WFS paging, snake_case mapper, Hydro-Québec SECLEVEL=1 SSL)
+- [x] 16-07-PLAN.md — Gap closure cycle 3 (bridges int→str coercion, electricity XLSX legend row filter)
 
 ### Phase 17: Alberta Government Open Data
 

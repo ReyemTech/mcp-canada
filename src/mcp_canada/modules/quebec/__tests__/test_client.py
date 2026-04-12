@@ -902,6 +902,123 @@ class TestQuebecBridgeStructuresIntFilter:
         assert result[0].route_num == "00020"
 
 
+class TestQuebecBridgeRouteSubstringFix:
+    """Regression: route='A-20' must NOT return Route 204 bridges.
+
+    The old nom_route substring fallback let '20' match inside 'route 204'.
+    After the fix, only exact num_route match is used.
+    """
+
+    @pytest.fixture()
+    def _mixed_route_pages(self):
+        """Two WFS pages: page 1 has 2x A-20 + 1x Route 204; page 2 is empty."""
+        page1 = [
+            {
+                "ide_strct": 200645,
+                "num_dossr": 4116,
+                "val_annee_": 1985,
+                "code_des_s": "Bon",
+                "nom_route": "Autoroute 20 Ouest",
+                "nom_obstc": "Rivière",
+                "nom_muncp": "Saint-Hyacinthe",
+                "cod_muncp": 17010,
+                "nom_strct": "Pont A",
+                "num_route": "00020",
+                "geo_lattd": 45.5,
+                "geo_longt": -73.0,
+                "val_longr": 42.5,
+                "val_largr_": 12.0,
+                "cod_type_s": 1,
+            },
+            {
+                "ide_strct": 200646,
+                "num_dossr": 4117,
+                "val_annee_": 1990,
+                "code_des_s": "Bon",
+                "nom_route": "Autoroute 20 Est",
+                "nom_obstc": "Ruisseau",
+                "nom_muncp": "Drummondville",
+                "cod_muncp": 17020,
+                "nom_strct": "Pont B",
+                "num_route": "00020",
+                "geo_lattd": 45.8,
+                "geo_longt": -72.5,
+                "val_longr": 35.0,
+                "val_largr_": 10.0,
+                "cod_type_s": 1,
+            },
+            {
+                "ide_strct": 300099,
+                "num_dossr": 5500,
+                "val_annee_": 1995,
+                "code_des_s": "Bon",
+                "nom_route": "Route 204",
+                "nom_obstc": "Rivière",
+                "nom_muncp": "Lac-Mégantic",
+                "cod_muncp": 30050,
+                "nom_strct": "Pont Route 204",
+                "num_route": "00204",
+                "geo_lattd": 45.6,
+                "geo_longt": -70.9,
+                "val_longr": 50.0,
+                "val_largr_": 11.0,
+                "cod_type_s": 1,
+            },
+        ]
+        return page1
+
+    async def test_a20_excludes_route_204(self, _mixed_route_pages) -> None:
+        """route='A-20' must return ONLY route_num='00020', not '00204'."""
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        async def fake_fetch_and_parse(url, **kwargs):
+            return _mixed_route_pages, False
+
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.fetch_and_parse",
+                side_effect=fake_fetch_and_parse,
+            ):
+                result, _ = await q_client.fetch_bridge_structures(route="A-20", limit=10)
+
+        assert len(result) == 2, (
+            f"Expected 2 A-20 rows, got {len(result)}: "
+            f"{[r.route_num for r in result]}"
+        )
+        for r in result:
+            assert r.route_num == "00020", f"Unexpected route_num: {r.route_num}"
+        # Explicitly verify no Route 204 leak
+        assert all(r.route_num != "00204" for r in result), (
+            "Route 204 row leaked through A-20 filter"
+        )
+
+    async def test_route_204_excludes_a20(self, _mixed_route_pages) -> None:
+        """route='Route 204' must return ONLY route_num='00204', not '00020'."""
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        async def fake_fetch_and_parse(url, **kwargs):
+            return _mixed_route_pages, False
+
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.fetch_and_parse",
+                side_effect=fake_fetch_and_parse,
+            ):
+                result, _ = await q_client.fetch_bridge_structures(route="Route 204", limit=10)
+
+        assert len(result) == 1, (
+            f"Expected 1 Route 204 row, got {len(result)}: "
+            f"{[r.route_num for r in result]}"
+        )
+        assert result[0].route_num == "00204"
+
+
 class TestQuebecPopulationIntCoercion:
     """Latent replicate-check: MAMH mcode is digit-only → int after _mask_privacy."""
 

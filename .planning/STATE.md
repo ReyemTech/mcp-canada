@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 16-04-PLAN.md
-last_updated: "2026-04-11T23:53:23.318Z"
+stopped_at: Completed 16-05-PLAN.md
+last_updated: "2026-04-12T02:32:05.354Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 11
-  total_plans: 35
-  completed_plans: 35
+  total_plans: 36
+  completed_plans: 36
   percent: 0
 ---
 
@@ -84,6 +84,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 16-quebec-government-open-data P01 | 5min | 2 tasks | 15 files |
 | Phase 16-quebec-government-open-data P03 | 39 | 2 tasks | 6 files |
 | Phase 16-quebec-government-open-data P04 | 28 | 4 tasks | 12 files |
+| Phase 16-quebec-government-open-data P05 | 8min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -184,6 +185,9 @@ Recent decisions affecting current work:
 - [Phase 16-quebec-government-open-data]: Metadata-only tools return model_dump() directly — no additional parsing layer for SHP/GPKG archives that fetch_and_parse cannot handle
 - [Phase 16-quebec-government-open-data]: quebec_active_fires_now prompt explicitly redirects to sopfeu.qc.ca — SOPFEU confirmed not registered on Données Québec
 - [Phase 16-quebec-government-open-data]: Resource tests converted from sync+asyncio.get_event_loop() to async def — Python 3.14 raises RuntimeError for get_event_loop() without a running loop in main thread
+- [Phase 16-quebec-government-open-data]: fetch_and_parse query-string format detection: urllib.parse.parse_qs with case-insensitive key normalization — zero new deps, backward-compatible with path-suffix detection
+- [Phase 16-quebec-government-open-data]: fetch_electricity_data 3-tuple (rows, source_url, was_cached): bundled in _fetch() tuple so single cache entry holds both; cache key uses v2 suffix to invalidate stale entries
+- [Phase 16-quebec-government-open-data]: Hydro-Québec historique-production-consommation package is XLSX-only (years 2018-2021; 2020 empty URL): format matcher expanded from CSV-only to (CSV, XLSX, XLS)
 
 ### Roadmap Evolution
 
@@ -211,6 +215,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-11T23:47:20.121Z
-Stopped at: Completed 16-04-PLAN.md
+Last session: 2026-04-12T02:32:05.348Z
+Stopped at: Completed 16-05-PLAN.md
 Resume file: None

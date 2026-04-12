@@ -518,6 +518,167 @@ class TestFetchBridgeStructures:
         assert result[0].municipality == "Granby"
 
 
+class TestFetchBridgeStructuresPaging:
+    """Tests for WFS paging loop and route normalizer (16-06 gap closure)."""
+
+    async def test_paging_collects_all_rows(self):
+        """Paging loop: page 1 returns PAGE_SIZE rows (fetch more), page 2 returns less (stop)."""
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        # Page 1: 500 rows with no A-20 (use num_route "00999")
+        page1_rows = [
+            {
+                "ide_strct": f"S-{i}", "num_dossr": str(i), "val_annee_": "2000",
+                "code_des_s": "Bon", "nom_route": "Route 999", "nom_obstc": "Riviere",
+                "nom_muncp": "Ville", "cod_muncp": "12345", "nom_strct": f"Pont {i}",
+                "num_route": "00999", "geo_lattd": "45.0", "geo_longt": "-72.0",
+                "val_longr": "10.0", "val_largr_": "5.0", "cod_type_s": "Pont",
+            }
+            for i in range(500)
+        ]
+        # Page 2: 3 rows with A-20
+        page2_rows = [
+            {
+                "ide_strct": "S-A20-1", "num_dossr": "9001", "val_annee_": "1985",
+                "code_des_s": "Bon", "nom_route": "Autoroute 20 Ouest", "nom_obstc": "Riviere",
+                "nom_muncp": "Saint-Hyacinthe", "cod_muncp": "47017", "nom_strct": "Pont A-20",
+                "num_route": "00020", "geo_lattd": "45.5", "geo_longt": "-73.0",
+                "val_longr": "42.5", "val_largr_": "12.0", "cod_type_s": "Pont",
+            },
+            {
+                "ide_strct": "S-A20-2", "num_dossr": "9002", "val_annee_": "1990",
+                "code_des_s": "Bon", "nom_route": "Autoroute 20 Est", "nom_obstc": "Canal",
+                "nom_muncp": "Vaudreuil-Dorion", "cod_muncp": "71095", "nom_strct": "Pont A-20 Est",
+                "num_route": "00020", "geo_lattd": "45.4", "geo_longt": "-74.0",
+                "val_longr": "55.0", "val_largr_": "12.0", "cod_type_s": "Pont",
+            },
+            {
+                "ide_strct": "S-A20-3", "num_dossr": "9003", "val_annee_": "2000",
+                "code_des_s": "Bon", "nom_route": "Autoroute 20", "nom_obstc": "Riviere B",
+                "nom_muncp": "Dorval", "cod_muncp": "06030", "nom_strct": "Pont A-20 Dorval",
+                "num_route": "00020", "geo_lattd": "45.4", "geo_longt": "-73.8",
+                "val_longr": "30.0", "val_largr_": "10.0", "cod_type_s": "Pont",
+            },
+        ]
+
+        call_count = 0
+
+        async def fake_fetch_and_parse(url, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if "startIndex=0" in url:
+                return page1_rows, False
+            elif "startIndex=500" in url:
+                return page2_rows, False
+            return [], False
+
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.fetch_and_parse",
+                side_effect=fake_fetch_and_parse,
+            ):
+                result, _ = await q_client.fetch_bridge_structures(route="A-20", limit=100)
+
+        # Must have fetched both pages
+        assert call_count == 2
+        # Must have filtered to only A-20 rows
+        assert len(result) == 3
+        assert all(r.route_num == "00020" for r in result)
+
+    async def test_route_normalizer_a20_maps_to_zero_padded(self):
+        """route='A-20' normalizes to '00020' and matches num_route='00020'."""
+        import mcp_canada.modules.quebec.client as _mod
+        from mcp_canada.modules.quebec.client import _normalize_route
+
+        assert _normalize_route("A-20") == "00020"
+        assert _normalize_route("Autoroute 20") == "00020"
+        assert _normalize_route("autoroute 20") == "00020"
+        assert _normalize_route("20") == "00020"
+
+    async def test_route_normalizer_132_formats(self):
+        """route='Route 132', '132', '00132' all normalize to '00132'."""
+        from mcp_canada.modules.quebec.client import _normalize_route
+
+        assert _normalize_route("Route 132") == "00132"
+        assert _normalize_route("132") == "00132"
+        assert _normalize_route("00132") == "00132"
+
+    async def test_paging_stops_when_page_smaller_than_count(self):
+        """Loop terminates when page returns fewer rows than PAGE_SIZE."""
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        call_count = 0
+
+        async def fake_fetch_and_parse(url, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            # First page returns 10 rows (< PAGE_SIZE=500) — loop should stop
+            return [
+                {
+                    "ide_strct": f"S-{i}", "num_dossr": str(i), "val_annee_": "2000",
+                    "code_des_s": "Bon", "nom_route": "Route 132", "nom_obstc": "Mer",
+                    "nom_muncp": "Rimouski", "cod_muncp": "97047", "nom_strct": f"Pont {i}",
+                    "num_route": "00132", "geo_lattd": "48.0", "geo_longt": "-68.5",
+                    "val_longr": "20.0", "val_largr_": "8.0", "cod_type_s": "Pont",
+                }
+                for i in range(10)
+            ], False
+
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.fetch_and_parse",
+                side_effect=fake_fetch_and_parse,
+            ):
+                result, _ = await q_client.fetch_bridge_structures(route="132", limit=100)
+
+        # Only one page fetched (10 < 500 = stop)
+        assert call_count == 1
+        assert len(result) == 10
+
+    async def test_municipality_filter_regression_with_paging(self):
+        """Municipality filter still works after paging collects all rows."""
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        rows = [
+            {
+                "ide_strct": "S-1", "num_dossr": "1", "val_annee_": "2000",
+                "code_des_s": "Bon", "nom_route": "Route 132", "nom_obstc": "Mer",
+                "nom_muncp": "Granby", "cod_muncp": "47017", "nom_strct": "Pont 1",
+                "num_route": "00132", "geo_lattd": "45.0", "geo_longt": "-72.0",
+                "val_longr": "10.0", "val_largr_": "5.0", "cod_type_s": "Pont",
+            },
+            {
+                "ide_strct": "S-2", "num_dossr": "2", "val_annee_": "2000",
+                "code_des_s": "Bon", "nom_route": "Route 132", "nom_obstc": "Mer",
+                "nom_muncp": "Rimouski", "cod_muncp": "97047", "nom_strct": "Pont 2",
+                "num_route": "00132", "geo_lattd": "48.0", "geo_longt": "-68.5",
+                "val_longr": "20.0", "val_largr_": "8.0", "cod_type_s": "Pont",
+            },
+        ]
+
+        async def fake_fetch_and_parse(url, **kwargs):
+            return rows, False
+
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.fetch_and_parse",
+                side_effect=fake_fetch_and_parse,
+            ):
+                result, _ = await q_client.fetch_bridge_structures(municipality="Granby")
+
+        assert len(result) == 1
+        assert result[0].municipality == "Granby"
+
+
 # ---------------------------------------------------------------------------
 # Environment / Energy — Plan 04
 # ---------------------------------------------------------------------------

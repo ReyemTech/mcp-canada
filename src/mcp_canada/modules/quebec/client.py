@@ -22,6 +22,7 @@ CRITICAL (Phase 15 lesson — _api_get MUST follow this contract):
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import httpx
@@ -583,6 +584,22 @@ async def fetch_road_events() -> tuple[list[QuebecRoadEvent], bool]:
     return await cached_fetch(cache_key, CACHE_TTL_ACTIVE, _fetch)
 
 
+def _normalize_route(route: str) -> str:
+    """Extract digits from a route string and zero-pad to 5 chars.
+
+    Handles all common user-facing route formats:
+        'A-20'       -> '00020'
+        'Autoroute 20' -> '00020'
+        '20'         -> '00020'
+        'Route 132'  -> '00132'
+        '00132'      -> '00132'
+    """
+    digits = re.search(r"\d+", route)
+    if not digits:
+        return route.strip()
+    return digits.group(0).zfill(5)
+
+
 def _flatten_bridge(r: dict[str, Any]) -> QuebecBridgeStructure:
     return QuebecBridgeStructure(
         structure_id=r.get("ide_strct"),
@@ -603,6 +620,9 @@ def _flatten_bridge(r: dict[str, Any]) -> QuebecBridgeStructure:
     )
 
 
+_BRIDGES_PAGE_SIZE = 500
+
+
 async def fetch_bridge_structures(
     route: str | None = None,
     municipality: str | None = None,
@@ -611,18 +631,36 @@ async def fetch_bridge_structures(
 ) -> tuple[list[QuebecBridgeStructure], bool]:
     """MTQ bridge inventory via WFS CSV (ms:gsq_v_desc_strct_tri).
 
-    ~50K+ structures. At least one filter REQUIRED (enforced in the @tool layer)
-    to avoid unbounded response. Post-parse filter since MTQ WFS CSV has no
-    server-side filter params.
+    11,696 structures total. At least one filter REQUIRED (enforced in the @tool
+    layer). WFS server caps default page at 30 rows and ignores CQL_FILTER —
+    paging via count+startIndex is the only way to retrieve the full dataset.
+    Post-parse filtering applied after all pages are collected.
     """
     cache_key = f"quebec:mtq:bridges:{route}:{municipality}:{region}:{limit}"
 
     async def _fetch() -> list[QuebecBridgeStructure]:
-        rows, _ = await fetch_and_parse(MTQ_BRIDGES_URL, ttl=CACHE_TTL_META)
+        # WFS paging loop: collect all rows across pages
+        all_rows: list[dict[str, Any]] = []
+        offset = 0
+        while True:
+            paged_url = MTQ_BRIDGES_URL + f"&count={_BRIDGES_PAGE_SIZE}&startIndex={offset}"
+            page_rows, _ = await fetch_and_parse(paged_url, ttl=CACHE_TTL_META)
+            all_rows.extend(page_rows)
+            if len(page_rows) < _BRIDGES_PAGE_SIZE:
+                break
+            offset += _BRIDGES_PAGE_SIZE
+
+        # Post-parse filtering
+        norm = _normalize_route(route) if route else None
         out: list[QuebecBridgeStructure] = []
-        for r in rows:
-            if route and str(r.get("num_route", "")).strip() != route.strip():
-                continue
+        for r in all_rows:
+            if norm is not None:
+                num = str(r.get("num_route") or "").strip()
+                nom = str(r.get("nom_route") or "").lower()
+                # Match zero-padded num_route OR nom_route contains the raw digits
+                raw_digits = norm.lstrip("0") or "0"
+                if num != norm and raw_digits not in nom:
+                    continue
             if municipality and municipality.lower() not in str(
                 r.get("nom_muncp", "")
             ).lower():

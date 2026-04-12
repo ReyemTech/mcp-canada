@@ -1677,12 +1677,26 @@ class TestQuebecToolScenarios:
         assert "error" in no_filter
         assert no_filter["error"]["code"] == "INVALID_INPUT"
 
-        # With municipality filter should succeed or return empty list
+        # With municipality filter should succeed (strict assertion — tolerant OR removed)
         with_filter = await call_tool(mcp_server, "quebec_get_bridge_structures", {
             "municipality": "Granby",
             "limit": 5,
         })
-        assert "_meta" in with_filter or "error" in with_filter
+        assert "_meta" in with_filter, f"Expected _meta envelope, got: {with_filter}"
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(120)
+    async def test_bridges_route_filter_returns_rows(self, mcp_server):
+        """'Show bridges on Autoroute 20.' — WFS paging must reach A-20 rows beyond first 30."""
+        data = await call_tool(mcp_server, "quebec_get_bridge_structures", {
+            "route": "A-20",
+            "limit": 10,
+        })
+        assert "_meta" in data, f"Expected _meta envelope, got: {data}"
+        assert len(data["data"]) > 0, (
+            "Expected non-empty bridge list for A-20 — check WFS paging loop and route normalizer"
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.integration

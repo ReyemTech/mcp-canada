@@ -904,3 +904,28 @@ class TestQuebecGetProtectedAreas:
         resources = result["data"]["resources"]
         assert len(resources) == 2
         assert any(r["format"] == "GPKG" for r in resources)
+
+
+class TestQuebecGetErWaitTimesKeywords:
+    """Regression for UAT Gap 4 — BM25 discovery must match 'Quebec hospitals health' queries."""
+
+    def test_keywords_contain_health_tokens(self) -> None:
+        """Keywords line must contain health, medical, sante tokens."""
+        doc = q_tools.quebec_get_er_wait_times.__doc__ or ""
+        keywords_line = next(
+            (line for line in doc.splitlines() if line.strip().startswith("Keywords:")),
+            "",
+        )
+        assert "health" in keywords_line.lower()
+        assert "medical" in keywords_line.lower()
+        assert "sante" in keywords_line.lower()
+
+    def test_keywords_still_contain_original_tokens(self) -> None:
+        """Keywords line must still contain original pre-fix tokens (additive, not replacement)."""
+        doc = q_tools.quebec_get_er_wait_times.__doc__ or ""
+        keywords_line = next(
+            (line for line in doc.splitlines() if line.strip().startswith("Keywords:")),
+            "",
+        )
+        for token in ("er", "urgence", "hospital", "wait times", "civieres", "msss"):
+            assert token in keywords_line.lower(), f"Lost original token: {token}"

@@ -288,7 +288,7 @@ async def quebec_get_er_wait_times(
     """Get current Quebec emergency room wait times and stretcher occupancy (hourly refresh from MSSS).
 
     Use for: Checking real-time ER congestion, stretcher occupancy, patients waiting 24h/48h at any Quebec hospital; 116 EDs updated hourly.
-    Keywords: quebec, emergency, er, wait times, urgence, hospital, civieres, msss, real-time, stretchers, occupancy, temps attente
+    Keywords: quebec, emergency, er, wait times, urgence, hospital, health, medical, sante, civieres, msss, real-time, stretchers, occupancy, temps attente
 
     installation: Full-text search on installation name (e.g. "Rimouski", "Sainte-Justine").
     """

@@ -1,8 +1,9 @@
 ---
-status: diagnosed
+status: resolved
 trigger: "Quebec Tests 8/9/11 — MTQ WFS CSV + Hydro-Québec two-step fetches return empty or UPSTREAM_ERROR 'File is not a zip file'"
 created: 2026-04-12T02:00:00Z
-updated: 2026-04-12T02:10:00Z
+updated: 2026-04-11T00:00:00Z
+resolved_by: "16-05-PLAN.md (phase 16 gap closure)"
 ---
 
 ## Current Focus

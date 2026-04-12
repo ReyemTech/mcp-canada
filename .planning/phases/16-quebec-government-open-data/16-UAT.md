@@ -8,6 +8,7 @@ source:
   - 16-04-SUMMARY.md
 started: 2026-04-11T00:00:00Z
 updated: 2026-04-12T00:00:00Z
+gaps_resolved: 2026-04-11T00:00:00Z
 ---
 
 ## Current Test
@@ -106,37 +107,75 @@ skipped: 0
 ## Gaps
 
 - truth: "quebec_get_bridge_structures returns bridge features when filtered by route"
-  status: failed
+  status: resolved
   reason: "User reported: UPSTREAM_ERROR 'MTQ WFS error: File is not a zip file' — fetch_and_parse is trying to unzip a non-zip response from the MTQ bridge structures endpoint"
   severity: major
   test: 8
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "shared/parsers.py:fetch_and_parse detects file format from URL path suffix only (line 513: url.lower().split('?')[0]). MTQ WFS URLs put the format in the query string (?outputformat=csv); after stripping the query the path /swtq has no suffix and falls through to _parse_xlsx. openpyxl then raises zipfile.BadZipFile: File is not a zip file. Affects ALL 4 MTQ WFS tools (road_works and road_events are also silently broken — integration tests use tolerant or/or assertions)."
+  artifacts:
+    - path: "src/mcp_canada/shared/parsers.py:513"
+      issue: "URL path-suffix-only format detection ignores ?outputformat=csv query hint; falls through to _parse_xlsx which raises BadZipFile on CSV bytes"
+    - path: "src/mcp_canada/modules/quebec/client.py:624"
+      issue: "fetch_bridge_structures calls fetch_and_parse(MTQ_BRIDGES_URL) — propagates the BadZipFile exception to tools.py:454 which wraps it as UPSTREAM_ERROR"
+    - path: "src/mcp_canada/modules/quebec/client.py:552"
+      issue: "fetch_road_works has the same bug (silently covered by tolerant integration test)"
+    - path: "src/mcp_canada/modules/quebec/client.py:583"
+      issue: "fetch_road_events has the same bug (silently covered by tolerant integration test)"
+    - path: "src/mcp_canada/shared/__tests__/test_parsers.py"
+      issue: "Parser routing tests only exercise URLs with path suffixes (example.com/data.csv, .xlsx). No test covers WFS-style query-param format hints."
+    - path: "tests/integration/test_tool_scenarios.py:1662,1685"
+      issue: "test_get_road_works_wfs_csv and test_get_bridge_structures_requires_filter use tolerant assertion '_meta in data OR error in data' — error envelopes count as pass, masking the regression."
+  missing:
+    - "Enhance fetch_and_parse (shared/parsers.py) to detect format from query string (outputformat/format/f) in addition to URL path suffix"
+    - "Add shared/__tests__/test_parsers.py test case for WFS-style URL with ?outputformat=csv and no .csv path suffix"
+    - "Replace tolerant '_meta in data or error in data' integration assertions for MTQ tools with strict '_meta in data'"
+  debug_session: ".planning/debug/quebec-mtq-csv-fetch-family.md"
 
 - truth: "quebec_get_road_conditions returns current MTQ road condition rows"
-  status: failed
-  reason: "User reported: envelope well-formed but data=[]. Graceful-empty path in _fetch masked the real failure — tool provides no value. Same root cause family as Test 8 MTQ WFS CSV endpoints."
+  status: resolved
+  reason: "User reported: envelope well-formed but data=[]. Graceful-empty path in _fetch masked the real failure — tool provides no value. Same root cause as Test 8: MTQ WFS CSV URL routed to _parse_xlsx which raises BadZipFile, then swallowed by try/except in fetch_road_conditions."
   severity: major
   test: 9
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "Same primary root cause as Test 8 — shared/parsers.py:fetch_and_parse routing bug. The MTQ conditions_routieres WFS CSV endpoint is live and returns real CSV (confirmed via curl: 103KB, columns include DescriptionEtatChausseeFR/EN). The research doc was wrong to flag this endpoint as LOW confidence — it works. The silent-empty result is because fetch_road_conditions catches Exception at client.py:502-505 and returns [] on any parser failure, hiding the BadZipFile."
+  artifacts:
+    - path: "src/mcp_canada/modules/quebec/client.py:502-505"
+      issue: "try/except Exception: return [] masks the real BadZipFile error raised by fetch_and_parse, making the tool appear healthy with data=[]"
+    - path: "src/mcp_canada/shared/parsers.py:513"
+      issue: "Same parser routing bug as Test 8 — strips ?outputFormat=csv before suffix check"
+    - path: ".planning/phases/16-quebec-government-open-data/16-RESEARCH.md:216"
+      issue: "Research assumption 'LOW confidence on WFS CSV' for ms:conditions_routieres is incorrect — the CSV endpoint works; the bug is client-side parser dispatch. Remove the low-confidence flag after fix."
+  missing:
+    - "Fix shared/parsers.py routing (same single-root-cause fix as Test 8)"
+    - "After fix, either remove the try/except graceful-empty path in fetch_road_conditions OR keep it as true seasonal fallback (winter-only data) but add logging so parser errors are surfaced"
+    - "Add integration test test_get_road_conditions_live asserting either non-empty data OR a documented off-season empty state (not a silent exception)"
+    - "Update 16-RESEARCH.md Pitfall 7 / conditions_routieres notes to reflect that CSV works"
+  debug_session: ".planning/debug/quebec-mtq-csv-fetch-family.md"
 
 - truth: "quebec_get_electricity_data returns Hydro-Québec historical production/consumption rows"
-  status: failed
-  reason: "User reported: envelope well-formed but data=[] and _meta.source.url points at package_show (step 1 of two-step), not the CSV URL. Two-step flow produced empty result."
+  status: resolved
+  reason: "User reported: envelope well-formed but data=[] and _meta.source.url points at package_show. DIFFERENT root cause from Tests 8/9 — Hydro-Québec package has zero CSV resources; all 4 resources are XLSX format. fetch_electricity_data matches only format=='CSV' so csv_url stays None and the function returns [] before fetch_and_parse is called. Envelope URL is hardcoded at package_show in the tool layer regardless of CSV parsing outcome."
   severity: major
   test: 11
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "Two bugs in fetch_electricity_data + quebec_get_electricity_data: (1) client.py:754-757 hardcodes format matcher to 'CSV' only, but the Hydro-Québec 'historique-production-consommation' package publishes 4 XLSX files (years 2018-2021) — NO CSV resources exist. Verified live: package_show returns success=True with 4 resources, all format='XLSX'. (2) tools.py:614 hardcodes api_url=BASE_URL + 'package_show' in the envelope, so even a successful file fetch would report the wrong URL. Research doc assumed 'CSV available' without live verification."
+  artifacts:
+    - path: "src/mcp_canada/modules/quebec/client.py:754-757"
+      issue: "Format matcher `(r.format or '').upper() == 'CSV'` returns no match because all 4 resources are XLSX. Function returns [] after successfully fetching package metadata."
+    - path: "src/mcp_canada/modules/quebec/tools.py:614"
+      issue: "api_url=BASE_URL + 'package_show' hardcoded in make_response — envelope URL stays at discovery endpoint regardless of whether any file was fetched"
+    - path: ".planning/phases/16-quebec-government-open-data/16-RESEARCH.md:286"
+      issue: "Research claimed 'CSV at Hydro-Québec direct URL (inside DQ package)' — WRONG. The package publishes XLSX files only. Verification step was skipped."
+    - path: "src/mcp_canada/modules/quebec/__tests__/test_client.py::TestFetchElectricityData"
+      issue: "Unit test mocks package_show response with a synthetic CSV resource, masking the real-world XLSX-only shape"
+  missing:
+    - "Rename csv_url→file_url and expand matcher to ('CSV', 'XLSX', 'XLS') in fetch_electricity_data"
+    - "Skip empty-url resources (the 2020 entry has url='')"
+    - "Have the client return the actual file URL so the tool envelope can reflect it (or document that package_show is the canonical discovery URL)"
+    - "Add live integration test that calls quebec_get_electricity_data and asserts len(data['data']) > 0 OR a bilingual 'no parseable resource' error — not silent empty"
+    - "Update 16-RESEARCH.md Hydro-Québec section to correct the 'CSV available' claim"
+  debug_session: ".planning/debug/quebec-mtq-csv-fetch-family.md"
 
 - truth: "quebec_get_er_wait_times is discoverable via BM25 search for Quebec health queries"
-  status: failed
+  status: resolved
   reason: "User reported: search for 'Quebec hospitals health' returned quebec_get_health_installations rank 1 but quebec_get_er_wait_times is not in the top 5. Keywords list missing the literal word 'health'."
   severity: minor
   test: 12

@@ -6,14 +6,18 @@ source:
   - 16-02-SUMMARY.md
   - 16-03-SUMMARY.md
   - 16-04-SUMMARY.md
+  - 16-05-SUMMARY.md
 started: 2026-04-11T00:00:00Z
-updated: 2026-04-12T00:00:00Z
+updated: 2026-04-11T00:00:00Z
 gaps_resolved: 2026-04-11T00:00:00Z
+retest_started: 2026-04-11T00:00:00Z
+retest_completed: 2026-04-11T00:00:00Z
+retest_scope: "Tests 8, 9, 11, 12 — post-16-05 gap closure re-verification"
 ---
 
 ## Current Test
 
-[testing complete]
+[retest complete]
 
 ## Tests
 
@@ -51,14 +55,20 @@ result: pass
 ### 8. Bridge structures with filter returns features
 expected: Call `quebec_get_bridge_structures(route="A-20")` — returns bridge structures filtered to Autoroute 20 from the MTQ WFS CSV. Each has structure ID, name, municipality, coordinates. Not the guard error.
 result: issue
-reported: "{'error': {'code': 'UPSTREAM_ERROR', 'message': 'MTQ WFS error: File is not a zip file', 'lang': 'en'}}"
+retest: 2026-04-11
+retest_result: issue
+retest_reported: "Envelope well-formed with _meta.source.url=https://ws.mapserver.transports.gouv.qc.ca/swtq but data=[] — BadZipFile error is gone (parser fix worked) but route='A-20' filter returns zero rows. Either the CSV column holding route number has a different name than the client matcher expects, or the CSV payload for swtq is a layer-list doc (not the feature CSV), or the WFS request is missing a typename and returning the capabilities doc."
 severity: major
+notes: "Parser fix from 16-05 task 1 is confirmed working (no more BadZipFile exception propagation). Remaining issue is a DIFFERENT root cause: either the CSV column name mismatch in fetch_bridge_structures filter logic, or fetch_and_parse is parsing the wrong response (WFS capabilities doc instead of feature CSV because the URL is missing ?service=WFS&typename=...). Needs live curl of MTQ_BRIDGES_URL to inspect payload shape."
 
 ### 9. Road conditions (MTQ WFS CSV, active TTL)
 expected: Call `quebec_get_road_conditions()` — returns current Quebec road condition data from the MTQ WFS CSV endpoint. Bilingual columns — EN vs FR descriptions selected by `lang` param. `_meta.cached` uses short TTL (active data). Graceful empty list if the WFS endpoint fails (research flagged low-confidence endpoint).
 result: issue
-reported: "Envelope well-formed with _meta.source.url=https://ws.mapserver.transports.gouv.qc.ca/swtq but data=[] — graceful empty path hit, meaning the MTQ WFS CSV fetch failed silently"
+retest: 2026-04-11
+retest_result: issue
+retest_reported: "CSV now parses and rows ARE returned (no more silent empty), but every field in every row is null: {segment_id: null, route_num: null, route_name: null, region: null, pavement_status: null, visibility: null, has_snow_presence: null, timestamp: null}. Column mapping in fetch_road_conditions doesn't match the real CSV column names."
 severity: major
+notes: "Parser fix + error propagation fix from 16-05 task 1 both confirmed working — rows flow through. Remaining issue is DIFFERENT root cause: the schema mapping layer (fetch_road_conditions transform) uses column names that don't exist in the live MTQ CSV. Fix: curl MTQ_ROAD_CONDITIONS_URL, inspect actual headers, align mapper. Same class of bug likely exists for bridges (Test 8 retest) and road_works/road_events."
 notes: Likely same root cause family as Test 8 (MTQ WFS CSV endpoints not being fetched/parsed correctly). Research flagged fetch_road_conditions as low-confidence — the graceful-empty path in _fetch masks the real failure. Test 8 surfaced the underlying "File is not a zip file" error when route filter path was hit; road_conditions swallows the exception and returns empty.
 
 ### 10. Air quality stations (RSQAQ datastore)
@@ -68,16 +78,19 @@ result: pass
 ### 11. Electricity data (two-step CKAN → CSV)
 expected: Call `quebec_get_electricity_data()` — two-step: first fetches Hydro-Québec dataset details, picks first CSV resource, then parses it via `fetch_and_parse`. Returns historical production/consumption rows. Note: this is NOT real-time outages (SOPFEU/outages data is not on Données Québec per research — replaced with historical data).
 result: issue
-reported: "Envelope well-formed with _meta.source.url=https://www.donneesquebec.ca/recherche/api/3/action/package_show but data=[] — tool returns no rows. Two-step flow (package_show → pick CSV → fetch_and_parse) produced empty result."
+retest: 2026-04-11
+retest_result: issue
+retest_reported: "{'error':{'code':'UPSTREAM_ERROR','message':'Error fetching electricity data: [SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] ssl/tls alert handshake failure (_ssl.c:1081)','lang':'en'}}"
 severity: major
+notes: "XLSX matcher fix (16-05 task 2) + envelope source_url plumbing both confirmed working — the tool now reaches the actual XLSX fetch step instead of returning silent empty. Remaining issue is NEW (not covered by 16-05): the Hydro-Québec server (hydroquebec.com) rejects the TLS handshake with SSLV3_ALERT_HANDSHAKE_FAILURE. This is a server-side cipher/protocol mismatch. Options: (a) use the donneesquebec.ca-hosted mirror URL instead of the direct hydroquebec.com URL if the package has one, (b) pass a custom httpx SSLContext with broader cipher suites, (c) document this as a known upstream limitation. Needs investigation of alternate resource URLs in package_show response."
 notes: _meta.source.url points at package_show (step 1) rather than the CSV URL (step 2), suggesting either (a) the selected Hydro-Québec dataset has no CSV resource, (b) the CSV parse step failed silently, or (c) the code returns package_show source URL even after successful CSV parse. Needs diagnosis.
 
 ### 12. Discovery finds Quebec tools via BM25
 expected: Call `discover_tools(query="Quebec hospitals health")` — returns Quebec tools in the top results (e.g. `quebec_get_health_installations`, `quebec_get_er_wait_times`, `quebec_explore_health` prompt). The 18 quebec_ tools are reachable through the BM25 discovery layer.
 result: issue
-reported: "Top 5 results: quebec_get_health_installations, york_region_get_public_health, quebec_search_datasets, quebec_get_dataset_details, quebec_list_organizations. quebec_get_er_wait_times is NOT in the top results."
-severity: minor
-notes: "quebec_get_er_wait_times BM25 keywords are 'quebec, emergency, er, wait times, urgence, hospital, civieres, msss, real-time, stretchers, occupancy, temps attente' — missing the literal word 'health'. BM25 matches only 2/3 query tokens (quebec+hospital) versus 3/3 for quebec_get_health_installations. Fix: add 'health', 'medical', 'sante' to the keywords line. Trivial one-line fix in tools.py docstring."
+retest: 2026-04-11
+retest_result: pass
+notes: "quebec_get_er_wait_times BM25 keywords are 'quebec, emergency, er, wait times, urgence, hospital, civieres, msss, real-time, stretchers, occupancy, temps attente' — missing the literal word 'health'. BM25 matches only 2/3 query tokens (quebec+hospital) versus 3/3 for quebec_get_health_installations. Fix: add 'health', 'medical', 'sante' to the keywords line. Trivial one-line fix in tools.py docstring. CONFIRMED FIXED 2026-04-11 post 16-05 commit 5c371cb — quebec_get_er_wait_times now in top-5 results."
 
 ### 13. quebec_explore_health prompt returns guided workflow
 expected: Invoke the `quebec_explore_health` prompt — returns a multi-message conversation (user + assistant roles) walking through a Quebec health analysis workflow: installations → ER wait times → population by region. `lang="fr"` returns French content.
@@ -103,6 +116,13 @@ passed: 12
 issues: 4
 pending: 0
 skipped: 0
+
+retest_2026-04-11:
+  scope: "Tests 8, 9, 11, 12 — post-16-05 gap closure"
+  total: 4
+  passed: 1    # Test 12 (BM25 keywords)
+  issues: 3    # Tests 8, 9, 11 (new downstream root causes revealed by parser fix)
+  status: "16-05 confirmed landed (parser/error-propagation/xlsx-matcher/BM25 all verified). Three NEW downstream issues remain, requiring a second gap-closure cycle (16-06)."
 
 ## Gaps
 
@@ -185,4 +205,63 @@ skipped: 0
       issue: "Keywords line missing health/medical/sante tokens"
   missing:
     - "Add 'health', 'medical', 'sante' to the Keywords line of quebec_get_er_wait_times"
+  debug_session: ""
+  resolved_by: "16-05 commit 5c371cb; confirmed by 2026-04-11 retest"
+
+# ═══════════════════════════════════════════════════════════════════
+# NEW GAPS from 2026-04-11 retest — post-16-05 downstream root causes
+# ═══════════════════════════════════════════════════════════════════
+
+- truth: "quebec_get_bridge_structures(route='A-20') returns non-empty bridge features"
+  status: failed
+  reason: "User reported: envelope well-formed with _meta.source.url=https://ws.mapserver.transports.gouv.qc.ca/swtq but data=[] — route filter returns zero rows"
+  severity: major
+  test: 8
+  retest_of: 8
+  discovered: 2026-04-11
+  root_cause: "UNDIAGNOSED — hypothesis: either (a) the CSV column holding route number has a different name than the filter matcher expects in fetch_bridge_structures, or (b) the MTQ_BRIDGES_URL is missing WFS query params (service=WFS&typename=...) and swtq is returning a capabilities/layer-list doc rather than the feature CSV, so fetch_and_parse successfully parses a CSV that has no route rows at all. Needs live curl of the URL to inspect payload shape."
+  artifacts: []
+  missing:
+    - "curl MTQ_BRIDGES_URL and inspect response (is it feature data or layer list?)"
+    - "If feature data: compare CSV column names to the filter matcher in fetch_bridge_structures"
+    - "If layer list: add missing WFS query params (service=WFS, version=2.0.0, request=GetFeature, typename=<bridges_layer>)"
+  debug_session: ""
+
+- truth: "quebec_get_road_conditions returns rows with populated fields (route/region/pavement/visibility/snow/timestamp)"
+  status: failed
+  reason: "User reported: rows ARE returned (error propagation fix confirmed) but every field is null — {segment_id: null, route_num: null, route_name: null, region: null, pavement_status: null, visibility: null, has_snow_presence: null, timestamp: null}"
+  severity: major
+  test: 9
+  retest_of: 9
+  discovered: 2026-04-11
+  root_cause: "UNDIAGNOSED — the schema-mapping layer in fetch_road_conditions uses column names that don't match the real MTQ conditions_routieres CSV headers. The transform dict/mapper references columns like 'SegmentId', 'RouteNum', 'Region' but the live CSV likely uses different casing or French names (e.g., 'id_segment', 'numero_route', 'NomRegion'). Needs live curl to enumerate actual headers."
+  artifacts:
+    - path: "src/mcp_canada/modules/quebec/client.py:fetch_road_conditions"
+      issue: "Row-to-schema mapper references column names that don't exist in the live CSV; every field null-coalesces"
+  missing:
+    - "curl MTQ_ROAD_CONDITIONS_URL, inspect header row"
+    - "Align fetch_road_conditions column-mapper keys with actual CSV headers"
+    - "Apply same alignment audit to fetch_bridge_structures, fetch_road_works, fetch_road_events (same family)"
+    - "Add a unit test with a fixture CSV that matches the live header shape, not the synthetic one"
+  debug_session: ""
+
+- truth: "quebec_get_electricity_data returns non-empty Hydro-Québec historical rows"
+  status: failed
+  reason: "User reported: {'error':{'code':'UPSTREAM_ERROR','message':'Error fetching electricity data: [SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] ssl/tls alert handshake failure (_ssl.c:1081)','lang':'en'}}"
+  severity: major
+  test: 11
+  retest_of: 11
+  discovered: 2026-04-11
+  root_cause: "UNDIAGNOSED — the Hydro-Québec origin server (hydroquebec.com) rejects httpx's default TLS handshake. Likely OpenSSL 3.x default SECLEVEL=2 excluding weak ciphers/protocols the server still uses. Either (a) the server supports only legacy cipher suites, or (b) needs SNI-specific config, or (c) cert chain issue. Now that the XLSX matcher fix landed, the tool actually reaches the fetch step and surfaces the real upstream error instead of returning empty."
+  artifacts:
+    - path: "src/mcp_canada/shared/http.py"
+      issue: "Default httpx.AsyncClient lacks SSL context override for legacy hydroquebec.com TLS config"
+    - path: "src/mcp_canada/modules/quebec/client.py:fetch_electricity_data"
+      issue: "Selects the first XLSX resource URL (hydroquebec.com) without checking for alternate mirror URLs in the package_show response"
+  missing:
+    - "Try `curl -v` on the XLSX URL to confirm the handshake failure and identify the server's preferred ciphers"
+    - "Option A: Build a custom ssl.SSLContext (set_ciphers('DEFAULT:@SECLEVEL=1')) scoped only to hydroquebec.com fetches"
+    - "Option B: Check package_show for a donneesquebec.ca-hosted mirror of the same XLSX and prefer it"
+    - "Option C: Document as known upstream limitation and return a bilingual 'external service unavailable' error"
+    - "Add an integration test that asserts either non-empty data OR this specific SSL error (not a silent empty)"
   debug_session: ""

@@ -387,8 +387,8 @@ class TestFetchRoadConditions:
             result, _ = await q_client.fetch_road_conditions(lang="en")
         assert isinstance(result, list)
         assert len(result) == 1
-        assert result[0]["segment_id"] == "3201", f"segment_id was None — mapper uses wrong key"
-        assert result[0]["route_num"] == "117", f"route_num was None — mapper uses wrong key"
+        assert result[0]["segment_id"] == "3201", "segment_id was None — mapper uses wrong key"
+        assert result[0]["route_num"] == "117", "route_num was None — mapper uses wrong key"
         assert result[0]["region"] == "abitibi-temiscamingue"
         assert result[0]["pavement_status"] == "Bare and Dry"
         assert result[0]["timestamp"] == "2026/04/11 05:02:04"
@@ -636,7 +636,6 @@ class TestFetchBridgeStructuresPaging:
 
     async def test_route_normalizer_a20_maps_to_zero_padded(self):
         """route='A-20' normalizes to '00020' and matches num_route='00020'."""
-        import mcp_canada.modules.quebec.client as _mod
         from mcp_canada.modules.quebec.client import _normalize_route
 
         assert _normalize_route("A-20") == "00020"
@@ -971,6 +970,99 @@ class TestFetchElectricityData:
                     rows, source_url, was_cached = await q_client.fetch_electricity_data()
         assert source_url == "https://www.hydroquebec.com/data/suivi-2019.xlsx"
         assert len(rows) > 0
+
+    async def test_hydroquebec_url_gets_seclevel1_ssl_context(self) -> None:
+        """fetch_electricity_data passes ssl_context with SECLEVEL=1 for hydroquebec.com URLs."""
+        import ssl
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        hydro_pkg = {
+            "success": True,
+            "result": {
+                "id": "hydro-uuid",
+                "name": "historique-production-consommation",
+                "title": "Historique de production et consommation",
+                "notes": "Données historiques...",
+                "organization": {"name": "hydro-quebec", "title": "Hydro-Québec"},
+                "resources": [
+                    {
+                        "id": "xlsx-2021",
+                        "name": "Suivi 2021",
+                        "format": "XLSX",
+                        "url": "https://www.hydroquebec.com/data/suivi-2021.xlsx",
+                        "datastore_active": False,
+                    }
+                ],
+            },
+        }
+        captured_kwargs: dict = {}
+
+        async def capture_fetch_and_parse(url, **kwargs):
+            captured_kwargs.update(kwargs)
+            return [{"year": 2021}], False
+
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch("mcp_canada.modules.quebec.client.api_get", new=AsyncMock(return_value=hydro_pkg)):
+                with patch(
+                    "mcp_canada.modules.quebec.client.fetch_and_parse",
+                    side_effect=capture_fetch_and_parse,
+                ):
+                    await q_client.fetch_electricity_data()
+
+        assert "ssl_context" in captured_kwargs, (
+            "fetch_and_parse must receive ssl_context kwarg for hydroquebec.com URLs"
+        )
+        ssl_ctx = captured_kwargs["ssl_context"]
+        assert isinstance(ssl_ctx, ssl.SSLContext), (
+            f"Expected ssl.SSLContext, got {type(ssl_ctx)}"
+        )
+
+    async def test_non_hydroquebec_url_gets_no_ssl_context(self) -> None:
+        """Non-hydroquebec.com URLs get ssl_context=None — scoped fix only."""
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        hydro_pkg = {
+            "success": True,
+            "result": {
+                "id": "hydro-uuid",
+                "name": "historique-production-consommation",
+                "title": "Historique de production et consommation",
+                "notes": "Données historiques...",
+                "organization": {"name": "hydro-quebec", "title": "Hydro-Québec"},
+                "resources": [
+                    {
+                        "id": "csv-001",
+                        "name": "Other XLSX",
+                        "format": "XLSX",
+                        "url": "https://example.com/data.xlsx",
+                        "datastore_active": False,
+                    }
+                ],
+            },
+        }
+        captured_kwargs: dict = {}
+
+        async def capture_fetch_and_parse(url, **kwargs):
+            captured_kwargs.update(kwargs)
+            return [{"year": 2020}], False
+
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch("mcp_canada.modules.quebec.client.api_get", new=AsyncMock(return_value=hydro_pkg)):
+                with patch(
+                    "mcp_canada.modules.quebec.client.fetch_and_parse",
+                    side_effect=capture_fetch_and_parse,
+                ):
+                    await q_client.fetch_electricity_data()
+
+        assert captured_kwargs.get("ssl_context") is None, (
+            "Non-hydroquebec.com URLs must not get ssl_context (scoped fix only)"
+        )
 
     async def test_raises_when_no_parseable_resource(self) -> None:
         """If all resources are SHP/GPKG (unparseable), raise ValueError — not silent empty."""

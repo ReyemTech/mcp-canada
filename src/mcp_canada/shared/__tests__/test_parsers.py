@@ -558,6 +558,111 @@ class TestFetchAndParse:
 
 
 # ---------------------------------------------------------------------------
+# fetch_and_parse — ssl_context passthrough (16-06 Hydro-Québec TLS fix)
+# ---------------------------------------------------------------------------
+
+
+class TestFetchAndParseSSLContext:
+    """Tests that ssl_context parameter is passed through to httpx.AsyncClient.verify."""
+
+    @pytest.mark.asyncio
+    async def test_ssl_context_passed_as_verify_when_provided(self) -> None:
+        """fetch_and_parse(url, ssl_context=ctx) passes verify=ctx to AsyncClient."""
+        import ssl
+
+        xlsx_bytes = _make_xlsx_bytes(["Year"], [[2021]])
+
+        async def fake_cached_fetch(key: str, ttl: int, fetcher: Any) -> tuple[Any, bool]:
+            return await fetcher(), False
+
+        mock_response = MagicMock()
+        mock_response.content = xlsx_bytes
+        mock_response.raise_for_status = MagicMock()
+
+        mock_ctx = ssl.create_default_context()
+        mock_ctx.set_ciphers("DEFAULT:@SECLEVEL=1")
+
+        with (
+            patch("mcp_canada.shared.parsers.cached_fetch", side_effect=fake_cached_fetch),
+            patch("httpx.AsyncClient") as mock_client_cls,
+            patch("mcp_canada.shared.parsers._parse_xlsx", return_value=[{"year": 2021}]),
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client_cls.return_value = mock_client
+
+            from mcp_canada.shared.parsers import fetch_and_parse
+
+            await fetch_and_parse(
+                "https://www.hydroquebec.com/data/suivi-2021.xlsx",
+                ssl_context=mock_ctx,
+            )
+
+        # AsyncClient must be constructed with verify=mock_ctx
+        mock_client_cls.assert_called_once()
+        call_kwargs = mock_client_cls.call_args[1]
+        assert call_kwargs.get("verify") is mock_ctx, (
+            f"Expected verify=ctx, got verify={call_kwargs.get('verify')}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_no_ssl_context_uses_verify_true(self) -> None:
+        """fetch_and_parse without ssl_context uses verify=True (default, no regression)."""
+        xlsx_bytes = _make_xlsx_bytes(["Year"], [[2020]])
+
+        async def fake_cached_fetch(key: str, ttl: int, fetcher: Any) -> tuple[Any, bool]:
+            return await fetcher(), False
+
+        mock_response = MagicMock()
+        mock_response.content = xlsx_bytes
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch("mcp_canada.shared.parsers.cached_fetch", side_effect=fake_cached_fetch),
+            patch("httpx.AsyncClient") as mock_client_cls,
+            patch("mcp_canada.shared.parsers._parse_xlsx", return_value=[{"year": 2020}]),
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client_cls.return_value = mock_client
+
+            from mcp_canada.shared.parsers import fetch_and_parse
+
+            await fetch_and_parse("https://example.com/data.xlsx")
+
+        mock_client_cls.assert_called_once()
+        call_kwargs = mock_client_cls.call_args[1]
+        assert call_kwargs.get("verify") is True, (
+            f"Expected verify=True for no ssl_context, got verify={call_kwargs.get('verify')}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_ssl_flag_in_cache_key(self) -> None:
+        """fetch_and_parse with ssl_context gets a different cache key than without."""
+        import ssl
+
+        calls: list[str] = []
+        mock_ctx = ssl.create_default_context()
+
+        async def capture_cached_fetch(key: str, ttl: int, fetcher: Any) -> tuple[Any, bool]:
+            calls.append(key)
+            return [], False
+
+        with patch("mcp_canada.shared.parsers.cached_fetch", side_effect=capture_cached_fetch):
+            from mcp_canada.shared.parsers import fetch_and_parse
+
+            await fetch_and_parse("https://example.com/data.xlsx", ssl_context=None)
+            await fetch_and_parse("https://example.com/data.xlsx", ssl_context=mock_ctx)
+
+        assert len(calls) == 2
+        assert calls[0] != calls[1], "SSL and non-SSL fetches must use different cache keys"
+
+
+# ---------------------------------------------------------------------------
 # _parse_ircc_xlsx
 # ---------------------------------------------------------------------------
 

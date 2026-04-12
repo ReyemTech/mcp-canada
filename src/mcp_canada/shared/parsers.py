@@ -1,7 +1,7 @@
 """Shared file parser for XLSX, XLS, CSV, GeoJSON, and JSON files from government URLs.
 
 Public API:
-    fetch_and_parse(url, sheet, skip_rows, ttl) -> (list[dict], was_cached)
+    fetch_and_parse(url, sheet, skip_rows, ttl, ssl_context) -> (list[dict], was_cached)
     _parse_geojson(content, include_geometry) -> list[dict]
     _parse_json(content) -> list[dict]
 """
@@ -11,6 +11,7 @@ from __future__ import annotations
 import csv
 import json
 import re
+import ssl
 import unicodedata
 from io import BytesIO, StringIO
 from typing import Any
@@ -482,6 +483,7 @@ async def fetch_and_parse(
     skip_rows: int = 0,
     ttl: int = 86400,
     ircc_parse_config: dict | None = None,
+    ssl_context: ssl.SSLContext | None = None,
 ) -> tuple[list[dict[str, Any]], bool]:
     """Fetch a remote file and parse it into a list of dicts.
 
@@ -498,15 +500,20 @@ async def fetch_and_parse(
         ircc_parse_config: When provided (dict with skip_rows, header_rows, label_cols),
             routes XLSX files through _parse_ircc_xlsx for multi-row merged header support.
             Non-IRCC callers that omit this parameter get identical existing behavior.
+        ssl_context: Optional custom SSLContext passed as verify= to httpx.AsyncClient.
+            Used for servers with non-standard TLS config (e.g. Hydro-Québec SECLEVEL=2 rejection).
+            When None (default), httpx uses verify=True (standard cert validation).
 
     Returns:
         (list[dict], was_cached) where was_cached=True if served from cache.
     """
     config_hash = str(sorted(ircc_parse_config.items())) if ircc_parse_config else ""
-    cache_key = f"parsers:{url}:{sheet}:{skip_rows}:{config_hash}"
+    ssl_flag = "1" if ssl_context is not None else "0"
+    cache_key = f"parsers:{url}:{sheet}:{skip_rows}:{config_hash}:{ssl_flag}"
 
     async def _fetch() -> list[dict[str, Any]]:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        verify: bool | ssl.SSLContext = ssl_context if ssl_context is not None else True
+        async with httpx.AsyncClient(timeout=60.0, verify=verify) as client:
             response = await client.get(url)
             response.raise_for_status()
             raw = response.content

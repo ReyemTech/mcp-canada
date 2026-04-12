@@ -1738,3 +1738,15 @@ class TestQuebecToolScenarios:
         })
         assert "error" in data
         assert data["error"]["code"] in ("NOT_FOUND", "UPSTREAM_ERROR")
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(60)
+    async def test_electricity_data_returns_rows(self, mcp_server):
+        """'Show Hydro-Québec historical electricity data.' — SSL handshake must succeed."""
+        data = await call_tool(mcp_server, "quebec_get_electricity_data", {})
+        assert "_meta" in data, f"Expected _meta envelope, got: {data}"
+        assert len(data["data"]) > 0, (
+            "Expected non-empty electricity data — SSL handshake to hydroquebec.com failed or "
+            "no XLSX resource found. Check fetch_and_parse ssl_context and SECLEVEL=1 fix."
+        )

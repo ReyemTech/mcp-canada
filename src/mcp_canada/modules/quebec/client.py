@@ -23,6 +23,7 @@ CRITICAL (Phase 15 lesson — _api_get MUST follow this contract):
 from __future__ import annotations
 
 import re
+import ssl
 from typing import Any
 
 import httpx
@@ -803,7 +804,14 @@ async def fetch_electricity_data(
                 "No parseable CSV/XLSX/XLS resource found in "
                 "historique-production-consommation package"
             )
-        rows, _ = await fetch_and_parse(file_url, ttl=CACHE_TTL_META)
+        # Hydro-Québec server uses TLSv1.2/AES128-GCM-SHA256, rejected by
+        # Python's OpenSSL 3.x SECLEVEL=2 default. Build a SECLEVEL=1 context
+        # scoped only to hydroquebec.com requests — no global SSL change.
+        ssl_ctx: ssl.SSLContext | None = None
+        if "hydroquebec.com" in file_url:
+            ssl_ctx = ssl.create_default_context()
+            ssl_ctx.set_ciphers("DEFAULT:@SECLEVEL=1")
+        rows, _ = await fetch_and_parse(file_url, ttl=CACHE_TTL_META, ssl_context=ssl_ctx)
         return rows[:limit], file_url
 
     bundled, was_cached = await cached_fetch(cache_key, CACHE_TTL_META, _fetch)

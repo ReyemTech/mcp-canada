@@ -118,25 +118,25 @@ Agents see **5 always-visible tools**:
 
 All tools accept `lang: "en" | "fr"` for bilingual support. Responses include a `_meta` envelope with source attribution and cache status. Click a module for its full tool, prompt, and resource catalog.
 
-| Module | Tools | Prompts | Resources | Description |
-|--------|------:|--------:|----------:|-------------|
-| [Meta / Discovery](docs/modules/meta.md) | 5 | — | — | Always-visible orchestration tools (`discover_tools`, `call_tool`, `list_modules`, `plan_query`, `execute_batch`) |
-| [Bank of Canada](docs/modules/bank-of-canada.md) | 8 | 5 | 7 | Exchange rates, interest rates, commodity prices, inflation — [Valet API](https://www.bankofcanada.ca/valet/) |
-| [Open Parliament](docs/modules/open-parliament.md) | 10 | 5 | 7 | Bills, MPs, votes, ballots, Hansard debates — [Open Parliament API](https://api.openparliament.ca/) |
-| [Recalls & Safety](docs/modules/recalls.md) | 6 | 4 | 6 | Food, vehicle, and health product recalls — [Healthy Canadians](https://healthycanadians.gc.ca/recall-alert-rappel-avis/api/) |
-| [Drug Database](docs/modules/drug-database.md) | 8 | 5 | 7 | Drug products, ingredients, schedules — [Health Canada DPD](https://health-products.canada.ca/api/drug/) |
-| [CKAN Open Data](docs/modules/ckan.md) | 7 | 5 | 7 | 80,000+ federal datasets — [open.canada.ca](https://open.canada.ca/data/en/api/3/) |
-| [Nutrient File](docs/modules/nutrient-file.md) | 8 | 5 | 7 | Food nutrition data — [Canadian Nutrient File](https://food-nutrition.canada.ca/api/canadian-nutrient-file/) |
-| [Weather](docs/modules/weather.md) | 34 | 6 | 8 | Conditions, climate, air quality, hydrology, marine, radar — [MSC GeoMet](https://api.weather.gc.ca/) |
-| [Statistics Canada](docs/modules/statcan.md) | 15 | 6 | 8 | Time series, cube metadata, SDMX filtering — [StatCan WDS](https://www.statcan.gc.ca/en/developers/wds) |
-| [Local Datastore](docs/modules/datastore.md) | 6 | 4 | 6 | SQLite persistence for cross-API SQL JOINs — `~/.mcp-canada/datastore.db` |
-| [IRCC Immigration](docs/modules/ircc.md) | 10 | 5 | 7 | PR, study/work permits, Express Entry, asylum — [IRCC Open Data](https://www.ircc.canada.ca/opendata-donneesouvertes/data/) |
-| [Ontario](docs/modules/ontario.md) | 6 | 4 | 6 | 3,000+ provincial datasets — [Ontario Open Data](https://data.ontario.ca) |
-| [Toronto](docs/modules/toronto.md) | 12 | 6 | 8 | TTC, neighbourhoods, 311, RentSafe — [Toronto Open Data](https://open.toronto.ca) |
-| [York Region](docs/modules/york-region.md) | 27 | 5 | 8 | 4 ArcGIS Hub portals (York Region, Markham, Newmarket, Aurora) |
-| [British Columbia](docs/modules/british-columbia.md) | 20 | 6 | 7 | CKAN + WFS geospatial — [BC Data Catalogue](https://catalogue.data.gov.bc.ca) |
-| [Quebec](docs/modules/quebec.md) | 18 | 6 | 7 | Federated CKAN (139 orgs) — [Données Québec](https://www.donneesquebec.ca) |
-| **Total** | **193** | **~81** | **~110** | |
+| Module | Level | Tools | Prompts | Resources | Description |
+|--------|-------|------:|--------:|----------:|-------------|
+| [Meta / Discovery](docs/modules/meta.md) | — | 5 | — | — | Always-visible orchestration tools (`discover_tools`, `call_tool`, `list_modules`, `plan_query`, `execute_batch`) |
+| [Bank of Canada](docs/modules/bank-of-canada.md) | Federal | 8 | 5 | 7 | Exchange rates, interest rates, commodity prices, inflation — [Valet API](https://www.bankofcanada.ca/valet/) |
+| [Open Parliament](docs/modules/open-parliament.md) | Federal | 10 | 5 | 7 | Bills, MPs, votes, ballots, Hansard debates — [Open Parliament API](https://api.openparliament.ca/) |
+| [Recalls & Safety](docs/modules/recalls.md) | Federal | 6 | 4 | 6 | Food, vehicle, and health product recalls — [Healthy Canadians](https://healthycanadians.gc.ca/recall-alert-rappel-avis/api/) |
+| [Drug Database](docs/modules/drug-database.md) | Federal | 8 | 5 | 7 | Drug products, ingredients, schedules — [Health Canada DPD](https://health-products.canada.ca/api/drug/) |
+| [CKAN Open Data](docs/modules/ckan.md) | Federal | 7 | 5 | 7 | 80,000+ federal datasets — [open.canada.ca](https://open.canada.ca/data/en/api/3/) |
+| [Nutrient File](docs/modules/nutrient-file.md) | Federal | 8 | 5 | 7 | Food nutrition data — [Canadian Nutrient File](https://food-nutrition.canada.ca/api/canadian-nutrient-file/) |
+| [Weather](docs/modules/weather.md) | Federal | 34 | 6 | 8 | Conditions, climate, air quality, hydrology, marine, radar — [MSC GeoMet](https://api.weather.gc.ca/) |
+| [Statistics Canada](docs/modules/statcan.md) | Federal | 15 | 6 | 8 | Time series, cube metadata, SDMX filtering — [StatCan WDS](https://www.statcan.gc.ca/en/developers/wds) |
+| [Local Datastore](docs/modules/datastore.md) | Local | 6 | 4 | 6 | SQLite persistence for cross-API SQL JOINs — `~/.mcp-canada/datastore.db` |
+| [IRCC Immigration](docs/modules/ircc.md) | Federal | 10 | 5 | 7 | PR, study/work permits, Express Entry, asylum — [IRCC Open Data](https://www.ircc.canada.ca/opendata-donneesouvertes/data/) |
+| [Ontario](docs/modules/ontario.md) | Provincial | 6 | 4 | 6 | 3,000+ provincial datasets — [Ontario Open Data](https://data.ontario.ca) |
+| [Toronto](docs/modules/toronto.md) | Municipal | 12 | 6 | 8 | TTC, neighbourhoods, 311, RentSafe — [Toronto Open Data](https://open.toronto.ca) |
+| [York Region](docs/modules/york-region.md) | Municipal | 27 | 5 | 8 | 4 ArcGIS Hub portals (York Region, Markham, Newmarket, Aurora) |
+| [British Columbia](docs/modules/british-columbia.md) | Provincial | 20 | 6 | 7 | CKAN + WFS geospatial — [BC Data Catalogue](https://catalogue.data.gov.bc.ca) |
+| [Quebec](docs/modules/quebec.md) | Provincial | 18 | 6 | 7 | Federated CKAN (139 orgs) — [Données Québec](https://www.donneesquebec.ca) |
+| **Total** | | **193** | **~81** | **~110** | |
 
 ---
 

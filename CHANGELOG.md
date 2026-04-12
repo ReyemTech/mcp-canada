@@ -2,6 +2,300 @@
 
 <!-- CHANGELOG -->
 
+## v0.6.0 (2026-04-12)
+
+### Bug Fixes
+
+- **15-05**: Bilingualize bc_get_water_wells 130K guard message
+  ([`7b01153`](https://github.com/ReyemTech/mcp-canada/commit/7b011538d85b5e185f3645507a754c79a73e51a4))
+
+- **15-05**: Rewrite BC _api_get to treat shared api_get return as parsed dict
+  ([`e7a1440`](https://github.com/ReyemTech/mcp-canada/commit/e7a14407985bd63ef4b9121497e5c2b8c75e352b))
+
+- **16-05**: Add health/medical/sante keywords to quebec_get_er_wait_times for BM25 discovery
+  ([`b980a9d`](https://github.com/ReyemTech/mcp-canada/commit/b980a9da395e9fb5c3951293b1587316e4ad9d21))
+
+- **16-05**: Expand electricity format matcher to XLSX/XLS + fix envelope source URL
+  ([`833ef5b`](https://github.com/ReyemTech/mcp-canada/commit/833ef5b8c10d11766f0d68bc39eeb2876f6b602f))
+
+- **16-05**: Extend fetch_and_parse to detect query-string format hints + remove road_conditions
+  exception swallow
+  ([`f2ca2b9`](https://github.com/ReyemTech/mcp-canada/commit/f2ca2b90524d84ea0eff295b0b2021fc5af7467d))
+
+- **16-06**: Fix fetch_road_conditions snake_case mapper keys
+  ([`1ad899a`](https://github.com/ReyemTech/mcp-canada/commit/1ad899ab6ded48880dfd0c86a267c0d48c486430))
+
+- **16-06**: Scoped SECLEVEL=1 SSLContext for Hydro-Québec XLSX TLS fix
+  ([`53d8217`](https://github.com/ReyemTech/mcp-canada/commit/53d82174066de3532813c4207b50c94c5892baaf))
+
+- **16-07**: Skip Hydro-Québec XLSX formula legend row in fetch_electricity_data
+  ([`d37232f`](https://github.com/ReyemTech/mcp-canada/commit/d37232fabee09cd9532fafb911616ae07a2ad87a))
+
+- **16-07**: Stringify numeric ID fields in quebec mappers for Pydantic str schemas
+  ([`37e6846`](https://github.com/ReyemTech/mcp-canada/commit/37e68463babfd2ce7694ee32f1d72590bb0fcae6))
+
+- **16-08**: Remove nom_route substring fallback — exact num_route match only
+  ([`a5a3aea`](https://github.com/ReyemTech/mcp-canada/commit/a5a3aea4bf987b053c5ffbfaa0e2d28a087bdbd1))
+
+- **server**: Exclude underscore-prefixed module fixtures from production loading
+  ([`fb78203`](https://github.com/ReyemTech/mcp-canada/commit/fb782033dc1d1fea13a335696b8978089997cf70))
+
+### Chores
+
+- Sync uv.lock after release
+  ([`76e7174`](https://github.com/ReyemTech/mcp-canada/commit/76e7174e3ccacce0441da3de3ab228302999340b))
+
+- **16-05**: Remove pre-existing unused variable in test_client.py (ruff F841)
+  ([`f56f7be`](https://github.com/ReyemTech/mcp-canada/commit/f56f7beb857af27432be553fe753ac71430ad5b7))
+
+### Documentation
+
+- Capture todo - Research cross-Canada ER wait times datasets
+  ([`5ae25b0`](https://github.com/ReyemTech/mcp-canada/commit/5ae25b0590789d6b1eac3c667bec21cec00b54c0))
+
+- **14**: Add research, validation, and scope adjustment
+  ([`aaecf3e`](https://github.com/ReyemTech/mcp-canada/commit/aaecf3ed9e3b457796702d1d566285c4ac2a4926))
+
+- **14**: Capture phase context
+  ([`f7cc85a`](https://github.com/ReyemTech/mcp-canada/commit/f7cc85afc3eab1c9619cf6aecc82ade94965529e))
+
+- **14**: Create phase plan for York Region ArcGIS Hub module
+  ([`97d7175`](https://github.com/ReyemTech/mcp-canada/commit/97d7175230086c7089ba3114b8d75ba0bce58b6e))
+
+- **14**: Fix checker blockers - tool count and validation assignments
+  ([`851c4d3`](https://github.com/ReyemTech/mcp-canada/commit/851c4d3d53229eca0c76d92397b772189589a662))
+
+- **14**: Research phase ArcGIS Hub domain
+  ([`50072f2`](https://github.com/ReyemTech/mcp-canada/commit/50072f231da25c9f7460c9a29f57ed4c18b4e672))
+
+- **14-01**: Complete york_region module skeleton plan
+  ([`336d511`](https://github.com/ReyemTech/mcp-canada/commit/336d511d05f88f254f367693087d944aa933a9ba))
+
+- **14-02**: Complete york_region tools plan — 27 tools, 99.89% coverage
+  ([`d03e950`](https://github.com/ReyemTech/mcp-canada/commit/d03e950aea1a8ffd3040e390248ba2d3b5b87cf6))
+
+- **14-03**: Complete york_region prompts+resources plan — phase 14 done
+  ([`2345f17`](https://github.com/ReyemTech/mcp-canada/commit/2345f17289e10e5958530a8821a3dc38b2b715de))
+
+- **15**: Add research and validation strategy
+  ([`d48e219`](https://github.com/ReyemTech/mcp-canada/commit/d48e219d0cb88cf9fb0f9caeddafb2a476fade26))
+
+- **15**: Capture phase context
+  ([`669a216`](https://github.com/ReyemTech/mcp-canada/commit/669a2165ae771fd54d37b6d13601d3a044ddd5d5))
+
+- **15**: Plan British Columbia phase — 4 plans across 4 waves
+  ([`97aad99`](https://github.com/ReyemTech/mcp-canada/commit/97aad99ec76c9c5dd875dae3532616e73af04e1f))
+
+- **15**: Research BC CKAN + WFS — verified 15 curated datasets live
+  ([`a78c1ee`](https://github.com/ReyemTech/mcp-canada/commit/a78c1eec72b3cf520c684d75a4be4638276d19ca))
+
+- **15-01**: Complete BC infrastructure plan — shared/ogc.py + module skeleton + Wave 0 stubs
+  ([`031c4a9`](https://github.com/ReyemTech/mcp-canada/commit/031c4a97072b20248ae2c6c58eb9aab35d06c9dc))
+
+- **15-02**: Complete BC CKAN discovery tools plan
+  ([`1d85bde`](https://github.com/ReyemTech/mcp-canada/commit/1d85bdeb5cc92fdf7b01638e779e4988eded4882))
+
+- **15-03**: Complete BC WFS curated tools plan — 15 tools, 175 total
+  ([`05e2a9e`](https://github.com/ReyemTech/mcp-canada/commit/05e2a9e82cfcbd0efdabbe6b58c60d05006c297b))
+
+- **15-04**: Complete BC module — prompts+resources+integration tests plan
+  ([`e050c81`](https://github.com/ReyemTech/mcp-canada/commit/e050c813776729b1bd599340f1cecfd77a735062))
+
+- **15-05**: Add gap-closure plan for _api_get + bilingual guard
+  ([`9ed8c09`](https://github.com/ReyemTech/mcp-canada/commit/9ed8c09d7401778ab67da11574e456177fdd5ed6))
+
+- **15-05**: Complete BC gap closure plan — 0 integration failures, bilingual guard fixed
+  ([`1ce51c7`](https://github.com/ReyemTech/mcp-canada/commit/1ce51c73548eff71ca2efef48f39c93fae5edb7c))
+
+- **15-05**: Verify gap closure — 5/5 resolved, UAT green
+  ([`88fb15d`](https://github.com/ReyemTech/mcp-canada/commit/88fb15db1d1e1c66c7a99158ba3acb307af7dee2))
+
+- **16**: Add phase context for Quebec CKAN module
+  ([`fff0213`](https://github.com/ReyemTech/mcp-canada/commit/fff0213e43c4e1fe7f0a7a33000025935b79d384))
+
+- **16**: Add research and validation strategy
+  ([`27a65bb`](https://github.com/ReyemTech/mcp-canada/commit/27a65bbfadf25de188bf7d123376dfa6b25b2d20))
+
+- **16**: Create Quebec phase plan (4 plans, 4 waves, 18 tools)
+  ([`eb9d826`](https://github.com/ReyemTech/mcp-canada/commit/eb9d8263328f195355a21b4dd45640378c4c02d9))
+
+- **16**: Diagnose route filter substring match bug (Test 8, cycle 4)
+  ([`a732aec`](https://github.com/ReyemTech/mcp-canada/commit/a732aec0fab7ca6e807664d41cab6d5b316a660c))
+
+- **16**: Research Quebec CKAN — live-verified dataset availability, bilingual field shape, pitfalls
+  ([`116721d`](https://github.com/ReyemTech/mcp-canada/commit/116721d6d04cf8fda86894b306883d7fcc484e44))
+
+- **16-01**: Complete Quebec module skeleton plan — wave_0_complete, 105 test stubs
+  ([`65e4b41`](https://github.com/ReyemTech/mcp-canada/commit/65e4b41a3ba0a72f7e9761e4b1d86d98bd33e3a9))
+
+- **16-02**: Complete Quebec CKAN discovery layer — client + 5 tools, 96% coverage
+  ([`ec9e4f8`](https://github.com/ReyemTech/mcp-canada/commit/ec9e4f8dfac9bf6fc913269d2d405cc272c974fe))
+
+- **16-03**: Complete Quebec health+transport tools plan — 7 tools, 98% coverage
+  ([`83012dc`](https://github.com/ReyemTech/mcp-canada/commit/83012dc527b001ba5bbb937dd8ef688355113d03))
+
+- **16-04**: Complete Quebec environment/energy plan — Phase 16 done, 18 tools, 96.51% coverage
+  ([`47b6d89`](https://github.com/ReyemTech/mcp-canada/commit/47b6d89005633a23d7d3adab7eed2818ed62497b))
+
+- **16-04**: Update README, CLAUDE.md, and VALIDATION.md for Phase 16 completion
+  ([`9c94cfb`](https://github.com/ReyemTech/mcp-canada/commit/9c94cfbaa2156a1b138463477fea82ced2e598f3))
+
+- **16-05**: Add gap-closure plan for MTQ CSV parser + Hydro XLSX + BM25 keywords
+  ([`da40056`](https://github.com/ReyemTech/mcp-canada/commit/da40056608e9787bea3d6e28e2d984f2e92c9fa2))
+
+- **16-05**: Complete Quebec gap-closure plan summary and state updates
+  ([`a4f9d77`](https://github.com/ReyemTech/mcp-canada/commit/a4f9d774440d53228a3ed5c5c62776f6aed56f51))
+
+- **16-06**: Add gap-closure plan for bridges paging, road conditions mapper, Hydro-Quebec TLS
+  ([`5cfe98b`](https://github.com/ReyemTech/mcp-canada/commit/5cfe98b4bfbf14fbbf797dc8b54bfeaf2c97ec75))
+
+- **16-06**: Complete gap closure cycle 2 plan
+  ([`4b18c69`](https://github.com/ReyemTech/mcp-canada/commit/4b18c69cce3ab74c1149f381a8fd06efcdc3f031))
+
+- **16-07**: Complete quebec gap closure cycle 3 plan
+  ([`900597b`](https://github.com/ReyemTech/mcp-canada/commit/900597bc57f786fed3198bde8a5e969a0cb7d48a))
+
+- **16-08**: Complete bridge route substring fix plan
+  ([`7e538e3`](https://github.com/ReyemTech/mcp-canada/commit/7e538e3f5b370ea0faf7ed4fedbf84d9864fe597))
+
+- **16-08**: Create gap closure cycle 4 plan — route filter substring match fix
+  ([`73eb8ae`](https://github.com/ReyemTech/mcp-canada/commit/73eb8ae3ae7ccaa2515da8ca94766c9a96d9d922))
+
+- **phase-14**: Complete phase execution
+  ([`289e1a7`](https://github.com/ReyemTech/mcp-canada/commit/289e1a79a57c86dba09e50127184535fe9369d3e))
+
+- **phase-15**: Complete phase execution
+  ([`61d8c41`](https://github.com/ReyemTech/mcp-canada/commit/61d8c41a42dc63ed1a0075f41644a22485d8c317))
+
+- **phase-16**: Complete phase execution
+  ([`55d9f91`](https://github.com/ReyemTech/mcp-canada/commit/55d9f91c160bae7b8d36cb263b827f82e5590b57))
+
+- **phase-16**: Complete phase execution
+  ([`47c174e`](https://github.com/ReyemTech/mcp-canada/commit/47c174ebe5daa81a9ff94e58444fc8f6ebc08a02))
+
+- **phase-16**: Complete phase execution (cycle 4 — route filter fix)
+  ([`0176241`](https://github.com/ReyemTech/mcp-canada/commit/0176241cf2e3185b7991d19a2008a6a7d7540ad9))
+
+- **phase-16**: Resolve 3 post-retest UAT gaps after 16-06 gap closure cycle 2
+  ([`c307908`](https://github.com/ReyemTech/mcp-canada/commit/c307908bb31fc59e6907d55fd23730fd84e9406d))
+
+- **phase-16**: Resolve UAT gaps and debug session after 16-05 gap closure
+  ([`31d37e1`](https://github.com/ReyemTech/mcp-canada/commit/31d37e17ce736f476e9c2f6af6def03e9e8c39d2))
+
+- **state**: Record phase 14 context session
+  ([`2b53d17`](https://github.com/ReyemTech/mcp-canada/commit/2b53d178bdf79ccbb10a9b43b9e1ee27bb75655b))
+
+- **state**: Record phase 15 context session
+  ([`491ce6b`](https://github.com/ReyemTech/mcp-canada/commit/491ce6be7c313c1a3f9bd3d2b05beb7fec0244a3))
+
+### Features
+
+- **14-01**: Add shared/arcgis_hub.py ArcGIS Hub + FeatureServer client
+  ([`08dc020`](https://github.com/ReyemTech/mcp-canada/commit/08dc0206af4a4b7acb7c98b05688f3e8ac4977b6))
+
+- **14-01**: Add york_region module skeleton with client and unit tests
+  ([`39e5b20`](https://github.com/ReyemTech/mcp-canada/commit/39e5b209c8e26b9c25930b2efa6f7eff6746a52d))
+
+- **14-02**: Add york_region tools.py — 27 @tool functions with unit tests
+  ([`3d875e9`](https://github.com/ReyemTech/mcp-canada/commit/3d875e9aa7aaf7143bfbf46d3e77e5fafa20ea5b))
+
+- **14-03**: Add integration tests, update README and REQUIREMENTS.md
+  ([`875b098`](https://github.com/ReyemTech/mcp-canada/commit/875b098e6ea0ac65d10417349b0ed4f2fbeef1a9))
+
+- **14-03**: Add york_region prompts.py + resources.py with unit tests
+  ([`dc0d00a`](https://github.com/ReyemTech/mcp-canada/commit/dc0d00afddb38c7e3b8a26a35c014580636287f2))
+
+- **15-01**: Create british_columbia module 7-file skeleton
+  ([`731ac5b`](https://github.com/ReyemTech/mcp-canada/commit/731ac5b5cc75c5f4c6b7e736f1fd4ab43be1b744))
+
+- **15-01**: Implement shared/ogc.py WFS 2.0 client with unit tests
+  ([`cf2cb23`](https://github.com/ReyemTech/mcp-canada/commit/cf2cb23233b5fafa07e44bdb6ef58f4f6915ba14))
+
+- **15-01**: Scaffold Wave 0 test stubs for british_columbia + integration classes
+  ([`57c6699`](https://github.com/ReyemTech/mcp-canada/commit/57c6699291c092fd0c8ed0cc94d8d8d03124c73c))
+
+- **15-02**: Implement 5 BC CKAN discovery tools + bc_query_features WFS routing
+  ([`5c5e3df`](https://github.com/ReyemTech/mcp-canada/commit/5c5e3df786719bbc48bead63df71bc53e9847e19))
+
+- **15-02**: Implement CKAN client functions + queryable_via_wfs derivation
+  ([`39de48e`](https://github.com/ReyemTech/mcp-canada/commit/39de48e649b15374b8876757a2d4ad04d2631cb3))
+
+- **15-03**: Implement 10 curated environment/health/transport/climate tools
+  ([`75d4df9`](https://github.com/ReyemTech/mcp-canada/commit/75d4df93211b9d4e7c7b4004cb228069322fe755))
+
+- **15-03**: Implement _wfs_fetch + 5 curated wildfire/forestry tools
+  ([`6de1b66`](https://github.com/ReyemTech/mcp-canada/commit/6de1b66bb54d5692cd232f5226f540efe265259e))
+
+- **15-04**: Implement bc_ prompts (6) + resources (7) + unit tests
+  ([`f48eec2`](https://github.com/ReyemTech/mcp-canada/commit/f48eec2e06a41292d8e1a17b1a342a51c618166b))
+
+- **15-04**: Populate integration tests + update README.md + CLAUDE.md
+  ([`bca1002`](https://github.com/ReyemTech/mcp-canada/commit/bca1002d7bf0b9c1be0114b7ef58896e017c10b4))
+
+- **16-01**: Quebec module skeleton — 7-file pattern with constants, schemas, client stubs
+  ([`ffb03a0`](https://github.com/ReyemTech/mcp-canada/commit/ffb03a06d35e161e78925018c04d07a6d70bc494))
+
+- **16-02**: Implement 5 Quebec CKAN discovery tools
+  ([`9509770`](https://github.com/ReyemTech/mcp-canada/commit/9509770658bb16a9997e672e43ed7e789b5e62bc))
+
+- **16-02**: Implement Quebec CKAN client with Phase 15 parsed-dict _api_get
+  ([`310b2aa`](https://github.com/ReyemTech/mcp-canada/commit/310b2aa7fad03c7a87d70b342c2792f9e44d5c49))
+
+- **16-03**: Add 7 curated Quebec tools (health + MTQ transport)
+  ([`7b5ca00`](https://github.com/ReyemTech/mcp-canada/commit/7b5ca00671a710b29955d23d05574f4cec15d60d))
+
+- **16-03**: Implement 7 Health/MTQ client functions
+  ([`3c0c1ea`](https://github.com/ReyemTech/mcp-canada/commit/3c0c1eae5c09fba327e1910836824342e3c4109d))
+
+- **16-04**: Implement 6 bilingual prompts + 7 zero-parameter resources
+  ([`121be2e`](https://github.com/ReyemTech/mcp-canada/commit/121be2eb2f7f38d0b2bc283dd67e315c0e120b52))
+
+- **16-04**: Implement 6 environment/energy client + tool functions
+  ([`6d61252`](https://github.com/ReyemTech/mcp-canada/commit/6d61252f1058eb7dcd250e705015a707a8eabd1e))
+
+- **16-04**: Wire Quebec integration tests through MCP Client layer
+  ([`e5e88ce`](https://github.com/ReyemTech/mcp-canada/commit/e5e88cedbf038e699a6a37a97c876069de10b9b1))
+
+- **16-06**: WFS paging loop and route normalizer for bridge structures
+  ([`3fdd9d7`](https://github.com/ReyemTech/mcp-canada/commit/3fdd9d7473eb78ece2f80137457b543eff702e16))
+
+### Testing
+
+- **14**: Complete UAT - 9/9 passed
+  ([`afb6b3d`](https://github.com/ReyemTech/mcp-canada/commit/afb6b3dd84bced60872742ec8845a4f23eccb5f7))
+
+- **15**: Complete UAT - 9 passed, 5 issues
+  ([`f2775e8`](https://github.com/ReyemTech/mcp-canada/commit/f2775e8f93f697c6a9f230441ee634d2123f8492))
+
+- **15**: Diagnose UAT gaps — _api_get contract + bilingual error
+  ([`9e57a9e`](https://github.com/ReyemTech/mcp-canada/commit/9e57a9e1cc53b2ea34adc8aa8a3be936269e8f09))
+
+- **16**: Complete UAT - 12 passed, 4 issues
+  ([`c29bb67`](https://github.com/ReyemTech/mcp-canada/commit/c29bb6794ccb003be25c32f2572efb1358a6227d))
+
+- **16**: Retest 2 post-16-06 - 2 fixed (9, 11), 1 new schema issue + 1 minor
+  ([`2cf0eb6`](https://github.com/ReyemTech/mcp-canada/commit/2cf0eb64278af8dc4b8d54a57d6b80ea7ef4fea4))
+
+- **16**: Retest 3 post-16-07 — Test 11 FIXED (legend row skip), Test 8 new route filter substring
+  match bug
+  ([`ea83209`](https://github.com/ReyemTech/mcp-canada/commit/ea83209311086ab9283726494a27a365357f187e))
+
+- **16**: Retest 4 post-16-08 — Test 8 PASSED, all 16 UAT tests green, phase DONE
+  ([`cdc03da`](https://github.com/ReyemTech/mcp-canada/commit/cdc03dacb8e05a4d03cc7d57b64d8043e96a5446))
+
+- **16**: Retest post-16-05 - 1 fixed (BM25), 3 new downstream issues
+  ([`2fe59b6`](https://github.com/ReyemTech/mcp-canada/commit/2fe59b614fc4b07a55afad8320cc4836a18eb9d7))
+
+- **16-01**: Wave 0 test scaffolds for Quebec module
+  ([`d858b02`](https://github.com/ReyemTech/mcp-canada/commit/d858b0262cf54914306cb5e6822dbc786616a539))
+
+- **16-08**: Add failing test for route filter substring match bug
+  ([`3f32f49`](https://github.com/ReyemTech/mcp-canada/commit/3f32f49206d83b11a0cc3f08cebc25e2d88ce28f))
+
+- **16-08**: Tighten integration test to reject Route 204 in A-20 results
+  ([`def28fb`](https://github.com/ReyemTech/mcp-canada/commit/def28fb565d9ecb06af0f3d9c2d2ecb2da231201))
+
+
 ## v0.5.0 (2026-04-09)
 
 ### Bug Fixes

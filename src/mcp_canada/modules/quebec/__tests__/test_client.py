@@ -184,8 +184,6 @@ class TestFetchQueryDataset:
         # Patch cached_fetch to always call the fetcher (bypass cache isolation issues)
         import mcp_canada.modules.quebec.client as _mod
 
-        original_cached_fetch = _mod.cached_fetch
-
         async def passthrough_cached_fetch(key, ttl, fetcher):
             return (await fetcher(), False)
 

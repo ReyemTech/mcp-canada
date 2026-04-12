@@ -7,17 +7,21 @@ source:
   - 16-03-SUMMARY.md
   - 16-04-SUMMARY.md
   - 16-05-SUMMARY.md
+  - 16-06-SUMMARY.md
 started: 2026-04-11T00:00:00Z
 updated: 2026-04-11T00:00:00Z
 gaps_resolved: 2026-04-11T00:00:00Z
 retest_started: 2026-04-11T00:00:00Z
 retest_completed: 2026-04-11T00:00:00Z
 retest_scope: "Tests 8, 9, 11, 12 — post-16-05 gap closure re-verification"
+retest2_started: 2026-04-11T00:00:00Z
+retest2_completed: 2026-04-11T00:00:00Z
+retest2_scope: "Tests 8, 9, 11 — post-16-06 gap closure re-verification (cycle 2)"
 ---
 
 ## Current Test
 
-[retest complete]
+[retest 2 complete]
 
 ## Tests
 
@@ -69,6 +73,9 @@ retest_result: issue
 retest_reported: "CSV now parses and rows ARE returned (no more silent empty), but every field in every row is null: {segment_id: null, route_num: null, route_name: null, region: null, pavement_status: null, visibility: null, has_snow_presence: null, timestamp: null}. Column mapping in fetch_road_conditions doesn't match the real CSV column names."
 severity: major
 notes: "Parser fix + error propagation fix from 16-05 task 1 both confirmed working — rows flow through. Remaining issue is DIFFERENT root cause: the schema mapping layer (fetch_road_conditions transform) uses column names that don't exist in the live MTQ CSV. Fix: curl MTQ_ROAD_CONDITIONS_URL, inspect actual headers, align mapper. Same class of bug likely exists for bridges (Test 8 retest) and road_works/road_events."
+retest2: 2026-04-11
+retest2_result: pass
+retest2_notes: "CONFIRMED FIXED — 16-06 commit 6979468. Live response: [{segment_id:3201, route_num:117, route_name:'route 117', region:'Abitibi-Témiscamingue', pavement_status:'Bare and Dry', visibility:'Good', has_snow_presence:'N', timestamp:'2026/04/11 05:02:04'}, ...]. All 8 fields populated. Bilingual lang=en param working (English description strings). QuebecRoadCondition Pydantic schema apparently uses int for segment_id/route_num — no int→str validation issue unlike QuebecBridgeStructure."
 notes: Likely same root cause family as Test 8 (MTQ WFS CSV endpoints not being fetched/parsed correctly). Research flagged fetch_road_conditions as low-confidence — the graceful-empty path in _fetch masks the real failure. Test 8 surfaced the underlying "File is not a zip file" error when route filter path was hit; road_conditions swallows the exception and returns empty.
 
 ### 10. Air quality stations (RSQAQ datastore)
@@ -83,6 +90,9 @@ retest_result: issue
 retest_reported: "{'error':{'code':'UPSTREAM_ERROR','message':'Error fetching electricity data: [SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] ssl/tls alert handshake failure (_ssl.c:1081)','lang':'en'}}"
 severity: major
 notes: "XLSX matcher fix (16-05 task 2) + envelope source_url plumbing both confirmed working — the tool now reaches the actual XLSX fetch step instead of returning silent empty. Remaining issue is NEW (not covered by 16-05): the Hydro-Québec server (hydroquebec.com) rejects the TLS handshake with SSLV3_ALERT_HANDSHAKE_FAILURE. This is a server-side cipher/protocol mismatch. Options: (a) use the donneesquebec.ca-hosted mirror URL instead of the direct hydroquebec.com URL if the package has one, (b) pass a custom httpx SSLContext with broader cipher suites, (c) document this as a known upstream limitation. Needs investigation of alternate resource URLs in package_show response."
+retest2: 2026-04-11
+retest2_result: pass
+retest2_notes: "CONFIRMED FIXED — 16-06 commit 23b7a33. TLS handshake succeeds against hydroquebec.com, XLSX parsed, rows contain real hourly production/consumption values (e.g. rang=1 mois=1 jour=1 heure=1 production_brute=21065.13 MWh). Scoped SECLEVEL=1 SSLContext works end-to-end. Minor data-quality observation (new minor issue, logged below): first row is the XLSX legend/formula row with rang=null and formula strings like '5=1-2+3+4' in cells — the parser should skip the first row. Not a blocker for the SSL fix verification but worth a follow-up cleanup."
 notes: _meta.source.url points at package_show (step 1) rather than the CSV URL (step 2), suggesting either (a) the selected Hydro-Québec dataset has no CSV resource, (b) the CSV parse step failed silently, or (c) the code returns package_show source URL even after successful CSV parse. Needs diagnosis.
 
 ### 12. Discovery finds Quebec tools via BM25
@@ -123,6 +133,14 @@ retest_2026-04-11:
   passed: 1    # Test 12 (BM25 keywords)
   issues: 3    # Tests 8, 9, 11 (new downstream root causes revealed by parser fix)
   status: "16-05 confirmed landed (parser/error-propagation/xlsx-matcher/BM25 all verified). Three NEW downstream issues remain, requiring a second gap-closure cycle (16-06)."
+
+retest2_2026-04-11:
+  scope: "Tests 8, 9, 11 — post-16-06 gap closure"
+  total: 3
+  passed: 2    # Tests 9 (snake_case mapper) and 11 (SSLContext)
+  issues: 1    # Test 8 — Pydantic int→str coercion (NEW downstream issue exposed by WFS paging reaching rows)
+  minor_issues: 1  # Test 11 — XLSX legend/formula row leak (new minor, data-quality, not blocking)
+  status: "16-06 confirmed landed (WFS paging + route normalizer + snake_case mapper + SECLEVEL=1 SSLContext all working end-to-end). One major + one minor downstream issue remain, requiring a third gap-closure cycle (16-07)."
 
 ## Gaps
 
@@ -214,7 +232,7 @@ retest_2026-04-11:
 
 - truth: "quebec_get_bridge_structures(route='A-20') returns non-empty bridge features"
   status: resolved
-  resolved_by: "16-06 commit 970a93a — WFS paging loop + _normalize_route helper"
+  resolved_by: "16-06 commit 970a93a — WFS paging loop + _normalize_route helper (paging + normalization confirmed working 2026-04-11 retest 2; reveals schema type-coercion gap tracked as new entry below)"
   reason: "User reported: envelope well-formed with _meta.source.url=https://ws.mapserver.transports.gouv.qc.ca/swtq but data=[] — route filter returns zero rows"
   severity: major
   test: 8
@@ -315,4 +333,78 @@ retest_2026-04-11:
     - "Unit test: mock fetch_and_parse to assert ssl_context is passed when url is hydroquebec.com"
     - "Integration test asserting either len(data['data']) > 0 OR a structured UPSTREAM_ERROR (not a silent empty)"
     - "Update shared/__tests__/test_parsers.py to cover ssl_context passthrough (mock httpx.AsyncClient and assert verify=ctx)"
+  debug_session: ""
+
+# ═══════════════════════════════════════════════════════════════════
+# NEW GAPS from 2026-04-11 retest 2 — post-16-06 downstream root causes
+# ═══════════════════════════════════════════════════════════════════
+
+- truth: "quebec_get_bridge_structures(route='A-20') rows validate against QuebecBridgeStructure schema"
+  status: failed
+  reason: |
+    User reported: "MTQ WFS error: 5 validation errors for QuebecBridgeStructure
+    structure_id   Input should be a valid string [input_value=200645, input_type=int]
+    dossier_num    Input should be a valid string [input_value=4116, input_type=int]
+    municipality_code  Input should be a valid string [input_value=17010, input_type=int]
+    route_num      Input should be a valid string [input_value=204, input_type=int]
+    structure_type Input should be a valid string [input_value=1, input_type=int]"
+  severity: major
+  test: 8
+  retest_of: 8
+  discovered: 2026-04-11
+  cycle: 3
+  root_cause: |
+    UNDIAGNOSED — hypothesis:
+    WFS paging + route normalizer fixes from 16-06 are confirmed working (rows ARE now reaching
+    the feature parser instead of 30-row empty page / missing features). The new failure is at the
+    Pydantic validation layer: shared/parsers.py:_parse_csv auto-detects numeric-looking columns
+    as int (probably via pandas inference or a cast step in the normalizer), but the
+    QuebecBridgeStructure schema in quebec/schemas.py declares these fields as `str`. Pydantic v2
+    does not coerce int→str by default and strict validation fails on every row.
+    Five affected fields: structure_id, dossier_num, municipality_code, route_num, structure_type —
+    all stored in the CSV as digit-only values like 200645, 4116, 17010, 204, 1.
+    Note: route_num failure is interesting — it's the field we JUST added a zero-pad normalizer for.
+    Either (a) the normalizer only runs for user-facing filter comparison and not for the outgoing
+    schema value (so the row still carries 204 instead of '00204'), or (b) _parse_csv normalizes
+    AFTER _normalize_route runs.
+    Needs inspection of _parse_csv type-inference behavior and the QuebecBridgeStructure field types.
+  artifacts:
+    - path: "src/mcp_canada/modules/quebec/schemas.py:QuebecBridgeStructure"
+      issue: "Fields structure_id, dossier_num, municipality_code, route_num, structure_type declared as str but _parse_csv returns them as int"
+    - path: "src/mcp_canada/shared/parsers.py:_parse_csv"
+      issue: "Numeric columns auto-inferred as int; no opt-in to keep everything as str"
+  missing:
+    - "Inspect _parse_csv to find where/how type inference happens"
+    - "Decide fix: (a) change schema fields to `int | str` or `int`, (b) add field_validator with str coercion, or (c) stringify all values in _parse_csv or in fetch_bridge_structures mapper"
+    - "Preferred: stringify numeric IDs in fetch_bridge_structures mapper with str(r.get(...)) — least invasive and honors the schema contract that these are ID codes (not numbers)"
+    - "Replicate check for other Quebec schemas that declare `str` for numeric-looking ID fields — same bug may be latent elsewhere"
+    - "Integration test: test_bridges_route_filter_returns_rows should now pass (rows + correct types)"
+  debug_session: ""
+
+- truth: "quebec_get_electricity_data skips the XLSX legend/formula row (first row)"
+  status: failed
+  reason: "Rows include a leading legend row with rang=null, mois=null, jour=null, heure=null and cells containing Excel formula strings like '5=1-2+3+4', '7=5-6', '9=7-8', '13=11x12'. These are the XLSX column formula definitions that document how derived columns are computed, not real data."
+  severity: minor
+  test: 11
+  retest_of: 11
+  discovered: 2026-04-11
+  cycle: 3
+  root_cause: |
+    UNDIAGNOSED — hypothesis:
+    The Hydro-Québec 'historique-production-consommation' XLSX files use the FIRST data row
+    (after the header row) to document formulas for computed/derived columns. Real data starts
+    at row 2. Either (a) pandas.read_excel picks up this legend row as regular data, or (b)
+    _parse_xlsx doesn't skip it. A defensive filter: skip rows where all of rang/mois/jour/heure
+    are null (the first 4 columns are indexing and should always be populated on real rows).
+    Alternative: use `header=[0,1]` in pandas.read_excel to consume both the column name row
+    AND the formula legend row as a multi-index header, then flatten.
+  artifacts:
+    - path: "src/mcp_canada/modules/quebec/client.py:fetch_electricity_data"
+      issue: "After XLSX parse, returned rows include an XLSX legend/formula row that should be skipped (contains formula strings in numeric cells)"
+    - path: "src/mcp_canada/shared/parsers.py:_parse_xlsx"
+      issue: "Generic XLSX parser can't know about domain-specific legend rows; fix should be in the caller, not the shared parser"
+  missing:
+    - "Add a row filter in fetch_electricity_data: skip any row where rang is null OR the value of a known numeric column is a string containing '='"
+    - "Document this XLSX quirk in a comment referencing the Hydro-Québec file shape"
+    - "Integration test assertion: first row has rang == 1 (not null)"
   debug_session: ""

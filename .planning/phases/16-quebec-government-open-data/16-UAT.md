@@ -1,5 +1,5 @@
 ---
-status: complete
+status: testing
 phase: 16-quebec-government-open-data
 source:
   - 16-01-SUMMARY.md
@@ -8,8 +8,9 @@ source:
   - 16-04-SUMMARY.md
   - 16-05-SUMMARY.md
   - 16-06-SUMMARY.md
+  - 16-07-SUMMARY.md
 started: 2026-04-11T00:00:00Z
-updated: 2026-04-11T00:00:00Z
+updated: 2026-04-12T00:00:00Z
 gaps_resolved: 2026-04-11T00:00:00Z
 retest_started: 2026-04-11T00:00:00Z
 retest_completed: 2026-04-11T00:00:00Z
@@ -17,11 +18,14 @@ retest_scope: "Tests 8, 9, 11, 12 — post-16-05 gap closure re-verification"
 retest2_started: 2026-04-11T00:00:00Z
 retest2_completed: 2026-04-11T00:00:00Z
 retest2_scope: "Tests 8, 9, 11 — post-16-06 gap closure re-verification (cycle 2)"
+retest3_started: 2026-04-12T00:00:00Z
+retest3_completed: 2026-04-12T00:00:00Z
+retest3_scope: "Tests 8, 11 — post-16-07 gap closure re-verification (cycle 3)"
 ---
 
 ## Current Test
 
-[retest 2 complete]
+[retest 3 complete]
 
 ## Tests
 
@@ -64,6 +68,10 @@ retest_result: issue
 retest_reported: "Envelope well-formed with _meta.source.url=https://ws.mapserver.transports.gouv.qc.ca/swtq but data=[] — BadZipFile error is gone (parser fix worked) but route='A-20' filter returns zero rows. Either the CSV column holding route number has a different name than the client matcher expects, or the CSV payload for swtq is a layer-list doc (not the feature CSV), or the WFS request is missing a typename and returning the capabilities doc."
 severity: major
 notes: "Parser fix from 16-05 task 1 is confirmed working (no more BadZipFile exception propagation). Remaining issue is a DIFFERENT root cause: either the CSV column name mismatch in fetch_bridge_structures filter logic, or fetch_and_parse is parsing the wrong response (WFS capabilities doc instead of feature CSV because the URL is missing ?service=WFS&typename=...). Needs live curl of MTQ_BRIDGES_URL to inspect payload shape."
+retest3: 2026-04-12
+retest3_result: issue
+retest3_reported: "Int→str coercion CONFIRMED WORKING — all ID fields are strings (structure_id='200645', route_num='00204', structure_type='1'). route_num zero-padded correctly. BUT route FILTER is returning WRONG routes: route='A-20' should match Autoroute 20 (route_num='00020') but returns Route 204 bridges (route_num='00204', route_name='Route 204'). Likely the nom_route fallback is doing a substring match where '20' matches inside 'Route 204'."
+retest3_severity: major
 
 ### 9. Road conditions (MTQ WFS CSV, active TTL)
 expected: Call `quebec_get_road_conditions()` — returns current Quebec road condition data from the MTQ WFS CSV endpoint. Bilingual columns — EN vs FR descriptions selected by `lang` param. `_meta.cached` uses short TTL (active data). Graceful empty list if the WFS endpoint fails (research flagged low-confidence endpoint).
@@ -94,6 +102,9 @@ retest2: 2026-04-11
 retest2_result: pass
 retest2_notes: "CONFIRMED FIXED — 16-06 commit 23b7a33. TLS handshake succeeds against hydroquebec.com, XLSX parsed, rows contain real hourly production/consumption values (e.g. rang=1 mois=1 jour=1 heure=1 production_brute=21065.13 MWh). Scoped SECLEVEL=1 SSLContext works end-to-end. Minor data-quality observation (new minor issue, logged below): first row is the XLSX legend/formula row with rang=null and formula strings like '5=1-2+3+4' in cells — the parser should skip the first row. Not a blocker for the SSL fix verification but worth a follow-up cleanup."
 notes: _meta.source.url points at package_show (step 1) rather than the CSV URL (step 2), suggesting either (a) the selected Hydro-Québec dataset has no CSV resource, (b) the CSV parse step failed silently, or (c) the code returns package_show source URL even after successful CSV parse. Needs diagnosis.
+retest3: 2026-04-12
+retest3_result: pass
+retest3_notes: "CONFIRMED FIXED — 16-07 commit baa6913. Legend/formula row skip working: first returned row has rang=1, mois=1, jour=1, heure=1 with real production_brute=21065.13 MWh. No formula strings in any row. TLS fix from 16-06 still intact. All 14 XLSX columns populated with real numeric values."
 
 ### 12. Discovery finds Quebec tools via BM25
 expected: Call `discover_tools(query="Quebec hospitals health")` — returns Quebec tools in the top results (e.g. `quebec_get_health_installations`, `quebec_get_er_wait_times`, `quebec_explore_health` prompt). The 18 quebec_ tools are reachable through the BM25 discovery layer.
@@ -141,6 +152,13 @@ retest2_2026-04-11:
   issues: 1    # Test 8 — Pydantic int→str coercion (NEW downstream issue exposed by WFS paging reaching rows)
   minor_issues: 1  # Test 11 — XLSX legend/formula row leak (new minor, data-quality, not blocking)
   status: "16-06 confirmed landed (WFS paging + route normalizer + snake_case mapper + SECLEVEL=1 SSLContext all working end-to-end). One major + one minor downstream issue remain, requiring a third gap-closure cycle (16-07)."
+
+retest3_2026-04-12:
+  scope: "Tests 8, 11 — post-16-07 gap closure (cycle 3)"
+  total: 2
+  passed: 1    # Test 11 (legend row skip + TLS still working)
+  issues: 1    # Test 8 — int→str coercion WORKS but route filter returns wrong routes (Route 204 instead of Autoroute 20; nom_route substring match bug)
+  status: "16-07 confirmed landed (int→str coercion + legend row skip both verified). Test 11 CLOSED. Test 8 has a NEW downstream issue: route filter substring match returns wrong routes. Requires cycle 4 (16-08)."
 
 ## Gaps
 
@@ -340,7 +358,8 @@ retest2_2026-04-11:
 # ═══════════════════════════════════════════════════════════════════
 
 - truth: "quebec_get_bridge_structures(route='A-20') rows validate against QuebecBridgeStructure schema"
-  status: failed
+  status: resolved
+  resolved_by: "16-07 commit bce827b — _str_or_none stringifies 5 ID fields; route_num zero-padded via _normalize_route (confirmed by retest 3 — all fields are strings, route_num='00204')"
   reason: |
     User reported: "MTQ WFS error: 5 validation errors for QuebecBridgeStructure
     structure_id   Input should be a valid string [input_value=200645, input_type=int]
@@ -382,7 +401,8 @@ retest2_2026-04-11:
   debug_session: ""
 
 - truth: "quebec_get_electricity_data skips the XLSX legend/formula row (first row)"
-  status: failed
+  status: resolved
+  resolved_by: "16-07 commit baa6913 — _is_real_electricity_row skips legend/formula rows (confirmed by retest 3 — first row has rang=1, all numeric values real)"
   reason: "Rows include a leading legend row with rang=null, mois=null, jour=null, heure=null and cells containing Excel formula strings like '5=1-2+3+4', '7=5-6', '9=7-8', '13=11x12'. These are the XLSX column formula definitions that document how derived columns are computed, not real data."
   severity: minor
   test: 11
@@ -407,4 +427,28 @@ retest2_2026-04-11:
     - "Add a row filter in fetch_electricity_data: skip any row where rang is null OR the value of a known numeric column is a string containing '='"
     - "Document this XLSX quirk in a comment referencing the Hydro-Québec file shape"
     - "Integration test assertion: first row has rang == 1 (not null)"
+  debug_session: ""
+
+# ═══════════════════════════════════════════════════════════════════
+# NEW GAP from 2026-04-12 retest 3 — post-16-07 downstream root cause
+# ═══════════════════════════════════════════════════════════════════
+
+- truth: "quebec_get_bridge_structures(route='A-20') returns Autoroute 20 bridges (not Route 204)"
+  status: failed
+  reason: "User reported: int→str coercion CONFIRMED WORKING (all ID fields are strings, route_num zero-padded). But route filter returns WRONG routes: route='A-20' should match Autoroute 20 (route_num='00020') but returns Route 204 bridges (route_num='00204', route_name='Route 204'). The nom_route fallback is likely doing a substring match where '20' matches inside 'Route 204'."
+  severity: major
+  test: 8
+  retest_of: 8
+  discovered: 2026-04-12
+  cycle: 4
+  root_cause: ""
+  artifacts:
+    - path: "src/mcp_canada/modules/quebec/client.py:fetch_bridge_structures"
+      issue: "Post-parse filter route matching logic: _normalize_route('A-20') produces '00020' but returned rows have route_num='00204'. Either (a) the num_route comparison is wrong (matching '0002' as prefix of '00204'?), or (b) the nom_route fallback does substring match where '20' matches inside 'Route 204'"
+  missing:
+    - "Inspect fetch_bridge_structures post-parse filter logic to identify exact comparison semantics"
+    - "Fix to use EXACT match on normalized route_num (not startswith/in/substring)"
+    - "If nom_route fallback exists, use word-boundary or exact-after-prefix match (e.g. 'Autoroute 20' not 'Route 204')"
+    - "Unit test: fixture with both route_num='00020' (Autoroute 20) and route_num='00204' (Route 204) rows — assert route='A-20' returns ONLY Autoroute 20 rows"
+    - "Integration test: assert returned rows have route_num='00020' or route_name containing 'Autoroute 20'"
   debug_session: ""

@@ -632,8 +632,20 @@ class TestFetchWaterQualityMonitoring:
 
 
 class TestFetchElectricityData:
+    """Tests for fetch_electricity_data — updated for phase 16-05 3-tuple contract.
+
+    The Hydro-Québec historique-production-consommation package publishes XLSX files
+    (years 2018-2021), NOT CSV. The old CSV-only matcher never hit; fixed to accept
+    CSV/XLSX/XLS. Return type changed from (rows, was_cached) to (rows, source_url, was_cached).
+    """
+
     async def test_parses_hydro_quebec_csv(self):
-        """fetch_electricity_data finds CSV resource then calls fetch_and_parse."""
+        """fetch_electricity_data finds CSV resource then calls fetch_and_parse (3-tuple return)."""
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
         hydro_pkg = {
             "success": True,
             "result": {
@@ -654,15 +666,144 @@ class TestFetchElectricityData:
             },
         }
         sample_rows = [{"annee": "2023", "production_twh": "200.5", "consommation_twh": "195.0"}]
-        with patch("mcp_canada.modules.quebec.client.api_get", new=AsyncMock(return_value=hydro_pkg)):
-            with patch(
-                "mcp_canada.modules.quebec.client.fetch_and_parse",
-                new=AsyncMock(return_value=(sample_rows, False)),
-            ):
-                result, _ = await q_client.fetch_electricity_data()
-        assert isinstance(result, list)
-        assert len(result) == 1
-        assert result[0]["annee"] == "2023"
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch("mcp_canada.modules.quebec.client.api_get", new=AsyncMock(return_value=hydro_pkg)):
+                with patch(
+                    "mcp_canada.modules.quebec.client.fetch_and_parse",
+                    new=AsyncMock(return_value=(sample_rows, False)),
+                ):
+                    rows, source_url, was_cached = await q_client.fetch_electricity_data()
+        assert isinstance(rows, list)
+        assert len(rows) == 1
+        assert rows[0]["annee"] == "2023"
+        assert source_url == "https://hydroquebec.com/data/historique.csv"
+
+    async def test_matches_xlsx_resource_when_no_csv_present(self) -> None:
+        """Hydro-Québec package has ZERO CSV — must accept XLSX format resources."""
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        hydro_pkg = {
+            "success": True,
+            "result": {
+                "id": "hydro-uuid",
+                "name": "historique-production-consommation",
+                "title": "Historique de production et consommation",
+                "notes": "Données historiques...",
+                "organization": {"name": "hydro-quebec", "title": "Hydro-Québec"},
+                "resources": [
+                    {
+                        "id": "xlsx-2021",
+                        "name": "Suivi 2021 XLSX",
+                        "format": "XLSX",
+                        "url": "https://www.hydroquebec.com/data/suivi-2021.xlsx",
+                        "datastore_active": False,
+                    },
+                    {
+                        "id": "xlsx-2019",
+                        "name": "Suivi 2019 XLSX",
+                        "format": "XLSX",
+                        "url": "https://www.hydroquebec.com/data/suivi-2019.xlsx",
+                        "datastore_active": False,
+                    },
+                ],
+            },
+        }
+        sample_rows = [{"year": 2021, "production": 100}]
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch("mcp_canada.modules.quebec.client.api_get", new=AsyncMock(return_value=hydro_pkg)):
+                with patch(
+                    "mcp_canada.modules.quebec.client.fetch_and_parse",
+                    new=AsyncMock(return_value=(sample_rows, False)),
+                ):
+                    rows, source_url, was_cached = await q_client.fetch_electricity_data()
+        assert len(rows) > 0
+        assert source_url == "https://www.hydroquebec.com/data/suivi-2021.xlsx"
+        assert was_cached is False
+
+    async def test_skips_empty_url_resources(self) -> None:
+        """Resources with url='' (real 2020 Hydro-Québec entry) must be skipped."""
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        hydro_pkg = {
+            "success": True,
+            "result": {
+                "id": "hydro-uuid",
+                "name": "historique-production-consommation",
+                "title": "Historique de production et consommation",
+                "notes": "Données historiques...",
+                "organization": {"name": "hydro-quebec", "title": "Hydro-Québec"},
+                "resources": [
+                    {
+                        "id": "xlsx-2020",
+                        "name": "Suivi 2020 XLSX — empty URL",
+                        "format": "XLSX",
+                        "url": "",  # real 2020 entry has empty URL
+                        "datastore_active": False,
+                    },
+                    {
+                        "id": "xlsx-2019",
+                        "name": "Suivi 2019 XLSX",
+                        "format": "XLSX",
+                        "url": "https://www.hydroquebec.com/data/suivi-2019.xlsx",
+                        "datastore_active": False,
+                    },
+                ],
+            },
+        }
+        sample_rows = [{"year": 2019, "production": 90}]
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch("mcp_canada.modules.quebec.client.api_get", new=AsyncMock(return_value=hydro_pkg)):
+                with patch(
+                    "mcp_canada.modules.quebec.client.fetch_and_parse",
+                    new=AsyncMock(return_value=(sample_rows, False)),
+                ):
+                    rows, source_url, was_cached = await q_client.fetch_electricity_data()
+        assert source_url == "https://www.hydroquebec.com/data/suivi-2019.xlsx"
+        assert len(rows) > 0
+
+    async def test_raises_when_no_parseable_resource(self) -> None:
+        """If all resources are SHP/GPKG (unparseable), raise ValueError — not silent empty."""
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        hydro_pkg = {
+            "success": True,
+            "result": {
+                "id": "hydro-uuid",
+                "name": "historique-production-consommation",
+                "title": "Historique de production et consommation",
+                "notes": "Données historiques...",
+                "organization": {"name": "hydro-quebec", "title": "Hydro-Québec"},
+                "resources": [
+                    {
+                        "id": "shp-001",
+                        "name": "Shapefile",
+                        "format": "SHP",
+                        "url": "https://example.com/a.shp",
+                        "datastore_active": False,
+                    },
+                    {
+                        "id": "gpkg-001",
+                        "name": "GeoPackage",
+                        "format": "GPKG",
+                        "url": "https://example.com/b.gpkg",
+                        "datastore_active": False,
+                    },
+                ],
+            },
+        }
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch("mcp_canada.modules.quebec.client.api_get", new=AsyncMock(return_value=hydro_pkg)):
+                with pytest.raises(ValueError, match="No parseable"):
+                    await q_client.fetch_electricity_data(limit=100)
 
 
 class TestFetchProtectedAreas:

@@ -681,10 +681,10 @@ Nyquist validation is ENABLED (`workflow.nyquist_validation: true` in `.planning
    - Confirmed working: `outputformat=csv` returns ~100KB of real CSV from the live WFS.
    - Root cause of original failure: `shared/parsers.py` stripped query string before format detection; format hint was in `?outputformat=csv` not in path suffix. Fixed by adding `urllib.parse` query-param inspection in `fetch_and_parse`.
 
-2. **Hydro-Québec electricity production CSV URL**
-   - What we know: `historique-production-consommation` package exists on DQ from Hydro-Québec org. CSV resource URL needs to be retrieved from `package_show`.
-   - What's unclear: Direct download URL stability (may use DQ redirect wrapper).
-   - Recommendation: Probe in Plan 02.
+2. **Hydro-Québec electricity production CSV URL** — RESOLVED (phase 16-05)
+   - The `historique-production-consommation` package publishes XLSX files ONLY (years 2018-2021; 2020 resource has empty URL). There are no CSV resources.
+   - Fix: expanded format matcher from `("CSV",)` to `("CSV", "XLSX", "XLS")`, skip empty URLs, return `(rows, source_url, was_cached)` 3-tuple so the tool envelope reflects the real XLSX URL.
+   - Original research claim ("CSV at Hydro-Québec direct URL") was incorrect — not verified against live package_show.
 
 3. **RSQAQ real-time AQI via ArcGIS FeatureServer**
    - What we know: `rsqaq-indice-de-la-qualite-de-l-air` has REST resource pointing to ArcGIS FeatureServer (not CKAN datastore). `shared/arcgis_hub.py` is available.

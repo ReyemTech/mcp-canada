@@ -598,7 +598,7 @@ async def quebec_get_electricity_data(
     For current power outages, visit hydroquebec.com/pannes/ directly.
     """
     try:
-        rows, cached = await _client.fetch_electricity_data(
+        rows, source_url, cached = await _client.fetch_electricity_data(
             limit=min(max(limit, 1), 5000),
         )
     except Exception as exc:
@@ -611,7 +611,7 @@ async def quebec_get_electricity_data(
     return make_response(
         data=rows,
         api_name=API_NAME,
-        api_url=BASE_URL + "package_show",
+        api_url=source_url,
         cached=cached,
         lang=lang,
     )

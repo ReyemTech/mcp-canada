@@ -801,21 +801,25 @@ class TestQuebecGetWaterQualityMonitoring:
 
 
 class TestQuebecGetElectricityData:
+    """Tests updated for phase 16-05: fetch_electricity_data now returns 3-tuple (rows, source_url, was_cached)."""
+
     async def test_happy_path(self):
-        """quebec_get_electricity_data returns CSV rows with _meta envelope."""
+        """quebec_get_electricity_data returns rows with _meta envelope (3-tuple client return)."""
         rows = [{"annee": "2023", "production_twh": "200.5"}]
+        xlsx_url = "https://www.hydroquebec.com/data/suivi-2021.xlsx"
         with patch(
             "mcp_canada.modules.quebec.tools._client.fetch_electricity_data",
-            new=AsyncMock(return_value=(rows, False)),
+            new=AsyncMock(return_value=(rows, xlsx_url, False)),
         ):
             result = await q_tools.quebec_get_electricity_data()
         assert "_meta" in result
         assert result["data"] == rows
 
     async def test_meta_envelope_shape(self):
+        xlsx_url = "https://www.hydroquebec.com/data/suivi-2021.xlsx"
         with patch(
             "mcp_canada.modules.quebec.tools._client.fetch_electricity_data",
-            new=AsyncMock(return_value=([], False)),
+            new=AsyncMock(return_value=([], xlsx_url, False)),
         ):
             result = await q_tools.quebec_get_electricity_data()
         assert "_meta" in result
@@ -829,6 +833,24 @@ class TestQuebecGetElectricityData:
             result = await q_tools.quebec_get_electricity_data()
         assert "error" in result
         assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+
+class TestQuebecGetElectricityDataEnvelope:
+    """Regression for UAT Gap 3 — envelope URL must reflect real fetched XLSX, not package_show."""
+
+    async def test_envelope_source_url_points_at_xlsx_not_package_show(self) -> None:
+        """_meta.source.url must be the actual XLSX URL, not the CKAN package_show endpoint."""
+        xlsx_url = "https://www.hydroquebec.com/data/documents-donnees/xls/suivi-2021-de-l-entente-globale-cadre.xlsx"
+        with patch(
+            "mcp_canada.modules.quebec.tools._client.fetch_electricity_data",
+            new=AsyncMock(return_value=([{"year": 2021, "prod": 100}], xlsx_url, False)),
+        ):
+            result = await q_tools.quebec_get_electricity_data(limit=10, lang="en")
+
+        assert "_meta" in result
+        assert result["_meta"]["source"]["url"] == xlsx_url
+        assert "package_show" not in result["_meta"]["source"]["url"]
+        assert len(result["data"]) == 1
 
 
 class TestQuebecGetProtectedAreas:

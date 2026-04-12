@@ -735,29 +735,39 @@ async def fetch_water_quality_monitoring() -> tuple[dict[str, Any], bool]:
 
 async def fetch_electricity_data(
     limit: int = 500,
-) -> tuple[list[dict[str, Any]], bool]:
-    """Hydro-Québec historical electricity production/consumption CSV.
+) -> tuple[list[dict[str, Any]], str, bool]:
+    """Hydro-Québec historical electricity production/consumption file.
 
-    Picks the first CSV resource from the historique-production-consommation package
-    and parses it via fetch_and_parse. Returns rows up to limit.
+    Picks the first CSV/XLSX/XLS resource (non-empty URL) from the
+    historique-production-consommation package and parses it via fetch_and_parse.
+    Returns (rows, source_url, was_cached). The Hydro-Québec package publishes
+    XLSX files (years 2018-2021) — no CSV resources exist.
+
+    Raises ValueError if no parseable resource is found.
 
     Note: Current outages are NOT on DQ CKAN — redirect agents to hydroquebec.com/pannes/.
     """
-    cache_key = f"quebec:hydro:electricity:{limit}"
+    cache_key = f"quebec:hydro:electricity:v2:{limit}"
 
-    async def _fetch() -> list[dict[str, Any]]:
+    async def _fetch() -> tuple[list[dict[str, Any]], str]:
         details, _ = await fetch_dataset_details("historique-production-consommation")
-        csv_url: str | None = None
+        file_url: str | None = None
         for r in details.resources:
-            if (r.format or "").upper() == "CSV" and r.url:
-                csv_url = r.url
+            fmt = (r.format or "").upper()
+            if fmt in ("CSV", "XLSX", "XLS") and r.url:
+                file_url = r.url
                 break
-        if csv_url is None:
-            return []
-        rows, _ = await fetch_and_parse(csv_url, ttl=CACHE_TTL_META)
-        return rows[:limit]
+        if file_url is None:
+            raise ValueError(
+                "No parseable CSV/XLSX/XLS resource found in "
+                "historique-production-consommation package"
+            )
+        rows, _ = await fetch_and_parse(file_url, ttl=CACHE_TTL_META)
+        return rows[:limit], file_url
 
-    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
+    bundled, was_cached = await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
+    rows, source_url = bundled
+    return rows, source_url, was_cached
 
 
 async def fetch_protected_areas() -> tuple[dict[str, Any], bool]:

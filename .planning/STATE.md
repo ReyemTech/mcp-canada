@@ -201,7 +201,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+- [research] Research cross-Canada ER wait times datasets — `.planning/todos/pending/2026-04-12-research-cross-canada-er-wait-times-datasets.md`
 
 ### Blockers/Concerns
 

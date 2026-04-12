@@ -698,10 +698,7 @@ async def fetch_bridge_structures(
                 # relying on the nom_route substring fallback.
                 num_raw = r.get("num_route")
                 num = _normalize_route(str(num_raw)) if num_raw is not None else ""
-                nom = str(r.get("nom_route") or "").lower()
-                # Match zero-padded num_route OR nom_route contains the raw digits
-                raw_digits = norm.lstrip("0") or "0"
-                if num != norm and raw_digits not in nom:
+                if num != norm:
                     continue
             if municipality and municipality.lower() not in str(
                 r.get("nom_muncp", "")

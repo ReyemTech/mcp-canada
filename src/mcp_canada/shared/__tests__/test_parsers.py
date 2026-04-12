@@ -397,6 +397,165 @@ class TestFetchAndParse:
 
         mock_xlsx.assert_called_once_with(xlsx_bytes, 0, 0)
 
+    @pytest.mark.asyncio
+    async def test_routes_wfs_csv_via_query_param(self) -> None:
+        """MTQ WFS URL with ?outputformat=csv routes to _parse_csv even though path has no .csv suffix."""
+        csv_bytes = _make_csv_bytes(["Col"], [["val"]])
+
+        async def fake_cached_fetch(key: str, ttl: int, fetcher: Any) -> tuple[Any, bool]:
+            data = await fetcher()
+            return data, False
+
+        mock_response = MagicMock()
+        mock_response.content = csv_bytes
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch("mcp_canada.shared.parsers.cached_fetch", side_effect=fake_cached_fetch),
+            patch("httpx.AsyncClient") as mock_client_cls,
+            patch("mcp_canada.shared.parsers._parse_csv", return_value=[{"col": "val"}]) as mock_csv,
+            patch("mcp_canada.shared.parsers._parse_xlsx") as mock_xlsx,
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client_cls.return_value = mock_client
+
+            from mcp_canada.shared.parsers import fetch_and_parse
+
+            url = (
+                "https://ws.mapserver.transports.gouv.qc.ca/swtq"
+                "?service=wfs&version=2.0.0&request=getfeature"
+                "&typename=ms:gsq_v_desc_strct_tri&outputformat=csv"
+            )
+            result, _ = await fetch_and_parse(url)
+
+        mock_csv.assert_called_once_with(csv_bytes, 0)
+        mock_xlsx.assert_not_called()
+        assert result == [{"col": "val"}]
+
+    @pytest.mark.asyncio
+    async def test_routes_wfs_csv_via_mixed_case_outputFormat(self) -> None:
+        """?outputFormat=csv (mixed case key) routes to _parse_csv — key comparison is case-insensitive."""
+        csv_bytes = _make_csv_bytes(["A"], [["b"]])
+
+        async def fake_cached_fetch(key: str, ttl: int, fetcher: Any) -> tuple[Any, bool]:
+            return await fetcher(), False
+
+        mock_response = MagicMock()
+        mock_response.content = csv_bytes
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch("mcp_canada.shared.parsers.cached_fetch", side_effect=fake_cached_fetch),
+            patch("httpx.AsyncClient") as mock_client_cls,
+            patch("mcp_canada.shared.parsers._parse_csv", return_value=[{"a": "b"}]) as mock_csv,
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client_cls.return_value = mock_client
+
+            from mcp_canada.shared.parsers import fetch_and_parse
+
+            result, _ = await fetch_and_parse(
+                "https://ws.example.com/swtq?typeName=ms:roads&outputFormat=csv"
+            )
+
+        mock_csv.assert_called_once()
+        assert result == [{"a": "b"}]
+
+    @pytest.mark.asyncio
+    async def test_routes_wfs_csv_via_format_key(self) -> None:
+        """?format=csv short key also routes to _parse_csv."""
+        csv_bytes = _make_csv_bytes(["X"], [["y"]])
+
+        async def fake_cached_fetch(key: str, ttl: int, fetcher: Any) -> tuple[Any, bool]:
+            return await fetcher(), False
+
+        mock_response = MagicMock()
+        mock_response.content = csv_bytes
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch("mcp_canada.shared.parsers.cached_fetch", side_effect=fake_cached_fetch),
+            patch("httpx.AsyncClient") as mock_client_cls,
+            patch("mcp_canada.shared.parsers._parse_csv", return_value=[{"x": "y"}]) as mock_csv,
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client_cls.return_value = mock_client
+
+            from mcp_canada.shared.parsers import fetch_and_parse
+
+            await fetch_and_parse("https://api.example.com/wfs?format=csv")
+
+        mock_csv.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_path_suffix_still_wins_for_xlsx_even_with_irrelevant_query(self) -> None:
+        """Backward compat: .xlsx path suffix routes to _parse_xlsx regardless of unrelated query params."""
+        xlsx_bytes = _make_xlsx_bytes(["Year"], [[2020]])
+
+        async def fake_cached_fetch(key: str, ttl: int, fetcher: Any) -> tuple[Any, bool]:
+            return await fetcher(), False
+
+        mock_response = MagicMock()
+        mock_response.content = xlsx_bytes
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch("mcp_canada.shared.parsers.cached_fetch", side_effect=fake_cached_fetch),
+            patch("httpx.AsyncClient") as mock_client_cls,
+            patch("mcp_canada.shared.parsers._parse_xlsx", return_value=[{"year": 2020}]) as mock_xlsx,
+            patch("mcp_canada.shared.parsers._parse_csv") as mock_csv,
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client_cls.return_value = mock_client
+
+            from mcp_canada.shared.parsers import fetch_and_parse
+
+            await fetch_and_parse("https://example.com/data.xlsx?cacheBust=123")
+
+        mock_xlsx.assert_called_once()
+        mock_csv.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_no_format_hint_falls_through_to_xlsx(self) -> None:
+        """URL with neither suffix nor format query key still falls through to _parse_xlsx (existing behaviour)."""
+        xlsx_bytes = _make_xlsx_bytes(["A"], [["b"]])
+
+        async def fake_cached_fetch(key: str, ttl: int, fetcher: Any) -> tuple[Any, bool]:
+            return await fetcher(), False
+
+        mock_response = MagicMock()
+        mock_response.content = xlsx_bytes
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch("mcp_canada.shared.parsers.cached_fetch", side_effect=fake_cached_fetch),
+            patch("httpx.AsyncClient") as mock_client_cls,
+            patch("mcp_canada.shared.parsers._parse_xlsx", return_value=[{"a": "b"}]) as mock_xlsx,
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client_cls.return_value = mock_client
+
+            from mcp_canada.shared.parsers import fetch_and_parse
+
+            await fetch_and_parse("https://api.example.com/resource?id=123&token=abc")
+
+        mock_xlsx.assert_called_once()
+
 
 # ---------------------------------------------------------------------------
 # _parse_ircc_xlsx

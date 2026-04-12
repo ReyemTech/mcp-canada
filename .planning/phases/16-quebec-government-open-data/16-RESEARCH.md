@@ -213,7 +213,7 @@ Note: The MTQ WFS CSV URLs are stored as resource URLs within DQ CKAN packages (
 - **Fallback:** Annual current CSV at `https://ws.mapserver.transports.gouv.qc.ca/donnees/geomatique/crh_annee_courante_csv.zip` — 970K rows, 19MB ZIP — TOO LARGE for `fetch_and_parse` (224MB unzipped)
 - **Key columns (from CSV):** `NumeroSegment`, `NumeroRoute`, `NomRoute`, `NomRegion`, `CodeEtatChaussee`, `DescriptionEtatChausseeFR`, `DescriptionEtatChausseeEN`, `CodeVisibilite`, `DescriptionVisibiliteFR`, `DescriptionVisibiliteEN`, `IndicateurPresenceLamesNeige`, `DateEtHeureCondition`
 - **Rate of change:** Continuous — `CACHE_TTL_ACTIVE` (300s) when using live WFS
-- **IMPORTANT:** The `ms:conditions_routieres` typename is in the WFS capabilities but the GeoJSON endpoint returned HTTP 400 (template missing on server). Test the CSV outputformat instead. If the WFS live endpoint proves unreliable, implement as: return the dataset `package_show` URL + note that data is winter-season only, and guide agents to use the WFS link directly. Research flag: LOW confidence on WFS CSV for this specific layer — validate in Plan implementation.
+- **CONFIRMED WORKING (phase 16-05 correction):** The `ms:conditions_routieres` WFS CSV endpoint returns ~100KB of real CSV data. The previous LOW-confidence flag was incorrect — the bug was a client-side parser dispatch issue in `shared/parsers.py` that stripped query strings before detecting the format, causing all MTQ WFS CSV responses (whose format hint is `?outputformat=csv` in the query string, not the path suffix) to fall through to `_parse_xlsx` and raise `BadZipFile`. Fixed in plan 16-05 gap closure.
 - **Bilingual columns:** `DescriptionEtatChausseeFR/EN` and `DescriptionVisibiliteFR/EN` — client should select by `lang` parameter.
 
 #### Tool 5: `quebec_get_road_works`
@@ -677,10 +677,9 @@ Nyquist validation is ENABLED (`workflow.nyquist_validation: true` in `.planning
 
 ## Open Questions
 
-1. **`ms:conditions_routieres` WFS CSV format**
-   - What we know: The typename exists in the WFS capabilities. The GeoJSON format returns HTTP 400 (missing server template). Annual CSV archive is 970K rows / 530MB (too large).
-   - What's unclear: Does `outputformat=csv` work for `ms:conditions_routieres`? This needs to be live-tested in the plan implementation.
-   - Recommendation: Plan 02/03 should test this endpoint first. Fallback: implement as a metadata tool that returns the WFS endpoint URL and guides agents to use it with HTTP clients supporting streaming.
+1. **`ms:conditions_routieres` WFS CSV format** — RESOLVED (phase 16-05)
+   - Confirmed working: `outputformat=csv` returns ~100KB of real CSV from the live WFS.
+   - Root cause of original failure: `shared/parsers.py` stripped query string before format detection; format hint was in `?outputformat=csv` not in path suffix. Fixed by adding `urllib.parse` query-param inspection in `fetch_and_parse`.
 
 2. **Hydro-Québec electricity production CSV URL**
    - What we know: `historique-production-consommation` package exists on DQ from Hydro-Québec org. CSV resource URL needs to be retrieved from `package_show`.

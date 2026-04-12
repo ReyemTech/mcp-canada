@@ -404,6 +404,9 @@ class TestFetchRoadConditions:
         assert result[0]["pavement_status"] == "Bon"
 
     async def test_returns_empty_on_parse_error(self):
+        # NOTE: This test is updated as part of phase 16-05 gap closure.
+        # The old contract (return [] on error) was a bug — errors should propagate.
+        # This test now asserts that exceptions are NOT swallowed.
         import mcp_canada.modules.quebec.client as _mod
 
         async def passthrough(key, ttl, fetcher):
@@ -414,8 +417,29 @@ class TestFetchRoadConditions:
                 "mcp_canada.modules.quebec.client.fetch_and_parse",
                 new=AsyncMock(side_effect=Exception("WFS endpoint down")),
             ):
-                result, _ = await q_client.fetch_road_conditions()
-        assert result == []
+                with pytest.raises(Exception, match="WFS endpoint down"):
+                    await q_client.fetch_road_conditions()
+
+    async def test_propagates_parser_exceptions_no_silent_swallow(self) -> None:
+        """fetch_road_conditions must raise parser exceptions — gap 16-02 regression.
+
+        Before the fix, client.py:502-505 caught Exception and returned [], masking
+        the real BadZipFile error from fetch_and_parse. The fix removes the try/except
+        so errors propagate to the @tool layer where they become structured UPSTREAM_ERROR.
+        """
+        import zipfile
+        import mcp_canada.modules.quebec.client as _mod
+
+        async def passthrough(key, ttl, fetcher):
+            return (await fetcher(), False)
+
+        with patch.object(_mod, "cached_fetch", side_effect=passthrough):
+            with patch(
+                "mcp_canada.modules.quebec.client.fetch_and_parse",
+                new=AsyncMock(side_effect=zipfile.BadZipFile("File is not a zip file")),
+            ):
+                with pytest.raises(zipfile.BadZipFile):
+                    await q_client.fetch_road_conditions(lang="en")
 
 
 class TestFetchRoadWorks:

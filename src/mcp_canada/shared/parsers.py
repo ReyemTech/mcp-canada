@@ -14,6 +14,7 @@ import re
 import unicodedata
 from io import BytesIO, StringIO
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 
@@ -510,14 +511,29 @@ async def fetch_and_parse(
             response.raise_for_status()
             raw = response.content
 
-        lower_url = url.lower().split("?")[0]
-        if lower_url.endswith(".csv"):
+        # Detect format from URL path suffix first, then query-string format hints.
+        # WFS endpoints put the format in the query string (e.g. MTQ: ?outputformat=csv),
+        # so the historic path-only check falls through to _parse_xlsx and crashes.
+        parsed = urlparse(url)
+        path_lower = parsed.path.lower()
+        query_params = {
+            k.lower(): [v.lower() for v in vs]
+            for k, vs in parse_qs(parsed.query).items()
+        }
+        query_formats: set[str] = set()
+        for key in ("outputformat", "format", "f"):
+            query_formats.update(query_params.get(key, []))
+
+        def _matches(ext: str, fmt: str) -> bool:
+            return path_lower.endswith(ext) or fmt in query_formats
+
+        if _matches(".csv", "csv"):
             return _parse_csv(raw, skip_rows)
-        elif lower_url.endswith(".xls"):
+        elif _matches(".xls", "xls"):
             return _parse_xls(raw, sheet, skip_rows)
-        elif lower_url.endswith(".geojson"):
+        elif _matches(".geojson", "geojson"):
             return _parse_geojson(raw)
-        elif lower_url.endswith(".json"):
+        elif _matches(".json", "json"):
             return _parse_json(raw)
         elif ircc_parse_config is not None:
             return _parse_ircc_xlsx(raw, sheet=sheet, **ircc_parse_config)

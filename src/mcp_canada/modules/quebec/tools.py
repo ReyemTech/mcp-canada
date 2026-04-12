@@ -353,7 +353,7 @@ async def quebec_get_road_conditions(
     Use for: Winter driving safety — current pavement status, visibility, snow presence across Quebec's road network. Returns bilingual columns based on lang.
     Keywords: quebec, road conditions, winter, mtq, pavement, visibility, driving, conditions routieres, hiver, transports, snow, neige
 
-    Note: Winter-season data. May return empty list in summer. WFS endpoint reliability varies — research flagged LOW confidence.
+    Note: Winter-season data. May return empty list in summer. WFS endpoint confirmed working (phase 16-05 gap closure fixed a parser dispatch bug that previously masked this).
     """
     try:
         rows, cached = await _client.fetch_road_conditions(lang=lang)

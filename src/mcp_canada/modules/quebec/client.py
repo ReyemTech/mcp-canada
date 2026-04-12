@@ -492,17 +492,14 @@ async def fetch_road_conditions(
 ) -> tuple[list[dict[str, Any]], bool]:
     """MTQ winter road conditions via WFS CSV (ms:conditions_routieres).
 
-    LOW confidence on live WFS for this layer (research flagged). If endpoint
-    returns HTTP 400 or errors, returns empty list gracefully.
+    Confirmed working — live MTQ WFS endpoint returns ~100KB of CSV with bilingual columns.
+    Errors propagate to the @tool layer.
     Bilingual columns: DescriptionEtatChausseeFR/EN, DescriptionVisibiliteFR/EN.
     """
     cache_key = f"quebec:mtq:road_cond:{lang}"
 
     async def _fetch() -> list[dict[str, Any]]:
-        try:
-            rows, _ = await fetch_and_parse(MTQ_ROAD_CONDITIONS_URL, ttl=CACHE_TTL_ACTIVE)
-        except Exception:
-            return []
+        rows, _ = await fetch_and_parse(MTQ_ROAD_CONDITIONS_URL, ttl=CACHE_TTL_ACTIVE)
         desc_col = "DescriptionEtatChausseeFR" if lang == "fr" else "DescriptionEtatChausseeEN"
         vis_col = "DescriptionVisibiliteFR" if lang == "fr" else "DescriptionVisibiliteEN"
         out = []

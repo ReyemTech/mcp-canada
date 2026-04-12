@@ -1755,6 +1755,13 @@ class TestQuebecToolScenarios:
             assert "0020" in row["route_num"] or row["route_num"] == "00020", (
                 f"route_num should be zero-padded form '00020', got {row['route_num']}"
             )
+            assert row["route_num"] != "00204", (
+                f"Route 204 row leaked through A-20 filter — substring match bug"
+            )
+            if row.get("route_name"):
+                assert "route 204" not in row["route_name"].lower(), (
+                    f"Route 204 name leaked: {row['route_name']}"
+                )
             assert isinstance(row["structure_type"], str), (
                 f"structure_type must be str, got "
                 f"{type(row['structure_type']).__name__}={row['structure_type']}"

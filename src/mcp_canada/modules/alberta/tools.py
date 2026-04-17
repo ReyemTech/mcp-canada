@@ -122,7 +122,31 @@ async def alberta_search_datasets(
 
     Keywords: alberta open data search ckan datasets discovery catalogue dataset_search find browse query provincial
     """
-    raise NotImplementedError("Plan 02 implements")
+    try:
+        payload, cached = await _client.fetch_search_datasets(
+            q=q,
+            organization=organization,
+            format=format,
+            rows=rows,
+            start=start,
+        )
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Échec de la requête CKAN: {exc}"
+            if lang == "fr"
+            else f"CKAN search failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    # Convert Pydantic summaries to plain dicts for JSON serialisation
+    results_dicts = [r.model_dump() for r in payload.get("results", [])]
+    data = {"count": payload.get("count", 0), "results": results_dicts}
+    return make_response(
+        data=data,
+        api_name=API_NAME_CKAN,
+        api_url=CKAN_BASE_URL + "package_search",
+        cached=cached,
+        lang=lang,
+    )
 
 
 @tool
@@ -136,7 +160,29 @@ async def alberta_get_dataset_details(
 
     Keywords: alberta dataset details package_show ckan resources inspect metadata description extras slug
     """
-    raise NotImplementedError("Plan 02 implements")
+    if not package_id or not package_id.strip():
+        msg = (
+            "package_id est requis"
+            if lang == "fr"
+            else "package_id is required"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang)
+    try:
+        details, cached = await _client.fetch_dataset_details(package_id.strip())
+    except httpx.HTTPStatusError:
+        msg = (
+            f"Jeu de données introuvable: {package_id}"
+            if lang == "fr"
+            else f"Dataset not found: {package_id}"
+        )
+        return make_error("NOT_FOUND", msg, lang=lang)
+    return make_response(
+        data=details.model_dump(),
+        api_name=API_NAME_CKAN,
+        api_url=CKAN_BASE_URL + "package_show",
+        cached=cached,
+        lang=lang,
+    )
 
 
 @tool
@@ -153,7 +199,44 @@ async def alberta_query_dataset(
 
     Keywords: alberta query dataset resource fetch parse esri rest featureserver csv xlsx geojson router auto-detect
     """
-    raise NotImplementedError("Plan 02 implements")
+    if not package_id or not package_id.strip():
+        msg = "package_id est requis" if lang == "fr" else "package_id is required"
+        return make_error("INVALID_INPUT", msg, lang=lang)
+    if resource_index < 0:
+        msg = (
+            "resource_index doit être >= 0"
+            if lang == "fr"
+            else "resource_index must be >= 0"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang)
+    try:
+        payload, cached = await _client.fetch_query_dataset(
+            package_id=package_id.strip(),
+            resource_index=resource_index,
+            where=where,
+            max_records=max(1, min(max_records, 5000)),
+        )
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur lors de la requête: {exc}"
+            if lang == "fr"
+            else f"Query failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    except Exception as exc:  # parser errors, arcgis errors
+        msg = (
+            f"Erreur inattendue: {exc}"
+            if lang == "fr"
+            else f"Unexpected error: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=payload,
+        api_name=API_NAME_CKAN,
+        api_url=payload.get("url", CKAN_BASE_URL),
+        cached=cached,
+        lang=lang,
+    )
 
 
 @tool
@@ -166,7 +249,22 @@ async def alberta_list_organizations(
 
     Keywords: alberta organizations ministries list orgs federated historical crown corp ministry slug catalog provincial
     """
-    raise NotImplementedError("Plan 02 implements")
+    try:
+        orgs, cached = await _client.fetch_organizations()
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur CKAN: {exc}"
+            if lang == "fr"
+            else f"CKAN organization_list failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=[o.model_dump() for o in orgs],
+        api_name=API_NAME_CKAN,
+        api_url=CKAN_BASE_URL + "organization_list",
+        cached=cached,
+        lang=lang,
+    )
 
 
 @tool
@@ -179,7 +277,22 @@ async def alberta_list_categories(
 
     Keywords: alberta categories formats catalog facets list browse classification taxonomy types res_format
     """
-    raise NotImplementedError("Plan 02 implements")
+    try:
+        cats, cached = await _client.fetch_format_categories()
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur CKAN: {exc}"
+            if lang == "fr"
+            else f"CKAN facet search failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=[c.model_dump() for c in cats],
+        api_name=API_NAME_CKAN,
+        api_url=CKAN_BASE_URL + "package_search",
+        cached=cached,
+        lang=lang,
+    )
 
 
 # ---------------------------------------------------------------------------

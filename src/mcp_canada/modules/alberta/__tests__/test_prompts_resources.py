@@ -124,5 +124,117 @@ class TestAlbertaPrompts:
         assert "alberta_get_active_fires" in result
 
 
-class TestAlbertaResources:  # Plan 08 Task 2 — filled below after resources.py
-    pass
+class TestAlbertaResources:
+    async def test_seven_resources_registered(self):
+        """All 7 @resource functions are importable from resources module."""
+        expected = [
+            "alberta_ministries",
+            "alberta_forest_areas",
+            "alberta_ahs_zones",
+            "alberta_aer_data_guide",
+            "alberta_wildfire_data_guide",
+            "alberta_dataset_report_template",
+            "alberta_wildfire_report_template",
+        ]
+        for name in expected:
+            assert hasattr(a_resources, name), f"resources module missing {name}"
+
+    async def test_ministries_returns_valid_json(self):
+        """data://alberta/ministries returns valid JSON with 14 ministries + bilingual labels."""
+        result = await a_resources.alberta_ministries()
+        parsed = json.loads(result)
+        assert isinstance(parsed, dict)
+        assert "ministries" in parsed
+        assert len(parsed["ministries"]) == 14
+        first = parsed["ministries"][0]
+        assert "slug" in first
+        assert "name_en" in first
+        assert "name_fr" in first
+
+    async def test_forest_areas_returns_valid_json_with_ten_entries(self):
+        """data://alberta/forest-areas returns JSON with exactly 10 forest areas."""
+        result = await a_resources.alberta_forest_areas()
+        parsed = json.loads(result)
+        assert isinstance(parsed, dict)
+        assert "forest_areas" in parsed
+        assert len(parsed["forest_areas"]) == 10
+        # Verify the 10 expected FA_NAMEs are present
+        fa_names = {fa["fa_name"] for fa in parsed["forest_areas"]}
+        expected_names = {
+            "High Level", "Fort McMurray", "Peace River", "Slave Lake",
+            "Lac La Biche", "Grande Prairie", "Whitecourt", "Edson",
+            "Rocky Mountain House", "Calgary",
+        }
+        assert fa_names == expected_names
+        # Each entry has area_hectares
+        for fa in parsed["forest_areas"]:
+            assert "area_hectares" in fa
+
+    async def test_ahs_zones_returns_valid_json_with_five_entries(self):
+        """data://alberta/ahs-zones returns JSON with exactly 5 AHS zones + POP2016."""
+        result = await a_resources.alberta_ahs_zones()
+        parsed = json.loads(result)
+        assert isinstance(parsed, dict)
+        assert "zones" in parsed
+        assert len(parsed["zones"]) == 5
+        # Each zone has pop_2006, pop_2011, pop_2016
+        for zone in parsed["zones"]:
+            assert "zone_id" in zone
+            assert "zone_name" in zone
+            assert "pop_2006" in zone
+            assert "pop_2011" in zone
+            assert "pop_2016" in zone
+            assert "name_en" in zone
+            assert "name_fr" in zone
+        # Calgary zone should have largest 2016 population (spot-check data integrity)
+        calgary = next(z for z in parsed["zones"] if z["zone_name"] == "Calgary")
+        assert calgary["pop_2016"] == 1_544_495
+
+    async def test_aer_data_guide_returns_markdown(self):
+        """docs://alberta/aer-data-guide returns non-empty markdown with tool references."""
+        result = await a_resources.alberta_aer_data_guide()
+        assert isinstance(result, str)
+        assert result.startswith("#")
+        assert len(result) > 500
+        # Key AER terminology must be present
+        assert "ST1" in result
+        assert "ST3" in result
+        assert "ST39" in result
+        assert "alberta_get_well_licences_today" in result
+        # Bilingual content inline
+        assert "English" in result or "## English" in result
+        assert "Français" in result or "## Français" in result
+
+    async def test_wildfire_data_guide_returns_markdown_with_ab23_guidance(self):
+        """docs://alberta/wildfire-data-guide mentions water-licence guidance for AB-23."""
+        result = await a_resources.alberta_wildfire_data_guide()
+        assert isinstance(result, str)
+        assert result.startswith("#")
+        assert len(result) > 500
+        # AB-23 water-licence guidance must be present (case-insensitive check)
+        lower = result.lower()
+        assert "water-licence" in lower or "water licence" in lower
+        assert "AB-23" in result
+        # WMBappServices reference
+        assert "WMBappServices" in result
+        # Bilingual
+        assert "Français" in result or "## Français" in result
+
+    async def test_dataset_report_template_has_placeholders(self):
+        """template://alberta/dataset-report returns markdown with {placeholder} syntax."""
+        result = await a_resources.alberta_dataset_report_template()
+        assert isinstance(result, str)
+        assert result.startswith("#")
+        assert "{" in result and "}" in result
+        # Key placeholders
+        assert "{dataset_slug}" in result
+        assert "{total_count}" in result
+
+    async def test_wildfire_report_template_has_placeholders(self):
+        """template://alberta/wildfire-report returns markdown with {placeholder} syntax."""
+        result = await a_resources.alberta_wildfire_report_template()
+        assert isinstance(result, str)
+        assert result.startswith("#")
+        assert "{" in result and "}" in result
+        assert "{active_count}" in result
+        assert "{largest_fire_number}" in result

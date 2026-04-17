@@ -754,15 +754,141 @@ class TestAlbertaHealthFacilitiesTool:  # Plan 05
 
 
 class TestAlbertaRoadEventsTool:  # Plan 06
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_envelope(self):
+        """Happy path: envelope with alberta-511 api_name + /event URL."""
+        from mcp_canada.modules.alberta.constants import FIVE11_BASE_URL
+        from mcp_canada.modules.alberta.tools import alberta_get_road_events
+
+        payload = {
+            "events": [{"ID": "e1", "EventType": "closure"}],
+            "count": 1,
+        }
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_road_events",
+            new=AsyncMock(return_value=(payload, False)),
+        ):
+            out = await alberta_get_road_events()
+        assert "_meta" in out
+        assert out["_meta"]["lang"] == "en"
+        assert out["_meta"]["source"]["api"] == "alberta-511"
+        assert out["_meta"]["source"]["url"] == f"{FIVE11_BASE_URL}/event"
+        assert out["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_forwards_event_type(self):
+        """event_type= passes through to the client unchanged."""
+        from mcp_canada.modules.alberta.tools import alberta_get_road_events
+
+        mock_fetch = AsyncMock(return_value=({"events": [], "count": 0}, False))
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_road_events",
+            new=mock_fetch,
+        ):
+            await alberta_get_road_events(event_type="Construction")
+        assert mock_fetch.call_args.kwargs.get("event_type") == "Construction"
+
+    @pytest.mark.asyncio
+    async def test_french_error_on_upstream(self):
+        """lang='fr' returns French UPSTREAM_ERROR when client raises HTTPStatusError."""
+        from mcp_canada.modules.alberta.tools import alberta_get_road_events
+
+        err = httpx.HTTPStatusError(
+            "boom",
+            request=httpx.Request("GET", "https://511.alberta.ca/api/v2/get/event"),
+            response=httpx.Response(502),
+        )
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_road_events",
+            new=AsyncMock(side_effect=err),
+        ):
+            out = await alberta_get_road_events(lang="fr")
+        assert out["error"]["code"] == "UPSTREAM_ERROR"
+        assert out["error"]["lang"] == "fr"
+        assert "511" in out["error"]["message"]
+        assert "502" in out["error"]["message"]
 
 
 class TestAlbertaWinterRoadConditionsTool:  # Plan 06
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_envelope(self):
+        """Happy path: envelope with /winterroads URL."""
+        from mcp_canada.modules.alberta.constants import FIVE11_BASE_URL
+        from mcp_canada.modules.alberta.tools import (
+            alberta_get_winter_road_conditions,
+        )
+
+        payload = {"conditions": [{"ID": "wr1"}], "count": 1}
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_winter_road_conditions",
+            new=AsyncMock(return_value=(payload, False)),
+        ):
+            out = await alberta_get_winter_road_conditions()
+        assert "_meta" in out
+        assert out["_meta"]["source"]["api"] == "alberta-511"
+        assert out["_meta"]["source"]["url"] == f"{FIVE11_BASE_URL}/winterroads"
+        assert out["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_forwards_area_name(self):
+        """area_name= passes through to the client."""
+        from mcp_canada.modules.alberta.tools import (
+            alberta_get_winter_road_conditions,
+        )
+
+        mock_fetch = AsyncMock(
+            return_value=({"conditions": [], "count": 0}, False)
+        )
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_winter_road_conditions",
+            new=mock_fetch,
+        ):
+            await alberta_get_winter_road_conditions(area_name="Calgary")
+        assert mock_fetch.call_args.kwargs.get("area_name") == "Calgary"
 
 
 class TestAlbertaTrafficCamerasTool:  # Plan 06
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_envelope(self):
+        """Happy path: envelope with /cameras URL."""
+        from mcp_canada.modules.alberta.constants import FIVE11_BASE_URL
+        from mcp_canada.modules.alberta.tools import alberta_get_traffic_cameras
+
+        payload = {
+            "cameras": [
+                {"ID": "c1", "Views": [{"Url": "https://x", "Direction": "N"}]}
+            ],
+            "count": 1,
+        }
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_traffic_cameras",
+            new=AsyncMock(return_value=(payload, False)),
+        ):
+            out = await alberta_get_traffic_cameras()
+        assert "_meta" in out
+        assert out["_meta"]["source"]["api"] == "alberta-511"
+        assert out["_meta"]["source"]["url"] == f"{FIVE11_BASE_URL}/cameras"
+        assert out["data"]["count"] == 1
+        assert out["data"]["cameras"][0]["Views"][0]["Url"] == "https://x"
+
+    @pytest.mark.asyncio
+    async def test_english_error_on_upstream(self):
+        """Default lang='en' returns English UPSTREAM_ERROR when client raises."""
+        from mcp_canada.modules.alberta.tools import alberta_get_traffic_cameras
+
+        err = httpx.HTTPStatusError(
+            "boom",
+            request=httpx.Request("GET", "https://x"),
+            response=httpx.Response(503),
+        )
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_traffic_cameras",
+            new=AsyncMock(side_effect=err),
+        ):
+            out = await alberta_get_traffic_cameras()
+        assert out["error"]["code"] == "UPSTREAM_ERROR"
+        assert out["error"]["lang"] == "en"
+        assert "503" in out["error"]["message"]
 
 
 # ---------------------------------------------------------------------------

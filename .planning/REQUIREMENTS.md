@@ -161,12 +161,12 @@
 - **AB-18**: Agent can get current road events (closures, construction, incidents) from 511 Alberta v2 API at /api/v2/get/event with optional event_type filter
 - **AB-19**: Agent can get current winter road conditions (~1121 records) from 511 Alberta v2 API at /api/v2/get/winterroads with optional area_name filter
 - **AB-20**: Agent can get traffic camera locations and snapshot URLs (~376 cameras) from 511 Alberta v2 API at /api/v2/get/cameras
-- **AB-21**: Agent can get 75 air quality monitoring stations with current pollutant readings (SO2/H2S/TRS/O3/NO2/CO/PM2.5/etc.) from GeoDiscover Alberta AQHI MapServer layer 1
-- **AB-22**: Agent can get water management advisories dispatched by advisory_type: Literal["river","water_management","drought","ice_cover","water_sharing"] from GeoDiscover river forecast centre FeatureServer
+- [x] **AB-21**: Agent can get 75 air quality monitoring stations with current pollutant readings (SO2/H2S/TRS/O3/NO2/CO/PM2.5/etc.) from GeoDiscover Alberta AQHI MapServer layer 1
+- [x] **AB-22**: Agent can get water management advisories dispatched by advisory_type: Literal["river","water_management","drought","ice_cover","water_sharing"] from GeoDiscover river forecast centre FeatureServer
 - [x] **AB-23**: Water licence registry (87MB+ active, 169MB+ inactive) is exposed as discovery-only via alberta_search_datasets / alberta_get_dataset_details with row-filter requirement documented in tool docstring + docs://alberta/wildfire-data-guide resource
-- **AB-24**: Agent can get historical major crop production statistics (2000-2014 Alberta Official Statistic) from open.alberta.ca CKAN major-crop-production-alberta package CSV
-- **AB-25**: Agent can get population estimates with optional breakdown: csd (default) / quarterly / annual / age_sex / sub_provincial / components_of_growth — complementing StatCan (Alberta provides CSD-level municipal; StatCan provides CMA-level only)
-- **AB-26**: Agent can get all Alberta provincial parks and protected areas from GeoDiscover boundary/parks_protected_areas_alberta FeatureServer
+- [x] **AB-24**: Agent can get historical major crop production statistics (2000-2014 Alberta Official Statistic) from open.alberta.ca CKAN major-crop-production-alberta package CSV
+- [x] **AB-25**: Agent can get population estimates with optional breakdown: csd (default) / quarterly / annual / age_sex / sub_provincial / components_of_growth — complementing StatCan (Alberta provides CSD-level municipal; StatCan provides CMA-level only)
+- [x] **AB-26**: Agent can get all Alberta provincial parks and protected areas from GeoDiscover boundary/parks_protected_areas_alberta FeatureServer
 - **AB-27**: All Alberta tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, alberta_ prefix), are discoverable via discover_tools, and 6 prompts + 7 resources are auto-discovered by FileSystemProvider
 
 ## v2 Requirements
@@ -321,12 +321,12 @@
 | AB-18 | Phase 17 | Planned |
 | AB-19 | Phase 17 | Planned |
 | AB-20 | Phase 17 | Planned |
-| AB-21 | Phase 17 | Planned |
-| AB-22 | Phase 17 | Planned |
+| AB-21 | Phase 17 | Complete |
+| AB-22 | Phase 17 | Complete |
 | AB-23 | Phase 17 | Complete |
-| AB-24 | Phase 17 | Planned |
-| AB-25 | Phase 17 | Planned |
-| AB-26 | Phase 17 | Planned |
+| AB-24 | Phase 17 | Complete |
+| AB-25 | Phase 17 | Complete |
+| AB-26 | Phase 17 | Complete |
 | AB-27 | Phase 17 | Planned |
 
 **Coverage:**

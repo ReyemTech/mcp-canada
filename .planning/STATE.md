@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 17-07-PLAN.md
-last_updated: "2026-04-17T19:17:11.666Z"
+stopped_at: Completed 17-08-PLAN.md
+last_updated: "2026-04-17T19:27:21.041Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 11
   total_plans: 48
-  completed_plans: 46
+  completed_plans: 47
   percent: 0
 ---
 
@@ -94,6 +94,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 17-alberta-government-open-data P04 | 13min | 2 tasks | 4 files |
 | Phase 17 P06 | 4min | 2 tasks | 4 files |
 | Phase 17-alberta-government-open-data P07 | 6min | 2 tasks | 4 files |
+| Phase 17-alberta-government-open-data P08 | 6min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -220,6 +221,8 @@ Recent decisions affecting current work:
 - [Phase 17-alberta-government-open-data]: Plan 07: Distinct GeoDiscover api_name per tool (alberta-geodiscover-aqhi/water/parks) for finer envelope source attribution
 - [Phase 17-alberta-government-open-data]: Plan 07: WATER_ADVISORY_LAYERS + POPULATION_BREAKDOWN_HINTS dispatch tables live in client.py (implementation detail, not shared constants)
 - [Phase 17-alberta-government-open-data]: Plan 07: fetch_population_estimates breakdown Literal aligned to 'annual' (not Wave 0 'cma') — matches research § AB-25 and avoids StatCan CMA overlap
+- [Phase 17-alberta-government-open-data]: Plan 08: Kept alberta quick-lookup prompts at lang-only signatures — honors Plan 01 'signatures locked at Wave 0' invariant and matches BC/Quebec precedent
+- [Phase 17-alberta-government-open-data]: Plan 08: AB-23 water-licence guidance placed in docs://alberta/wildfire-data-guide as documentation-only — resources too large (87MB+ active, 169MB+ inactive) for alberta_query_dataset; agents directed to external download tools
 
 ### Roadmap Evolution
 
@@ -247,6 +250,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-17T19:17:11.663Z
-Stopped at: Completed 17-07-PLAN.md
+Last session: 2026-04-17T19:27:21.036Z
+Stopped at: Completed 17-08-PLAN.md
 Resume file: None

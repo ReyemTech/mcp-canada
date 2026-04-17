@@ -167,7 +167,7 @@
 - [x] **AB-24**: Agent can get historical major crop production statistics (2000-2014 Alberta Official Statistic) from open.alberta.ca CKAN major-crop-production-alberta package CSV
 - [x] **AB-25**: Agent can get population estimates with optional breakdown: csd (default) / quarterly / annual / age_sex / sub_provincial / components_of_growth — complementing StatCan (Alberta provides CSD-level municipal; StatCan provides CMA-level only)
 - [x] **AB-26**: Agent can get all Alberta provincial parks and protected areas from GeoDiscover boundary/parks_protected_areas_alberta FeatureServer
-- **AB-27**: All Alberta tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, alberta_ prefix), are discoverable via discover_tools, and 6 prompts + 7 resources are auto-discovered by FileSystemProvider
+- [x] **AB-27**: All Alberta tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, alberta_ prefix), are discoverable via discover_tools, and 6 prompts + 7 resources are auto-discovered by FileSystemProvider
 
 ## v2 Requirements
 
@@ -327,7 +327,7 @@
 | AB-24 | Phase 17 | Complete |
 | AB-25 | Phase 17 | Complete |
 | AB-26 | Phase 17 | Complete |
-| AB-27 | Phase 17 | Planned |
+| AB-27 | Phase 17 | Complete |
 
 **Coverage:**
 - v1 requirements: 73 total (added 27 Alberta requirements in Phase 17)

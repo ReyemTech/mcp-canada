@@ -1110,10 +1110,122 @@ class TestAlbertaProvincialParksTool:  # Plan 07
 # Parametrized phase-wide tests — Plan 09
 # ---------------------------------------------------------------------------
 
+# (tool_name, client_fn_attribute_on_alberta.client, sample_kwargs, sample_client_return)
+#
+# Count check: 5 discovery + 4 AER + 4 wildfire + 3 health + 3 transport + 5 env/agri/demo/parks = 24
+ALL_ALBERTA_TOOLS: list[tuple[str, str, dict, tuple]] = [
+    # Discovery (Plan 02) — 5
+    ("alberta_search_datasets", "fetch_search_datasets", {"q": ""}, ({"count": 0, "results": []}, False)),
+    ("alberta_get_dataset_details", "fetch_dataset_details", {"package_id": "x"},
+     (AlbertaDatasetDetails(id="x", name="x", title="X", resources=[]), False)),
+    ("alberta_query_dataset", "fetch_query_dataset", {"package_id": "x"},
+     ({"data": [], "format": "CSV", "url": "u"}, False)),
+    ("alberta_list_organizations", "fetch_organizations", {}, ([], False)),
+    ("alberta_list_categories", "fetch_format_categories", {}, ([], False)),
+    # AER / energy (Plan 03) — 4
+    ("alberta_get_well_licences_today", "fetch_well_licences_today", {}, ([], False)),
+    ("alberta_get_well_licences_archive", "fetch_well_licences_archive",
+     {"year": 2024, "month": 1}, ({"url": "x", "year": 2024, "month": 1}, False)),
+    ("alberta_get_pipeline_statistics", "fetch_pipeline_statistics", {"year": 2024}, ([], False)),
+    ("alberta_get_production_volumes", "fetch_production_volumes", {"product": "Gas"}, ([], False)),
+    # Wildfire (Plan 04) — 4
+    ("alberta_get_active_fires", "fetch_active_fires", {},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    ("alberta_get_fire_perimeters", "fetch_fire_perimeters", {"status": "active"},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    ("alberta_get_fire_bans", "fetch_fire_bans", {},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    ("alberta_get_fire_control_orders", "fetch_fire_control_orders", {"category": "fire_control"},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    # Health (Plan 05) — 3
+    ("alberta_get_hospitals", "fetch_hospitals", {},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    ("alberta_get_ahs_zones", "fetch_ahs_zones", {},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    ("alberta_get_health_facilities", "fetch_health_facilities", {"facility_type": "ems"},
+     ({"features": [], "count": 0, "truncated": False, "facility_type": "ems"}, False)),
+    # Transport / 511 (Plan 06) — 3
+    ("alberta_get_road_events", "fetch_road_events", {},
+     ({"events": [], "count": 0}, False)),
+    ("alberta_get_winter_road_conditions", "fetch_winter_road_conditions", {},
+     ({"conditions": [], "count": 0}, False)),
+    ("alberta_get_traffic_cameras", "fetch_traffic_cameras", {},
+     ({"cameras": [], "count": 0}, False)),
+    # Environment / agriculture / demographics / parks (Plan 07) — 5
+    ("alberta_get_air_quality_stations", "fetch_air_quality_stations", {},
+     ({"stations": [], "count": 0, "truncated": False}, False)),
+    ("alberta_get_water_advisories", "fetch_water_advisories", {"advisory_type": "river"},
+     ({"advisories": [], "count": 0, "truncated": False, "advisory_type": "river"}, False)),
+    ("alberta_get_crop_production", "fetch_crop_production", {},
+     ({"rows": [], "count": 0, "source_url": "https://open.alberta.ca/x.csv"}, False)),
+    ("alberta_get_population_estimates", "fetch_population_estimates", {"breakdown": "csd"},
+     ({"rows": [], "count": 0, "breakdown": "csd"}, False)),
+    ("alberta_get_provincial_parks", "fetch_provincial_parks", {},
+     ({"parks": [], "count": 0, "truncated": False}, False)),
+]
 
-class TestAlbertaEnvelopes:  # Plan 09 — parametrized over all 24 tools
-    pass
+# Sanity: count must equal 24 (5 + 4 + 4 + 3 + 3 + 5)
+assert len(ALL_ALBERTA_TOOLS) == 24, (
+    f"ALL_ALBERTA_TOOLS must have 24 entries (got {len(ALL_ALBERTA_TOOLS)}) — "
+    "adding or removing alberta tools requires updating this list in lockstep"
+)
 
 
-class TestAlbertaLangParam:  # Plan 09 — parametrized over all 24 tools
-    pass
+class TestAlbertaEnvelopes:
+    """Plan 09 — parametrized over all 24 tools; verifies _meta envelope shape."""
+
+    @pytest.mark.parametrize(
+        ("tool_name", "client_fn", "kwargs", "client_return"),
+        ALL_ALBERTA_TOOLS,
+        ids=[t[0] for t in ALL_ALBERTA_TOOLS],
+    )
+    @pytest.mark.asyncio
+    async def test_envelope_structure(
+        self, tool_name: str, client_fn: str, kwargs: dict, client_return: tuple
+    ):
+        """Every tool returns `_meta` with {source.api, source.url, cached, lang, timestamp}."""
+        from mcp_canada.modules.alberta import tools
+
+        tool_fn = getattr(tools, tool_name)
+        with patch(
+            f"mcp_canada.modules.alberta.tools._client.{client_fn}",
+            new=AsyncMock(return_value=client_return),
+        ):
+            result = await tool_fn(**kwargs, lang="en")
+
+        assert "_meta" in result, f"{tool_name} missing _meta envelope"
+        meta = result["_meta"]
+        for key in ("source", "cached", "lang", "timestamp"):
+            assert key in meta, f"{tool_name} _meta missing '{key}'"
+        assert "api" in meta["source"], f"{tool_name} _meta.source missing 'api'"
+        assert "url" in meta["source"], f"{tool_name} _meta.source missing 'url'"
+        assert meta["lang"] == "en", (
+            f"{tool_name} should default _meta.lang to 'en', got {meta['lang']!r}"
+        )
+
+
+class TestAlbertaLangParam:
+    """Plan 09 — parametrized over all 24 tools; verifies lang='fr' propagation to _meta.lang."""
+
+    @pytest.mark.parametrize(
+        ("tool_name", "client_fn", "kwargs", "client_return"),
+        ALL_ALBERTA_TOOLS,
+        ids=[t[0] for t in ALL_ALBERTA_TOOLS],
+    )
+    @pytest.mark.asyncio
+    async def test_lang_propagation(
+        self, tool_name: str, client_fn: str, kwargs: dict, client_return: tuple
+    ):
+        """Every tool propagates `lang='fr'` to the `_meta.lang` field on success."""
+        from mcp_canada.modules.alberta import tools
+
+        tool_fn = getattr(tools, tool_name)
+        with patch(
+            f"mcp_canada.modules.alberta.tools._client.{client_fn}",
+            new=AsyncMock(return_value=client_return),
+        ):
+            result = await tool_fn(**kwargs, lang="fr")
+
+        assert result.get("_meta", {}).get("lang") == "fr", (
+            f"{tool_name} did not propagate lang='fr' to _meta.lang — got {result.get('_meta')}"
+        )

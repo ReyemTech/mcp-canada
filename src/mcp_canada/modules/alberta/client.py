@@ -743,39 +743,162 @@ async def fetch_production_volumes(
 # ---------------------------------------------------------------------------
 
 
+# Module-level WMB limiter — shared by all 4 wildfire fetchers (5 r/s)
+_wmb_limiter = get_limiter(RATE_GROUP_WMB, RATE_LIMIT_WMB)
+
+
 async def fetch_active_fires(
     status: str | None = None,
     max_records: int = 5000,
     include_geometry: bool = False,
-) -> tuple[list[AlbertaActiveFire], bool]:
-    """Current active wildfires from WMBappServices Active_Wildfires_Dashboard_view. Filled by Plan 04."""
-    raise NotImplementedError("Plan 04 implements")
+) -> tuple[dict[str, Any], bool]:
+    """Current active wildfires from WMBappServices Active_Wildfires_Dashboard_view (layer 0).
+
+    Uses `shared/arcgis_hub.query_feature_service` — WMBappServices is a public
+    ArcGIS Online org (`Eb8P5h4CJk8utIBz`) and does NOT require a token, unlike
+    GeoDiscover's wildfire folder (Pitfall 3). Optional status= pushes through
+    as a WHERE filter (`FIRE_STATUS='<status>'`); None returns all active fires.
+
+    Returns:
+        `({"features": list, "truncated": bool, "count": int}, was_cached)` —
+        `truncated=True` when the 5000-record cap was hit with more available.
+    """
+    where = f"FIRE_STATUS='{status}'" if status else None
+    cache_key = (
+        f"{CACHE_KEY_PREFIX}wmb:active_fires:{status}:{max_records}:{include_geometry}"
+    )
+
+    async def _fetch() -> dict[str, Any]:
+        await _wmb_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            ACTIVE_WILDFIRES_FS_URL,
+            0,
+            where=where,
+            out_fields="*",
+            include_geometry=include_geometry,
+            max_records=max_records,
+        )
+        return {"features": features, "truncated": truncated, "count": len(features)}
+
+    return await cached_fetch(cache_key, CACHE_TTL_LIVE, _fetch)
 
 
 async def fetch_fire_perimeters(
     status: Literal["active", "extinguished"] = "active",
-    year: int | None = None,
     max_records: int = 5000,
     include_geometry: bool = False,
-) -> tuple[list[AlbertaFirePerimeter], bool]:
-    """Fire perimeters from WMB Active_/Extinguished_Wildfire_Perimeters_Simplified_view. Filled by Plan 04."""
-    raise NotImplementedError("Plan 04 implements")
+) -> tuple[dict[str, Any], bool]:
+    """Fire perimeters from WMB Active_/Extinguished_Wildfire_Perimeters_Simplified_view.
+
+    Dispatches by status:
+      - "active"        → ACTIVE_FIRE_PERIMETERS_FS_URL (LIVE 5-min cache)
+      - "extinguished"  → EXTINGUISHED_PERIMETERS_FS_URL (STATIC 24h cache)
+
+    Raises:
+        ValueError: If `status` is not "active" or "extinguished".
+    """
+    if status == "active":
+        url = ACTIVE_FIRE_PERIMETERS_FS_URL
+        ttl = CACHE_TTL_LIVE
+    elif status == "extinguished":
+        url = EXTINGUISHED_PERIMETERS_FS_URL
+        ttl = CACHE_TTL_STATIC
+    else:
+        raise ValueError(
+            f"status must be 'active' or 'extinguished', got '{status}'"
+        )
+
+    cache_key = (
+        f"{CACHE_KEY_PREFIX}wmb:perimeters:{status}:{max_records}:{include_geometry}"
+    )
+
+    async def _fetch() -> dict[str, Any]:
+        await _wmb_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            url,
+            0,
+            where=None,
+            out_fields="*",
+            include_geometry=include_geometry,
+            max_records=max_records,
+        )
+        return {"features": features, "truncated": truncated, "count": len(features)}
+
+    return await cached_fetch(cache_key, ttl, _fetch)
 
 
 async def fetch_fire_bans(
     max_records: int = 5000,
     include_geometry: bool = False,
-) -> tuple[list[AlbertaFireBan], bool]:
-    """Fire bans and restrictions from WMB alberta_fire_ban_system FeatureServer. Filled by Plan 04."""
-    raise NotImplementedError("Plan 04 implements")
+) -> tuple[dict[str, Any], bool]:
+    """Province-wide fire ban registry from WMB alberta_fire_ban_system FeatureServer.
+
+    Same data backing the public albertafirebans.ca SPA dashboard (research
+    confirmed it's federated and public). 5-minute cache because bans can be
+    issued/lifted during active fire events.
+    """
+    cache_key = (
+        f"{CACHE_KEY_PREFIX}wmb:fire_bans:{max_records}:{include_geometry}"
+    )
+
+    async def _fetch() -> dict[str, Any]:
+        await _wmb_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            FIRE_BAN_SYSTEM_FS_URL,
+            0,
+            where=None,
+            out_fields="*",
+            include_geometry=include_geometry,
+            max_records=max_records,
+        )
+        return {"features": features, "truncated": truncated, "count": len(features)}
+
+    return await cached_fetch(cache_key, CACHE_TTL_LIVE, _fetch)
 
 
 async def fetch_fire_control_orders(
+    category: Literal["fire_control", "ohv_restriction", "forest_area"] = "fire_control",
     max_records: int = 5000,
     include_geometry: bool = False,
-) -> tuple[list[AlbertaFireControlOrder], bool]:
-    """Fire Control Orders from WMB Fire_Control_Orders_Prod_View2. Filled by Plan 04."""
-    raise NotImplementedError("Plan 04 implements")
+) -> tuple[dict[str, Any], bool]:
+    """Fire control orders / OHV restrictions / forest area boundaries from WMBappServices.
+
+    Dispatches by category:
+      - "fire_control"    → FIRE_CONTROL_ORDERS_FS_URL (LIVE 5-min cache)
+      - "ohv_restriction" → OHV_RESTRICTION_FS_URL (LIVE 5-min cache)
+      - "forest_area"     → FOREST_AREA_FS_URL (STATIC 24h cache — 10 Alberta
+                            forest areas; stable reference data)
+
+    Raises:
+        ValueError: If `category` is not one of the 3 accepted values.
+    """
+    url_map: dict[str, tuple[str, int]] = {
+        "fire_control": (FIRE_CONTROL_ORDERS_FS_URL, CACHE_TTL_LIVE),
+        "ohv_restriction": (OHV_RESTRICTION_FS_URL, CACHE_TTL_LIVE),
+        "forest_area": (FOREST_AREA_FS_URL, CACHE_TTL_STATIC),
+    }
+    if category not in url_map:
+        raise ValueError(
+            f"category must be one of {list(url_map)}, got '{category}'"
+        )
+    url, ttl = url_map[category]
+    cache_key = (
+        f"{CACHE_KEY_PREFIX}wmb:fco:{category}:{max_records}:{include_geometry}"
+    )
+
+    async def _fetch() -> dict[str, Any]:
+        await _wmb_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            url,
+            0,
+            where=None,
+            out_fields="*",
+            include_geometry=include_geometry,
+            max_records=max_records,
+        )
+        return {"features": features, "truncated": truncated, "count": len(features)}
+
+    return await cached_fetch(cache_key, ttl, _fetch)
 
 
 # ---------------------------------------------------------------------------

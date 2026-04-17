@@ -597,15 +597,155 @@ class TestAlbertaFireControlOrdersTool:  # Plan 04
 
 
 class TestAlbertaHospitalsTool:  # Plan 05
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_envelope(self):
+        """Happy path — returns `_meta` envelope with alberta-ahs-arcgis api and hospital payload."""
+        from mcp_canada.modules.alberta.tools import alberta_get_hospitals
+
+        payload = {
+            "features": [
+                {
+                    "Location": "Foothills Medical Centre",
+                    "Hospital_N": "Foothills",
+                    "IP": 1,
+                    "ED": 1,
+                },
+            ],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_hospitals",
+            new=AsyncMock(return_value=(payload, False)),
+        ):
+            out = await alberta_get_hospitals()
+        assert "_meta" in out
+        assert out["_meta"]["source"]["api"] == "alberta-ahs-arcgis"
+        assert out["_meta"]["lang"] == "en"
+        assert out["data"]["count"] == 1
+        assert out["data"]["features"][0]["IP"] == 1
+        assert out["data"]["features"][0]["ED"] == 1
+
+    @pytest.mark.asyncio
+    async def test_french_error_on_upstream(self):
+        """lang='fr' returns French UPSTREAM_ERROR when the client raises HTTPStatusError."""
+        from mcp_canada.modules.alberta.tools import alberta_get_hospitals
+
+        err = httpx.HTTPStatusError(
+            "boom",
+            request=httpx.Request("GET", "https://x"),
+            response=httpx.Response(500),
+        )
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_hospitals",
+            new=AsyncMock(side_effect=err),
+        ):
+            out = await alberta_get_hospitals(lang="fr")
+        assert "error" in out
+        assert out["error"]["code"] == "UPSTREAM_ERROR"
+        assert out["error"]["lang"] == "fr"
+        msg = out["error"]["message"].lower()
+        assert any(w in msg for w in ("échec", "erreur"))
 
 
 class TestAlbertaAhsZonesTool:  # Plan 05
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_envelope(self):
+        """Happy path — 5-zone payload flows through with correct api_url."""
+        from mcp_canada.modules.alberta.tools import alberta_get_ahs_zones
+        from mcp_canada.modules.alberta.constants import AHS_ZONE_FS_URL
+
+        payload = {
+            "features": [
+                {
+                    "zone_name": "Calgary",
+                    "zone_id": "Z2",
+                    "pop_2006": 1_200_000,
+                    "pop_2011": 1_400_000,
+                    "pop_2016": 1_500_000,
+                },
+            ],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_ahs_zones",
+            new=AsyncMock(return_value=(payload, False)),
+        ):
+            out = await alberta_get_ahs_zones()
+        assert "_meta" in out
+        assert out["_meta"]["source"]["url"] == AHS_ZONE_FS_URL
+        assert out["data"]["features"][0]["pop_2016"] == 1_500_000
 
 
 class TestAlbertaHealthFacilitiesTool:  # Plan 05
-    pass
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("facility_type", "expected_url_const"),
+        [
+            ("ems", "AHS_EMS_FS_URL"),
+            ("pcn_clinic", "PCN_CLINICS_FS_URL"),
+        ],
+    )
+    async def test_facility_type_dispatch(self, facility_type, expected_url_const):
+        """facility_type= routes to the right AHSGIS FeatureServer and sets api_url accordingly."""
+        from mcp_canada.modules.alberta import constants as ab_constants
+        from mcp_canada.modules.alberta.tools import alberta_get_health_facilities
+
+        payload = {
+            "features": [],
+            "count": 0,
+            "truncated": False,
+            "facility_type": facility_type,
+        }
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_health_facilities",
+            new=mock_fetch,
+        ):
+            out = await alberta_get_health_facilities(facility_type=facility_type)
+        assert "_meta" in out
+        assert out["_meta"]["source"]["url"] == getattr(ab_constants, expected_url_const)
+        kwargs = mock_fetch.call_args.kwargs
+        assert kwargs.get("facility_type") == facility_type
+
+    @pytest.mark.asyncio
+    async def test_invalid_facility_type_returns_invalid_input(self):
+        """Invalid facility_type returns INVALID_INPUT without calling the client."""
+        from mcp_canada.modules.alberta.tools import alberta_get_health_facilities
+
+        mock_client = AsyncMock()
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_health_facilities",
+            new=mock_client,
+        ):
+            out = await alberta_get_health_facilities(facility_type="bogus")  # type: ignore[arg-type]
+        assert out.get("error", {}).get("code") == "INVALID_INPUT"
+        assert out["error"].get("valid") == ["ems", "pcn_clinic"]
+        mock_client.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_invalid_facility_type_french_message(self):
+        """Invalid facility_type + lang='fr' returns French error message."""
+        from mcp_canada.modules.alberta.tools import alberta_get_health_facilities
+
+        out = await alberta_get_health_facilities(
+            facility_type="bogus",  # type: ignore[arg-type]
+            lang="fr",
+        )
+        assert out["error"]["code"] == "INVALID_INPUT"
+        assert out["error"]["lang"] == "fr"
+        # Contains French wording for "invalid"
+        assert "invalide" in out["error"]["message"].lower()
+
+    def test_docstring_mentions_er_wait_times_deferred(self):
+        """Pitfall 9: tool must document that ER wait times are NOT included (widget-only)."""
+        from mcp_canada.modules.alberta import tools
+
+        doc = tools.alberta_get_health_facilities.__doc__ or ""
+        # Must mention ER wait times and widget-only caveat
+        doc_lower = doc.lower()
+        assert "wait" in doc_lower or "widget" in doc_lower
 
 
 # ---------------------------------------------------------------------------

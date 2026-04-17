@@ -139,6 +139,36 @@
 - **PR-19**: README updated with prompt catalog (~60 prompts) and resource catalog (~80-100 resources)
 - **PR-20**: CLAUDE.md updated with 7-file module pattern and prompt/resource coding conventions
 
+### Alberta Government Open Data
+
+- **AB-01**: Agent can search Alberta's open.alberta.ca CKAN catalogue (33,269 datasets) by keyword with optional `organization`, `format`, and pagination filters
+- **AB-02**: Agent can get full details for an Alberta dataset by id/slug, including resources list with format and URL — flattening 50+ Alberta CKAN extras (publication identifiers) to the agent-useful subset
+- **AB-03**: Agent can query a dataset (file resource OR live ESRI REST FeatureServer) via auto-router — routes ESRI REST → arcgis_hub.query_feature_service; CSV/XLSX/JSON → fetch_and_parse; PDF/ZIP/KML → metadata-only; FeatureServer preferred over MapServer
+- **AB-04**: Agent can list 370 federated Alberta organizations (current ministries + ~150 historical predecessor ministries + Crown corps + advisory committees)
+- **AB-05**: Agent can list dataset format categories — Alberta CKAN does NOT use groups (group_list returns empty); uses res_format facet via package_search
+- **AB-06**: Agent can fetch today's AER ST1 daily well licences from static.aer.ca/prd/data/well-lic/WELLS{day}.TXT (rotates by day-of-week, fixed-width plain-text parsed inline)
+- **AB-07**: Agent can get the AER ST1 monthly archive ZIP URL by year/month (discovery-only — files are large fixed-width TXT, not auto-parsed)
+- **AB-08**: Agent can fetch AER ST39 annual pipeline statistics XLSX for a verified year (length by substance/operator)
+- **AB-09**: Agent can fetch AER ST3 monthly oil/gas/bitumen production volumes for one of 7 verified products (Butane/Ethane/NGL/Oil/Gas/Propane/Sulphur — case-sensitive, Pitfall 8)
+- **AB-10**: Agent can get current active wildfires from WMBappServices Active_Wildfires_Dashboard_view FeatureServer with optional fire_status filter
+- **AB-11**: Agent can get wildfire perimeters dispatched by status: Literal["active","extinguished"] from WMBappServices simplified-view FeatureServers
+- **AB-12**: Historical wildfire data (2006-current CSV) is documented as routed via alberta_query_dataset (CKAN wildfire-data package) — NO dedicated tool
+- **AB-13**: Agent can get current province-wide fire bans from WMBappServices alberta_fire_ban_system FeatureServer (the data backend behind albertafirebans.ca)
+- **AB-14**: Agent can get fire control orders, OHV restrictions, and forest area boundaries via single tool dispatched by category param (replaces deferred alberta_get_fire_weather since FWI is not publicly published)
+- **AB-15**: Agent can get 101 AHS hospitals with zone/IP/ED capability flags from AHSGIS AHS_Hospitals FeatureServer
+- **AB-16**: Agent can get EMS station OR PCN clinic locations from AHSGIS via single tool dispatched by facility_type param (subsumes deferred ER wait times — Pitfall 9)
+- **AB-17**: Agent can get 5 AHS zone boundaries (South, Calgary, Central, Edmonton, North) with POP2006/2011/2016 population from AHS_Zone FeatureServer
+- **AB-18**: Agent can get current road events (closures, construction, incidents) from 511 Alberta v2 API at /api/v2/get/event with optional event_type filter
+- **AB-19**: Agent can get current winter road conditions (~1121 records) from 511 Alberta v2 API at /api/v2/get/winterroads with optional area_name filter
+- **AB-20**: Agent can get traffic camera locations and snapshot URLs (~376 cameras) from 511 Alberta v2 API at /api/v2/get/cameras
+- **AB-21**: Agent can get 75 air quality monitoring stations with current pollutant readings (SO2/H2S/TRS/O3/NO2/CO/PM2.5/etc.) from GeoDiscover Alberta AQHI MapServer layer 1
+- **AB-22**: Agent can get water management advisories dispatched by advisory_type: Literal["river","water_management","drought","ice_cover","water_sharing"] from GeoDiscover river forecast centre FeatureServer
+- **AB-23**: Water licence registry (87MB+ active, 169MB+ inactive) is exposed as discovery-only via alberta_search_datasets / alberta_get_dataset_details with row-filter requirement documented in tool docstring + docs://alberta/wildfire-data-guide resource
+- **AB-24**: Agent can get historical major crop production statistics (2000-2014 Alberta Official Statistic) from open.alberta.ca CKAN major-crop-production-alberta package CSV
+- **AB-25**: Agent can get population estimates with optional breakdown: csd (default) / quarterly / annual / age_sex / sub_provincial / components_of_growth — complementing StatCan (Alberta provides CSD-level municipal; StatCan provides CMA-level only)
+- **AB-26**: Agent can get all Alberta provincial parks and protected areas from GeoDiscover boundary/parks_protected_areas_alberta FeatureServer
+- **AB-27**: All Alberta tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, alberta_ prefix), are discoverable via discover_tools, and 6 prompts + 7 resources are auto-discovered by FileSystemProvider
+
 ## v2 Requirements
 
 ### Extended Datastore
@@ -271,17 +301,45 @@
 | PR-18 | Phase 40 | Planned |
 | PR-19 | Phase 40 | Planned |
 | PR-20 | Phase 40 | Planned |
+| AB-01 | Phase 17 | Planned |
+| AB-02 | Phase 17 | Planned |
+| AB-03 | Phase 17 | Planned |
+| AB-04 | Phase 17 | Planned |
+| AB-05 | Phase 17 | Planned |
+| AB-06 | Phase 17 | Planned |
+| AB-07 | Phase 17 | Planned |
+| AB-08 | Phase 17 | Planned |
+| AB-09 | Phase 17 | Planned |
+| AB-10 | Phase 17 | Planned |
+| AB-11 | Phase 17 | Planned |
+| AB-12 | Phase 17 | Planned |
+| AB-13 | Phase 17 | Planned |
+| AB-14 | Phase 17 | Planned |
+| AB-15 | Phase 17 | Planned |
+| AB-16 | Phase 17 | Planned |
+| AB-17 | Phase 17 | Planned |
+| AB-18 | Phase 17 | Planned |
+| AB-19 | Phase 17 | Planned |
+| AB-20 | Phase 17 | Planned |
+| AB-21 | Phase 17 | Planned |
+| AB-22 | Phase 17 | Planned |
+| AB-23 | Phase 17 | Planned |
+| AB-24 | Phase 17 | Planned |
+| AB-25 | Phase 17 | Planned |
+| AB-26 | Phase 17 | Planned |
+| AB-27 | Phase 17 | Planned |
 
 **Coverage:**
-- v1 requirements: 46 total (added 14 York Region requirements in Phase 14)
-- Mapped to phases: 46
+- v1 requirements: 73 total (added 27 Alberta requirements in Phase 17)
+- Mapped to phases: 73
 - Unmapped: 0
 - York Region requirements: 14 total (Phase 14)
 - IRCC requirements: 9 total (Phase 11)
 - Ontario requirements: 8 total (Phase 12)
 - Toronto requirements: 12 total (Phase 13)
+- Alberta requirements: 27 total (Phase 17)
 - Prompts & Resources requirements: 20 total (Phase 40)
 
 ---
 *Requirements defined: 2026-04-07*
-*Last updated: 2026-04-09 after Phase 40 planning*
+*Last updated: 2026-04-17 after Phase 17 planning*

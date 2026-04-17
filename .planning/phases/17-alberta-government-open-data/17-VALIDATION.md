@@ -1,8 +1,8 @@
 ---
 phase: 17
 slug: alberta-government-open-data
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-04-17
 ---
@@ -40,48 +40,48 @@ created: 2026-04-17
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 17-01-XX | 01 | 0 | Wave 0 fixtures + stubs | unit | `uv run pytest src/mcp_canada/modules/alberta/__tests__/ -x` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-01 search_datasets shape | unit (mocked api_get) | `...::TestAlbertaSearchDatasets` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-01 format= filter via fq=res_format: | unit | `...::TestAlbertaSearchDatasets::test_format_filter` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-02 get_dataset_details flattens 50+ extras | unit | `...::TestAlbertaGetDatasetDetails` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-03 query_dataset routes ESRI REST → arcgis_hub | unit (mocked) | `...::TestAlbertaQueryDataset::test_routes_esri_rest_to_feature_server` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-03 query_dataset routes CSV → fetch_and_parse | unit (mocked) | `...::TestAlbertaQueryDataset::test_routes_csv_to_fetch_and_parse` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-03 query_dataset returns metadata-only for PDF/ZIP | unit | `...::TestAlbertaQueryDataset::test_pdf_returns_metadata_only` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-04 list_organizations returns 370 orgs | unit | `...::TestAlbertaListOrganizations` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-05 list_categories uses package_search facet (NOT group_list) | unit | `...::TestAlbertaListCategories::test_uses_format_facet` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-06..AB-09 AER tools (ST1, ST3, ST39 fetch from static URLs) | unit (mocked fetch_and_parse) | `...::TestAlbertaAER` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-08 ST3 invalid product → INVALID_INPUT (FR when lang=fr) | unit | `...::TestAlbertaProduction::test_invalid_product_french_error` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-10 active_fires calls correct WMB FeatureServer | unit (mocked arcgis_hub) | `...::TestAlbertaActiveFires` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-10 fire status filter passes through CQL/WHERE | unit | `...::TestAlbertaActiveFires::test_status_filter` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-11 fire_perimeters dispatches by status Literal | unit | `...::TestAlbertaFirePerimeters` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-13 fire_bans returns ban registry | unit | `...::TestAlbertaFireBans` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-15 hospitals returns 101 with IP/ED flags | unit | `...::TestAlbertaHospitals` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-17 ahs_zones returns 5 zones with population | unit | `...::TestAlbertaAhsZones` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-18 road_events calls 511 v2 endpoint correctly | unit (mocked api_get) | `...::TestAlbertaRoadEvents` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-18 road_events event_type= filter | unit | `...::TestAlbertaRoadEvents::test_event_type_filter` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-19 winter_road_conditions correct endpoint | unit | `...::TestAlbertaWinterRoadConditions` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-20 traffic_cameras returns 376 cameras | unit | `...::TestAlbertaTrafficCameras` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-21 air_quality_stations returns 75 stations | unit | `...::TestAlbertaAirQuality` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-22 water_advisories dispatches by advisory_type | unit | `...::TestAlbertaWaterAdvisories` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-25 population_estimates defaults to CSD breakdown | unit | `...::TestAlbertaPopulation` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 1+ | AB-26 provincial_parks calls GeoDiscover FeatureServer | unit | `...::TestAlbertaProvincialParks` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | last | AB-27 all 22 tools return _meta envelope | unit (parametrized) | `...::TestAlbertaEnvelopes` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | last | AB-27 all 22 tools propagate lang parameter | unit (parametrized) | `...::TestAlbertaLangParam` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 0+1 | INF _api_get treats api_get return as parsed dict | unit | `...::TestSharedApiGetContract` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | 0+1 | INF _api_get raises on success=False | unit | `...::TestSharedApiGetContract::test_ckan_success_false_raises` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | last | INF all 22 tools have 8+ Keywords + Use-for | quality (auto-discovered) | `uv run pytest src/mcp_canada/__tests__/test_quality.py -x` | ✅ exists | ⬜ pending |
-| 17-XX-XX | XX | last | AB-01 INTEGRATION live search returns wildfire results | integration | `...::TestAlbertaToolScenarios -v -m integration --timeout=30 -k search` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | last | AB-10 INTEGRATION live active_fires returns _meta envelope | integration | `...::TestAlbertaToolScenarios -k active_fires` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | last | AB-15 INTEGRATION live hospitals returns ~101 hospitals | integration | `...::TestAlbertaToolScenarios -k hospitals` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | last | AB-18 INTEGRATION live road_events returns event list | integration | `...::TestAlbertaToolScenarios -k road_events` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | last | AB-09 INTEGRATION live AER ST3 Gas_current.xlsx parses | integration | `...::TestAlbertaToolScenarios -k production_volumes` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | last | AB-27 INTEGRATION discover_tools finds Alberta via BM25 | integration | `...::TestAlbertaToolScenarios -k discover` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | last | AB-27 INTEGRATION 6 prompts via client.list_prompts() | integration | `tests/integration/test_prompts_resources_scenarios.py::TestAlbertaPromptsResources` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | last | AB-27 INTEGRATION 7 resources via client.read_resource() | integration | `...::TestAlbertaPromptsResources -k resources` | ❌ W0 | ⬜ pending |
-| 17-XX-XX | XX | last | INF coverage ≥ 95% for alberta module | coverage | `uv run pytest --cov=src/mcp_canada/modules/alberta --cov-fail-under=95` | runs at end | ⬜ pending |
+| 17-01-01..03 | 01 | 0 | Wave 0 fixtures + stubs | unit | `uv run pytest src/mcp_canada/modules/alberta/__tests__/ -x` | ❌ W0 | ⬜ pending |
+| 17-02-01 | 02 | 1 | AB-01 search_datasets shape | unit (mocked api_get) | `...::TestAlbertaSearchDatasets` | ❌ W0 | ⬜ pending |
+| 17-02-01 | 02 | 1 | AB-01 format= filter via fq=res_format: | unit | `...::TestAlbertaSearchDatasets::test_format_filter` | ❌ W0 | ⬜ pending |
+| 17-02-01 | 02 | 1 | AB-02 get_dataset_details flattens 50+ extras | unit | `...::TestAlbertaGetDatasetDetails` | ❌ W0 | ⬜ pending |
+| 17-02-01 | 02 | 1 | AB-03 query_dataset routes ESRI REST → arcgis_hub | unit (mocked) | `...::TestAlbertaQueryDataset::test_routes_esri_rest_to_feature_server` | ❌ W0 | ⬜ pending |
+| 17-02-01 | 02 | 1 | AB-03 query_dataset routes CSV → fetch_and_parse | unit (mocked) | `...::TestAlbertaQueryDataset::test_routes_csv_to_fetch_and_parse` | ❌ W0 | ⬜ pending |
+| 17-02-01 | 02 | 1 | AB-03 query_dataset returns metadata-only for PDF/ZIP | unit | `...::TestAlbertaQueryDataset::test_pdf_returns_metadata_only` | ❌ W0 | ⬜ pending |
+| 17-02-01 | 02 | 1 | AB-04 list_organizations returns 370 orgs | unit | `...::TestAlbertaListOrganizations` | ❌ W0 | ⬜ pending |
+| 17-02-01 | 02 | 1 | AB-05 list_categories uses package_search facet (NOT group_list) | unit | `...::TestAlbertaListCategories::test_uses_format_facet` | ❌ W0 | ⬜ pending |
+| 17-03-01 | 03 | 2 | AB-06..AB-09 AER tools (ST1, ST3, ST39 fetch from static URLs) | unit (mocked fetch_and_parse) | `...::TestAlbertaAER` | ❌ W0 | ⬜ pending |
+| 17-03-02 | 03 | 2 | AB-08 ST3 invalid product → INVALID_INPUT (FR when lang=fr) | unit | `...::TestAlbertaProduction::test_invalid_product_french_error` | ❌ W0 | ⬜ pending |
+| 17-04-01 | 04 | 2 | AB-10 active_fires calls correct WMB FeatureServer | unit (mocked arcgis_hub) | `...::TestAlbertaActiveFires` | ❌ W0 | ⬜ pending |
+| 17-04-01 | 04 | 2 | AB-10 fire status filter passes through CQL/WHERE | unit | `...::TestAlbertaActiveFires::test_status_filter` | ❌ W0 | ⬜ pending |
+| 17-04-01 | 04 | 2 | AB-11 fire_perimeters dispatches by status Literal | unit | `...::TestAlbertaFirePerimeters` | ❌ W0 | ⬜ pending |
+| 17-04-02 | 04 | 2 | AB-13 fire_bans returns ban registry | unit | `...::TestAlbertaFireBans` | ❌ W0 | ⬜ pending |
+| 17-05-01 | 05 | 2 | AB-15 hospitals returns 101 with IP/ED flags | unit | `...::TestAlbertaHospitals` | ❌ W0 | ⬜ pending |
+| 17-05-01 | 05 | 2 | AB-17 ahs_zones returns 5 zones with population | unit | `...::TestAlbertaAhsZones` | ❌ W0 | ⬜ pending |
+| 17-06-01 | 06 | 3 | AB-18 road_events calls 511 v2 endpoint correctly | unit (mocked api_get) | `...::TestAlbertaRoadEvents` | ❌ W0 | ⬜ pending |
+| 17-06-01 | 06 | 3 | AB-18 road_events event_type= filter | unit | `...::TestAlbertaRoadEvents::test_event_type_filter` | ❌ W0 | ⬜ pending |
+| 17-06-01 | 06 | 3 | AB-19 winter_road_conditions correct endpoint | unit | `...::TestAlbertaWinterRoadConditions` | ❌ W0 | ⬜ pending |
+| 17-06-01 | 06 | 3 | AB-20 traffic_cameras returns 376 cameras | unit | `...::TestAlbertaTrafficCameras` | ❌ W0 | ⬜ pending |
+| 17-07-01 | 07 | 3 | AB-21 air_quality_stations returns 75 stations | unit | `...::TestAlbertaAirQuality` | ❌ W0 | ⬜ pending |
+| 17-07-01 | 07 | 3 | AB-22 water_advisories dispatches by advisory_type | unit | `...::TestAlbertaWaterAdvisories` | ❌ W0 | ⬜ pending |
+| 17-07-01 | 07 | 3 | AB-25 population_estimates defaults to CSD breakdown | unit | `...::TestAlbertaPopulation` | ❌ W0 | ⬜ pending |
+| 17-07-01 | 07 | 3 | AB-26 provincial_parks calls GeoDiscover FeatureServer | unit | `...::TestAlbertaProvincialParks` | ❌ W0 | ⬜ pending |
+| 17-09-01 | 09 | 5 | AB-27 all 22 tools return _meta envelope | unit (parametrized) | `...::TestAlbertaEnvelopes` | ❌ W0 | ⬜ pending |
+| 17-09-01 | 09 | 5 | AB-27 all 22 tools propagate lang parameter | unit (parametrized) | `...::TestAlbertaLangParam` | ❌ W0 | ⬜ pending |
+| 17-02-01 | 02 | 1 | INF _api_get treats api_get return as parsed dict | unit | `...::TestSharedApiGetContract` | ❌ W0 | ⬜ pending |
+| 17-02-01 | 02 | 1 | INF _api_get raises on success=False | unit | `...::TestSharedApiGetContract::test_ckan_success_false_raises` | ❌ W0 | ⬜ pending |
+| 17-09-03 | 09 | 5 | INF all 22 tools have 8+ Keywords + Use-for | quality (auto-discovered) | `uv run pytest src/mcp_canada/__tests__/test_quality.py -x` | ✅ exists | ⬜ pending |
+| 17-09-02 | 09 | 5 | AB-01 INTEGRATION live search returns wildfire results | integration | `...::TestAlbertaToolScenarios -v -m integration --timeout=30 -k search` | ❌ W0 | ⬜ pending |
+| 17-09-02 | 09 | 5 | AB-10 INTEGRATION live active_fires returns _meta envelope | integration | `...::TestAlbertaToolScenarios -k active_fires` | ❌ W0 | ⬜ pending |
+| 17-09-02 | 09 | 5 | AB-15 INTEGRATION live hospitals returns ~101 hospitals | integration | `...::TestAlbertaToolScenarios -k hospitals` | ❌ W0 | ⬜ pending |
+| 17-09-02 | 09 | 5 | AB-18 INTEGRATION live road_events returns event list | integration | `...::TestAlbertaToolScenarios -k road_events` | ❌ W0 | ⬜ pending |
+| 17-09-02 | 09 | 5 | AB-09 INTEGRATION live AER ST3 Gas_current.xlsx parses | integration | `...::TestAlbertaToolScenarios -k production_volumes` | ❌ W0 | ⬜ pending |
+| 17-09-02 | 09 | 5 | AB-27 INTEGRATION discover_tools finds Alberta via BM25 | integration | `...::TestAlbertaToolScenarios -k discover` | ❌ W0 | ⬜ pending |
+| 17-09-02 | 09 | 5 | AB-27 INTEGRATION 6 prompts via client.list_prompts() | integration | `tests/integration/test_prompts_resources_scenarios.py::TestAlbertaPromptsResources` | ❌ W0 | ⬜ pending |
+| 17-09-02 | 09 | 5 | AB-27 INTEGRATION 7 resources via client.read_resource() | integration | `...::TestAlbertaPromptsResources -k resources` | ❌ W0 | ⬜ pending |
+| 17-09-03 | 09 | 5 | INF coverage ≥ 95% for alberta module | coverage | `uv run pytest --cov=src/mcp_canada/modules/alberta --cov-fail-under=95` | runs at end | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
-*Task IDs (`17-XX-XX`) are placeholders — gsd-planner assigns them when PLAN.md files are created.*
+*Task IDs in format `17-{plan}-{task}` map to PLAN.md files in this phase directory.*
 
 ---
 
@@ -124,4 +124,4 @@ created: 2026-04-17
 - [ ] Feedback latency < 30s for unit suite
 - [ ] `nyquist_compliant: true` set in frontmatter (after planner finalizes task IDs)
 
-**Approval:** pending — gsd-planner replaces `17-XX-XX` task IDs with real plan/task IDs and flips `nyquist_compliant: true`
+**Approval:** approved 2026-04-17 — gsd-planner replaced `17-XX-XX` task IDs with real plan/task IDs (17-{plan}-{task} format) and flipped `nyquist_compliant: true`

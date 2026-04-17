@@ -210,7 +210,7 @@ Plans:
 **Goal:** Add Alberta's provincial open data surface to mcp-canada via 24 alberta_ tools (5 discovery + 19 curated) covering open.alberta.ca CKAN catalogue (33,269 datasets), GeoDiscover Alberta ArcGIS REST 11.3, WMBappServices wildfire FeatureServers, AHSGIS health FeatureServers, AER (Alberta Energy Regulator) static reports (ST1/ST3/ST39), and 511 Alberta road API. Reuses shared/arcgis_hub.py + shared/parsers.fetch_and_parse — NO new shared utilities. Adds 6 prompts + 7 resources from day 1.
 **Requirements**: AB-01, AB-02, AB-03, AB-04, AB-05, AB-06, AB-07, AB-08, AB-09, AB-10, AB-11, AB-12, AB-13, AB-14, AB-15, AB-16, AB-17, AB-18, AB-19, AB-20, AB-21, AB-22, AB-23, AB-24, AB-25, AB-26, AB-27
 **Depends on:** Phase 16
-**Plans:** 8/9 plans executed
+**Plans:** 9/9 plans complete
 
 Plans:
 - [ ] 17-01-PLAN.md — Module scaffolding: 7-file pattern + Wave 0 test stubs + _api_get/_511_get helpers + 24 client function stubs

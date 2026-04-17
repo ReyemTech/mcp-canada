@@ -897,23 +897,213 @@ class TestAlbertaTrafficCamerasTool:  # Plan 06
 
 
 class TestAlbertaAirQualityTool:  # Plan 07
-    pass
+    """@tool alberta_get_air_quality_stations — envelope + upstream error."""
+
+    @pytest.mark.asyncio
+    async def test_returns_envelope(self):
+        from mcp_canada.modules.alberta.tools import alberta_get_air_quality_stations
+
+        payload = {
+            "stations": [{"station_name": "Calgary Central"}],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_air_quality_stations",
+            new=AsyncMock(return_value=(payload, False)),
+        ):
+            out = await alberta_get_air_quality_stations()
+        assert "_meta" in out
+        assert out["_meta"]["source"]["api"] == "alberta-geodiscover-aqhi"
+        assert out["_meta"]["lang"] == "en"
+        assert out["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_upstream_error_bilingual(self):
+        from mcp_canada.modules.alberta.tools import alberta_get_air_quality_stations
+
+        err = httpx.HTTPStatusError(
+            "boom",
+            request=httpx.Request("GET", "https://x"),
+            response=httpx.Response(503),
+        )
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_air_quality_stations",
+            new=AsyncMock(side_effect=err),
+        ):
+            out = await alberta_get_air_quality_stations(lang="fr")
+        assert out["error"]["code"] == "UPSTREAM_ERROR"
+        assert out["error"]["lang"] == "fr"
+        assert "échec" in out["error"]["message"].lower()
 
 
 class TestAlbertaWaterAdvisoriesTool:  # Plan 07
-    pass
+    """@tool alberta_get_water_advisories — advisory_type dispatch + INVALID_INPUT."""
+
+    @pytest.mark.asyncio
+    async def test_valid_advisory_type_passes_through(self):
+        from mcp_canada.modules.alberta.tools import alberta_get_water_advisories
+
+        payload = {
+            "advisories": [{"advisory_id": "A-1"}],
+            "count": 1,
+            "truncated": False,
+            "advisory_type": "river",
+        }
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_water_advisories",
+            new=mock_fetch,
+        ):
+            out = await alberta_get_water_advisories(advisory_type="river")
+        assert "_meta" in out
+        assert out["_meta"]["source"]["api"] == "alberta-geodiscover-water"
+        assert out["data"]["count"] == 1
+        kwargs = mock_fetch.call_args.kwargs
+        assert kwargs.get("advisory_type") == "river"
+
+    @pytest.mark.asyncio
+    async def test_invalid_advisory_type_returns_invalid_input(self):
+        """advisory_type outside the 5-value set → INVALID_INPUT with valid list."""
+        from mcp_canada.modules.alberta.tools import alberta_get_water_advisories
+
+        out = await alberta_get_water_advisories(advisory_type="bogus")  # type: ignore[arg-type]
+        assert out["error"]["code"] == "INVALID_INPUT"
+        assert out["error"]["valid"] == [
+            "river",
+            "water_management",
+            "drought",
+            "ice_cover",
+            "water_sharing",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_invalid_advisory_type_french(self):
+        from mcp_canada.modules.alberta.tools import alberta_get_water_advisories
+
+        out = await alberta_get_water_advisories(
+            advisory_type="bogus", lang="fr"
+        )  # type: ignore[arg-type]
+        assert out["error"]["lang"] == "fr"
+        msg = out["error"]["message"].lower()
+        assert "invalide" in msg or "entrée" in msg
 
 
 class TestAlbertaCropProductionTool:  # Plan 07
-    pass
+    """@tool alberta_get_crop_production — envelope + upstream error."""
+
+    @pytest.mark.asyncio
+    async def test_returns_envelope(self):
+        from mcp_canada.modules.alberta.tools import alberta_get_crop_production
+
+        payload = {
+            "rows": [{"year": 2013, "crop": "Wheat"}],
+            "count": 1,
+            "source_url": "https://open.alberta.ca/x.csv",
+        }
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_crop_production",
+            new=AsyncMock(return_value=(payload, False)),
+        ):
+            out = await alberta_get_crop_production()
+        assert "_meta" in out
+        assert out["_meta"]["source"]["api"] == "alberta-open-data"
+        assert out["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_upstream_error(self):
+        from mcp_canada.modules.alberta.tools import alberta_get_crop_production
+
+        err = httpx.HTTPStatusError(
+            "boom",
+            request=httpx.Request("GET", "https://x"),
+            response=httpx.Response(500),
+        )
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_crop_production",
+            new=AsyncMock(side_effect=err),
+        ):
+            out = await alberta_get_crop_production(lang="fr")
+        assert out["error"]["code"] == "UPSTREAM_ERROR"
+        assert out["error"]["lang"] == "fr"
 
 
 class TestAlbertaPopulationEstimatesTool:  # Plan 07
-    pass
+    """@tool alberta_get_population_estimates — breakdown dispatch + INVALID_INPUT."""
+
+    @pytest.mark.asyncio
+    async def test_default_csd_breakdown(self):
+        from mcp_canada.modules.alberta.tools import alberta_get_population_estimates
+
+        payload = {
+            "rows": [{"geo_code": "4806016", "geo_name": "Calgary"}],
+            "count": 1,
+            "breakdown": "csd",
+        }
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_population_estimates",
+            new=mock_fetch,
+        ):
+            out = await alberta_get_population_estimates()  # default csd
+        assert "_meta" in out
+        assert out["data"]["breakdown"] == "csd"
+        kwargs = mock_fetch.call_args.kwargs
+        assert kwargs.get("breakdown") == "csd"
+
+    @pytest.mark.asyncio
+    async def test_invalid_breakdown_returns_invalid_input(self):
+        from mcp_canada.modules.alberta.tools import alberta_get_population_estimates
+
+        out = await alberta_get_population_estimates(breakdown="bogus")  # type: ignore[arg-type]
+        assert out["error"]["code"] == "INVALID_INPUT"
+        assert out["error"]["valid"] == [
+            "csd",
+            "quarterly",
+            "annual",
+            "age_sex",
+            "sub_provincial",
+            "components_of_growth",
+        ]
 
 
 class TestAlbertaProvincialParksTool:  # Plan 07
-    pass
+    """@tool alberta_get_provincial_parks — envelope + upstream error."""
+
+    @pytest.mark.asyncio
+    async def test_returns_envelope(self):
+        from mcp_canada.modules.alberta.tools import alberta_get_provincial_parks
+
+        payload = {
+            "parks": [{"park_name": "Kananaskis Country"}],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_provincial_parks",
+            new=AsyncMock(return_value=(payload, False)),
+        ):
+            out = await alberta_get_provincial_parks()
+        assert "_meta" in out
+        assert out["_meta"]["source"]["api"] == "alberta-geodiscover-parks"
+        assert out["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_upstream_error(self):
+        from mcp_canada.modules.alberta.tools import alberta_get_provincial_parks
+
+        err = httpx.HTTPStatusError(
+            "boom",
+            request=httpx.Request("GET", "https://x"),
+            response=httpx.Response(502),
+        )
+        with patch(
+            "mcp_canada.modules.alberta.tools._client.fetch_provincial_parks",
+            new=AsyncMock(side_effect=err),
+        ):
+            out = await alberta_get_provincial_parks(lang="en")
+        assert out["error"]["code"] == "UPSTREAM_ERROR"
+        assert out["error"]["lang"] == "en"
 
 
 # ---------------------------------------------------------------------------

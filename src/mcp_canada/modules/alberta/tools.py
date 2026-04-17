@@ -67,6 +67,9 @@ API_NAME_CKAN = "alberta-open-data"
 API_NAME_WMB = "alberta-wmb-arcgis"
 API_NAME_AHS = "alberta-ahs-arcgis"
 API_NAME_GEODISCOVER = "alberta-geodiscover"
+API_NAME_GEODISCOVER_AQHI = "alberta-geodiscover-aqhi"
+API_NAME_GEODISCOVER_WATER = "alberta-geodiscover-water"
+API_NAME_GEODISCOVER_PARKS = "alberta-geodiscover-parks"
 API_NAME_AER = "alberta-aer-static"
 API_NAME_511 = "alberta-511"
 
@@ -844,6 +847,24 @@ async def alberta_get_traffic_cameras(
 # ---------------------------------------------------------------------------
 
 
+_WATER_ADVISORY_TYPES = [
+    "river",
+    "water_management",
+    "drought",
+    "ice_cover",
+    "water_sharing",
+]
+
+_POPULATION_BREAKDOWNS = [
+    "csd",
+    "quarterly",
+    "annual",
+    "age_sex",
+    "sub_provincial",
+    "components_of_growth",
+]
+
+
 @tool
 async def alberta_get_air_quality_stations(
     max_records: int = 5000,
@@ -856,7 +877,26 @@ async def alberta_get_air_quality_stations(
 
     Keywords: alberta air quality AQHI monitoring stations pollutant ozone nitrogen dioxide PM2.5 environment readings
     """
-    raise NotImplementedError("Plan 07 implements")
+    try:
+        data, cached = await _client.fetch_air_quality_stations(
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        msg = (
+            f"Échec de la requête GeoDiscover AQHI : HTTP {status}"
+            if lang == "fr"
+            else f"GeoDiscover AQHI query failed: HTTP {status}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=data,
+        api_name=API_NAME_GEODISCOVER_AQHI,
+        api_url=AQHI_AIR_LAYER_URL,
+        cached=cached,
+        lang=lang,
+    )
 
 
 @tool
@@ -872,7 +912,39 @@ async def alberta_get_water_advisories(
 
     Keywords: alberta water advisory river forecast drought ice cover sharing environment management hydro flood
     """
-    raise NotImplementedError("Plan 07 implements")
+    if advisory_type not in _WATER_ADVISORY_TYPES:
+        msg = (
+            f"Type d'avis invalide : '{advisory_type}'"
+            if lang == "fr"
+            else f"Invalid advisory_type: '{advisory_type}'"
+        )
+        return make_error(
+            "INVALID_INPUT",
+            msg,
+            lang=lang,
+            valid=list(_WATER_ADVISORY_TYPES),
+        )
+    try:
+        data, cached = await _client.fetch_water_advisories(
+            advisory_type=advisory_type,
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        msg = (
+            f"Échec de la requête GeoDiscover : HTTP {status}"
+            if lang == "fr"
+            else f"GeoDiscover water advisories query failed: HTTP {status}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=data,
+        api_name=API_NAME_GEODISCOVER_WATER,
+        api_url=RIVER_FORECAST_FS_URL,
+        cached=cached,
+        lang=lang,
+    )
 
 
 @tool
@@ -885,7 +957,23 @@ async def alberta_get_crop_production(
 
     Keywords: alberta crop production agriculture historical wheat canola barley yield harvest farm statistics CKAN
     """
-    raise NotImplementedError("Plan 07 implements")
+    try:
+        data, cached = await _client.fetch_crop_production()
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        msg = (
+            f"Échec de la requête CKAN pour production agricole : HTTP {status}"
+            if lang == "fr"
+            else f"CKAN crop production fetch failed: HTTP {status}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=data,
+        api_name=API_NAME_CKAN,
+        api_url=CKAN_BASE_URL + "package_show?id=major-crop-production-alberta",
+        cached=cached,
+        lang=lang,
+    )
 
 
 @tool
@@ -901,7 +989,35 @@ async def alberta_get_population_estimates(
 
     Keywords: alberta population estimates census subdivision CSD municipal quarterly annual age sex statistics demographics
     """
-    raise NotImplementedError("Plan 07 implements")
+    if breakdown not in _POPULATION_BREAKDOWNS:
+        msg = (
+            f"Ventilation invalide : '{breakdown}'"
+            if lang == "fr"
+            else f"Invalid breakdown: '{breakdown}'"
+        )
+        return make_error(
+            "INVALID_INPUT",
+            msg,
+            lang=lang,
+            valid=list(_POPULATION_BREAKDOWNS),
+        )
+    try:
+        data, cached = await _client.fetch_population_estimates(breakdown=breakdown)
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        msg = (
+            f"Échec de la requête CKAN pour estimations de population : HTTP {status}"
+            if lang == "fr"
+            else f"CKAN population estimates fetch failed: HTTP {status}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=data,
+        api_name=API_NAME_CKAN,
+        api_url=CKAN_BASE_URL + "package_show?id=alberta-population-estimates-data-tables",
+        cached=cached,
+        lang=lang,
+    )
 
 
 @tool
@@ -916,4 +1032,23 @@ async def alberta_get_provincial_parks(
 
     Keywords: alberta parks provincial protected areas wildland ecological reserve recreation natural area boundary geodiscover
     """
-    raise NotImplementedError("Plan 07 implements")
+    try:
+        data, cached = await _client.fetch_provincial_parks(
+            max_records=max_records,
+            include_geometry=include_geometry,
+        )
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        msg = (
+            f"Échec de la requête GeoDiscover parcs : HTTP {status}"
+            if lang == "fr"
+            else f"GeoDiscover provincial parks query failed: HTTP {status}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=data,
+        api_name=API_NAME_GEODISCOVER_PARKS,
+        api_url=PROVINCIAL_PARKS_FS_URL,
+        cached=cached,
+        lang=lang,
+    )

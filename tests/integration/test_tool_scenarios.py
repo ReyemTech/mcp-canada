@@ -1824,3 +1824,125 @@ class TestQuebecToolScenarios:
             assert not (
                 isinstance(v, str) and "=" in v and any(ch.isdigit() for ch in v)
             ), f"Formula string leaked into first row [{k}]={v!r}"
+
+
+# ─── Alberta Government Open Data scenarios ──────────────────────────────────
+
+
+@pytest.mark.asyncio
+class TestAlbertaToolScenarios:
+    """Live open.alberta.ca CKAN + WMBappServices + AHSGIS + 511 Alberta + AER integration tests.
+
+    Every test calls alberta tools through the MCP Client layer (via call_tool/discover_tools),
+    not the client functions directly — the same path an agent takes. Assertions are
+    shape-focused, not value-specific (counts, statuses, and prices drift daily).
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(60)
+    async def test_search_wildfire_datasets(self, mcp_server):
+        """'Find Alberta wildfire datasets' — live open.alberta.ca CKAN search."""
+        data = await call_tool(mcp_server, "alberta_search_datasets", {
+            "q": "wildfire",
+            "format": "CSV",
+            "rows": 5,
+        })
+        assert "_meta" in data or "error" in data
+        if "_meta" in data:
+            assert data["_meta"]["source"]["api"] == "alberta-open-data"
+            # Results shape: {"count": int, "results": [...]}
+            assert "results" in data["data"]
+            assert data["data"].get("count", 0) >= 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(60)
+    async def test_active_fires_now(self, mcp_server):
+        """'How many active wildfires in Alberta right now?' — live WMBappServices FeatureServer."""
+        data = await call_tool(mcp_server, "alberta_get_active_fires", {})
+        assert "_meta" in data or "error" in data
+        if "_meta" in data:
+            assert data["_meta"]["source"]["api"] == "alberta-wmb-arcgis"
+            assert "features" in data["data"]
+            assert isinstance(data["data"]["features"], list)
+            # Don't assert exact count — varies seasonally (May-October peak)
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(60)
+    async def test_alberta_hospitals(self, mcp_server):
+        """'List Alberta hospitals' — live AHSGIS FeatureServer (~101 hospitals)."""
+        data = await call_tool(mcp_server, "alberta_get_hospitals", {})
+        assert "_meta" in data or "error" in data
+        if "_meta" in data:
+            assert data["_meta"]["source"]["api"] == "alberta-ahs-arcgis"
+            assert "features" in data["data"]
+            # ~101 hospitals expected; allow generous ±50 window for live drift
+            if isinstance(data["data"].get("count"), int):
+                assert 50 <= data["data"]["count"] <= 250, (
+                    f"Alberta hospital count unexpectedly far from ~101: {data['data']['count']}"
+                )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(60)
+    async def test_alberta_road_events(self, mcp_server):
+        """'What's happening on Alberta roads right now?' — live 511 Alberta JSON feed."""
+        data = await call_tool(mcp_server, "alberta_get_road_events", {})
+        assert "_meta" in data or "error" in data
+        if "_meta" in data:
+            assert data["_meta"]["source"]["api"] == "alberta-511"
+            assert "events" in data["data"]
+            assert isinstance(data["data"]["events"], list)
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(90)
+    async def test_alberta_production_volumes_gas(self, mcp_server):
+        """'Get Alberta natural gas monthly production' — live AER static XLSX."""
+        data = await call_tool(mcp_server, "alberta_get_production_volumes", {
+            "product": "Gas",
+        })
+        assert "_meta" in data or "error" in data
+        # Either success with rows OR graceful upstream/rate-limit error — no silent shape drift.
+        # AER sometimes returns a redirect / XLSX parse fails during republish windows;
+        # accept UPSTREAM_ERROR or RATE_LIMITED as legitimate transient outcomes.
+        if "_meta" in data:
+            # `data` from fetch_production_volumes is the parsed row list (see client.py)
+            # which surfaces as `data["data"]` — may be a list (rows) or dict wrapping rows.
+            payload = data["data"]
+            # Shape sanity: either we got rows, or a wrapper with rows, or a dict at minimum.
+            assert isinstance(payload, (list, dict)), (
+                f"Unexpected data payload shape: {type(payload).__name__}"
+            )
+        else:
+            assert data.get("error", {}).get("code") in {"UPSTREAM_ERROR", "RATE_LIMITED"}, (
+                f"Expected UPSTREAM_ERROR or RATE_LIMITED, got: {data.get('error')}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_alberta_invalid_product_returns_structured_error(self, mcp_server):
+        """'Get Bitumen production' — should fail with INVALID_INPUT (Pitfall 8, case-sensitive)."""
+        data = await call_tool(mcp_server, "alberta_get_production_volumes", {
+            "product": "Bitumen",  # Not a valid slug; Bitumen is bundled inside Oil
+        })
+        assert "error" in data
+        assert data["error"]["code"] == "INVALID_INPUT"
+        # valid= extras list must be present with all 7 products
+        assert "valid" in data["error"]
+        assert "Butane" in data["error"]["valid"]
+        assert "Gas" in data["error"]["valid"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_discover_alberta_via_bm25(self, mcp_server):
+        """'alberta wells oil energy regulator' — BM25 must surface alberta_ tools in top 5."""
+        results = await discover(mcp_server, "alberta wells oil energy regulator")
+        names = [r["name"] for r in results]
+        assert any(n.startswith("alberta_") for n in names), (
+            f"No alberta_ tool found in BM25 discovery results: {names}"
+        )

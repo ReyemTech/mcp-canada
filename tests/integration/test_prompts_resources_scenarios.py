@@ -642,3 +642,88 @@ class TestQuebecPromptsResources:
         slugs = [entry["slug"] for entry in parsed]
         assert "msss" in slugs
         assert "mtq" in slugs
+
+
+# ─── Alberta prompts and resources scenarios ──────────────────────────────────
+
+
+@pytest.mark.asyncio
+class TestAlbertaPromptsResources:
+    """Integration tests for Alberta prompts (6 bilingual) and resources (7 zero-param).
+
+    Verifies discovery through client.list_prompts() / client.list_resources() and
+    read_resource() round-trip for JSON-validation of the ministries catalog.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_six_prompts_discoverable(self, mcp_server):
+        """Alberta's 6 prompts (3 guided + 3 quick lookups) appear in prompts/list."""
+        prompts = await list_prompts(mcp_server)
+        names = {p.name for p in prompts}
+        expected = [
+            "alberta_explore_energy",
+            "alberta_explore_wildfires",
+            "alberta_explore_health_or_transport",
+            "alberta_quick_dataset_search",
+            "alberta_check_road_conditions",
+            "alberta_active_fires_now",
+        ]
+        for prompt_name in expected:
+            assert prompt_name in names, (
+                f"Missing Alberta prompt: {prompt_name}. "
+                f"alberta_ prompts found: {sorted(n for n in names if n.startswith('alberta_'))}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_seven_resources_discoverable(self, mcp_server):
+        """Alberta's 7 resources (3 data:// + 2 docs:// + 2 template://) appear in resources/list."""
+        resources = await list_resources(mcp_server)
+        uris = {str(r.uri) for r in resources}
+        expected_uris = [
+            "data://alberta/ministries",
+            "data://alberta/forest-areas",
+            "data://alberta/ahs-zones",
+            "docs://alberta/aer-data-guide",
+            "docs://alberta/wildfire-data-guide",
+            "template://alberta/dataset-report",
+            "template://alberta/wildfire-report",
+        ]
+        for uri in expected_uris:
+            assert uri in uris, (
+                f"Missing Alberta resource URI: {uri}. "
+                f"alberta/ URIs found: {sorted(u for u in uris if '/alberta/' in u)}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_ministries_resource_returns_valid_json(self, mcp_server):
+        """data://alberta/ministries returns valid JSON with energy-and-minerals ministry."""
+        content = await read_resource(mcp_server, "data://alberta/ministries")
+        assert content, "data://alberta/ministries returned empty content"
+        parsed = json.loads(content)
+        assert isinstance(parsed, dict)
+        assert "ministries" in parsed
+        ministries = parsed["ministries"]
+        assert isinstance(ministries, list)
+        assert len(ministries) >= 10
+        slugs = [m["slug"] for m in ministries]
+        assert "energy-and-minerals" in slugs, (
+            f"Expected 'energy-and-minerals' ministry slug; got: {slugs}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_wildfire_data_guide_mentions_ab23(self, mcp_server):
+        """docs://alberta/wildfire-data-guide must include the AB-23 water-licence guidance."""
+        content = await read_resource(mcp_server, "docs://alberta/wildfire-data-guide")
+        assert content, "docs://alberta/wildfire-data-guide returned empty content"
+        assert "AB-23" in content, (
+            "wildfire-data-guide must keep AB-23 water-licence section (Plan 08 requirement)"
+        )
+        assert "water-licence" in content.lower() or "water licence" in content.lower()

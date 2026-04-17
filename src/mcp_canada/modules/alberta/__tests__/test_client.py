@@ -808,15 +808,162 @@ class TestAlbertaFireControlOrders:  # Plan 04
 
 
 class TestAlbertaHospitals:  # Plan 05
-    pass
+    """fetch_hospitals — AHSGIS AHS_Hospitals FeatureServer (101 hospitals)."""
+
+    @pytest.mark.asyncio
+    async def test_calls_correct_featureserver(self):
+        """fetch_hospitals targets AHS_HOSPITALS_FS_URL layer 0."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.constants import AHS_HOSPITALS_FS_URL
+
+        mock_qfs = AsyncMock(return_value=([], False))
+        with patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs):
+            await ab_client.fetch_hospitals()
+        call_args = mock_qfs.call_args
+        url_arg = (
+            call_args.args[0] if call_args.args else call_args.kwargs["service_url"]
+        )
+        layer_arg = (
+            call_args.args[1]
+            if len(call_args.args) > 1
+            else call_args.kwargs["layer_id"]
+        )
+        assert url_arg == AHS_HOSPITALS_FS_URL
+        assert layer_arg == 0
+
+    @pytest.mark.asyncio
+    async def test_zone_filter_applied(self):
+        """zone='Calgary' filters features whose Location contains 'calgary' (case-insensitive)."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        fake_features = [
+            {"Location": "Calgary South Health Campus", "Hospital_N": "Calgary South", "IP": 1, "ED": 1},
+            {"Location": "Edmonton General", "Hospital_N": "Edmonton General", "IP": 1, "ED": 0},
+            {"Location": "South Health Centre Calgary", "Hospital_N": "South Health", "IP": 0, "ED": 1},
+            {"Location": "Foothills Medical Centre", "Hospital_N": "Foothills", "IP": 1, "ED": 1},
+        ]
+        with patch.object(
+            ab_client.arcgis_hub,
+            "query_feature_service",
+            new=AsyncMock(return_value=(fake_features, False)),
+        ):
+            payload, _ = await ab_client.fetch_hospitals(zone="Calgary")
+        locations = [
+            (f.get("Location", "") or "").lower() for f in payload["features"]
+        ]
+        # At least the 2 Calgary entries survive the substring match
+        assert sum("calgary" in loc for loc in locations) >= 2
+        # Non-Calgary entries filtered out
+        assert not any("edmonton general" == loc for loc in locations)
+        # Filtered count matches the feature list length
+        assert payload["count"] == len(payload["features"])
+
+    @pytest.mark.asyncio
+    async def test_ip_ed_flags_preserved(self):
+        """Hospital IP/ED capability flags survive the fetch."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        fake = [
+            {"Location": "Foothills", "Hospital_N": "Foothills Medical Centre", "IP": 1, "ED": 0},
+        ]
+        with patch.object(
+            ab_client.arcgis_hub,
+            "query_feature_service",
+            new=AsyncMock(return_value=(fake, False)),
+        ):
+            payload, _ = await ab_client.fetch_hospitals()
+        assert payload["features"][0]["IP"] == 1
+        assert payload["features"][0]["ED"] == 0
 
 
 class TestAlbertaAhsZones:  # Plan 05
-    pass
+    """fetch_ahs_zones — 5 AHS zones with POP2006/2011/2016 normalized to snake_case."""
+
+    @pytest.mark.asyncio
+    async def test_returns_5_zones(self):
+        """Happy path: 5 zone features flow through with population field snake-cased."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        fake = [
+            {"Zone_Name": "South", "Zone_ID": "Z1", "POP2006": 300_000, "POP2011": 320_000, "POP2016": 350_000},
+            {"Zone_Name": "Calgary", "Zone_ID": "Z2", "POP2006": 1_200_000, "POP2011": 1_400_000, "POP2016": 1_500_000},
+            {"Zone_Name": "Central", "Zone_ID": "Z3", "POP2006": 450_000, "POP2011": 470_000, "POP2016": 490_000},
+            {"Zone_Name": "Edmonton", "Zone_ID": "Z4", "POP2006": 1_050_000, "POP2011": 1_200_000, "POP2016": 1_350_000},
+            {"Zone_Name": "North", "Zone_ID": "Z5", "POP2006": 420_000, "POP2011": 450_000, "POP2016": 480_000},
+        ]
+        with patch.object(
+            ab_client.arcgis_hub,
+            "query_feature_service",
+            new=AsyncMock(return_value=(fake, False)),
+        ):
+            payload, _ = await ab_client.fetch_ahs_zones()
+        assert payload["count"] == 5
+        names = {f["zone_name"] for f in payload["features"]}
+        assert names == {"South", "Calgary", "Central", "Edmonton", "North"}
+        for f in payload["features"]:
+            assert "pop_2016" in f
+
+    @pytest.mark.asyncio
+    async def test_population_field_normalization(self):
+        """POP2016=1500000 → pop_2016=1500000 in output."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        fake = [
+            {"Zone_Name": "Calgary", "Zone_ID": "Z2", "POP2006": 1_200_000, "POP2011": 1_400_000, "POP2016": 1_500_000},
+        ]
+        with patch.object(
+            ab_client.arcgis_hub,
+            "query_feature_service",
+            new=AsyncMock(return_value=(fake, False)),
+        ):
+            payload, _ = await ab_client.fetch_ahs_zones()
+        f = payload["features"][0]
+        assert f["pop_2006"] == 1_200_000
+        assert f["pop_2011"] == 1_400_000
+        assert f["pop_2016"] == 1_500_000
+        assert f["zone_id"] == "Z2"
 
 
 class TestAlbertaHealthFacilities:  # Plan 05
-    pass
+    """fetch_health_facilities — dispatch by facility_type (ems | pcn_clinic)."""
+
+    @pytest.mark.asyncio
+    async def test_ems_dispatch(self):
+        """facility_type='ems' hits AHS_EMS_FS_URL."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.constants import AHS_EMS_FS_URL
+
+        mock_qfs = AsyncMock(return_value=([], False))
+        with patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs):
+            await ab_client.fetch_health_facilities(facility_type="ems")
+        call_args = mock_qfs.call_args
+        url_arg = (
+            call_args.args[0] if call_args.args else call_args.kwargs["service_url"]
+        )
+        assert url_arg == AHS_EMS_FS_URL
+
+    @pytest.mark.asyncio
+    async def test_pcn_dispatch(self):
+        """facility_type='pcn_clinic' hits PCN_CLINICS_FS_URL."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.constants import PCN_CLINICS_FS_URL
+
+        mock_qfs = AsyncMock(return_value=([], False))
+        with patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs):
+            await ab_client.fetch_health_facilities(facility_type="pcn_clinic")
+        call_args = mock_qfs.call_args
+        url_arg = (
+            call_args.args[0] if call_args.args else call_args.kwargs["service_url"]
+        )
+        assert url_arg == PCN_CLINICS_FS_URL
+
+    @pytest.mark.asyncio
+    async def test_invalid_type_raises(self):
+        """facility_type='bogus' raises ValueError (client-layer contract)."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        with pytest.raises(ValueError):
+            await ab_client.fetch_health_facilities(facility_type="bogus")  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------

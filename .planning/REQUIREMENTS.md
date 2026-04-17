@@ -146,10 +146,10 @@
 - [x] **AB-03**: Agent can query a dataset (file resource OR live ESRI REST FeatureServer) via auto-router — routes ESRI REST → arcgis_hub.query_feature_service; CSV/XLSX/JSON → fetch_and_parse; PDF/ZIP/KML → metadata-only; FeatureServer preferred over MapServer
 - [x] **AB-04**: Agent can list 370 federated Alberta organizations (current ministries + ~150 historical predecessor ministries + Crown corps + advisory committees)
 - [x] **AB-05**: Agent can list dataset format categories — Alberta CKAN does NOT use groups (group_list returns empty); uses res_format facet via package_search
-- **AB-06**: Agent can fetch today's AER ST1 daily well licences from static.aer.ca/prd/data/well-lic/WELLS{day}.TXT (rotates by day-of-week, fixed-width plain-text parsed inline)
-- **AB-07**: Agent can get the AER ST1 monthly archive ZIP URL by year/month (discovery-only — files are large fixed-width TXT, not auto-parsed)
-- **AB-08**: Agent can fetch AER ST39 annual pipeline statistics XLSX for a verified year (length by substance/operator)
-- **AB-09**: Agent can fetch AER ST3 monthly oil/gas/bitumen production volumes for one of 7 verified products (Butane/Ethane/NGL/Oil/Gas/Propane/Sulphur — case-sensitive, Pitfall 8)
+- [x] **AB-06**: Agent can fetch today's AER ST1 daily well licences from static.aer.ca/prd/data/well-lic/WELLS{day}.TXT (rotates by day-of-week, fixed-width plain-text parsed inline)
+- [x] **AB-07**: Agent can get the AER ST1 monthly archive ZIP URL by year/month (discovery-only — files are large fixed-width TXT, not auto-parsed)
+- [x] **AB-08**: Agent can fetch AER ST39 annual pipeline statistics XLSX for a verified year (length by substance/operator)
+- [x] **AB-09**: Agent can fetch AER ST3 monthly oil/gas/bitumen production volumes for one of 7 verified products (Butane/Ethane/NGL/Oil/Gas/Propane/Sulphur — case-sensitive, Pitfall 8)
 - **AB-10**: Agent can get current active wildfires from WMBappServices Active_Wildfires_Dashboard_view FeatureServer with optional fire_status filter
 - **AB-11**: Agent can get wildfire perimeters dispatched by status: Literal["active","extinguished"] from WMBappServices simplified-view FeatureServers
 - **AB-12**: Historical wildfire data (2006-current CSV) is documented as routed via alberta_query_dataset (CKAN wildfire-data package) — NO dedicated tool
@@ -306,10 +306,10 @@
 | AB-03 | Phase 17 | Complete |
 | AB-04 | Phase 17 | Complete |
 | AB-05 | Phase 17 | Complete |
-| AB-06 | Phase 17 | Planned |
-| AB-07 | Phase 17 | Planned |
-| AB-08 | Phase 17 | Planned |
-| AB-09 | Phase 17 | Planned |
+| AB-06 | Phase 17 | Complete |
+| AB-07 | Phase 17 | Complete |
+| AB-08 | Phase 17 | Complete |
+| AB-09 | Phase 17 | Complete |
 | AB-10 | Phase 17 | Planned |
 | AB-11 | Phase 17 | Planned |
 | AB-12 | Phase 17 | Planned |

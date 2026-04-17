@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 17-02-PLAN.md
-last_updated: "2026-04-17T18:47:23.007Z"
+stopped_at: Completed 17-03-PLAN.md
+last_updated: "2026-04-17T18:56:01.888Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 11
   total_plans: 48
-  completed_plans: 41
+  completed_plans: 42
   percent: 0
 ---
 
@@ -89,6 +89,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 16-quebec-government-open-data P07 | 8min | 3 tasks | 3 files |
 | Phase 16-quebec-government-open-data P08 | 2min | 2 tasks | 3 files |
 | Phase 17-alberta-government-open-data P02 | 6min | 2 tasks | 4 files |
+| Phase 17-alberta-government-open-data P03 | 5min | 2 tasks tasks | 4 files files |
 
 ## Accumulated Context
 
@@ -203,6 +204,9 @@ Recent decisions affecting current work:
 - [Phase 17-alberta-government-open-data]: TestSharedApiGetContract patches module-local client.api_get (BC pattern) — achieves same regression guard as shared-layer patch, works with Python from-import semantics
 - [Phase 17-alberta-government-open-data]: Alberta fetch_search_datasets composes organization+format filters via space-joined fq (CKAN implicit AND across tokens)
 - [Phase 17-alberta-government-open-data]: Hybrid router prefers FeatureServer over MapServer at resource_index==0 (Pitfall 12); explicit non-zero index falls back to literal indexing for agent control
+- [Phase 17-alberta-government-open-data]: ST1 column layout: licence_number (0-9), operator (9-35), well_name (35-63), field_code (63-EOL) — derived from fixture, auto-detected via numeric-licence-block rule
+- [Phase 17-alberta-government-open-data]: ST3 INVALID_INPUT includes valid=[7 products] in error extras (Pitfall 8); French inline ternary via lang == 'fr'
+- [Phase 17-alberta-government-open-data]: No shared/aer.py extraction — AER tools use fetch_and_parse() + direct httpx for ~30 LOC ST1 parsing (reuse threshold not met)
 
 ### Roadmap Evolution
 
@@ -230,6 +234,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-17T18:46:31.047Z
-Stopped at: Completed 17-02-PLAN.md
+Last session: 2026-04-17T18:55:51.834Z
+Stopped at: Completed 17-03-PLAN.md
 Resume file: None

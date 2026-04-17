@@ -1066,21 +1066,80 @@ async def fetch_health_facilities(
 
 async def fetch_road_events(
     event_type: str | None = None,
-) -> tuple[list[Alberta511Event], bool]:
-    """Active road events (closures, construction, incidents, accidents) from 511 /event. Filled by Plan 06."""
-    raise NotImplementedError("Plan 06 implements")
+) -> tuple[dict[str, Any], bool]:
+    """Active road events (closures, construction, incidents) from 511 Alberta /event.
+
+    Uses `_511_get` (NOT `_api_get` — Pitfall 6: 511 returns a raw JSON list,
+    not a CKAN envelope). Optional `event_type` performs a case-insensitive
+    substring match on the `EventType` field (e.g. "Closure", "Construction").
+
+    Returns:
+        `({"events": list[dict], "count": int}, was_cached)` with TTL=LIVE (5min).
+    """
+    cache_key = f"{CACHE_KEY_PREFIX}511:event:{event_type}"
+    limiter = get_limiter(RATE_GROUP_511, RATE_LIMIT_511)
+
+    async def _fetch() -> dict[str, Any]:
+        await limiter.acquire()
+        rows = await _511_get("event")
+        if event_type:
+            needle = event_type.lower()
+            rows = [
+                r for r in rows if needle in (r.get("EventType", "") or "").lower()
+            ]
+        return {"events": rows, "count": len(rows)}
+
+    return await cached_fetch(cache_key, CACHE_TTL_LIVE, _fetch)
 
 
 async def fetch_winter_road_conditions(
     area_name: str | None = None,
-) -> tuple[list[Alberta511WinterRoad], bool]:
-    """Winter road conditions from 511 /winterroads. Filled by Plan 06."""
-    raise NotImplementedError("Plan 06 implements")
+) -> tuple[dict[str, Any], bool]:
+    """Winter road conditions (~1,121 segments) from 511 Alberta /winterroads.
+
+    Uses `_511_get` (Pitfall 6: raw JSON list). Optional `area_name` performs a
+    case-insensitive substring match on the `AreaName` field.
+
+    Returns:
+        `({"conditions": list[dict], "count": int}, was_cached)` with TTL=LIVE
+        (5min — source refreshes every 5 minutes during winter operations).
+    """
+    cache_key = f"{CACHE_KEY_PREFIX}511:winterroads:{area_name}"
+    limiter = get_limiter(RATE_GROUP_511, RATE_LIMIT_511)
+
+    async def _fetch() -> dict[str, Any]:
+        await limiter.acquire()
+        rows = await _511_get("winterroads")
+        if area_name:
+            needle = area_name.lower()
+            rows = [
+                r for r in rows if needle in (r.get("AreaName", "") or "").lower()
+            ]
+        return {"conditions": rows, "count": len(rows)}
+
+    return await cached_fetch(cache_key, CACHE_TTL_LIVE, _fetch)
 
 
-async def fetch_traffic_cameras() -> tuple[list[Alberta511Camera], bool]:
-    """376 traffic camera locations + snapshot URLs from 511 /cameras. Filled by Plan 06."""
-    raise NotImplementedError("Plan 06 implements")
+async def fetch_traffic_cameras() -> tuple[dict[str, Any], bool]:
+    """~376 traffic camera locations + snapshot URLs from 511 Alberta /cameras.
+
+    Uses `_511_get` (Pitfall 6: raw JSON list). Each camera includes a Views
+    array of snapshot URLs — the Views URLs are stable; the camera image bytes
+    refresh continuously upstream.
+
+    Returns:
+        `({"cameras": list[dict], "count": int}, was_cached)` with TTL=MONTHLY
+        (24h — camera locations are stable).
+    """
+    cache_key = f"{CACHE_KEY_PREFIX}511:cameras"
+    limiter = get_limiter(RATE_GROUP_511, RATE_LIMIT_511)
+
+    async def _fetch() -> dict[str, Any]:
+        await limiter.acquire()
+        rows = await _511_get("cameras")
+        return {"cameras": rows, "count": len(rows)}
+
+    return await cached_fetch(cache_key, CACHE_TTL_MONTHLY, _fetch)
 
 
 # ---------------------------------------------------------------------------

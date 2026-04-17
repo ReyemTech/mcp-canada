@@ -155,9 +155,9 @@
 - **AB-12**: Historical wildfire data (2006-current CSV) is documented as routed via alberta_query_dataset (CKAN wildfire-data package) — NO dedicated tool
 - **AB-13**: Agent can get current province-wide fire bans from WMBappServices alberta_fire_ban_system FeatureServer (the data backend behind albertafirebans.ca)
 - **AB-14**: Agent can get fire control orders, OHV restrictions, and forest area boundaries via single tool dispatched by category param (replaces deferred alberta_get_fire_weather since FWI is not publicly published)
-- **AB-15**: Agent can get 101 AHS hospitals with zone/IP/ED capability flags from AHSGIS AHS_Hospitals FeatureServer
-- **AB-16**: Agent can get EMS station OR PCN clinic locations from AHSGIS via single tool dispatched by facility_type param (subsumes deferred ER wait times — Pitfall 9)
-- **AB-17**: Agent can get 5 AHS zone boundaries (South, Calgary, Central, Edmonton, North) with POP2006/2011/2016 population from AHS_Zone FeatureServer
+- [x] **AB-15**: Agent can get 101 AHS hospitals with zone/IP/ED capability flags from AHSGIS AHS_Hospitals FeatureServer
+- [x] **AB-16**: Agent can get EMS station OR PCN clinic locations from AHSGIS via single tool dispatched by facility_type param (subsumes deferred ER wait times — Pitfall 9)
+- [x] **AB-17**: Agent can get 5 AHS zone boundaries (South, Calgary, Central, Edmonton, North) with POP2006/2011/2016 population from AHS_Zone FeatureServer
 - **AB-18**: Agent can get current road events (closures, construction, incidents) from 511 Alberta v2 API at /api/v2/get/event with optional event_type filter
 - **AB-19**: Agent can get current winter road conditions (~1121 records) from 511 Alberta v2 API at /api/v2/get/winterroads with optional area_name filter
 - **AB-20**: Agent can get traffic camera locations and snapshot URLs (~376 cameras) from 511 Alberta v2 API at /api/v2/get/cameras
@@ -315,9 +315,9 @@
 | AB-12 | Phase 17 | Planned |
 | AB-13 | Phase 17 | Planned |
 | AB-14 | Phase 17 | Planned |
-| AB-15 | Phase 17 | Planned |
-| AB-16 | Phase 17 | Planned |
-| AB-17 | Phase 17 | Planned |
+| AB-15 | Phase 17 | Complete |
+| AB-16 | Phase 17 | Complete |
+| AB-17 | Phase 17 | Complete |
 | AB-18 | Phase 17 | Planned |
 | AB-19 | Phase 17 | Planned |
 | AB-20 | Phase 17 | Planned |

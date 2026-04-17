@@ -17,7 +17,7 @@
 
 ---
 
-**193 tools, ~81 prompts, and ~110 resources** across **9 federal APIs + 4 provincial APIs + 2 municipal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, York Region ArcGIS Hub data, British Columbia CKAN + WFS geospatial data, Quebec Données Québec CKAN + ArcGIS IQA data, and persistent local storage. All bilingual (English/French).
+**217 tools, ~87 prompts, and ~117 resources** across **9 federal APIs + 5 provincial APIs + 2 municipal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, York Region ArcGIS Hub data, British Columbia CKAN + WFS geospatial data, Quebec Données Québec CKAN + ArcGIS IQA data, Alberta open data + AER energy + WMBappServices wildfire + AHSGIS health + 511 Alberta transport, and persistent local storage. All bilingual (English/French).
 
 > **First ArcGIS Hub module** — shared infrastructure in `shared/arcgis_hub.py` is reusable for future Canadian municipal modules (BC, Calgary, Edmonton, and other cities publishing via ArcGIS Hub).
 > **First OGC WFS module** — BC introduces WFS 2.0 (OGC) support via `shared/ogc.py`, making WFS the third portal technology alongside CKAN and ArcGIS Hub. See `docs://bc/wfs-query-guide` for the CKAN→WFS two-step workflow.
@@ -90,7 +90,7 @@ See **[EXAMPLES.md](EXAMPLES.md)** for 23 cross-API intelligence scenarios — f
 
 ## How Discovery Works
 
-With 193 tools, listing all of them would consume half an agent's context window. Instead, **BM25 search** lets agents find exactly what they need:
+With 217 tools, listing all of them would consume half an agent's context window. Instead, **BM25 search** lets agents find exactly what they need:
 
 ```
 Agent: "What tools do you have for exchange rates?"
@@ -130,13 +130,14 @@ All tools accept `lang: "en" | "fr"` for bilingual support. Responses include a 
 | [Recalls & Safety](docs/modules/recalls.md) | Federal | 6 | 4 | 6 | Food, vehicle, and health product recalls — [Healthy Canadians](https://healthycanadians.gc.ca/recall-alert-rappel-avis/api/) |
 | [Statistics Canada](docs/modules/statcan.md) | Federal | 15 | 6 | 8 | Time series, cube metadata, SDMX filtering — [StatCan WDS](https://www.statcan.gc.ca/en/developers/wds) |
 | [Weather](docs/modules/weather.md) | Federal | 34 | 6 | 8 | Conditions, climate, air quality, hydrology, marine, radar — [MSC GeoMet](https://api.weather.gc.ca/) |
+| [Alberta](docs/modules/alberta.md) | Provincial | 24 | 6 | 7 | CKAN + AER energy + WMBappServices wildfire + AHSGIS health + 511 Alberta — [open.alberta.ca](https://open.alberta.ca) |
 | [British Columbia](docs/modules/british-columbia.md) | Provincial | 20 | 6 | 7 | CKAN + WFS geospatial — [BC Data Catalogue](https://catalogue.data.gov.bc.ca) |
 | [Ontario](docs/modules/ontario.md) | Provincial | 6 | 4 | 6 | 3,000+ provincial datasets — [Ontario Open Data](https://data.ontario.ca) |
 | [Quebec](docs/modules/quebec.md) | Provincial | 18 | 6 | 7 | Federated CKAN (139 orgs) — [Données Québec](https://www.donneesquebec.ca) |
 | [Toronto](docs/modules/toronto.md) | Municipal | 12 | 6 | 8 | TTC, neighbourhoods, 311, RentSafe — [Toronto Open Data](https://open.toronto.ca) |
 | [York Region](docs/modules/york-region.md) | Municipal | 27 | 5 | 8 | 4 ArcGIS Hub portals (York Region, Markham, Newmarket, Aurora) |
 | [Local Datastore](docs/modules/datastore.md) | Local | 6 | 4 | 6 | SQLite persistence for cross-API SQL JOINs — `~/.mcp-canada/datastore.db` |
-| **Total** | | **193** | **~81** | **~110** | |
+| **Total** | | **217** | **~87** | **~117** | |
 
 ---
 
@@ -195,6 +196,7 @@ src/mcp_canada/
     ├── york_region/       # 27 tools — York Region ArcGIS Hub (4 portals)
     ├── british_columbia/  # 20 tools — BC Data Catalogue + WFS
     ├── quebec/            # 18 tools — Données Québec CKAN
+    ├── alberta/           # 24 tools — open.alberta.ca CKAN + AER + WMB + AHSGIS + 511
     ├── statcan/           # 15 tools — Statistics Canada WDS + SDMX
     └── weather/           # 34 tools — MSC GeoMet OGC API
         ├── current/       # 5 tools — realtime conditions, forecast, alerts

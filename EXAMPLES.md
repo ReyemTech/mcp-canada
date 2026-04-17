@@ -750,6 +750,54 @@ Step 9: ds_query(sql="
 
 ---
 
+### 24. Alberta Energy + Wildfire — The Production vs. Fire Season Map
+
+> "Are Alberta oil & gas production dips correlated with wildfire-season evacuations near producing wells?"
+
+**APIs:** Alberta AER + Alberta Wildfire + Datastore
+
+```
+Step 1: alberta_get_production_volumes(product="Gas")
+        → AER ST3 monthly gas production (current month XLSX)
+
+Step 2: alberta_get_production_volumes(product="Oil")
+        → AER ST3 monthly oil production (includes Bitumen + CrudeOil)
+
+Step 3: alberta_get_active_fires(status="Out of Control")
+        → WMBappServices Active_Wildfires_Dashboard_view, live 5-min TTL
+
+Step 4: alberta_get_fire_perimeters(status="active", include_geometry=true)
+        → Polygon coordinates for overlay against well licence locations
+
+Step 5: alberta_get_well_licences_today
+        → Today's new well licences from AER ST1 TXT
+
+Step 6: ds_create_table(
+          table_name="ab_production_fire_overlap",
+          columns=[
+            {name: "period",         type: "TEXT"},
+            {name: "product",        type: "TEXT"},
+            {name: "volume_e3m3",    type: "REAL"},
+            {name: "fires_nearby",   type: "INTEGER"},
+            {name: "area_evacuated", type: "REAL"}
+          ])
+
+Step 7: ds_insert_data(table_name="ab_production_fire_overlap", rows=[...joined from steps 1-4...])
+
+Step 8: ds_query(sql="
+          SELECT period, product, SUM(volume_e3m3) AS total_vol,
+                 SUM(fires_nearby) AS fires
+          FROM ab_production_fire_overlap
+          WHERE period LIKE '2026-0%'
+          GROUP BY period, product
+          ORDER BY period DESC")
+        → Month-by-month production × active fires near wells
+```
+
+**The insight:** Alberta's energy sector and wildfire response share a geography. The AER ST3 monthly production reports and WMBappServices live fire perimeters are published separately, but joined on date + Forest Area, they surface operational risk — which producing wells are in the evacuation zone this week? See `docs://alberta/aer-data-guide` for the 7 ST3 product slugs (case-sensitive: `Butane`, `Ethane`, `NGL`, `Oil`, `Gas`, `Propane`, `Sulphur`) and `docs://alberta/wildfire-data-guide` for the full WMBappServices source-of-truth matrix.
+
+---
+
 ## Key Patterns
 
 Three structural patterns make these examples work:

@@ -32,6 +32,7 @@ CRITICAL (Phase 15-05 contract — _api_get MUST follow this):
 
 from __future__ import annotations
 
+import datetime
 from typing import Any, Literal
 
 import httpx
@@ -43,16 +44,39 @@ from mcp_canada.shared.parsers import fetch_and_parse  # noqa: F401 — used by 
 from mcp_canada.shared.rate_limiter import get_limiter  # noqa: F401 — used by Plans 02-07
 
 from .constants import (
+    ACTIVE_FIRE_PERIMETERS_FS_URL,
+    ACTIVE_WILDFIRES_FS_URL,
+    AER_ST1_DAILY_BASE,
+    AER_ST1_MONTHLY_BASE,
+    AER_ST3_BASE,
+    AER_ST39_BASE,
     CACHE_KEY_PREFIX,
+    CACHE_TTL_ANNUAL,
+    CACHE_TTL_DAILY,
+    CACHE_TTL_LIVE,
     CACHE_TTL_META,
+    CACHE_TTL_MONTHLY,
     CACHE_TTL_SEARCH,
+    CACHE_TTL_STATIC,
     CKAN_BASE_URL,
+    DAY_ABBR,
     DEFAULT_HEADERS,
+    EXTINGUISHED_PERIMETERS_FS_URL,
+    FIRE_BAN_SYSTEM_FS_URL,
+    FIRE_CONTROL_ORDERS_FS_URL,
     FIVE11_BASE_URL,
+    FOREST_AREA_FS_URL,
+    OHV_RESTRICTION_FS_URL,
     RATE_GROUP_511,
+    RATE_GROUP_AER,
     RATE_GROUP_CKAN,
+    RATE_GROUP_WMB,
     RATE_LIMIT_511,
+    RATE_LIMIT_AER,
     RATE_LIMIT_CKAN,
+    RATE_LIMIT_WMB,
+    ST3_PRODUCTS,
+    USER_AGENT,
 )
 from .schemas import (  # noqa: F401 — re-exported for downstream plans to import from .client if needed
     Alberta511Camera,
@@ -125,6 +149,7 @@ __all__ = [
 
 _ckan_limiter = get_limiter(RATE_GROUP_CKAN, RATE_LIMIT_CKAN)
 _511_limiter = get_limiter(RATE_GROUP_511, RATE_LIMIT_511)
+_aer_limiter = get_limiter(RATE_GROUP_AER, RATE_LIMIT_AER)
 
 
 # ---------------------------------------------------------------------------
@@ -546,32 +571,171 @@ async def fetch_format_categories() -> tuple[list[AlbertaCategory], bool]:
 # ---------------------------------------------------------------------------
 
 
-async def fetch_well_licences_today() -> tuple[list[AlbertaWellLicence], bool]:
-    """Today's new well licences from AER ST1 daily TXT (WELLS{MON..SUN}.TXT). Filled by Plan 03."""
-    raise NotImplementedError("Plan 03 implements")
+# ST1 fixed-width column layout — verified against AER ST1 daily TXT (WELLSSUN.TXT 2026-04-17).
+#
+# The AER ST1 daily report uses a simple space-padded column layout. Columns are
+# detected by first locating the header row ("LIC_NUM" / "OPERATOR_NAME" / ...)
+# and then reading subsequent data rows until EOF. Position-based slicing keeps
+# the parser resilient when individual rows are shorter than the widest data row
+# (trailing columns may be blank/missing for some licences).
+_ST1_COLUMNS: tuple[tuple[str, int, int | None], ...] = (
+    # (field_name, start_inclusive, end_exclusive_or_None_for_line_end)
+    ("licence_number", 0, 9),
+    ("operator", 9, 35),
+    ("well_name", 35, 63),
+    ("field_code", 63, None),
+)
+
+
+def _parse_st1_txt(text: str) -> list[dict[str, Any]]:
+    """Parse AER ST1 fixed-width daily well-licence TXT into snake_case dict rows.
+
+    The ST1 daily TXT rotates by day-of-week (WELLS{MON..SUN}.TXT). Each file
+    begins with a few header / preamble lines ("Alberta Energy Regulator ...",
+    "Run Date: YYYY-MM-DD"), then a column-header row (starts with "LIC_NUM"),
+    then one data row per licence.
+
+    Data rows start with a numeric licence number in cols 0-7. We detect the
+    first such row and read to EOF. Rows shorter than the first data column's
+    start position are skipped as blank/footer padding.
+
+    Returns list[dict] with keys matching the AlbertaWellLicence schema plus the
+    raw `field_code` surfaced for agents that want the field context.
+    """
+    lines = text.splitlines()
+    data_start = next(
+        (
+            i
+            for i, ln in enumerate(lines)
+            if ln[:7].strip().isdigit()
+        ),
+        len(lines),
+    )
+    out: list[dict[str, Any]] = []
+    for raw in lines[data_start:]:
+        if not raw.strip():
+            continue
+        if not raw[:7].strip().isdigit():
+            # Footer / summary lines (e.g. "Total licences issued: N") — stop
+            # parsing once we leave the contiguous numeric-licence block.
+            break
+        record: dict[str, Any] = {}
+        for field, start, end in _ST1_COLUMNS:
+            segment = raw[start:end] if end is not None else raw[start:]
+            value = segment.strip()
+            record[field] = value or None
+        out.append(record)
+    return out
+
+
+async def fetch_well_licences_today() -> tuple[list[dict[str, Any]], bool]:
+    """Today's new well licences from AER ST1 daily TXT (WELLS{MON..SUN}.TXT).
+
+    The AER rotates ST1 daily TXT files by day-of-week; this tool always returns
+    the file for "today" based on the local weekday. The AER root URL returns a
+    303 redirect to `static.aer.ca` — we use httpx with `follow_redirects=True`.
+
+    Returns list[dict] rows with `licence_number`, `operator`, `well_name`, and
+    `field_code` keys parsed from the fixed-width TXT via `_parse_st1_txt`.
+    """
+    today_abbr = DAY_ABBR[datetime.date.today().weekday()]
+    url = f"{AER_ST1_DAILY_BASE}/WELLS{today_abbr}.TXT"
+    cache_key = f"{CACHE_KEY_PREFIX}aer_st1_daily:{today_abbr}"
+
+    async def _fetch() -> list[dict[str, Any]]:
+        await _aer_limiter.acquire()
+        async with httpx.AsyncClient(
+            follow_redirects=True,
+            timeout=30.0,
+            headers={"User-Agent": USER_AGENT},
+        ) as ac:
+            resp = await ac.get(url)
+            resp.raise_for_status()
+            return _parse_st1_txt(resp.text)
+
+    return await cached_fetch(cache_key, CACHE_TTL_DAILY, _fetch)
 
 
 async def fetch_well_licences_archive(
     year: int,
     month: int | None = None,
-) -> tuple[list[AlbertaWellLicence], bool]:
-    """Archived well licences from AER ST1 monthly/annual ZIP. Filled by Plan 03."""
-    raise NotImplementedError("Plan 03 implements")
+) -> tuple[dict[str, Any], bool]:
+    """Discovery-only lookup of AER ST1 monthly / annual archive ZIP URL.
+
+    Returns the URL and metadata for the archived well-licence ZIP for a given
+    year (+ optional month). The contents are large fixed-width TXT files that
+    should NOT be auto-parsed; agents are expected to download externally.
+
+    URL pattern:
+      - year + month: `{AER_ST1_MONTHLY_BASE}/dwll{YYYY}-{MM}.zip`
+      - year only:    `{AER_ST1_MONTHLY_BASE}/dwll{YYYY}.zip`
+    """
+    if month is not None:
+        filename = f"dwll{year}-{month:02d}.zip"
+    else:
+        filename = f"dwll{year}.zip"
+    url = f"{AER_ST1_MONTHLY_BASE}/{filename}"
+    payload: dict[str, Any] = {
+        "url": url,
+        "year": year,
+        "month": month,
+        "note": (
+            "Monthly archive ZIP — fixed-width TXT contents. "
+            "Download externally; do not auto-parse."
+        ),
+    }
+    return payload, False
 
 
 async def fetch_pipeline_statistics(
     year: int,
-) -> tuple[list[AlbertaPipelineRow], bool]:
-    """Pipeline statistics from AER ST39 annual XLSX. Filled by Plan 03."""
-    raise NotImplementedError("Plan 03 implements")
+) -> tuple[list[dict[str, Any]], bool]:
+    """Pipeline statistics from AER ST39 annual XLS.
+
+    Fetches `ST39-{YYYY}.xls` from `static.aer.ca` and flattens multi-sheet
+    content via `shared/parsers.fetch_and_parse`. Rows have snake_case keys
+    (substance, length_km, operator, year — exact keys depend on sheet layout).
+    """
+    url = f"{AER_ST39_BASE}/ST39-{year}.xls"
+    cache_key = f"{CACHE_KEY_PREFIX}aer_st39:{year}"
+
+    async def _fetch() -> list[dict[str, Any]]:
+        await _aer_limiter.acquire()
+        rows, _ = await fetch_and_parse(url, ttl=CACHE_TTL_ANNUAL)
+        return rows
+
+    return await cached_fetch(cache_key, CACHE_TTL_ANNUAL, _fetch)
 
 
 async def fetch_production_volumes(
     product: str,
     period: Literal["current", "monthly"] = "current",
-) -> tuple[list[AlbertaProductionRow], bool]:
-    """Monthly production volumes from AER ST3 per-product XLSX (Butane/Ethane/NGL/Oil/Gas/Propane/Sulphur). Filled by Plan 03."""
-    raise NotImplementedError("Plan 03 implements")
+) -> tuple[list[dict[str, Any]], bool]:
+    """Monthly production volumes from AER ST3 per-product XLSX.
+
+    Valid products (Pitfall 8 — exact case):
+      Butane, Ethane, NGL, Oil, Gas, Propane, Sulphur.
+
+    `period="current"` (the only currently-supported value) hits
+    `{Product}_current.xlsx`, which always reflects the latest month.
+
+    Raises:
+        ValueError: If `product` is not in `ST3_PRODUCTS` (includes hint).
+    """
+    if product not in ST3_PRODUCTS:
+        raise ValueError(
+            f"Invalid product '{product}'. "
+            f"Valid products: {list(ST3_PRODUCTS)}"
+        )
+    url = f"{AER_ST3_BASE}/{product}_current.xlsx"
+    cache_key = f"{CACHE_KEY_PREFIX}aer_st3:{product}:{period}"
+
+    async def _fetch() -> list[dict[str, Any]]:
+        await _aer_limiter.acquire()
+        rows, _ = await fetch_and_parse(url, ttl=CACHE_TTL_MONTHLY)
+        return rows
+
+    return await cached_fetch(cache_key, CACHE_TTL_MONTHLY, _fetch)
 
 
 # ---------------------------------------------------------------------------

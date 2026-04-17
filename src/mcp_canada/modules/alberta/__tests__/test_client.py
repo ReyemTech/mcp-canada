@@ -436,19 +436,185 @@ class TestAlbertaListCategories:  # Plan 02
 
 
 class TestAlbertaWellLicencesToday:  # Plan 03
-    pass
+    """fetch_well_licences_today — AER ST1 daily TXT (WELLS{day}.TXT)."""
+
+    @pytest.mark.asyncio
+    async def test_today_parses_fixed_width(self, sample_aer_st1_text):
+        """Parses ST1 fixed-width TXT → list of dicts with snake_case keys."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        mock_response = AsyncMock()
+        mock_response.text = sample_aer_st1_text
+        mock_response.raise_for_status = lambda: None
+
+        class _FakeClient:
+            def __init__(self, *a, **kw):
+                self._kwargs = kw
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+            async def get(self, url, **kw):
+                return mock_response
+
+        with patch.object(ab_client.httpx, "AsyncClient", _FakeClient):
+            rows, cached = await ab_client.fetch_well_licences_today()
+
+        assert isinstance(rows, list)
+        assert len(rows) == 3
+        # Snake-case keys only, strings (or None) for values
+        first = rows[0]
+        assert "licence_number" in first
+        assert first["licence_number"] == "0467890"
+        # Either operator or well_name should carry the Tourmaline text
+        text_values = " ".join(str(v or "") for v in first.values()).upper()
+        assert "TOURMALINE" in text_values
+
+    @pytest.mark.asyncio
+    async def test_today_handles_303_redirect(self, sample_aer_st1_text):
+        """httpx.AsyncClient is constructed with follow_redirects=True."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        mock_response = AsyncMock()
+        mock_response.text = sample_aer_st1_text
+        mock_response.raise_for_status = lambda: None
+
+        captured_kwargs: dict = {}
+
+        class _FakeClient:
+            def __init__(self, *a, **kw):
+                captured_kwargs.update(kw)
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+            async def get(self, url, **kw):
+                return mock_response
+
+        with patch.object(ab_client.httpx, "AsyncClient", _FakeClient):
+            await ab_client.fetch_well_licences_today()
+
+        assert captured_kwargs.get("follow_redirects") is True
+
+    @pytest.mark.asyncio
+    async def test_today_uses_correct_day_url(self, sample_aer_st1_text, monkeypatch):
+        """URL contains the day-of-week abbreviation matching today's weekday."""
+        import datetime as _dt
+
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.constants import DAY_ABBR
+
+        # Freeze "today" to a known Wednesday (2026-04-15 is a Wednesday per ISO)
+        class _FrozenDate(_dt.date):
+            @classmethod
+            def today(cls):
+                return cls(2026, 4, 15)  # Wednesday
+
+        monkeypatch.setattr(ab_client.datetime, "date", _FrozenDate)
+
+        captured_url: dict = {}
+        mock_response = AsyncMock()
+        mock_response.text = sample_aer_st1_text
+        mock_response.raise_for_status = lambda: None
+
+        class _FakeClient:
+            def __init__(self, *a, **kw):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+            async def get(self, url, **kw):
+                captured_url["url"] = url
+                return mock_response
+
+        with patch.object(ab_client.httpx, "AsyncClient", _FakeClient):
+            await ab_client.fetch_well_licences_today()
+
+        expected_day = DAY_ABBR[2]  # weekday=2 -> WED
+        assert expected_day == "WED"
+        assert f"WELLS{expected_day}.TXT" in captured_url["url"]
 
 
 class TestAlbertaWellLicencesArchive:  # Plan 03
-    pass
+    """fetch_well_licences_archive — discovery-only metadata (no fetch)."""
+
+    @pytest.mark.asyncio
+    async def test_archive_returns_metadata_only(self):
+        """Returns dict with url/year/month/note — does NOT call fetch_and_parse."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        mock_fap = AsyncMock(return_value=([], False))
+        with patch.object(ab_client, "fetch_and_parse", mock_fap):
+            payload, _ = await ab_client.fetch_well_licences_archive(2026, 3)
+
+        mock_fap.assert_not_called()
+        assert isinstance(payload, dict)
+        assert payload["year"] == 2026
+        assert payload["month"] == 3
+        assert "url" in payload
+        assert "dwll2026-03.zip" in payload["url"]
+        assert "note" in payload
 
 
 class TestAlbertaPipelineStatistics:  # Plan 03
-    pass
+    """fetch_pipeline_statistics — AER ST39 annual XLS via fetch_and_parse."""
+
+    @pytest.mark.asyncio
+    async def test_pipeline_statistics_uses_correct_url(
+        self, sample_aer_st39_rows
+    ):
+        """Passes ST39-{year}.xls URL to fetch_and_parse."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        mock_fap = AsyncMock(return_value=(sample_aer_st39_rows, False))
+        with patch.object(ab_client, "fetch_and_parse", mock_fap):
+            rows, _ = await ab_client.fetch_pipeline_statistics(2024)
+
+        call = mock_fap.call_args
+        url = call.args[0] if call.args else call.kwargs["url"]
+        assert url.endswith("ST39-2024.xls")
+        assert rows == sample_aer_st39_rows
 
 
 class TestAlbertaProductionVolumes:  # Plan 03
-    pass
+    """fetch_production_volumes — AER ST3 monthly XLSX (7 products)."""
+
+    @pytest.mark.asyncio
+    async def test_production_volumes_valid_product(self, sample_aer_st3_xlsx_rows):
+        """Valid product='Gas' → fetches Gas_current.xlsx, returns rows."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        mock_fap = AsyncMock(return_value=(sample_aer_st3_xlsx_rows, False))
+        with patch.object(ab_client, "fetch_and_parse", mock_fap):
+            rows, _ = await ab_client.fetch_production_volumes("Gas")
+
+        call = mock_fap.call_args
+        url = call.args[0] if call.args else call.kwargs["url"]
+        assert url.endswith("Gas_current.xlsx")
+        assert rows == sample_aer_st3_xlsx_rows
+
+    @pytest.mark.asyncio
+    async def test_production_volumes_invalid_product_raises(self):
+        """Invalid product='Bitumen' → ValueError with valid-product hint (Pitfall 8)."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        with pytest.raises(ValueError) as exc_info:
+            await ab_client.fetch_production_volumes("Bitumen")
+        msg = str(exc_info.value)
+        assert "Bitumen" in msg or "invalid" in msg.lower()
+        # Valid products list should be surfaced in the error message
+        for product in ("Butane", "Gas", "Oil"):
+            assert product in msg
 
 
 # ---------------------------------------------------------------------------
@@ -457,19 +623,183 @@ class TestAlbertaProductionVolumes:  # Plan 03
 
 
 class TestAlbertaActiveFires:  # Plan 04
-    pass
+    """fetch_active_fires — WMBappServices Active_Wildfires_Dashboard_view layer 0."""
+
+    @pytest.mark.asyncio
+    async def test_calls_correct_featureserver(self, sample_arcgis_query_geojson):
+        """service_url must be ACTIVE_WILDFIRES_FS_URL and layer_id == 0."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.constants import ACTIVE_WILDFIRES_FS_URL
+
+        features = sample_arcgis_query_geojson["features"]
+        mock_qfs = AsyncMock(return_value=(features, False))
+        with patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs):
+            await ab_client.fetch_active_fires()
+        call = mock_qfs.call_args
+        service_url = call.args[0] if call.args else call.kwargs["service_url"]
+        layer_id = call.args[1] if len(call.args) > 1 else call.kwargs["layer_id"]
+        assert service_url == ACTIVE_WILDFIRES_FS_URL
+        assert layer_id == 0
+
+    @pytest.mark.asyncio
+    async def test_status_filter(self, sample_arcgis_query_geojson):
+        """status='Out of Control' passes where=\"FIRE_STATUS='Out of Control'\"."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        features = sample_arcgis_query_geojson["features"]
+        mock_qfs = AsyncMock(return_value=(features, False))
+        with patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs):
+            await ab_client.fetch_active_fires(status="Out of Control")
+        kwargs = mock_qfs.call_args.kwargs
+        assert kwargs.get("where") == "FIRE_STATUS='Out of Control'"
+
+    @pytest.mark.asyncio
+    async def test_no_status_no_where_clause(self, sample_arcgis_query_geojson):
+        """status=None → where=None passed through."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        features = sample_arcgis_query_geojson["features"]
+        mock_qfs = AsyncMock(return_value=(features, False))
+        with patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs):
+            await ab_client.fetch_active_fires()
+        kwargs = mock_qfs.call_args.kwargs
+        assert kwargs.get("where") is None
+
+    @pytest.mark.asyncio
+    async def test_truncated_flag_propagates(self, sample_arcgis_query_geojson):
+        """When query_feature_service reports truncated=True, result dict carries it."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        features = sample_arcgis_query_geojson["features"]
+        mock_qfs = AsyncMock(return_value=(features, True))
+        with patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs):
+            payload, _ = await ab_client.fetch_active_fires()
+        assert payload["truncated"] is True
+        assert payload["count"] == len(features)
+        assert payload["features"] == features
 
 
 class TestAlbertaFirePerimeters:  # Plan 04
-    pass
+    """fetch_fire_perimeters — active vs extinguished dispatcher."""
+
+    @pytest.mark.asyncio
+    async def test_active_dispatch(self, sample_arcgis_query_geojson):
+        """status='active' uses ACTIVE_FIRE_PERIMETERS_FS_URL."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.constants import ACTIVE_FIRE_PERIMETERS_FS_URL
+
+        features = sample_arcgis_query_geojson["features"]
+        mock_qfs = AsyncMock(return_value=(features, False))
+        with patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs):
+            await ab_client.fetch_fire_perimeters(status="active")
+        call = mock_qfs.call_args
+        service_url = call.args[0] if call.args else call.kwargs["service_url"]
+        assert service_url == ACTIVE_FIRE_PERIMETERS_FS_URL
+
+    @pytest.mark.asyncio
+    async def test_extinguished_dispatch(self, sample_arcgis_query_geojson):
+        """status='extinguished' uses EXTINGUISHED_PERIMETERS_FS_URL."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.constants import EXTINGUISHED_PERIMETERS_FS_URL
+
+        features = sample_arcgis_query_geojson["features"]
+        mock_qfs = AsyncMock(return_value=(features, False))
+        with patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs):
+            await ab_client.fetch_fire_perimeters(status="extinguished")
+        call = mock_qfs.call_args
+        service_url = call.args[0] if call.args else call.kwargs["service_url"]
+        assert service_url == EXTINGUISHED_PERIMETERS_FS_URL
+
+    @pytest.mark.asyncio
+    async def test_invalid_status_raises(self):
+        """status='bogus' raises ValueError (dispatcher guard)."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        with pytest.raises(ValueError):
+            await ab_client.fetch_fire_perimeters(status="bogus")  # type: ignore[arg-type]
 
 
 class TestAlbertaFireBans:  # Plan 04
-    pass
+    """fetch_fire_bans — WMBappServices alberta_fire_ban_system FeatureServer."""
+
+    @pytest.mark.asyncio
+    async def test_calls_ban_system_featureserver(self, sample_arcgis_query_geojson):
+        """service_url must be FIRE_BAN_SYSTEM_FS_URL and layer_id == 0."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.constants import FIRE_BAN_SYSTEM_FS_URL
+
+        features = sample_arcgis_query_geojson["features"]
+        mock_qfs = AsyncMock(return_value=(features, False))
+        with patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs):
+            payload, _ = await ab_client.fetch_fire_bans()
+        call = mock_qfs.call_args
+        service_url = call.args[0] if call.args else call.kwargs["service_url"]
+        layer_id = call.args[1] if len(call.args) > 1 else call.kwargs["layer_id"]
+        assert service_url == FIRE_BAN_SYSTEM_FS_URL
+        assert layer_id == 0
+        assert payload["count"] == len(features)
 
 
 class TestAlbertaFireControlOrders:  # Plan 04
-    pass
+    """fetch_fire_control_orders — category dispatcher over 3 URLs."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "category,expected_const_name",
+        [
+            ("fire_control", "FIRE_CONTROL_ORDERS_FS_URL"),
+            ("ohv_restriction", "OHV_RESTRICTION_FS_URL"),
+            ("forest_area", "FOREST_AREA_FS_URL"),
+        ],
+    )
+    async def test_dispatches_by_category(
+        self, sample_arcgis_query_geojson, category, expected_const_name
+    ):
+        """category dispatch: fire_control / ohv_restriction / forest_area each use its own URL."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta import constants as ab_const
+
+        expected_url = getattr(ab_const, expected_const_name)
+        features = sample_arcgis_query_geojson["features"]
+        mock_qfs = AsyncMock(return_value=(features, False))
+        with patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs):
+            await ab_client.fetch_fire_control_orders(category=category)  # type: ignore[arg-type]
+        call = mock_qfs.call_args
+        service_url = call.args[0] if call.args else call.kwargs["service_url"]
+        assert service_url == expected_url
+
+    @pytest.mark.asyncio
+    async def test_forest_area_uses_static_ttl(self, sample_arcgis_query_geojson):
+        """category='forest_area' passes CACHE_TTL_STATIC to cached_fetch."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.constants import CACHE_TTL_STATIC
+
+        features = sample_arcgis_query_geojson["features"]
+        mock_qfs = AsyncMock(return_value=(features, False))
+
+        captured_ttl: dict[str, int] = {}
+
+        async def _capture_cached_fetch(key, ttl, fetcher):
+            captured_ttl["ttl"] = ttl
+            return (await fetcher(), False)
+
+        with (
+            patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs),
+            patch(
+                "mcp_canada.modules.alberta.client.cached_fetch",
+                new=_capture_cached_fetch,
+            ),
+        ):
+            await ab_client.fetch_fire_control_orders(category="forest_area")
+        assert captured_ttl.get("ttl") == CACHE_TTL_STATIC
+
+    @pytest.mark.asyncio
+    async def test_invalid_category_raises(self):
+        """category='bogus' raises ValueError (dispatcher guard)."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        with pytest.raises(ValueError):
+            await ab_client.fetch_fire_control_orders(category="bogus")  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------

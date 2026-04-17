@@ -141,11 +141,11 @@
 
 ### Alberta Government Open Data
 
-- **AB-01**: Agent can search Alberta's open.alberta.ca CKAN catalogue (33,269 datasets) by keyword with optional `organization`, `format`, and pagination filters
-- **AB-02**: Agent can get full details for an Alberta dataset by id/slug, including resources list with format and URL — flattening 50+ Alberta CKAN extras (publication identifiers) to the agent-useful subset
-- **AB-03**: Agent can query a dataset (file resource OR live ESRI REST FeatureServer) via auto-router — routes ESRI REST → arcgis_hub.query_feature_service; CSV/XLSX/JSON → fetch_and_parse; PDF/ZIP/KML → metadata-only; FeatureServer preferred over MapServer
-- **AB-04**: Agent can list 370 federated Alberta organizations (current ministries + ~150 historical predecessor ministries + Crown corps + advisory committees)
-- **AB-05**: Agent can list dataset format categories — Alberta CKAN does NOT use groups (group_list returns empty); uses res_format facet via package_search
+- [x] **AB-01**: Agent can search Alberta's open.alberta.ca CKAN catalogue (33,269 datasets) by keyword with optional `organization`, `format`, and pagination filters
+- [x] **AB-02**: Agent can get full details for an Alberta dataset by id/slug, including resources list with format and URL — flattening 50+ Alberta CKAN extras (publication identifiers) to the agent-useful subset
+- [x] **AB-03**: Agent can query a dataset (file resource OR live ESRI REST FeatureServer) via auto-router — routes ESRI REST → arcgis_hub.query_feature_service; CSV/XLSX/JSON → fetch_and_parse; PDF/ZIP/KML → metadata-only; FeatureServer preferred over MapServer
+- [x] **AB-04**: Agent can list 370 federated Alberta organizations (current ministries + ~150 historical predecessor ministries + Crown corps + advisory committees)
+- [x] **AB-05**: Agent can list dataset format categories — Alberta CKAN does NOT use groups (group_list returns empty); uses res_format facet via package_search
 - **AB-06**: Agent can fetch today's AER ST1 daily well licences from static.aer.ca/prd/data/well-lic/WELLS{day}.TXT (rotates by day-of-week, fixed-width plain-text parsed inline)
 - **AB-07**: Agent can get the AER ST1 monthly archive ZIP URL by year/month (discovery-only — files are large fixed-width TXT, not auto-parsed)
 - **AB-08**: Agent can fetch AER ST39 annual pipeline statistics XLSX for a verified year (length by substance/operator)
@@ -163,7 +163,7 @@
 - **AB-20**: Agent can get traffic camera locations and snapshot URLs (~376 cameras) from 511 Alberta v2 API at /api/v2/get/cameras
 - **AB-21**: Agent can get 75 air quality monitoring stations with current pollutant readings (SO2/H2S/TRS/O3/NO2/CO/PM2.5/etc.) from GeoDiscover Alberta AQHI MapServer layer 1
 - **AB-22**: Agent can get water management advisories dispatched by advisory_type: Literal["river","water_management","drought","ice_cover","water_sharing"] from GeoDiscover river forecast centre FeatureServer
-- **AB-23**: Water licence registry (87MB+ active, 169MB+ inactive) is exposed as discovery-only via alberta_search_datasets / alberta_get_dataset_details with row-filter requirement documented in tool docstring + docs://alberta/wildfire-data-guide resource
+- [x] **AB-23**: Water licence registry (87MB+ active, 169MB+ inactive) is exposed as discovery-only via alberta_search_datasets / alberta_get_dataset_details with row-filter requirement documented in tool docstring + docs://alberta/wildfire-data-guide resource
 - **AB-24**: Agent can get historical major crop production statistics (2000-2014 Alberta Official Statistic) from open.alberta.ca CKAN major-crop-production-alberta package CSV
 - **AB-25**: Agent can get population estimates with optional breakdown: csd (default) / quarterly / annual / age_sex / sub_provincial / components_of_growth — complementing StatCan (Alberta provides CSD-level municipal; StatCan provides CMA-level only)
 - **AB-26**: Agent can get all Alberta provincial parks and protected areas from GeoDiscover boundary/parks_protected_areas_alberta FeatureServer
@@ -301,11 +301,11 @@
 | PR-18 | Phase 40 | Planned |
 | PR-19 | Phase 40 | Planned |
 | PR-20 | Phase 40 | Planned |
-| AB-01 | Phase 17 | Planned |
-| AB-02 | Phase 17 | Planned |
-| AB-03 | Phase 17 | Planned |
-| AB-04 | Phase 17 | Planned |
-| AB-05 | Phase 17 | Planned |
+| AB-01 | Phase 17 | Complete |
+| AB-02 | Phase 17 | Complete |
+| AB-03 | Phase 17 | Complete |
+| AB-04 | Phase 17 | Complete |
+| AB-05 | Phase 17 | Complete |
 | AB-06 | Phase 17 | Planned |
 | AB-07 | Phase 17 | Planned |
 | AB-08 | Phase 17 | Planned |
@@ -323,7 +323,7 @@
 | AB-20 | Phase 17 | Planned |
 | AB-21 | Phase 17 | Planned |
 | AB-22 | Phase 17 | Planned |
-| AB-23 | Phase 17 | Planned |
+| AB-23 | Phase 17 | Complete |
 | AB-24 | Phase 17 | Planned |
 | AB-25 | Phase 17 | Planned |
 | AB-26 | Phase 17 | Planned |

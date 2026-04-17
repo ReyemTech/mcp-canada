@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 17-05-PLAN.md
-last_updated: "2026-04-17T18:59:46.273Z"
+stopped_at: Completed 17-04-PLAN.md
+last_updated: "2026-04-17T19:05:44.977Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 11
   total_plans: 48
-  completed_plans: 43
+  completed_plans: 44
   percent: 0
 ---
 
@@ -91,6 +91,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 17-alberta-government-open-data P02 | 6min | 2 tasks | 4 files |
 | Phase 17-alberta-government-open-data P03 | 5min | 2 tasks tasks | 4 files files |
 | Phase 17-alberta-government-open-data P05 | 7 min | 2 tasks | 4 files |
+| Phase 17-alberta-government-open-data P04 | 13min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -209,6 +210,9 @@ Recent decisions affecting current work:
 - [Phase 17-alberta-government-open-data]: ST3 INVALID_INPUT includes valid=[7 products] in error extras (Pitfall 8); French inline ternary via lang == 'fr'
 - [Phase 17-alberta-government-open-data]: No shared/aer.py extraction — AER tools use fetch_and_parse() + direct httpx for ~30 LOC ST1 parsing (reuse threshold not met)
 - [Phase 17-alberta-government-open-data]: Plan 05 AHS tools: fetch_* functions return dict payloads (features/count/truncated), double-guard on facility_type (tool INVALID_INPUT + client ValueError), hospital zone filter via case-insensitive Location substring (no polygon containment)
+- [Phase 17-alberta-government-open-data]: Wildfire tools use shared WMB module-level limiter (_wmb_limiter) at module scope; 4 fetchers share the 5 r/s TokenBucket; no GeoDiscover wildfire folder calls (Pitfall 3 honored)
+- [Phase 17-alberta-government-open-data]: fetch_fire_weather (FWI) dropped — not publicly available on any Alberta portal; replaced by fetch_fire_control_orders surfacing control orders / OHV / forest area boundaries via single category-dispatched tool
+- [Phase 17-alberta-government-open-data]: Wave 0 scaffold signatures for fetch_fire_perimeters (dropped year param) and fetch_fire_control_orders (added category param) updated inline during Plan 04 implementation to match plan spec
 
 ### Roadmap Evolution
 
@@ -236,6 +240,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-17T18:59:41.763Z
-Stopped at: Completed 17-05-PLAN.md
+Last session: 2026-04-17T19:05:44.974Z
+Stopped at: Completed 17-04-PLAN.md
 Resume file: None

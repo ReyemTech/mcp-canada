@@ -150,11 +150,11 @@
 - [x] **AB-07**: Agent can get the AER ST1 monthly archive ZIP URL by year/month (discovery-only — files are large fixed-width TXT, not auto-parsed)
 - [x] **AB-08**: Agent can fetch AER ST39 annual pipeline statistics XLSX for a verified year (length by substance/operator)
 - [x] **AB-09**: Agent can fetch AER ST3 monthly oil/gas/bitumen production volumes for one of 7 verified products (Butane/Ethane/NGL/Oil/Gas/Propane/Sulphur — case-sensitive, Pitfall 8)
-- **AB-10**: Agent can get current active wildfires from WMBappServices Active_Wildfires_Dashboard_view FeatureServer with optional fire_status filter
-- **AB-11**: Agent can get wildfire perimeters dispatched by status: Literal["active","extinguished"] from WMBappServices simplified-view FeatureServers
-- **AB-12**: Historical wildfire data (2006-current CSV) is documented as routed via alberta_query_dataset (CKAN wildfire-data package) — NO dedicated tool
-- **AB-13**: Agent can get current province-wide fire bans from WMBappServices alberta_fire_ban_system FeatureServer (the data backend behind albertafirebans.ca)
-- **AB-14**: Agent can get fire control orders, OHV restrictions, and forest area boundaries via single tool dispatched by category param (replaces deferred alberta_get_fire_weather since FWI is not publicly published)
+- [x] **AB-10**: Agent can get current active wildfires from WMBappServices Active_Wildfires_Dashboard_view FeatureServer with optional fire_status filter
+- [x] **AB-11**: Agent can get wildfire perimeters dispatched by status: Literal["active","extinguished"] from WMBappServices simplified-view FeatureServers
+- [x] **AB-12**: Historical wildfire data (2006-current CSV) is documented as routed via alberta_query_dataset (CKAN wildfire-data package) — NO dedicated tool
+- [x] **AB-13**: Agent can get current province-wide fire bans from WMBappServices alberta_fire_ban_system FeatureServer (the data backend behind albertafirebans.ca)
+- [x] **AB-14**: Agent can get fire control orders, OHV restrictions, and forest area boundaries via single tool dispatched by category param (replaces deferred alberta_get_fire_weather since FWI is not publicly published)
 - [x] **AB-15**: Agent can get 101 AHS hospitals with zone/IP/ED capability flags from AHSGIS AHS_Hospitals FeatureServer
 - [x] **AB-16**: Agent can get EMS station OR PCN clinic locations from AHSGIS via single tool dispatched by facility_type param (subsumes deferred ER wait times — Pitfall 9)
 - [x] **AB-17**: Agent can get 5 AHS zone boundaries (South, Calgary, Central, Edmonton, North) with POP2006/2011/2016 population from AHS_Zone FeatureServer
@@ -310,11 +310,11 @@
 | AB-07 | Phase 17 | Complete |
 | AB-08 | Phase 17 | Complete |
 | AB-09 | Phase 17 | Complete |
-| AB-10 | Phase 17 | Planned |
-| AB-11 | Phase 17 | Planned |
-| AB-12 | Phase 17 | Planned |
-| AB-13 | Phase 17 | Planned |
-| AB-14 | Phase 17 | Planned |
+| AB-10 | Phase 17 | Complete |
+| AB-11 | Phase 17 | Complete |
+| AB-12 | Phase 17 | Complete |
+| AB-13 | Phase 17 | Complete |
+| AB-14 | Phase 17 | Complete |
 | AB-15 | Phase 17 | Complete |
 | AB-16 | Phase 17 | Complete |
 | AB-17 | Phase 17 | Complete |

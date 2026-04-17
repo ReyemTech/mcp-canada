@@ -972,15 +972,203 @@ class TestAlbertaHealthFacilities:  # Plan 05
 
 
 class TestAlbertaRoadEvents:  # Plan 06
-    pass
+    """fetch_road_events — 511 Alberta v2 /event (Pitfall 6: raw JSON list, not CKAN envelope)."""
+
+    @pytest.mark.asyncio
+    async def test_calls_event_endpoint(self, sample_511_event_list):
+        """_511_get('event') is called (NOT _api_get — Pitfall 6)."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        mock_get = AsyncMock(return_value=sample_511_event_list)
+        with patch.object(ab_client, "_511_get", new=mock_get):
+            payload, _ = await ab_client.fetch_road_events()
+        assert mock_get.call_args.args[0] == "event"
+        assert payload["count"] == 3
+        assert len(payload["events"]) == 3
+
+    @pytest.mark.asyncio
+    async def test_event_type_filter(self, sample_511_event_list):
+        """event_type='Closure' filters to rows whose EventType contains 'closure' (case-insensitive)."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        with patch.object(
+            ab_client,
+            "_511_get",
+            new=AsyncMock(return_value=sample_511_event_list),
+        ):
+            payload, _ = await ab_client.fetch_road_events(event_type="Closure")
+        assert payload["count"] == 1
+        assert payload["events"][0]["EventType"] == "closure"
+
+    @pytest.mark.asyncio
+    async def test_no_filter_returns_all(self, sample_511_event_list):
+        """event_type=None returns every event without filtering."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        with patch.object(
+            ab_client,
+            "_511_get",
+            new=AsyncMock(return_value=sample_511_event_list),
+        ):
+            payload, _ = await ab_client.fetch_road_events(event_type=None)
+        assert payload["count"] == 3
+        assert {e["EventType"] for e in payload["events"]} == {
+            "closure",
+            "construction",
+            "incident",
+        }
+
+    @pytest.mark.asyncio
+    async def test_uses_live_ttl_and_511_rate_limit(self, sample_511_event_list):
+        """cached_fetch ttl is CACHE_TTL_LIVE; get_limiter is called with RATE_GROUP_511."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.constants import (
+            CACHE_TTL_LIVE,
+            RATE_GROUP_511,
+            RATE_LIMIT_511,
+        )
+
+        captured_ttls: list[int] = []
+
+        async def _capture_ttl(key, ttl, fetcher):
+            captured_ttls.append(ttl)
+            return (await fetcher(), False)
+
+        limiter_calls: list[tuple[str, float]] = []
+
+        def _capture_limiter(source, rate):
+            limiter_calls.append((source, rate))
+            mock_limiter = AsyncMock()
+            mock_limiter.acquire = AsyncMock()
+            return mock_limiter
+
+        with (
+            patch.object(ab_client, "cached_fetch", new=_capture_ttl),
+            patch.object(ab_client, "get_limiter", new=_capture_limiter),
+            patch.object(
+                ab_client,
+                "_511_get",
+                new=AsyncMock(return_value=sample_511_event_list),
+            ),
+        ):
+            await ab_client.fetch_road_events()
+        assert CACHE_TTL_LIVE in captured_ttls
+        assert (RATE_GROUP_511, RATE_LIMIT_511) in limiter_calls
 
 
 class TestAlbertaWinterRoadConditions:  # Plan 06
-    pass
+    """fetch_winter_road_conditions — 511 /winterroads."""
+
+    @pytest.mark.asyncio
+    async def test_calls_winterroads_endpoint(self, sample_511_winter_roads):
+        """_511_get('winterroads') is called (NOT _api_get — Pitfall 6)."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        mock_get = AsyncMock(return_value=sample_511_winter_roads)
+        with patch.object(ab_client, "_511_get", new=mock_get):
+            payload, _ = await ab_client.fetch_winter_road_conditions()
+        assert mock_get.call_args.args[0] == "winterroads"
+        assert payload["count"] == 2
+        assert len(payload["conditions"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_area_name_filter(self):
+        """area_name='Calgary' matches AreaName substring case-insensitively."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        rows = [
+            {"ID": "wr-1", "AreaName": "Calgary Region", "RoadwayName": "Hwy 2"},
+            {"ID": "wr-2", "AreaName": "Edmonton", "RoadwayName": "Hwy 16"},
+            {"ID": "wr-3", "AreaName": "calgary south", "RoadwayName": "Hwy 22X"},
+        ]
+        with patch.object(
+            ab_client, "_511_get", new=AsyncMock(return_value=rows)
+        ):
+            payload, _ = await ab_client.fetch_winter_road_conditions(
+                area_name="Calgary"
+            )
+        assert payload["count"] == 2
+        assert all(
+            "calgary" in (c.get("AreaName", "") or "").lower()
+            for c in payload["conditions"]
+        )
+
+    @pytest.mark.asyncio
+    async def test_uses_live_ttl(self, sample_511_winter_roads):
+        """Winter road conditions use CACHE_TTL_LIVE (refreshed every 5 min)."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.constants import CACHE_TTL_LIVE
+
+        captured_ttls: list[int] = []
+
+        async def _capture_ttl(key, ttl, fetcher):
+            captured_ttls.append(ttl)
+            return (await fetcher(), False)
+
+        with (
+            patch.object(ab_client, "cached_fetch", new=_capture_ttl),
+            patch.object(
+                ab_client,
+                "_511_get",
+                new=AsyncMock(return_value=sample_511_winter_roads),
+            ),
+        ):
+            await ab_client.fetch_winter_road_conditions()
+        assert CACHE_TTL_LIVE in captured_ttls
 
 
 class TestAlbertaTrafficCameras:  # Plan 06
-    pass
+    """fetch_traffic_cameras — 511 /cameras."""
+
+    @pytest.mark.asyncio
+    async def test_calls_cameras_endpoint(self, sample_511_cameras):
+        """_511_get('cameras') is called (NOT _api_get — Pitfall 6)."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        mock_get = AsyncMock(return_value=sample_511_cameras)
+        with patch.object(ab_client, "_511_get", new=mock_get):
+            payload, _ = await ab_client.fetch_traffic_cameras()
+        assert mock_get.call_args.args[0] == "cameras"
+        assert payload["count"] == 2
+        assert len(payload["cameras"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_views_array_preserved(self, sample_511_cameras):
+        """Views array with Url/Direction dicts flows through unmodified."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        with patch.object(
+            ab_client,
+            "_511_get",
+            new=AsyncMock(return_value=sample_511_cameras),
+        ):
+            payload, _ = await ab_client.fetch_traffic_cameras()
+        cam0 = payload["cameras"][0]
+        assert isinstance(cam0["Views"], list)
+        assert cam0["Views"][0]["Url"].startswith("https://511.alberta.ca/")
+
+    @pytest.mark.asyncio
+    async def test_uses_monthly_ttl(self, sample_511_cameras):
+        """Cameras cached 24h (CACHE_TTL_MONTHLY) — locations stable."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.constants import CACHE_TTL_MONTHLY
+
+        captured_ttls: list[int] = []
+
+        async def _capture_ttl(key, ttl, fetcher):
+            captured_ttls.append(ttl)
+            return (await fetcher(), False)
+
+        with (
+            patch.object(ab_client, "cached_fetch", new=_capture_ttl),
+            patch.object(
+                ab_client,
+                "_511_get",
+                new=AsyncMock(return_value=sample_511_cameras),
+            ),
+        ):
+            await ab_client.fetch_traffic_cameras()
+        assert CACHE_TTL_MONTHLY in captured_ttls
 
 
 # ---------------------------------------------------------------------------

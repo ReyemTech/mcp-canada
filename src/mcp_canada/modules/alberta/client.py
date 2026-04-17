@@ -50,6 +50,9 @@ from .constants import (
     AER_ST1_MONTHLY_BASE,
     AER_ST3_BASE,
     AER_ST39_BASE,
+    AHS_EMS_FS_URL,
+    AHS_HOSPITALS_FS_URL,
+    AHS_ZONE_FS_URL,
     CACHE_KEY_PREFIX,
     CACHE_TTL_ANNUAL,
     CACHE_TTL_DAILY,
@@ -67,12 +70,15 @@ from .constants import (
     FIVE11_BASE_URL,
     FOREST_AREA_FS_URL,
     OHV_RESTRICTION_FS_URL,
+    PCN_CLINICS_FS_URL,
     RATE_GROUP_511,
     RATE_GROUP_AER,
+    RATE_GROUP_AHS,
     RATE_GROUP_CKAN,
     RATE_GROUP_WMB,
     RATE_LIMIT_511,
     RATE_LIMIT_AER,
+    RATE_LIMIT_AHS,
     RATE_LIMIT_CKAN,
     RATE_LIMIT_WMB,
     ST3_PRODUCTS,
@@ -910,25 +916,147 @@ async def fetch_hospitals(
     zone: str | None = None,
     max_records: int = 5000,
     include_geometry: bool = False,
-) -> tuple[list[AlbertaHospital], bool]:
-    """Hospitals from AHSGIS AHS_Hospitals FeatureServer (~101 hospitals, IP/ED flags). Filled by Plan 05."""
-    raise NotImplementedError("Plan 05 implements")
+) -> tuple[dict[str, Any], bool]:
+    """101 AHS hospitals with IP/ED capability flags from AHSGIS.
+
+    Fetches all hospitals from the AHS_Hospitals FeatureServer (layer 0). When
+    `zone` is provided, performs a post-fetch case-insensitive substring match
+    on the `Location` field (name-substring only — no polygon containment).
+
+    Fields surfaced per feature include: Location, Hospital_N, St_Address,
+    PostalCode, Phone, H_Code, IP (inpatient flag), ED (emergency flag), Label.
+
+    Returns (`{"features": [...], "count": int, "truncated": bool}`, was_cached).
+    TTL=STATIC (24h).
+    """
+    cache_key = (
+        f"{CACHE_KEY_PREFIX}ahs:hospitals:{zone}:{max_records}:{include_geometry}"
+    )
+    limiter = get_limiter(RATE_GROUP_AHS, RATE_LIMIT_AHS)
+
+    async def _fetch() -> dict[str, Any]:
+        await limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            AHS_HOSPITALS_FS_URL,
+            0,
+            where="1=1",
+            out_fields="*",
+            include_geometry=include_geometry,
+            max_records=max_records,
+        )
+        if zone:
+            z = zone.lower()
+            features = [
+                f
+                for f in features
+                if z in (f.get("Location", "") or "").lower()
+                or z in (f.get("location", "") or "").lower()
+            ]
+        return {
+            "features": features,
+            "count": len(features),
+            "truncated": truncated,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_STATIC, _fetch)
 
 
 async def fetch_ahs_zones(
     include_geometry: bool = False,
-) -> tuple[list[AlbertaAhsZone], bool]:
-    """5 AHS zones (South/Calgary/Central/Edmonton/North) with census population. Filled by Plan 05."""
-    raise NotImplementedError("Plan 05 implements")
+) -> tuple[dict[str, Any], bool]:
+    """5 AHS zones (South/Calgary/Central/Edmonton/North) with POP2006/2011/2016.
+
+    Population field names are normalized from ArcGIS ALL-CAPS (POP2006/POP2011/
+    POP2016) to snake_case (pop_2006/pop_2011/pop_2016) for schema consistency.
+    Zone_Name and Zone_ID are also snake-cased.
+
+    Returns (`{"features": [...], "count": int, "truncated": bool}`, was_cached).
+    TTL=STATIC (24h).
+    """
+    cache_key = f"{CACHE_KEY_PREFIX}ahs:zones:{include_geometry}"
+    limiter = get_limiter(RATE_GROUP_AHS, RATE_LIMIT_AHS)
+
+    async def _fetch() -> dict[str, Any]:
+        await limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            AHS_ZONE_FS_URL,
+            0,
+            where="1=1",
+            out_fields="*",
+            include_geometry=include_geometry,
+            max_records=10,
+        )
+        normalized: list[dict[str, Any]] = []
+        for f in features:
+            entry: dict[str, Any] = {
+                "zone_name": f.get("Zone_Name") or f.get("zone_name"),
+                "zone_id": f.get("Zone_ID") or f.get("zone_id"),
+                "pop_2006": f.get("POP2006") or f.get("pop_2006"),
+                "pop_2011": f.get("POP2011") or f.get("pop_2011"),
+                "pop_2016": f.get("POP2016") or f.get("pop_2016"),
+            }
+            if include_geometry and "geometry" in f:
+                entry["geometry"] = f.get("geometry")
+            normalized.append(entry)
+        return {
+            "features": normalized,
+            "count": len(normalized),
+            "truncated": truncated,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_STATIC, _fetch)
 
 
 async def fetch_health_facilities(
     facility_type: Literal["ems", "pcn_clinic"],
     max_records: int = 5000,
     include_geometry: bool = False,
-) -> tuple[list[AlbertaEmsStation] | list[AlbertaPcnClinic], bool]:
-    """Dispatch helper for EMS stations or PCN clinics from AHSGIS FeatureServers. Filled by Plan 05."""
-    raise NotImplementedError("Plan 05 implements")
+) -> tuple[dict[str, Any], bool]:
+    """Dispatch helper for EMS stations or PCN clinics from AHSGIS.
+
+    facility_type='ems' hits AHS_EMS_FS_URL (Alberta EMS stations).
+    facility_type='pcn_clinic' hits PCN_CLINICS_FS_URL (Primary Care Network
+    clinics). Any other value raises ValueError (enforced at client layer).
+
+    NOTE: ER wait times are NOT exposed by AHS in machine-readable form (Pitfall
+    9 — AHS publishes via a JavaScript widget only). This tool slot is used for
+    facility-type dispatch instead.
+
+    Returns (`{"features": [...], "count": int, "truncated": bool, "facility_type": str}`,
+    was_cached). TTL=STATIC (24h).
+    """
+    url_map = {
+        "ems": AHS_EMS_FS_URL,
+        "pcn_clinic": PCN_CLINICS_FS_URL,
+    }
+    if facility_type not in url_map:
+        raise ValueError(
+            f"facility_type must be one of {list(url_map)}, got {facility_type!r}"
+        )
+    url = url_map[facility_type]
+    cache_key = (
+        f"{CACHE_KEY_PREFIX}ahs:facility:{facility_type}:{max_records}:{include_geometry}"
+    )
+    limiter = get_limiter(RATE_GROUP_AHS, RATE_LIMIT_AHS)
+
+    async def _fetch() -> dict[str, Any]:
+        await limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            url,
+            0,
+            where="1=1",
+            out_fields="*",
+            include_geometry=include_geometry,
+            max_records=max_records,
+        )
+        return {
+            "features": features,
+            "count": len(features),
+            "truncated": truncated,
+            "facility_type": facility_type,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_STATIC, _fetch)
 
 
 # ---------------------------------------------------------------------------

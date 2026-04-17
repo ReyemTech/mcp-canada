@@ -310,7 +310,22 @@ async def alberta_get_well_licences_today(
 
     Keywords: alberta well licences AER ST1 daily wells oil gas energy regulator licence operator today
     """
-    raise NotImplementedError("Plan 03 implements")
+    try:
+        rows, cached = await _client.fetch_well_licences_today()
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Échec du téléchargement ST1 : {exc}"
+            if lang == "fr"
+            else f"AER ST1 daily fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=rows,
+        api_name=API_NAME_AER,
+        api_url=AER_ST1_DAILY_BASE,
+        cached=cached,
+        lang=lang,
+    )
 
 
 @tool
@@ -325,7 +340,29 @@ async def alberta_get_well_licences_archive(
 
     Keywords: alberta well licences AER ST1 monthly archive ZIP historical wells oil gas regulator year
     """
-    raise NotImplementedError("Plan 03 implements")
+    if month < 1 or month > 12:
+        msg = (
+            "Mois invalide : doit être entre 1 et 12"
+            if lang == "fr"
+            else "Invalid month: must be between 1 and 12"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang)
+    try:
+        payload, cached = await _client.fetch_well_licences_archive(year, month)
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Échec de la recherche de l'archive ST1 : {exc}"
+            if lang == "fr"
+            else f"AER ST1 archive lookup failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=payload,
+        api_name=API_NAME_AER,
+        api_url=AER_ST1_MONTHLY_BASE,
+        cached=cached,
+        lang=lang,
+    )
 
 
 @tool
@@ -339,7 +376,29 @@ async def alberta_get_pipeline_statistics(
 
     Keywords: alberta pipelines AER ST39 statistics infrastructure oil gas substance length operator annual
     """
-    raise NotImplementedError("Plan 03 implements")
+    if year < 1960 or year > 2100:
+        msg = (
+            f"Année invalide : {year} (doit être entre 1960 et 2100)"
+            if lang == "fr"
+            else f"Invalid year: {year} (must be between 1960 and 2100)"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang)
+    try:
+        rows, cached = await _client.fetch_pipeline_statistics(year)
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Échec du téléchargement ST39-{year} : {exc}"
+            if lang == "fr"
+            else f"AER ST39-{year} fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=rows,
+        api_name=API_NAME_AER,
+        api_url=f"{AER_ST39_BASE}/ST39-{year}.xls",
+        cached=cached,
+        lang=lang,
+    )
 
 
 @tool
@@ -353,7 +412,34 @@ async def alberta_get_production_volumes(
 
     Keywords: alberta production volumes AER ST3 monthly oil gas butane ethane propane sulphur NGL energy
     """
-    raise NotImplementedError("Plan 03 implements")
+    if product not in ST3_PRODUCTS:
+        msg = (
+            f"Produit invalide. Valides : {', '.join(ST3_PRODUCTS)}"
+            if lang == "fr"
+            else f"Invalid product. Valid: {', '.join(ST3_PRODUCTS)}"
+        )
+        return make_error(
+            "INVALID_INPUT",
+            msg,
+            lang=lang,
+            valid=list(ST3_PRODUCTS),
+        )
+    try:
+        rows, cached = await _client.fetch_production_volumes(product)
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Échec du téléchargement ST3 {product} : {exc}"
+            if lang == "fr"
+            else f"AER ST3 {product} fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=rows,
+        api_name=API_NAME_AER,
+        api_url=f"{AER_ST3_BASE}/{product}_current.xlsx",
+        cached=cached,
+        lang=lang,
+    )
 
 
 # ---------------------------------------------------------------------------

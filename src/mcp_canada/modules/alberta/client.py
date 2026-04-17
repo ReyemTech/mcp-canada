@@ -53,6 +53,8 @@ from .constants import (
     AHS_EMS_FS_URL,
     AHS_HOSPITALS_FS_URL,
     AHS_ZONE_FS_URL,
+    AQHI_AIR_LAYER_URL,
+    AQHI_STATIONS_LAYER_ID,
     CACHE_KEY_PREFIX,
     CACHE_TTL_ANNUAL,
     CACHE_TTL_DAILY,
@@ -71,16 +73,20 @@ from .constants import (
     FOREST_AREA_FS_URL,
     OHV_RESTRICTION_FS_URL,
     PCN_CLINICS_FS_URL,
+    PROVINCIAL_PARKS_FS_URL,
     RATE_GROUP_511,
     RATE_GROUP_AER,
     RATE_GROUP_AHS,
     RATE_GROUP_CKAN,
+    RATE_GROUP_GEODISCOVER,
     RATE_GROUP_WMB,
     RATE_LIMIT_511,
     RATE_LIMIT_AER,
     RATE_LIMIT_AHS,
     RATE_LIMIT_CKAN,
+    RATE_LIMIT_GEODISCOVER,
     RATE_LIMIT_WMB,
+    RIVER_FORECAST_FS_URL,
     ST3_PRODUCTS,
     USER_AGENT,
 )
@@ -1147,44 +1153,249 @@ async def fetch_traffic_cameras() -> tuple[dict[str, Any], bool]:
 # ---------------------------------------------------------------------------
 
 
+# Water advisory layer dispatch (Plan 07). Verified against 17-RESEARCH.md § AB-22.
+WATER_ADVISORY_LAYERS: dict[str, int] = {
+    "river": 2,
+    "water_management": 7,
+    "drought": 4,
+    "ice_cover": 6,
+    "water_sharing": 9,
+}
+
+# Population breakdown → resource URL/name hint fragments (Plan 07).
+# First fragment wins; hint match is case-insensitive substring on the resource
+# URL (and name as fallback). Verified against 17-RESEARCH.md § AB-25.
+POPULATION_BREAKDOWN_HINTS: dict[str, tuple[str, ...]] = {
+    "csd": ("census-subdivision", "municipal"),
+    "quarterly": ("quarterly",),
+    "annual": ("annual", "1921"),
+    "age_sex": ("age-and-sex", "age", "sex"),
+    "sub_provincial": ("sub-provincial",),
+    "components_of_growth": ("components-of-growth", "components"),
+}
+
+
 async def fetch_air_quality_stations(
     max_records: int = 5000,
     include_geometry: bool = False,
-) -> tuple[list[AlbertaAqhiStation], bool]:
-    """75 AQHI air monitoring stations from GeoDiscover aqhi/air_layers MapServer/1. Filled by Plan 07."""
-    raise NotImplementedError("Plan 07 implements")
+) -> tuple[dict[str, Any], bool]:
+    """75 AQHI air monitoring stations from GeoDiscover aqhi/air_layers MapServer/1.
+
+    Returns `{"stations": [...], "count": int, "truncated": bool}` with
+    pollutant readings for each station (SO2, O3, NO2, PM2.5, etc.). TTL=LIVE
+    (5 min) because readings refresh every 5 minutes.
+    """
+    cache_key = (
+        f"{CACHE_KEY_PREFIX}geodiscover:aqhi:{max_records}:{include_geometry}"
+    )
+    limiter = get_limiter(RATE_GROUP_GEODISCOVER, RATE_LIMIT_GEODISCOVER)
+
+    async def _fetch() -> dict[str, Any]:
+        await limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            AQHI_AIR_LAYER_URL,
+            AQHI_STATIONS_LAYER_ID,
+            where="1=1",
+            out_fields="*",
+            include_geometry=include_geometry,
+            max_records=max_records,
+        )
+        return {
+            "stations": features,
+            "count": len(features),
+            "truncated": truncated,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_LIVE, _fetch)
 
 
 async def fetch_water_advisories(
-    advisory_type: str | None = None,
+    advisory_type: Literal[
+        "river", "water_management", "drought", "ice_cover", "water_sharing"
+    ],
     max_records: int = 5000,
     include_geometry: bool = False,
-) -> tuple[list[AlbertaWaterAdvisory], bool]:
-    """Water management advisories from GeoDiscover environment/river_forecast_centre. Filled by Plan 07."""
-    raise NotImplementedError("Plan 07 implements")
+) -> tuple[dict[str, Any], bool]:
+    """Water management advisories from GeoDiscover environment/river_forecast_centre.
+
+    Dispatches by advisory_type to the correct layer on RIVER_FORECAST_FS_URL:
+      - 'river'            → layer 2 (river forecast advisory polygons)
+      - 'water_management' → layer 7 (water-management advisories)
+      - 'drought'          → layer 4 (drought stages)
+      - 'ice_cover'        → layer 6 (river ice cover)
+      - 'water_sharing'    → layer 9 (water sharing agreements)
+
+    Raises:
+        ValueError: When advisory_type is not one of the 5 supported values.
+    """
+    if advisory_type not in WATER_ADVISORY_LAYERS:
+        raise ValueError(
+            f"advisory_type must be one of {list(WATER_ADVISORY_LAYERS)}, "
+            f"got {advisory_type!r}"
+        )
+    layer_id = WATER_ADVISORY_LAYERS[advisory_type]
+    cache_key = (
+        f"{CACHE_KEY_PREFIX}geodiscover:water:{advisory_type}:"
+        f"{max_records}:{include_geometry}"
+    )
+    limiter = get_limiter(RATE_GROUP_GEODISCOVER, RATE_LIMIT_GEODISCOVER)
+
+    async def _fetch() -> dict[str, Any]:
+        await limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            RIVER_FORECAST_FS_URL,
+            layer_id,
+            where="1=1",
+            out_fields="*",
+            include_geometry=include_geometry,
+            max_records=max_records,
+        )
+        return {
+            "advisories": features,
+            "count": len(features),
+            "truncated": truncated,
+            "advisory_type": advisory_type,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_LIVE, _fetch)
 
 
-async def fetch_crop_production(
-    year: int | None = None,
-    crop: str | None = None,
-) -> tuple[list[AlbertaCropProductionRow], bool]:
-    """Major crop production (historical CSV) from Alberta Agriculture and Irrigation. Filled by Plan 07."""
-    raise NotImplementedError("Plan 07 implements")
+async def fetch_crop_production() -> tuple[dict[str, Any], bool]:
+    """Historical major crop production from open.alberta.ca CKAN (Alberta Official Statistic).
+
+    Fetches the CSV resource attached to the `major-crop-production-alberta`
+    package and parses it via `shared.parsers.fetch_and_parse`. Dataset covers
+    2000-2014 (historical) — in-season reports are PDFs and not covered here.
+
+    TTL=ANNUAL (7 days) because the dataset updates infrequently.
+    """
+    cache_key = f"{CACHE_KEY_PREFIX}ckan:crop_production"
+
+    async def _fetch() -> dict[str, Any]:
+        pkg, _ = await fetch_dataset_details("major-crop-production-alberta")
+        csv_resource = next(
+            (
+                r
+                for r in pkg.resources
+                if (r.format or "").upper() == "CSV" and r.url
+            ),
+            None,
+        )
+        if csv_resource is None:
+            return {
+                "rows": [],
+                "count": 0,
+                "note": "No CSV resource found in major-crop-production-alberta package",
+            }
+        rows, _ = await fetch_and_parse(csv_resource.url, ttl=CACHE_TTL_ANNUAL)
+        return {
+            "rows": rows,
+            "count": len(rows),
+            "source_url": csv_resource.url,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_ANNUAL, _fetch)
 
 
 async def fetch_population_estimates(
     breakdown: Literal[
-        "csd", "cma", "quarterly", "age_sex", "sub_provincial", "components_of_growth"
+        "csd",
+        "quarterly",
+        "annual",
+        "age_sex",
+        "sub_provincial",
+        "components_of_growth",
     ] = "csd",
-    year: int | None = None,
-) -> tuple[list[AlbertaPopulationEstimate], bool]:
-    """Population estimates from alberta-population-estimates-data-tables XLSX. Filled by Plan 07."""
-    raise NotImplementedError("Plan 07 implements")
+) -> tuple[dict[str, Any], bool]:
+    """Alberta population estimates XLSX from `alberta-population-estimates-data-tables`.
+
+    Dispatches by breakdown to the XLSX resource whose URL/name contains the
+    matching hint fragment (POPULATION_BREAKDOWN_HINTS). Falls back to the
+    first XLSX in the package if no hint match is found.
+
+    Raises:
+        ValueError: When breakdown is not one of the 6 supported values.
+    """
+    if breakdown not in POPULATION_BREAKDOWN_HINTS:
+        raise ValueError(
+            f"breakdown must be one of {list(POPULATION_BREAKDOWN_HINTS)}, "
+            f"got {breakdown!r}"
+        )
+    hints = POPULATION_BREAKDOWN_HINTS[breakdown]
+    cache_key = f"{CACHE_KEY_PREFIX}ckan:population:{breakdown}"
+
+    async def _fetch() -> dict[str, Any]:
+        pkg, _ = await fetch_dataset_details(
+            "alberta-population-estimates-data-tables"
+        )
+        xlsx_resources = [
+            r
+            for r in pkg.resources
+            if (r.format or "").upper() in ("XLSX", "XLS") and r.url
+        ]
+        picked = next(
+            (
+                r
+                for r in xlsx_resources
+                if any(
+                    h in f"{(r.url or '').lower()} {(r.name or '').lower()}"
+                    for h in hints
+                )
+            ),
+            None,
+        )
+        if picked is None:
+            # Fallback: first XLSX resource in the package.
+            picked = xlsx_resources[0] if xlsx_resources else None
+        if picked is None:
+            return {
+                "rows": [],
+                "count": 0,
+                "note": (
+                    "No XLSX resource found in "
+                    "alberta-population-estimates-data-tables package"
+                ),
+                "breakdown": breakdown,
+            }
+        rows, _ = await fetch_and_parse(picked.url, ttl=CACHE_TTL_ANNUAL)
+        return {
+            "rows": rows,
+            "count": len(rows),
+            "source_url": picked.url,
+            "breakdown": breakdown,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_ANNUAL, _fetch)
 
 
 async def fetch_provincial_parks(
     max_records: int = 5000,
     include_geometry: bool = False,
-) -> tuple[list[AlbertaProvincialPark], bool]:
-    """Provincial parks / protected areas from GeoDiscover boundary/parks_protected_areas_alberta. Filled by Plan 07."""
-    raise NotImplementedError("Plan 07 implements")
+) -> tuple[dict[str, Any], bool]:
+    """All Alberta provincial parks + protected areas from GeoDiscover boundary FS.
+
+    Returns `{"parks": [...], "count": int, "truncated": bool}`. TTL=STATIC
+    (24h) — park boundaries change rarely.
+    """
+    cache_key = (
+        f"{CACHE_KEY_PREFIX}geodiscover:parks:{max_records}:{include_geometry}"
+    )
+    limiter = get_limiter(RATE_GROUP_GEODISCOVER, RATE_LIMIT_GEODISCOVER)
+
+    async def _fetch() -> dict[str, Any]:
+        await limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            PROVINCIAL_PARKS_FS_URL,
+            0,
+            where="1=1",
+            out_fields="*",
+            include_geometry=include_geometry,
+            max_records=max_records,
+        )
+        return {
+            "parks": features,
+            "count": len(features),
+            "truncated": truncated,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_STATIC, _fetch)

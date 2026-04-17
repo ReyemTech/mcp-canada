@@ -1177,20 +1177,288 @@ class TestAlbertaTrafficCameras:  # Plan 06
 
 
 class TestAlbertaAirQuality:  # Plan 07
-    pass
+    """fetch_air_quality_stations — GeoDiscover AQHI MapServer layer 1 (75 stations)."""
+
+    @pytest.mark.asyncio
+    async def test_calls_aqhi_layer_1(self, sample_aqhi_query):
+        """service_url must be AQHI_AIR_LAYER_URL and layer_id == AQHI_STATIONS_LAYER_ID (1)."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.constants import (
+            AQHI_AIR_LAYER_URL,
+            AQHI_STATIONS_LAYER_ID,
+        )
+
+        features = [f["attributes"] for f in sample_aqhi_query["features"]]
+        mock_qfs = AsyncMock(return_value=(features, False))
+        with patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs):
+            await ab_client.fetch_air_quality_stations()
+        call = mock_qfs.call_args
+        service_url = call.args[0] if call.args else call.kwargs["service_url"]
+        layer_id = call.args[1] if len(call.args) > 1 else call.kwargs["layer_id"]
+        assert service_url == AQHI_AIR_LAYER_URL
+        assert layer_id == AQHI_STATIONS_LAYER_ID
+        assert layer_id == 1
+
+    @pytest.mark.asyncio
+    async def test_returns_stations_count(self, sample_aqhi_query):
+        """Feature list returned under 'stations' with 'count' matching len; truncated flag propagates."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        features = [f["attributes"] for f in sample_aqhi_query["features"]]
+        mock_qfs = AsyncMock(return_value=(features, False))
+        with patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs):
+            payload, cached = await ab_client.fetch_air_quality_stations()
+        assert payload["stations"] == features
+        assert payload["count"] == len(features)
+        assert payload["truncated"] is False
+        assert cached is False
 
 
 class TestAlbertaWaterAdvisories:  # Plan 07
-    pass
+    """fetch_water_advisories — dispatcher over 5 RIVER_FORECAST_FS_URL layer IDs."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "advisory_type,expected_layer",
+        [
+            ("river", 2),
+            ("water_management", 7),
+            ("drought", 4),
+            ("ice_cover", 6),
+            ("water_sharing", 9),
+        ],
+    )
+    async def test_advisory_type_dispatch(self, advisory_type, expected_layer):
+        """advisory_type dispatches to the correct layer id on RIVER_FORECAST_FS_URL."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.constants import RIVER_FORECAST_FS_URL
+
+        mock_qfs = AsyncMock(return_value=([], False))
+        with patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs):
+            await ab_client.fetch_water_advisories(advisory_type=advisory_type)
+        call = mock_qfs.call_args
+        service_url = call.args[0] if call.args else call.kwargs["service_url"]
+        layer_id = call.args[1] if len(call.args) > 1 else call.kwargs["layer_id"]
+        assert service_url == RIVER_FORECAST_FS_URL
+        assert layer_id == expected_layer
+
+    @pytest.mark.asyncio
+    async def test_invalid_type_raises(self):
+        """advisory_type='bogus' raises ValueError before any fetch."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        with pytest.raises(ValueError):
+            await ab_client.fetch_water_advisories(advisory_type="bogus")
+
+    @pytest.mark.asyncio
+    async def test_payload_shape(self):
+        """Returns {advisories, count, truncated, advisory_type}."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        features = [{"advisory_id": "A-1"}]
+        mock_qfs = AsyncMock(return_value=(features, True))
+        with patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs):
+            payload, _ = await ab_client.fetch_water_advisories(advisory_type="drought")
+        assert payload["advisories"] == features
+        assert payload["count"] == 1
+        assert payload["truncated"] is True
+        assert payload["advisory_type"] == "drought"
 
 
 class TestAlbertaCropProduction:  # Plan 07
-    pass
+    """fetch_crop_production — CKAN package_show → CSV resource → fetch_and_parse."""
+
+    @pytest.mark.asyncio
+    async def test_calls_package_then_fetches_csv(self):
+        """fetch_dataset_details('major-crop-production-alberta') → CSV resource → parse."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.schemas import AlbertaDatasetDetails, AlbertaResource
+
+        csv_url = "https://open.alberta.ca/example/crop-production.csv"
+        fake_details = AlbertaDatasetDetails(
+            id="pkg-1",
+            name="major-crop-production-alberta",
+            title="Major Crop Production Alberta",
+            resources=[
+                AlbertaResource(id="r1", name="Crops CSV", format="CSV", url=csv_url),
+            ],
+        )
+        parsed_rows = [
+            {"year": 2013, "crop": "Wheat", "production_tonnes": 12345.0},
+            {"year": 2014, "crop": "Canola", "production_tonnes": 23456.0},
+        ]
+        mock_details = AsyncMock(return_value=(fake_details, False))
+        mock_parse = AsyncMock(return_value=(parsed_rows, False))
+        with patch.object(ab_client, "fetch_dataset_details", new=mock_details), patch.object(
+            ab_client, "fetch_and_parse", new=mock_parse
+        ):
+            payload, _ = await ab_client.fetch_crop_production()
+
+        assert mock_details.call_args.args[0] == "major-crop-production-alberta"
+        # fetch_and_parse must have been called with the CSV URL
+        assert mock_parse.call_args.args[0] == csv_url
+        assert payload["rows"] == parsed_rows
+        assert payload["count"] == len(parsed_rows)
+        assert payload["source_url"] == csv_url
+
+    @pytest.mark.asyncio
+    async def test_no_csv_resource_returns_note(self):
+        """When package has no CSV resource, returns empty rows with explanatory note."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.schemas import AlbertaDatasetDetails, AlbertaResource
+
+        fake_details = AlbertaDatasetDetails(
+            id="pkg-1",
+            name="major-crop-production-alberta",
+            title="No CSV package",
+            resources=[
+                AlbertaResource(id="r1", format="PDF", url="https://x/y.pdf"),
+            ],
+        )
+        mock_details = AsyncMock(return_value=(fake_details, False))
+        with patch.object(ab_client, "fetch_dataset_details", new=mock_details):
+            payload, _ = await ab_client.fetch_crop_production()
+
+        assert payload["rows"] == []
+        assert payload["count"] == 0
+        assert "note" in payload
 
 
 class TestAlbertaPopulationEstimates:  # Plan 07
-    pass
+    """fetch_population_estimates — 6 breakdowns, XLSX hint-matching."""
+
+    @pytest.mark.asyncio
+    async def test_csd_default(self):
+        """Default breakdown is 'csd' — no explicit arg required."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.schemas import AlbertaDatasetDetails, AlbertaResource
+
+        xlsx_url = (
+            "https://open.alberta.ca/dataset/"
+            "population-estimates-ab-census-subdivision-municipal.xlsx"
+        )
+        fake_details = AlbertaDatasetDetails(
+            id="pop-pkg",
+            name="alberta-population-estimates-data-tables",
+            title="Alberta Population Estimates",
+            resources=[
+                AlbertaResource(id="r-csd", format="XLSX", url=xlsx_url),
+            ],
+        )
+        rows = [{"geo_code": "4806016", "geo_name": "Calgary", "year": 2023, "population": 1336000}]
+        with patch.object(
+            ab_client,
+            "fetch_dataset_details",
+            new=AsyncMock(return_value=(fake_details, False)),
+        ), patch.object(
+            ab_client,
+            "fetch_and_parse",
+            new=AsyncMock(return_value=(rows, False)),
+        ):
+            payload, _ = await ab_client.fetch_population_estimates()
+        assert payload["breakdown"] == "csd"
+        assert payload["rows"] == rows
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "breakdown,url_hint",
+        [
+            ("csd", "census-subdivision"),
+            ("quarterly", "quarterly"),
+            ("annual", "annual"),
+            ("age_sex", "age"),
+            ("sub_provincial", "sub-provincial"),
+            ("components_of_growth", "components"),
+        ],
+    )
+    async def test_breakdown_dispatch(self, breakdown, url_hint):
+        """Each breakdown selects the XLSX resource whose URL/name contains the hint."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.schemas import AlbertaDatasetDetails, AlbertaResource
+
+        # All six possible resources; the dispatcher must pick the one matching the hint.
+        resources = [
+            AlbertaResource(
+                id="r-csd",
+                name="CSD",
+                format="XLSX",
+                url="https://x/population-estimates-ab-census-subdivision-municipal.xlsx",
+            ),
+            AlbertaResource(
+                id="r-quarterly",
+                name="Quarterly",
+                format="XLSX",
+                url="https://x/population-estimates-quarterly.xlsx",
+            ),
+            AlbertaResource(
+                id="r-annual",
+                name="Annual 1921-2020",
+                format="XLSX",
+                url="https://x/population-estimates-annual-1921-2020.xlsx",
+            ),
+            AlbertaResource(
+                id="r-age-sex",
+                name="Age and Sex",
+                format="XLSX",
+                url="https://x/population-by-age-and-sex.xlsx",
+            ),
+            AlbertaResource(
+                id="r-sub",
+                name="Sub-provincial",
+                format="XLSX",
+                url="https://x/population-sub-provincial.xlsx",
+            ),
+            AlbertaResource(
+                id="r-cog",
+                name="Components of Growth",
+                format="XLSX",
+                url="https://x/population-components-of-growth.xlsx",
+            ),
+        ]
+        fake_details = AlbertaDatasetDetails(
+            id="pop-pkg",
+            name="alberta-population-estimates-data-tables",
+            title="Alberta Population Estimates",
+            resources=resources,
+        )
+        mock_parse = AsyncMock(return_value=([], False))
+        with patch.object(
+            ab_client,
+            "fetch_dataset_details",
+            new=AsyncMock(return_value=(fake_details, False)),
+        ), patch.object(ab_client, "fetch_and_parse", new=mock_parse):
+            payload, _ = await ab_client.fetch_population_estimates(breakdown=breakdown)
+        assert payload["breakdown"] == breakdown
+        picked_url = mock_parse.call_args.args[0]
+        assert url_hint in picked_url.lower()
+
+    @pytest.mark.asyncio
+    async def test_invalid_breakdown_raises(self):
+        """Unknown breakdown raises ValueError before any fetch."""
+        from mcp_canada.modules.alberta import client as ab_client
+
+        with pytest.raises(ValueError):
+            await ab_client.fetch_population_estimates(breakdown="bogus")  # type: ignore[arg-type]
 
 
 class TestAlbertaProvincialParks:  # Plan 07
-    pass
+    """fetch_provincial_parks — GeoDiscover boundary/parks_protected_areas_alberta FS."""
+
+    @pytest.mark.asyncio
+    async def test_calls_geodiscover_parks_fs(self):
+        """service_url must be PROVINCIAL_PARKS_FS_URL and layer_id == 0."""
+        from mcp_canada.modules.alberta import client as ab_client
+        from mcp_canada.modules.alberta.constants import PROVINCIAL_PARKS_FS_URL
+
+        features = [{"park_name": "Kananaskis Country", "designation": "Provincial Park"}]
+        mock_qfs = AsyncMock(return_value=(features, False))
+        with patch.object(ab_client.arcgis_hub, "query_feature_service", new=mock_qfs):
+            payload, _ = await ab_client.fetch_provincial_parks()
+        call = mock_qfs.call_args
+        service_url = call.args[0] if call.args else call.kwargs["service_url"]
+        layer_id = call.args[1] if len(call.args) > 1 else call.kwargs["layer_id"]
+        assert service_url == PROVINCIAL_PARKS_FS_URL
+        assert layer_id == 0
+        assert payload["parks"] == features
+        assert payload["count"] == 1
+        assert payload["truncated"] is False

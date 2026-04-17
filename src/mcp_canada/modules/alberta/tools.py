@@ -755,11 +755,27 @@ async def alberta_get_road_events(
 ) -> dict[str, Any]:
     """Get Alberta road events (closures, construction, incidents, accidents) from 511 Alberta API.
 
-    Use for: Province-wide active road events on Alberta's highway network — includes full closures, partial closures, construction zones, incidents, and accidents. Optional event_type= filter (e.g., 'closures', 'construction', 'incidents', 'accidents'). Each event includes location (lat/lon), roadway name, description, and reporting timestamp.
+    Use for: Province-wide active road events on Alberta's highway network — includes full closures, partial closures, construction zones, incidents, and accidents. Optional event_type= substring filter on the EventType field (e.g., 'closure', 'construction', 'incident'). Each event includes location (lat/lon), roadway name, description, and reporting timestamp. NOTE: the 511 Alberta v2 API is undocumented (Pitfall 5 — the docs page redirects to /notfound) but stable; returns a raw JSON list (Pitfall 6), not a CKAN envelope.
 
-    Keywords: alberta road events 511 closures construction incidents accidents highway travel advisory
+    Keywords: alberta road events 511 closures construction incidents accidents highway travel advisory transport
     """
-    raise NotImplementedError("Plan 06 implements")
+    try:
+        data, cached = await _client.fetch_road_events(event_type=event_type)
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        msg = (
+            f"Échec de la requête 511 Alberta : HTTP {status}"
+            if lang == "fr"
+            else f"511 Alberta query failed: HTTP {status}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=data,
+        api_name=API_NAME_511,
+        api_url=f"{FIVE11_BASE_URL}/event",
+        cached=cached,
+        lang=lang,
+    )
 
 
 @tool
@@ -767,26 +783,60 @@ async def alberta_get_winter_road_conditions(
     area_name: str | None = None,
     lang: Literal["en", "fr"] = "en",
 ) -> dict[str, Any]:
-    """Get Alberta winter road conditions from 511 Alberta winterroads endpoint.
+    """Get Alberta winter road conditions from 511 Alberta winterroads endpoint (~1,121 records).
 
-    Use for: Mountain passes, prairies, and highway segments during winter season. Optional area_name= substring filter on the AreaName field (e.g., area_name='Calgary' returns Calgary-region roads). Returns primary condition, secondary conditions, visibility, and encoded polyline for each segment.
+    Use for: Winter driving conditions on Alberta highways and rural roads — Primary Condition (Bare/Snow Covered/Icy/etc.), Visibility, AreaName, RoadwayName, EncodedPolyline. Optional area_name= substring filter on the AreaName field (e.g., area_name='Calgary' returns Calgary-region roads). Critical for prairie/mountain-pass travel October-April. Refreshed every 5 minutes by source. Uses the undocumented-but-stable 511 Alberta v2 JSON API (Pitfall 5 + 6).
 
-    Keywords: alberta winter road conditions 511 visibility prairies mountain highway snow ice travel
+    Keywords: alberta winter road conditions 511 visibility snow ice prairie mountain pass driving safety transport
     """
-    raise NotImplementedError("Plan 06 implements")
+    try:
+        data, cached = await _client.fetch_winter_road_conditions(
+            area_name=area_name
+        )
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        msg = (
+            f"Échec de la requête 511 Alberta : HTTP {status}"
+            if lang == "fr"
+            else f"511 Alberta query failed: HTTP {status}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=data,
+        api_name=API_NAME_511,
+        api_url=f"{FIVE11_BASE_URL}/winterroads",
+        cached=cached,
+        lang=lang,
+    )
 
 
 @tool
 async def alberta_get_traffic_cameras(
     lang: Literal["en", "fr"] = "en",
 ) -> dict[str, Any]:
-    """Get Alberta traffic camera locations + live snapshot URLs from 511 Alberta cameras endpoint.
+    """Get Alberta traffic camera locations + snapshot URLs from 511 Alberta cameras endpoint (~376 cameras).
 
-    Use for: Locating Alberta traffic cameras (~376 total) with location names, coordinates, and current snapshot image URLs. Each camera entry includes a `views` array of snapshot URLs (multi-directional cameras have several views). Cache 24h — camera locations are stable.
+    Use for: Real-time visual confirmation of Alberta road conditions. Each camera includes Lat/Lon location and a Views array of snapshot URLs (the Views URLs are stable; the source camera images refresh continuously). Cache 24h — camera locations are stable. Uses the undocumented-but-stable 511 Alberta v2 JSON API (Pitfall 5 + 6: returns raw JSON list, not CKAN envelope).
 
-    Keywords: alberta traffic cameras 511 live snapshot views highway webcam monitoring locations
+    Keywords: alberta 511 traffic cameras snapshot live image highway road visual webcam transportation monitoring
     """
-    raise NotImplementedError("Plan 06 implements")
+    try:
+        data, cached = await _client.fetch_traffic_cameras()
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        msg = (
+            f"Échec de la requête 511 Alberta : HTTP {status}"
+            if lang == "fr"
+            else f"511 Alberta query failed: HTTP {status}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=data,
+        api_name=API_NAME_511,
+        api_url=f"{FIVE11_BASE_URL}/cameras",
+        cached=cached,
+        lang=lang,
+    )
 
 
 # ---------------------------------------------------------------------------

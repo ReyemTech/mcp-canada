@@ -2,6 +2,141 @@
 
 <!-- CHANGELOG -->
 
+## v0.7.0 (2026-05-13)
+
+### Chores
+
+- Sync uv.lock after release
+  ([`9ef16c4`](https://github.com/ReyemTech/mcp-canada/commit/9ef16c44d860e3a7c4282f95e422ac1875ac606d))
+
+### Documentation
+
+- Add government level column to modules table
+  ([`a79a6e1`](https://github.com/ReyemTech/mcp-canada/commit/a79a6e1dae3a2f2b01ef09030d916a77d4e03123))
+
+- Sort modules table by level then alphabetically
+  ([`fa9dcc3`](https://github.com/ReyemTech/mcp-canada/commit/fa9dcc30cf58f52ff75f03632166a0dcf5806231))
+
+- Split README catalogs into per-module docs
+  ([`2390038`](https://github.com/ReyemTech/mcp-canada/commit/239003862a542f6f1eb78e32bf362a96df7bb802))
+
+- **17**: Add validation strategy
+  ([`ffc42f5`](https://github.com/ReyemTech/mcp-canada/commit/ffc42f5fba66f176abffe8301a69c3f14539537a))
+
+- **17**: Capture phase context
+  ([`aeb63ab`](https://github.com/ReyemTech/mcp-canada/commit/aeb63abfd37f8eb523c893b937e6c8863184470e))
+
+- **17**: Verify Phase 17 Alberta — 27/27 must-haves pass, 3 doc-sync gaps
+  ([`b34bd10`](https://github.com/ReyemTech/mcp-canada/commit/b34bd10a21e35a4b32701d09f6ffafe29a56abf0))
+
+- **17-01**: Summary + state + roadmap update
+  ([`20f7ee1`](https://github.com/ReyemTech/mcp-canada/commit/20f7ee16631a20b35c567dfbfcda5c90e8408573))
+
+- **17-02**: Complete alberta discovery tools plan
+  ([`e02bae7`](https://github.com/ReyemTech/mcp-canada/commit/e02bae73cfda6768ae1249ff21a8b439740d9097))
+
+- **17-03**: Complete AER energy tools plan
+  ([`39cdd44`](https://github.com/ReyemTech/mcp-canada/commit/39cdd44390b7e948bb17635d3115e63511fc5ffb))
+
+- **17-04**: Complete alberta wildfire tools plan
+  ([`bfdaedc`](https://github.com/ReyemTech/mcp-canada/commit/bfdaedc0ffca28edfd02a0ef468663fa162390ae))
+
+- **17-05**: Complete alberta AHS health tools plan
+  ([`eb0eb84`](https://github.com/ReyemTech/mcp-canada/commit/eb0eb844bb5b81749e28a3efdc84592a5024ca21))
+
+- **17-06**: Complete Alberta 511 transport tools plan
+  ([`c2bd7de`](https://github.com/ReyemTech/mcp-canada/commit/c2bd7dedcca5410ef17268b6c167cce4fc608dc5))
+
+- **17-07**: Complete alberta env/agri/demo/parks tools plan
+  ([`1b69d3b`](https://github.com/ReyemTech/mcp-canada/commit/1b69d3b7622019185531678b1afb0b8b165aa315))
+
+- **17-08**: Complete alberta prompts and resources plan
+  ([`3e907ea`](https://github.com/ReyemTech/mcp-canada/commit/3e907eaa113634008606a251f2c83d15dba3fa2f))
+
+- **17-09**: Add Alberta to README catalog, module docs, examples, CLAUDE
+  ([`d5c6392`](https://github.com/ReyemTech/mcp-canada/commit/d5c6392a5fe8acda6078f1fb3abd86413e3ad52a))
+
+- **17-09**: Complete Alberta final wave — 48 parametrized + 11 integration + 96.84% coverage
+  ([`3700ab1`](https://github.com/ReyemTech/mcp-canada/commit/3700ab1e97b153c749f0782e47387718b6db327a))
+
+- **17-alberta-government-open-data**: Create phase plan (9 plans, 6 waves, 27 requirements, 22
+  tools)
+  ([`0971ead`](https://github.com/ReyemTech/mcp-canada/commit/0971ead4c7d512e978d4d992c4a7a7b22c088f7c))
+
+- **phase-17**: Alberta open data research
+  ([`c5c6b4a`](https://github.com/ReyemTech/mcp-canada/commit/c5c6b4afb6e83c6094e9f734f704b288b0f5dca8))
+
+- **readme**: Refresh badges and add changelog/security/community sections
+  ([`e71be8c`](https://github.com/ReyemTech/mcp-canada/commit/e71be8ca3c6a7448601899656e756bda0f1b36bb))
+
+- **state**: Record phase 17 context session
+  ([`2204170`](https://github.com/ReyemTech/mcp-canada/commit/2204170578a0ec3f471eabfc7639a464bc4a8f5b))
+
+### Features
+
+- **17-01**: Scaffold alberta module foundation (init, constants, schemas)
+  ([`c23eaa2`](https://github.com/ReyemTech/mcp-canada/commit/c23eaa258becdc6789ff51639a6a082b5f2d456d))
+
+- **17-01**: Stub 24 client/tool functions + 6 prompts + 7 resources
+  ([`be672d1`](https://github.com/ReyemTech/mcp-canada/commit/be672d17cc130a4b09aad099b5e9bfe3f4685c26))
+
+- **17-02**: Implement alberta 5 discovery @tool bodies
+  ([`01212af`](https://github.com/ReyemTech/mcp-canada/commit/01212afcb068cde24712e67fcf1a514d14b66e85))
+
+- **17-02**: Implement alberta discovery client + shared contract tests
+  ([`ef984df`](https://github.com/ReyemTech/mcp-canada/commit/ef984df584602443abe1be7cf8b093e7919f920a))
+
+- **17-03**: Implement 4 AER @tool bodies with bilingual errors
+  ([`35fd01d`](https://github.com/ReyemTech/mcp-canada/commit/35fd01d9ff0fdf0d552228d77fe1f13f02e7c2e1))
+
+- **17-03**: Implement 4 AER client functions + ST1 fixed-width parser
+  ([`2cbb316`](https://github.com/ReyemTech/mcp-canada/commit/2cbb3168feb0d1d6accd9d79339cb734faed3e56))
+
+- **17-04**: Implement 4 Alberta wildfire client functions
+  ([`fe7ecdb`](https://github.com/ReyemTech/mcp-canada/commit/fe7ecdb1314460ead523ffc87a65fe223d8ab8cc))
+
+- **17-05**: Implement 3 AHS @tool bodies for hospitals, zones, facilities
+  ([`ecebef4`](https://github.com/ReyemTech/mcp-canada/commit/ecebef4aeaaccefe029bdcc6c0b9501d829f265d))
+
+- **17-06**: Implement 3 Alberta 511 transport @tool bodies
+  ([`90263a4`](https://github.com/ReyemTech/mcp-canada/commit/90263a44a1ed426fdcc91a31732c1377d88f2673))
+
+- **17-06**: Implement 3 Alberta 511 transport client functions
+  ([`1aba8c6`](https://github.com/ReyemTech/mcp-canada/commit/1aba8c68b590b752a6b1c185f554487a37d0c5b4))
+
+- **17-07**: Implement 5 Alberta env/agri/demo/parks @tool bodies
+  ([`2da0e2a`](https://github.com/ReyemTech/mcp-canada/commit/2da0e2a84f094cae59b6247379a3d9636de105d8))
+
+- **17-07**: Implement 5 Alberta env/agri/demo/parks client functions
+  ([`73feb0a`](https://github.com/ReyemTech/mcp-canada/commit/73feb0a0a263a9d7954273d997460570a17a83c7))
+
+- **17-08**: Add 6 bilingual @prompt functions for alberta module
+  ([`1a904a9`](https://github.com/ReyemTech/mcp-canada/commit/1a904a9b8f92fafd97cc760bafb1e6c95668f40d))
+
+- **17-08**: Add 7 zero-parameter @resource functions for alberta module
+  ([`a53c187`](https://github.com/ReyemTech/mcp-canada/commit/a53c18774fb271e76efe6ef6f067d6e6fa2887e4))
+
+### Testing
+
+- **17-01**: Scaffold test fixtures and contract tests
+  ([`784699c`](https://github.com/ReyemTech/mcp-canada/commit/784699c6595ef2025e86b594db8cde8533c2ec33))
+
+- **17-04**: Add 13 TDD tests for Alberta wildfire client functions
+  ([`08acf4e`](https://github.com/ReyemTech/mcp-canada/commit/08acf4e6b1e6fc92036ae01ec991eb5d7ec69c59))
+
+- **17-06**: Add failing tests for 3 Alberta 511 transport tools
+  ([`539103d`](https://github.com/ReyemTech/mcp-canada/commit/539103d0a29c183aae08a1a18f1e01ff17b134bc))
+
+- **17-06**: Add failing tests for 511 transport client functions
+  ([`43cedbe`](https://github.com/ReyemTech/mcp-canada/commit/43cedbe7084bcc2e2006fc8e23bfdb5ba525a436))
+
+- **17-09**: Add Alberta integration scenarios via MCP Client
+  ([`40cd96a`](https://github.com/ReyemTech/mcp-canada/commit/40cd96a60a70a018bae609e900559421e5fe826c))
+
+- **17-09**: Parametrize envelope + lang propagation tests over all 24 alberta tools
+  ([`dc5a77e`](https://github.com/ReyemTech/mcp-canada/commit/dc5a77ecfc16a3ae35dbfae87e05b734aae37652))
+
+
 ## v0.6.0 (2026-04-12)
 
 ### Bug Fixes

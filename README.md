@@ -1,15 +1,16 @@
 <p align="center">
   <h1 align="center">🍁 mcp-canada</h1>
   <p align="center">
-    <strong>MCP server giving AI agents structured access to Canadian federal government data</strong>
+    <strong>MCP server giving AI agents structured access to Canadian federal, provincial, and municipal government data</strong>
   </p>
   <p align="center">
     <a href="https://pypi.org/project/mcp-canada/"><img src="https://img.shields.io/pypi/v/mcp-canada?color=blue&label=PyPI" alt="PyPI"></a>
+    <a href="https://pypi.org/project/mcp-canada/"><img src="https://img.shields.io/pypi/dm/mcp-canada?color=blue&label=downloads" alt="PyPI downloads"></a>
     <a href="https://github.com/ReyemTech/mcp-canada/actions/workflows/ci.yml"><img src="https://github.com/ReyemTech/mcp-canada/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <a href="https://github.com/ReyemTech/mcp-canada/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-96%25-brightgreen" alt="Coverage 96%"></a>
-    <a href="https://github.com/ReyemTech/mcp-canada/actions/workflows/integration.yml"><img src="https://github.com/ReyemTech/mcp-canada/actions/workflows/integration.yml/badge.svg" alt="Integration Tests"></a>
+    <a href="https://github.com/ReyemTech/mcp-canada/stargazers"><img src="https://img.shields.io/github/stars/ReyemTech/mcp-canada?style=flat&logo=github" alt="GitHub stars"></a>
     <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue" alt="Python 3.12+"></a>
-    <a href="https://github.com/reyemtech/mcp-canada/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
+    <a href="https://github.com/ReyemTech/mcp-canada/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
     <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-compatible-purple" alt="MCP Compatible"></a>
     <a href="https://github.com/jlowin/fastmcp"><img src="https://img.shields.io/badge/built%20with-FastMCP-orange" alt="Built with FastMCP"></a>
   </p>
@@ -255,6 +256,26 @@ Each module is self-contained. To add a new API:
 
 See [CLAUDE.md](CLAUDE.md) for coding conventions.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version-by-version changes, or browse [GitHub Releases](https://github.com/ReyemTech/mcp-canada/releases).
+
+## Security
+
+Found a vulnerability? Please **do not** open a public issue. Email [contact@reyem.tech](mailto:contact@reyem.tech) with details and reproduction steps. We support the latest minor version on PyPI.
+
+## Community
+
+- **Questions & ideas:** [GitHub Discussions](https://github.com/ReyemTech/mcp-canada/discussions)
+- **Bugs & feature requests:** [GitHub Issues](https://github.com/ReyemTech/mcp-canada/issues)
+- **Contact:** [contact@reyem.tech](mailto:contact@reyem.tech)
+
 ## License
 
 [MIT](LICENSE) — [Reyem Tech](https://reyem.tech)
+
+## Star History
+
+<a href="https://star-history.com/#ReyemTech/mcp-canada&Date">
+  <img src="https://api.star-history.com/svg?repos=ReyemTech/mcp-canada&type=Date" alt="Star History Chart">
+</a>

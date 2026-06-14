@@ -32,8 +32,14 @@ from .constants import (
     FLOOD_ALERTS_FS_URL,
     HUB_BASE_URL,
     HUB_SEARCH_URL,
+    PARK_TYPES,
+    PROVINCIAL_FORESTS_FS_URL,
+    PROVINCIAL_PARKS_FS_URL,
     PROVINCIAL_WATERWAYS_FS_URL,
     RIVER_CONDITIONS_CSV_URL,
+    RURAL_HEALTH_FACILITIES_FS_URL,
+    SURGICAL_WAIT_TIMES_FS_URL,
+    WATERBODY_DATA_FS_URL,
     WATERWAY_TYPES,
 )
 
@@ -46,6 +52,11 @@ _API_NAME_DROUGHT = "manitoba-drought-monitor"
 _API_NAME_AG_WEATHER = "manitoba-ag-weather-stations"
 _API_NAME_LIVESTOCK = "manitoba-livestock-prices"
 _API_NAME_CROP_REGIONS = "manitoba-crop-reporting-regions"
+_API_NAME_PARKS = "manitoba-provincial-parks"
+_API_NAME_FISHERIES = "manitoba-fisheries-waterbody"
+_API_NAME_FORESTS = "manitoba-provincial-forests"
+_API_NAME_WAIT_TIMES = "manitoba-surgical-wait-times"
+_API_NAME_HEALTH_FACILITIES = "manitoba-rural-health-facilities"
 
 __all__ = [
     # Discovery (Plan 02)
@@ -63,6 +74,12 @@ __all__ = [
     "manitoba_get_ag_weather_stations",
     "manitoba_get_livestock_prices",
     "manitoba_get_crop_regions",
+    # Environment / parks / health (Plan 05)
+    "manitoba_get_provincial_parks",
+    "manitoba_get_fisheries_data",
+    "manitoba_get_provincial_forests",
+    "manitoba_get_surgical_wait_times",
+    "manitoba_get_health_facilities",
 ]
 
 
@@ -492,6 +509,206 @@ async def manitoba_get_crop_regions(
         data=payload,
         api_name=_API_NAME_CROP_REGIONS,
         api_url=CROP_REGIONS_FS_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Environment / Parks / Health (Plan 05)
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def manitoba_get_provincial_parks(
+    park_type: str | None = None,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Manitoba provincial parks and protected areas (93 parks, bilingual).
+
+    Use for: Retrieving Manitoba provincial parks, heritage parks, wilderness areas, park reserves, and Indigenous Traditional Use parks from the Manitoba_Parks FeatureServer. Returns bilingual NAME_E (English) and NOM_F (French) park names plus TYPE_E/TYPE_F, BIOME, O_AREA, STATUS_E, PROTDATE, PRK_CLSS, and URL. Optional park_type filter: 'Provincial', 'Heritage', 'Wilderness', 'Recreation', 'Natural', 'Park Reserve', 'Indigenous Traditional Use'.
+
+    Keywords: manitoba parks provincial protected areas heritage wilderness bilingual NAME_E NOM_F park type BIOME area status recreation natural Indigenous Traditional Use
+    """
+    try:
+        payload, cached = await _client.fetch_provincial_parks(
+            park_type=park_type,
+            lang=lang,
+        )
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur lors du chargement des parcs: {exc}"
+            if lang == "fr"
+            else f"Provincial parks fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur lors du chargement des parcs: {exc}"
+            if lang == "fr"
+            else f"Provincial parks fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=payload,
+        api_name=_API_NAME_PARKS,
+        api_url=PROVINCIAL_PARKS_FS_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def manitoba_get_fisheries_data(
+    region: str | None = None,
+    name: str | None = None,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Manitoba fisheries and waterbody reference data (350+ water bodies).
+
+    Use for: Retrieving Manitoba fisheries management data including fishing regulations, species lists, stocking records, Secchi depth (water clarity), and boat launch availability. Covers 350+ water bodies monitored by Manitoba Sustainable Development. Focused field subset: Name, SurfaceArea, AvgDepth, SecchiDepth, FishingDivision, Species, Regulations, BoatLaunch. Use name= to search for a specific lake or river. Use region= to filter by FishingDivision (e.g. 'Division 1').
+
+    Keywords: manitoba fisheries waterbody fishing regulations species stocking Secchi depth boat launch lake river water quality Division walleye pickerel perch
+    """
+    try:
+        payload, cached = await _client.fetch_fisheries_data(
+            name_query=name,
+            fishing_division=region,
+            lang=lang,
+        )
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur lors du chargement des données halieutiques: {exc}"
+            if lang == "fr"
+            else f"Fisheries data fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur lors du chargement des données halieutiques: {exc}"
+            if lang == "fr"
+            else f"Fisheries data fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=payload,
+        api_name=_API_NAME_FISHERIES,
+        api_url=WATERBODY_DATA_FS_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def manitoba_get_provincial_forests(
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Manitoba provincial forest management boundaries.
+
+    Use for: Retrieving Manitoba provincial forest management unit polygons from Manitoba_Provincial_Forests___Version_6 FeatureServer. Returns administrative forest region boundaries used for forest management planning and resource allocation across Manitoba's boreal and transitional forest zones. Useful for timber harvesting context, wildfire management zones, and conservation planning.
+
+    Keywords: manitoba provincial forests forest management boundaries boreal timber harvesting conservation planning administrative zones resource management Version_6
+    """
+    try:
+        payload, cached = await _client.fetch_provincial_forests(lang=lang)
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur lors du chargement des forêts provinciales: {exc}"
+            if lang == "fr"
+            else f"Provincial forests fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur lors du chargement des forêts provinciales: {exc}"
+            if lang == "fr"
+            else f"Provincial forests fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=payload,
+        api_name=_API_NAME_FORESTS,
+        api_url=PROVINCIAL_FORESTS_FS_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def manitoba_get_surgical_wait_times(
+    procedure: str | None = None,
+    year: int | None = None,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Manitoba diagnostic and surgical wait time averages by procedure and year.
+
+    Use for: Retrieving annual average wait times (in days) for diagnostic and surgical procedures across Manitoba from Manitoba_Diagnostic_and_Surgical_Wait_Time_Averages FeatureServer. Fields: Year, IndicatorDataArea (procedure type), Average_Wait (days). NOTE: These are ANNUAL AVERAGES, not live ER wait times — real-time ER waits are not published in machine-readable form. Filter by procedure= (LIKE search on IndicatorDataArea) or year= for specific years. Manitoba's 5 RHAs: WRHA, PMH, IERHA, SHSS, NHR.
+
+    Keywords: manitoba surgical wait times diagnostic procedure annual averages hospital health care wait list days cardiac orthopedic cataract colonoscopy MRI CT scan RHA
+    """
+    try:
+        payload, cached = await _client.fetch_surgical_wait_times(
+            procedure=procedure,
+            year=year,
+            lang=lang,
+        )
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur lors du chargement des temps d'attente: {exc}"
+            if lang == "fr"
+            else f"Surgical wait times fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur lors du chargement des temps d'attente: {exc}"
+            if lang == "fr"
+            else f"Surgical wait times fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=payload,
+        api_name=_API_NAME_WAIT_TIMES,
+        api_url=SURGICAL_WAIT_TIMES_FS_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def manitoba_get_health_facilities(
+    rha: str | None = None,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Manitoba rural health care facilities with emergency, acute care, and PCH flags.
+
+    Use for: Retrieving rural health care facility locations and service availability across Manitoba from Rural_Health_Care_Facilities_in_Manitoba FeatureServer (spike-resolved). Fields: Community_Name, Facility_Name, coordinates, Emergency_Department_Availabili (Yes/No), Percentage_of_Time_Open__2015_, Nearest_Alternate_Emergency_Dep, Acute_Care_Availability, Acute_Care_Number_of_Beds. Optional rha= filter to search by community name substring. Manitoba's 5 RHAs: WRHA (Winnipeg), PMH (Prairie Mountain Health), IERHA (Interlake-Eastern), SHSS (Southern Health-Santé Sud), NHR (Northern Health Region).
+
+    Keywords: manitoba rural health care facilities emergency department acute care PCH hospital community RHA WRHA PMH IERHA SHSS NHR Selkirk Brandon Portage facilities beds
+    """
+    try:
+        payload, cached = await _client.fetch_health_facilities(
+            community=rha,
+            lang=lang,
+        )
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur lors du chargement des établissements de santé: {exc}"
+            if lang == "fr"
+            else f"Health facilities fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur lors du chargement des établissements de santé: {exc}"
+            if lang == "fr"
+            else f"Health facilities fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=payload,
+        api_name=_API_NAME_HEALTH_FACILITIES,
+        api_url=RURAL_HEALTH_FACILITIES_FS_URL,
         cached=cached,
         lang=lang,
     )

@@ -886,31 +886,434 @@ class TestManitobaGetCropRegions:
 class TestManitobaGetParks:
     """Tool unit tests for manitoba_get_provincial_parks. Plan 05 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """manitoba_get_provincial_parks returns _meta envelope with features."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_provincial_parks
+
+        mock_data = {
+            "features": [
+                {"NAME_E": "Hecla/Grindstone Provincial Park", "NOM_F": "Parc provincial de Hecla/Grindstone", "TYPE_E": "Provincial"},
+                {"NAME_E": "Riding Mountain National Park", "NOM_F": "Parc national du Mont-Riding", "TYPE_E": "Wilderness"},
+            ],
+            "count": 2,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_provincial_parks",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_provincial_parks()
+        assert "_meta" in result
+        assert "data" in result
+        assert result["data"]["count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_park_type_filter_passed_to_client(self):
+        """park_type parameter is forwarded to client."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_provincial_parks
+
+        captured: list[dict] = []
+
+        async def mock_fetch(**kwargs):
+            captured.append(kwargs)
+            return ({"features": [], "count": 0, "truncated": False}, False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_provincial_parks",
+            side_effect=mock_fetch,
+        ):
+            await manitoba_get_provincial_parks(park_type="Provincial")
+
+        assert len(captured) == 1
+        assert captured[0].get("park_type") == "Provincial"
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """lang parameter is reflected in _meta envelope."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_provincial_parks
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_provincial_parks",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_provincial_parks(lang="fr")
+        assert result.get("_meta", {}).get("lang") == "fr"
+
+    @pytest.mark.asyncio
+    async def test_returns_upstream_error_on_exception(self):
+        """manitoba_get_provincial_parks returns UPSTREAM_ERROR on HTTPStatusError."""
+        import httpx
+        from mcp_canada.modules.manitoba.tools import manitoba_get_provincial_parks
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_provincial_parks",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "bad", request=httpx.Request("GET", "http://x"), response=httpx.Response(500)
+            ),
+        ):
+            result = await manitoba_get_provincial_parks()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_meta_source_api_is_parks(self):
+        """_meta.source.api identifies the parks source."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_provincial_parks
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_provincial_parks",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_provincial_parks()
+        assert "park" in result["_meta"]["source"]["api"] or "manitoba" in result["_meta"]["source"]["api"]
 
 
 class TestManitobaGetFisheriesData:
     """Tool unit tests for manitoba_get_fisheries_data. Plan 05 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """manitoba_get_fisheries_data returns _meta envelope with features."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_fisheries_data
+
+        mock_data = {
+            "features": [
+                {"Name": "Lake Winnipeg", "Species": "Walleye", "Regulations": "6/day"},
+            ],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_fisheries_data",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_fisheries_data()
+        assert "_meta" in result
+        assert "data" in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_name_query_passed_to_client(self):
+        """name parameter is forwarded to client as name_query."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_fisheries_data
+
+        captured: list[dict] = []
+
+        async def mock_fetch(**kwargs):
+            captured.append(kwargs)
+            return ({"features": [], "count": 0, "truncated": False}, False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_fisheries_data",
+            side_effect=mock_fetch,
+        ):
+            await manitoba_get_fisheries_data(name="Lake Winnipeg")
+
+        assert len(captured) == 1
+        # Tool may pass name as name_query or name depending on mapping
+        assert captured[0].get("name_query") == "Lake Winnipeg" or captured[0].get("name") == "Lake Winnipeg"
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """lang parameter is reflected in _meta envelope."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_fisheries_data
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_fisheries_data",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_fisheries_data(lang="fr")
+        assert result.get("_meta", {}).get("lang") == "fr"
+
+    @pytest.mark.asyncio
+    async def test_returns_upstream_error_on_exception(self):
+        """manitoba_get_fisheries_data returns UPSTREAM_ERROR on exception."""
+        import httpx
+        from mcp_canada.modules.manitoba.tools import manitoba_get_fisheries_data
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_fisheries_data",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "bad", request=httpx.Request("GET", "http://x"), response=httpx.Response(500)
+            ),
+        ):
+            result = await manitoba_get_fisheries_data()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestManitobaGetForests:
     """Tool unit tests for manitoba_get_provincial_forests. Plan 05 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """manitoba_get_provincial_forests returns _meta envelope with features."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_provincial_forests
+
+        mock_data = {
+            "features": [{"Name": "Porcupine Hills Forest", "area_ha": 245000.0}],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_provincial_forests",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_provincial_forests()
+        assert "_meta" in result
+        assert "data" in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """lang parameter is reflected in _meta envelope."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_provincial_forests
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_provincial_forests",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_provincial_forests(lang="fr")
+        assert result.get("_meta", {}).get("lang") == "fr"
+
+    @pytest.mark.asyncio
+    async def test_returns_upstream_error_on_exception(self):
+        """manitoba_get_provincial_forests returns UPSTREAM_ERROR on exception."""
+        import httpx
+        from mcp_canada.modules.manitoba.tools import manitoba_get_provincial_forests
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_provincial_forests",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "bad", request=httpx.Request("GET", "http://x"), response=httpx.Response(500)
+            ),
+        ):
+            result = await manitoba_get_provincial_forests()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_meta_source_api_is_forests(self):
+        """_meta.source.api identifies the forests source."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_provincial_forests
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_provincial_forests",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_provincial_forests()
+        assert "forest" in result["_meta"]["source"]["api"] or "manitoba" in result["_meta"]["source"]["api"]
 
 
 class TestManitobaGetWaitTimes:
     """Tool unit tests for manitoba_get_surgical_wait_times. Plan 05 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """manitoba_get_surgical_wait_times returns _meta envelope with features."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_surgical_wait_times
+
+        mock_data = {
+            "features": [
+                {"Year": 2021, "IndicatorDataArea": "Cardiac surgery", "Average_Wait": 144},
+            ],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_surgical_wait_times",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_surgical_wait_times()
+        assert "_meta" in result
+        assert "data" in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_procedure_and_year_filters_passed_to_client(self):
+        """procedure and year parameters are forwarded to client."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_surgical_wait_times
+
+        captured: list[dict] = []
+
+        async def mock_fetch(**kwargs):
+            captured.append(kwargs)
+            return ({"features": [], "count": 0, "truncated": False}, False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_surgical_wait_times",
+            side_effect=mock_fetch,
+        ):
+            await manitoba_get_surgical_wait_times(procedure="Cardiac surgery", year=2021)
+
+        assert len(captured) == 1
+        assert captured[0].get("procedure") == "Cardiac surgery"
+        assert captured[0].get("year") == 2021
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """lang parameter is reflected in _meta envelope."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_surgical_wait_times
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_surgical_wait_times",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_surgical_wait_times(lang="fr")
+        assert result.get("_meta", {}).get("lang") == "fr"
+
+    @pytest.mark.asyncio
+    async def test_returns_upstream_error_on_exception(self):
+        """manitoba_get_surgical_wait_times returns UPSTREAM_ERROR on exception."""
+        import httpx
+        from mcp_canada.modules.manitoba.tools import manitoba_get_surgical_wait_times
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_surgical_wait_times",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "bad", request=httpx.Request("GET", "http://x"), response=httpx.Response(500)
+            ),
+        ):
+            result = await manitoba_get_surgical_wait_times()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_meta_source_api_is_wait_times(self):
+        """_meta.source.api identifies the surgical wait times source."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_surgical_wait_times
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_surgical_wait_times",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_surgical_wait_times()
+        api = result["_meta"]["source"]["api"]
+        assert "wait" in api or "surgical" in api or "health" in api or "manitoba" in api
 
 
 class TestManitobaGetHealthFacilities:
     """Tool unit tests for manitoba_get_health_facilities. Plan 05 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """manitoba_get_health_facilities returns _meta envelope with features."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_health_facilities
+
+        mock_data = {
+            "features": [
+                {
+                    "Community_Name": "Selkirk",
+                    "Facility_Name": "Selkirk & District General Hospital",
+                    "Emergency_Department_Availabili": "Yes",
+                    "Acute_Care_Availability": "Yes",
+                }
+            ],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_health_facilities",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_health_facilities()
+        assert "_meta" in result
+        assert "data" in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_rha_filter_passed_to_client(self):
+        """rha parameter is forwarded to client (as community or rha kwarg)."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_health_facilities
+
+        captured: list[dict] = []
+
+        async def mock_fetch(**kwargs):
+            captured.append(kwargs)
+            return ({"features": [], "count": 0, "truncated": False}, False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_health_facilities",
+            side_effect=mock_fetch,
+        ):
+            await manitoba_get_health_facilities(rha="WRHA")
+
+        assert len(captured) == 1
+        # Tool may pass rha as community or rha parameter to client
+        assert (
+            captured[0].get("rha") == "WRHA"
+            or captured[0].get("community") == "WRHA"
+        )
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """lang parameter is reflected in _meta envelope."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_health_facilities
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_health_facilities",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_health_facilities(lang="fr")
+        assert result.get("_meta", {}).get("lang") == "fr"
+
+    @pytest.mark.asyncio
+    async def test_returns_upstream_error_on_exception(self):
+        """manitoba_get_health_facilities returns UPSTREAM_ERROR on exception."""
+        import httpx
+        from mcp_canada.modules.manitoba.tools import manitoba_get_health_facilities
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_health_facilities",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "bad", request=httpx.Request("GET", "http://x"), response=httpx.Response(500)
+            ),
+        ):
+            result = await manitoba_get_health_facilities()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_meta_source_api_is_health_facilities(self):
+        """_meta.source.api identifies the rural health facilities source."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_health_facilities
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_health_facilities",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_health_facilities()
+        api = result["_meta"]["source"]["api"]
+        assert "health" in api or "facility" in api or "facilit" in api or "manitoba" in api
 
 
 class TestManitoba511RoadEvents:

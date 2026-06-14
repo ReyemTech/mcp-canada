@@ -193,7 +193,7 @@ Plans:
 **Goal:** Agents can search the Données Québec CKAN catalogue (1,593 datasets, 139 orgs, 10 thematic groups) and access curated MSSS health, MTQ transport, environment, demographics, and energy data via 18 `quebec_` tools (5 discovery + 13 curated), reusing the post-15-05 `_api_get` parsed-dict pattern and Phase 15 `TestSharedApiGetContract` test class from day 1.
 **Requirements**: TBD (no explicit REQ IDs yet — delivers on milestone provincial coverage goal)
 **Depends on:** Phase 15
-**Plans:** 8/8 plans complete
+**Plans:** 8/8 plans complete + 1 gap-closure plan (18-09)
 
 Plans:
 - [x] 16-01-PLAN.md — Quebec module skeleton + Wave 0 test scaffolds
@@ -239,6 +239,7 @@ Plans:
 - [ ] 18-06-PLAN.md — 3 transport tools (511 road events, winter conditions, cameras — conditional, NOT_CONFIGURED fallback)
 - [ ] 18-07-PLAN.md — 6 bilingual prompts + 7 resources (Phase 40 pattern)
 - [ ] 18-08-PLAN.md — Parametrized envelope/lang tests + integration tests + README/MODULES/CLAUDE/EXAMPLES sync + 95% coverage gate
+- [ ] 18-09-PLAN.md — Gap closure: fix 3 ArcGIS-Hub discovery tools (OGC limit/startindex params, omit blank q) + param-regression tests + live integration check [MB-01, MB-04, MB-05]
 
 ### Phase 19: Saskatchewan Government Open Data
 

@@ -1,5 +1,5 @@
 ---
-status: diagnosed
+status: resolved
 trigger: "UAT: 5 Manitoba ArcGIS Hub discovery tools return HTTP 400 against live geoportal.gov.mb.ca"
 created: 2026-06-14T00:00:00Z
 updated: 2026-06-14T00:00:00Z

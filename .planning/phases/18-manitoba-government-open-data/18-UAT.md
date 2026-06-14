@@ -1,5 +1,5 @@
 ---
-status: diagnosed
+status: resolved
 phase: 18-manitoba-government-open-data
 source: [18-01-SUMMARY.md, 18-02-SUMMARY.md, 18-03-SUMMARY.md, 18-04-SUMMARY.md, 18-05-SUMMARY.md, 18-06-SUMMARY.md, 18-07-SUMMARY.md, 18-08-SUMMARY.md]
 started: 2026-06-14T00:00:00Z
@@ -68,7 +68,8 @@ skipped: 0
 ## Gaps
 
 - truth: "Discovery tools (manitoba_search_datasets, manitoba_get_dataset_details, manitoba_query_dataset, manitoba_list_organizations, manitoba_list_categories) return live results from the Manitoba geoportal ArcGIS Hub"
-  status: failed
+  status: resolved
+  resolution: "Fixed in 18-09 (commit 06fa7dc): remapped outgoing Hub Search params num→limit, start→startindex (1-based, omit when 0), omit blank q. Live re-verified 2026-06-14: manitoba_search_datasets→18 results, manitoba_list_organizations→['Manitoba_Government'], manitoba_list_categories→8 categories. 5 param-regression tests added (assert on params dict). 238 unit tests + 3 live integration scenarios green."
   reason: "User reported: Live call returns HTTP 400 Bad Request from https://geoportal.gov.mb.ca/api/search/v1/collections/all/items?q=parks&num=10&start=0. Confirmed across manitoba_search_datasets, manitoba_list_organizations, manitoba_list_categories. The 15 curated FeatureServer tools all work live; only the 5 Hub-Search-based discovery tools fail. Unit tests passed because the Hub response was mocked — the real endpoint/params are wrong."
   severity: major
   test: 2

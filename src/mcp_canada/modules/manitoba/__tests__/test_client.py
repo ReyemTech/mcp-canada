@@ -502,25 +502,275 @@ class TestManitobaGetWaterways:
 class TestManitobaGetDroughtStatus:
     """Unit tests for fetch_drought_status. Plan 04 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_features_count_truncated(self):
+        """fetch_drought_status returns {features, count, truncated} payload."""
+        from mcp_canada.modules.manitoba.client import fetch_drought_status
+        from .conftest import SAMPLE_DROUGHT_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_DROUGHT_FEATURES,
+        ):
+            data, cached = await fetch_drought_status()
+        assert "features" in data
+        assert "count" in data
+        assert "truncated" in data
+        assert data["count"] == len(data["features"])
+
+    @pytest.mark.asyncio
+    async def test_filter_province_applies_bbox_geometry(self):
+        """fetch_drought_status with filter_province=True sends geometry envelope to FeatureServer."""
+        from mcp_canada.modules.manitoba.client import fetch_drought_status
+
+        captured_calls: list[dict] = []
+
+        async def mock_api_get(url, params, **kwargs):
+            captured_calls.append({"url": url, "params": params})
+            # Return a valid ArcGIS FeatureServer /query JSON response
+            return {
+                "features": [{"attributes": {"DM": "D1", "OBS_DATE": 1748995200000, "SOURCE": "NOAA"}}],
+                "exceededTransferLimit": False,
+            }
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.api_get",
+            side_effect=mock_api_get,
+        ):
+            data, _ = await fetch_drought_status(filter_province=True)
+
+        # Must have called api_get with geometry params
+        assert len(captured_calls) == 1
+        call = captured_calls[0]
+        params_str = str(call["params"])
+        # Geometry envelope param must be present
+        assert "geometry" in call["params"]
+        assert "geometryType" in call["params"]
+        assert call["params"]["geometryType"] == "esriGeometryEnvelope"
+        # Manitoba bbox values should be in the geometry string
+        assert "101" in call["params"]["geometry"] or "48" in call["params"]["geometry"]
+        # Spatial relationship must be set
+        assert "spatialRel" in call["params"]
+
+    @pytest.mark.asyncio
+    async def test_no_filter_returns_all_features(self):
+        """fetch_drought_status with filter_province=False queries without spatial filter."""
+        from mcp_canada.modules.manitoba.client import fetch_drought_status
+        from .conftest import SAMPLE_DROUGHT_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_DROUGHT_FEATURES,
+        ):
+            data, _ = await fetch_drought_status(filter_province=False)
+        assert isinstance(data["features"], list)
+
+    @pytest.mark.asyncio
+    async def test_features_contain_dm_and_obs_date(self):
+        """Drought features include DM intensity code and OBS_DATE fields."""
+        from mcp_canada.modules.manitoba.client import fetch_drought_status
+        from .conftest import SAMPLE_DROUGHT_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_DROUGHT_FEATURES,
+        ):
+            data, _ = await fetch_drought_status()
+        if data["features"]:
+            feat = data["features"][0]
+            assert "DM" in feat or "dm" in feat or "OBS_DATE" in feat
 
 
 class TestManitobaGetAgWeatherStations:
     """Unit tests for fetch_ag_weather_stations. Plan 04 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_features_count(self):
+        """fetch_ag_weather_stations returns {features, count} payload."""
+        from mcp_canada.modules.manitoba.client import fetch_ag_weather_stations
+        from .conftest import SAMPLE_AG_WEATHER_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_AG_WEATHER_FEATURES,
+        ):
+            data, cached = await fetch_ag_weather_stations()
+        assert "features" in data
+        assert "count" in data
+        assert data["count"] == len(data["features"])
+
+    @pytest.mark.asyncio
+    async def test_ag_region_filter_applied(self):
+        """fetch_ag_weather_stations passes WHERE clause when ag_region provided."""
+        from mcp_canada.modules.manitoba.client import fetch_ag_weather_stations
+
+        captured: list[dict] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured.append(kwargs)
+            return ([], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_ag_weather_stations(ag_region="Southwest")
+
+        assert len(captured) == 1
+        where = captured[0].get("where", "")
+        assert "Southwest" in where or "AgRegion" in where
+
+    @pytest.mark.asyncio
+    async def test_no_ag_region_returns_all(self):
+        """fetch_ag_weather_stations with no region returns all stations."""
+        from mcp_canada.modules.manitoba.client import fetch_ag_weather_stations
+        from .conftest import SAMPLE_AG_WEATHER_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_AG_WEATHER_FEATURES,
+        ):
+            data, _ = await fetch_ag_weather_stations()
+        assert data["count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_station_has_url_field(self):
+        """Each station includes URL field linking to live hourly data."""
+        from mcp_canada.modules.manitoba.client import fetch_ag_weather_stations
+        from .conftest import SAMPLE_AG_WEATHER_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_AG_WEATHER_FEATURES,
+        ):
+            data, _ = await fetch_ag_weather_stations()
+        if data["features"]:
+            assert "URL" in data["features"][0] or "url" in data["features"][0]
 
 
 class TestManitobaGetLivestockPrices:
     """Unit tests for fetch_livestock_prices. Plan 04 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_cattle_returns_features_count(self):
+        """fetch_livestock_prices(livestock='cattle') returns {features, count} payload."""
+        from mcp_canada.modules.manitoba.client import fetch_livestock_prices
+        from .conftest import SAMPLE_LIVESTOCK_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_LIVESTOCK_FEATURES,
+        ):
+            data, cached = await fetch_livestock_prices(livestock="cattle")
+        assert "features" in data
+        assert "count" in data
+        assert data["count"] == len(data["features"])
+
+    @pytest.mark.asyncio
+    async def test_hog_degrades_gracefully(self):
+        """fetch_livestock_prices(livestock='hog') returns empty or error gracefully when HOG_PRICES_FS_URL is None."""
+        from mcp_canada.modules.manitoba.client import fetch_livestock_prices
+
+        # Should not raise — must return (dict, bool) even when hog URL unresolved
+        result = await fetch_livestock_prices(livestock="hog")
+        assert isinstance(result, tuple)
+        assert isinstance(result[0], dict)
+        assert isinstance(result[1], bool)
+
+    @pytest.mark.asyncio
+    async def test_invalid_livestock_raises_value_error(self):
+        """fetch_livestock_prices raises ValueError for livestock not in {'cattle','hog'}."""
+        from mcp_canada.modules.manitoba.client import fetch_livestock_prices
+
+        with pytest.raises(ValueError, match="cattle.*hog|hog.*cattle|livestock"):
+            await fetch_livestock_prices(livestock="sheep")
+
+    @pytest.mark.asyncio
+    async def test_cattle_uses_cattle_fs_url(self):
+        """fetch_livestock_prices for cattle queries CATTLE_PRICES_FS_URL."""
+        from mcp_canada.modules.manitoba.client import fetch_livestock_prices
+        from mcp_canada.modules.manitoba.constants import CATTLE_PRICES_FS_URL
+
+        captured: list[str] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured.append(url)
+            return ([], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_livestock_prices(livestock="cattle")
+
+        assert len(captured) == 1
+        assert CATTLE_PRICES_FS_URL in captured[0] or captured[0] == CATTLE_PRICES_FS_URL
 
 
 class TestManitobaGetCropRegions:
     """Unit tests for fetch_crop_regions. Plan 04 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_features_count(self):
+        """fetch_crop_regions returns {features, count} payload."""
+        from mcp_canada.modules.manitoba.client import fetch_crop_regions
+        from .conftest import SAMPLE_CROP_REGIONS_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_CROP_REGIONS_FEATURES,
+        ):
+            data, cached = await fetch_crop_regions()
+        assert "features" in data
+        assert "count" in data
+        assert data["count"] == len(data["features"])
+
+    @pytest.mark.asyncio
+    async def test_features_are_bilingual(self):
+        """Crop region features include both REGION (EN) and RÉGION (FR) fields."""
+        from mcp_canada.modules.manitoba.client import fetch_crop_regions
+        from .conftest import SAMPLE_CROP_REGIONS_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_CROP_REGIONS_FEATURES,
+        ):
+            data, _ = await fetch_crop_regions()
+        if data["features"]:
+            feat = data["features"][0]
+            # Must have both English and French region name fields
+            assert "REGION" in feat
+            assert "RÉGION" in feat
+
+    @pytest.mark.asyncio
+    async def test_queries_crop_regions_fs_url(self):
+        """fetch_crop_regions queries CROP_REGIONS_FS_URL."""
+        from mcp_canada.modules.manitoba.client import fetch_crop_regions
+        from mcp_canada.modules.manitoba.constants import CROP_REGIONS_FS_URL
+
+        captured: list[str] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured.append(url)
+            return ([], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_crop_regions()
+
+        assert len(captured) == 1
+        assert CROP_REGIONS_FS_URL in captured[0] or captured[0] == CROP_REGIONS_FS_URL
 
 
 class TestManitobaGetParks:

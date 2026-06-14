@@ -603,13 +603,75 @@ async def fetch_drought_status(
     include_geometry: bool = False,
     lang: str = "en",
 ) -> tuple[dict[str, Any], bool]:
-    """Fetch Manitoba drought monitor polygons from Canada_USA_Drought_Monitor FeatureServer.
+    """Fetch drought monitor polygons from Canada_USA_Drought_Monitor FeatureServer.
 
-    filter_province=True applies Manitoba bbox (-101.36,48.99,-95.15,60.0) (Pitfall 8).
-    dm_level: None returns all, or one of "D0"/"D1"/"D2"/"D3"/"D4".
-    Filled by Plan 04.
+    filter_province=True (default) applies Manitoba bbox geometry filter
+    (-101.36,48.99,-95.15,60.0) so only Manitoba polygons are returned (Pitfall 8:
+    this layer has continental North America coverage; without filtering an agent
+    receives all of Canada and the US).
+
+    dm_level: None returns all intensity classes, or one of D0/D1/D2/D3/D4.
+    Layer 0 fields: DM (intensity), OBS_DATE, SOURCE.
     """
-    raise NotImplementedError("Plan 04 implements")
+    # Build WHERE clause
+    where_parts: list[str] = []
+    if dm_level is not None:
+        where_parts.append(f"DM='{dm_level}'")
+    where = " AND ".join(where_parts) if where_parts else "1=1"
+
+    cache_key = f"{CACHE_KEY_PREFIX}drought:{filter_province}:{dm_level}:{include_geometry}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+
+        if filter_province:
+            # Use geometry envelope to restrict to Manitoba bounding box.
+            # query_feature_service does not expose geometry params directly, so we
+            # call api_get against the FeatureServer /query endpoint with the
+            # geometry filter (server-side, avoids fetching continental data).
+            bbox_parts = MANITOBA_BBOX.split(",")  # xmin,ymin,xmax,ymax
+            geometry_param = (
+                f"{bbox_parts[0]},{bbox_parts[1]},{bbox_parts[2]},{bbox_parts[3]}"
+            )
+            params: dict[str, Any] = {
+                "where": where,
+                "geometry": geometry_param,
+                "geometryType": "esriGeometryEnvelope",
+                "spatialRel": "esriSpatialRelIntersects",
+                "inSR": "4326",
+                "outSR": "4326",
+                "outFields": "DM,OBS_DATE,SOURCE",
+                "returnGeometry": "true" if include_geometry else "false",
+                "resultRecordCount": MAX_RECORDS,
+                "f": "json",
+            }
+            raw = await api_get(
+                f"{DROUGHT_MONITOR_FS_URL}/0/query",
+                params,
+                headers={"User-Agent": USER_AGENT},
+            )
+            # ArcGIS FeatureServer /query returns {"features": [...]} with attributes
+            if isinstance(raw, dict):
+                raw_features = raw.get("features", [])
+                features = [f.get("attributes", f) for f in raw_features]
+                truncated = raw.get("exceededTransferLimit", False)
+            else:
+                features = []
+                truncated = False
+        else:
+            # No spatial filter — query the full continental layer
+            features, truncated = await arcgis_hub.query_feature_service(
+                DROUGHT_MONITOR_FS_URL,
+                layer_id=0,
+                where=where,
+                out_fields="DM,OBS_DATE,SOURCE",
+                include_geometry=include_geometry,
+                max_records=MAX_RECORDS,
+            )
+
+        return {"features": features, "count": len(features), "truncated": truncated}
+
+    return await cached_fetch(cache_key, CACHE_TTL_STATIC, _fetch)
 
 
 async def fetch_ag_weather_stations(
@@ -619,10 +681,26 @@ async def fetch_ag_weather_stations(
 ) -> tuple[dict[str, Any], bool]:
     """Fetch Manitoba agricultural weather station locations from WeatherStations FeatureServer.
 
-    ag_region: optional filter by AgRegion field value.
-    Filled by Plan 04.
+    ag_region: optional filter by AgRegion field value (e.g. "Southwest", "Central").
+    Layer 0 fields: StnName, LatDD, LongDD, Elevation, AgRegion, URL.
+    URL field links to live hourly readings per station at agrimaps.gov.mb.ca.
     """
-    raise NotImplementedError("Plan 04 implements")
+    where = f"AgRegion='{ag_region}'" if ag_region else "1=1"
+    cache_key = f"{CACHE_KEY_PREFIX}ag_weather:{ag_region}:{max_records}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            AG_WEATHER_STATIONS_FS_URL,
+            layer_id=0,
+            where=where,
+            out_fields="StnName,LatDD,LongDD,Elevation,AgRegion,URL",
+            include_geometry=False,
+            max_records=max_records,
+        )
+        return {"features": features, "count": len(features), "truncated": truncated}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 async def fetch_livestock_prices(
@@ -632,11 +710,52 @@ async def fetch_livestock_prices(
 ) -> tuple[dict[str, Any], bool]:
     """Fetch Manitoba livestock market prices from MB_Cattle_Prices_Current_year FeatureServer.
 
-    livestock: "cattle" | "hog" — note hog prices FS unresolved in Wave 0 spike.
-    Plan 04 investigates whether cattle FeatureServer contains hog data too.
-    Filled by Plan 04.
+    livestock: "cattle" queries MB_Cattle_Prices_Current_year FeatureServer.
+    livestock: "hog" — HOG_PRICES_FS_URL is unresolved (spike finding); returns
+    an empty result with a note rather than raising, to degrade gracefully.
+
+    Raises ValueError if livestock not in {"cattle", "hog"}.
+    Layer 0 fields: week, Auction, Parameter, Measure, Value.
     """
-    raise NotImplementedError("Plan 04 implements")
+    valid = {"cattle", "hog"}
+    if livestock not in valid:
+        raise ValueError(
+            f"Invalid livestock '{livestock}'. Must be one of: cattle, hog"
+        )
+
+    # Hog prices FeatureServer was not found in the Manitoba ArcGIS org during
+    # Wave 0 spike. Return an empty-features graceful response rather than an error.
+    if livestock == "hog" and HOG_PRICES_FS_URL is None:
+        return (
+            {
+                "features": [],
+                "count": 0,
+                "truncated": False,
+                "note": (
+                    "Hog prices FeatureServer URL is unresolved (not found in "
+                    "mMUesHYPkXjaFGfS ArcGIS org during Wave 0 spike). "
+                    "Cattle prices available via livestock='cattle'."
+                ),
+            },
+            False,
+        )
+
+    fs_url = CATTLE_PRICES_FS_URL if livestock == "cattle" else str(HOG_PRICES_FS_URL)
+    cache_key = f"{CACHE_KEY_PREFIX}livestock:{livestock}:{max_records}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            fs_url,
+            layer_id=0,
+            where="1=1",
+            out_fields="week,Auction,Parameter,Measure,Value",
+            include_geometry=False,
+            max_records=max_records,
+        )
+        return {"features": features, "count": len(features), "truncated": truncated}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 async def fetch_crop_regions(
@@ -645,10 +764,24 @@ async def fetch_crop_regions(
 ) -> tuple[dict[str, Any], bool]:
     """Fetch Manitoba crop reporting region boundaries from MbAg_Crop_Reporting_Regions FeatureServer.
 
-    Bilingual REGION (EN) and RÉGION (FR) fields.
-    Filled by Plan 04.
+    Layer 0 fields: OBJECTID, REGION (English), RÉGION (French).
+    Returns bilingual boundary polygons for Manitoba Agriculture's 5 crop reporting regions.
     """
-    raise NotImplementedError("Plan 04 implements")
+    cache_key = f"{CACHE_KEY_PREFIX}crop_regions:{include_geometry}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            CROP_REGIONS_FS_URL,
+            layer_id=0,
+            where="1=1",
+            out_fields="OBJECTID,REGION,RÉGION",
+            include_geometry=include_geometry,
+            max_records=MAX_RECORDS,
+        )
+        return {"features": features, "count": len(features), "truncated": truncated}
+
+    return await cached_fetch(cache_key, CACHE_TTL_STATIC, _fetch)
 
 
 # ---------------------------------------------------------------------------

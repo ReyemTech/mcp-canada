@@ -727,3 +727,153 @@ class TestAlbertaPromptsResources:
             "wildfire-data-guide must keep AB-23 water-licence section (Plan 08 requirement)"
         )
         assert "water-licence" in content.lower() or "water licence" in content.lower()
+
+
+# ─── Manitoba prompts and resources scenarios ─────────────────────────────────
+
+
+@pytest.mark.asyncio
+class TestManitobaPromptsResources:
+    """Integration tests for Manitoba prompts (6) and resources (7).
+
+    Verifies discovery via list_prompts() / list_resources() and content via read_resource()
+    through the full MCP Client layer (FileSystemProvider auto-discovery).
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_six_prompts_discoverable(self, mcp_server):
+        """Manitoba's 6 prompts (3 guided workflows + 3 quick lookups) appear in prompts/list."""
+        prompts = await list_prompts(mcp_server)
+        names = {p.name for p in prompts}
+        expected = [
+            "manitoba_explore_flood_or_water",
+            "manitoba_explore_transport",
+            "manitoba_explore_agriculture_or_health",
+            "manitoba_quick_dataset_search",
+            "manitoba_check_road_conditions",
+            "manitoba_flood_outlook_now",
+        ]
+        for prompt_name in expected:
+            assert prompt_name in names, (
+                f"Missing Manitoba prompt: {prompt_name}. "
+                f"manitoba_ prompts found: {sorted(n for n in names if n.startswith('manitoba_'))}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_seven_resources_discoverable(self, mcp_server):
+        """Manitoba's 7 resources (3 data:// + 2 docs:// + 2 template://) appear in resources/list."""
+        resources = await list_resources(mcp_server)
+        uris = {str(r.uri) for r in resources}
+        expected_uris = [
+            "data://manitoba/departments",
+            "data://manitoba/health-regions",
+            "data://manitoba/major-rivers",
+            "docs://manitoba/flood-data-guide",
+            "docs://manitoba/portal-guide",
+            "template://manitoba/dataset-report",
+            "template://manitoba/flood-report",
+        ]
+        for uri in expected_uris:
+            assert uri in uris, (
+                f"Missing Manitoba resource URI: {uri}. "
+                f"manitoba/ URIs found: {sorted(u for u in uris if '/manitoba/' in u)}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_departments_resource_returns_valid_json(self, mcp_server):
+        """data://manitoba/departments returns valid JSON with Manitoba ministry entries."""
+        content = await read_resource(mcp_server, "data://manitoba/departments")
+        assert content, "data://manitoba/departments returned empty content"
+        parsed = json.loads(content)
+        assert isinstance(parsed, dict)
+        assert "departments" in parsed
+        departments = parsed["departments"]
+        assert isinstance(departments, list)
+        assert len(departments) >= 3
+        # Verify expected fields exist in first entry
+        first = departments[0]
+        assert "name_en" in first or "name" in first, (
+            f"Department entry missing name_en/name field: {first}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_health_regions_resource_returns_valid_json(self, mcp_server):
+        """data://manitoba/health-regions returns JSON with 5 Regional Health Authorities."""
+        content = await read_resource(mcp_server, "data://manitoba/health-regions")
+        assert content, "data://manitoba/health-regions returned empty content"
+        parsed = json.loads(content)
+        # Should contain 5 RHAs: WRHA, PMH, IERHA, SHSS, NHR
+        if isinstance(parsed, dict):
+            data = parsed.get("regions", parsed.get("health_regions", list(parsed.values())[0]))
+        else:
+            data = parsed
+        assert isinstance(data, list)
+        assert len(data) >= 3, f"Expected >= 3 RHAs, got {len(data)}"
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_major_rivers_resource_returns_valid_json(self, mcp_server):
+        """data://manitoba/major-rivers returns JSON including Red River Floodway."""
+        content = await read_resource(mcp_server, "data://manitoba/major-rivers")
+        assert content, "data://manitoba/major-rivers returned empty content"
+        parsed = json.loads(content)
+        raw = json.dumps(parsed)
+        # Floodway is a critical infrastructure entry per Plan 07 decisions
+        assert "Floodway" in raw or "floodway" in raw.lower(), (
+            "major-rivers resource must include Red River Floodway entry"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_flood_data_guide_is_markdown(self, mcp_server):
+        """docs://manitoba/flood-data-guide returns markdown with Watch/Warning/Advisory table."""
+        content = await read_resource(mcp_server, "docs://manitoba/flood-data-guide")
+        assert content, "docs://manitoba/flood-data-guide returned empty content"
+        assert "#" in content, "flood-data-guide must be markdown with headings"
+        assert "Watch" in content or "Warning" in content, (
+            "flood-data-guide must contain alert type guidance (Watch/Warning/Advisory)"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_portal_guide_mentions_mli_retirement(self, mcp_server):
+        """docs://manitoba/portal-guide must document the MLI retirement (2022-02-09)."""
+        content = await read_resource(mcp_server, "docs://manitoba/portal-guide")
+        assert content, "docs://manitoba/portal-guide returned empty content"
+        assert "MLI" in content or "mli.gov.mb.ca" in content, (
+            "portal-guide must warn about MLI retirement (common pitfall from 18-RESEARCH)"
+        )
+        assert "#" in content, "portal-guide must be markdown with headings"
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_dataset_report_template_has_placeholders(self, mcp_server):
+        """template://manitoba/dataset-report returns markdown with {placeholder} syntax."""
+        content = await read_resource(mcp_server, "template://manitoba/dataset-report")
+        assert content, "template://manitoba/dataset-report returned empty content"
+        assert "{" in content and "}" in content, (
+            "template://manitoba/dataset-report must contain {placeholder} syntax for agents"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_flood_report_template_has_placeholders(self, mcp_server):
+        """template://manitoba/flood-report returns markdown with {placeholder} syntax."""
+        content = await read_resource(mcp_server, "template://manitoba/flood-report")
+        assert content, "template://manitoba/flood-report returned empty content"
+        assert "{" in content and "}" in content, (
+            "template://manitoba/flood-report must contain {placeholder} syntax for agents"
+        )

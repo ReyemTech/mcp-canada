@@ -1946,3 +1946,139 @@ class TestAlbertaToolScenarios:
         assert any(n.startswith("alberta_") for n in names), (
             f"No alberta_ tool found in BM25 discovery results: {names}"
         )
+
+
+# ─── Manitoba scenarios ──────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+class TestManitobaToolScenarios:
+    """Integration tests calling Manitoba tools through the MCP Client layer.
+
+    Tests simulate what an agent would ask via natural-language prompts:
+    - Flood alerts (empty list = normal, must NOT be an error)
+    - Provincial parks
+    - Surgical wait times
+    - Drought status
+    - BM25 discovery of manitoba_get_flood_alerts
+    - Invalid f_type returns structured INVALID_INPUT error
+    - 511 NOT_CONFIGURED when key absent (always-testable without a key)
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_flood_alerts_empty_is_success(self, mcp_server):
+        """'Current Manitoba flood alerts' — empty list is NORMAL and must return _meta not error."""
+        data = await call_tool(mcp_server, "manitoba_get_flood_alerts", {})
+        # Must return either a _meta envelope (with possibly empty features) or an UPSTREAM_ERROR
+        # (transient ArcGIS connectivity issue). Must NEVER return NOT_FOUND or INVALID_INPUT.
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR", (
+                "Flood alerts error must be UPSTREAM_ERROR, not any other code"
+            )
+        else:
+            assert "_meta" in data
+            assert data["_meta"]["source"]["api"] == "manitoba-flood-alerts"
+            payload = data["data"]
+            # features may be empty (off-season) or populated — both are valid
+            assert "features" in payload
+            assert isinstance(payload["features"], list)
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_provincial_parks(self, mcp_server):
+        """'What are Manitoba provincial parks?' — live ArcGIS FeatureServer (93 parks)."""
+        data = await call_tool(mcp_server, "manitoba_get_provincial_parks", {})
+        assert "_meta" in data or "error" in data
+        if "_meta" in data:
+            assert data["_meta"]["source"]["api"] == "manitoba-provincial-parks"
+            payload = data["data"]
+            assert "features" in payload
+            assert isinstance(payload["features"], list)
+            # ~93 parks expected; don't assert exact count (data drift)
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_surgical_wait_times_for_cardiac(self, mcp_server):
+        """'Manitoba surgical wait times for cardiac surgery' — live FeatureServer."""
+        data = await call_tool(mcp_server, "manitoba_get_surgical_wait_times", {
+            "procedure": "Cardiac",
+        })
+        assert "_meta" in data or "error" in data
+        if "_meta" in data:
+            assert data["_meta"]["source"]["api"] == "manitoba-surgical-wait-times"
+            payload = data["data"]
+            assert "features" in payload
+            assert isinstance(payload["features"], list)
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_drought_status(self, mcp_server):
+        """'Manitoba drought status' — live continental Drought Monitor FeatureServer."""
+        data = await call_tool(mcp_server, "manitoba_get_drought_status", {})
+        assert "_meta" in data or "error" in data
+        if "_meta" in data:
+            assert "drought" in data["_meta"]["source"]["api"]
+            payload = data["data"]
+            assert "features" in payload
+            assert isinstance(payload["features"], list)
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_discover_flood_alerts_via_bm25(self, mcp_server):
+        """'manitoba flood alerts warnings' — BM25 must surface manitoba_get_flood_alerts."""
+        results = await discover(mcp_server, "manitoba flood alerts warnings")
+        names = [r["name"] for r in results]
+        assert "manitoba_get_flood_alerts" in names, (
+            f"Expected manitoba_get_flood_alerts in BM25 results, got: {names}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_invalid_f_type_returns_structured_error(self, mcp_server):
+        """Invalid f_type 'swamp' → INVALID_INPUT with valid= list (not an exception)."""
+        data = await call_tool(mcp_server, "manitoba_get_provincial_waterways", {
+            "f_type": "swamp",
+        })
+        assert "error" in data
+        assert data["error"]["code"] == "INVALID_INPUT"
+        assert "valid" in data["error"]
+        valid_types = data["error"]["valid"]
+        assert isinstance(valid_types, list)
+        # Must include the real waterway types (dike, floodway, etc.)
+        assert len(valid_types) >= 3
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_511_not_configured_without_key(self, mcp_server):
+        """Manitoba 511 road events returns NOT_CONFIGURED when MANITOBA_511_KEY absent.
+
+        This test exercises the NOT_CONFIGURED path WITHOUT needing the actual API key.
+        The error is deterministic: key absent = NOT_CONFIGURED, no flakiness.
+        """
+        import os
+        key = os.environ.pop("MANITOBA_511_KEY", None)
+        try:
+            data = await call_tool(mcp_server, "manitoba_get_road_events", {})
+        finally:
+            if key is not None:
+                os.environ["MANITOBA_511_KEY"] = key
+
+        if key is None:
+            # Key was absent during test — must get NOT_CONFIGURED
+            assert "error" in data
+            assert data["error"]["code"] == "NOT_CONFIGURED", (
+                f"Expected NOT_CONFIGURED for missing 511 key, got: {data}"
+            )
+            assert "511" in data["error"]["message"] or "MANITOBA_511_KEY" in data["error"]["message"]
+        else:
+            # Key was present — either live data or UPSTREAM_ERROR is acceptable
+            assert "_meta" in data or "error" in data

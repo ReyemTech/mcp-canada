@@ -1497,19 +1497,129 @@ class TestManitoba511Cameras:
         assert result.get("_meta", {}).get("lang") == "fr"
 
 
-class TestManitobaEnvelopes:
-    """Parametrized envelope tests for all Manitoba tools.
+# ---------------------------------------------------------------------------
+# Parametrized phase-wide tests — Plan 08
+# ---------------------------------------------------------------------------
 
-    Plan 08 fills — verifies _meta envelope structure across all ~15 tools.
+# (tool_name, client_fn_attribute_on_manitoba.client, sample_kwargs, sample_client_return)
+#
+# Count check: 5 discovery + 3 flood + 4 agriculture + 5 environment/health + 3 transport = 20
+ALL_MANITOBA_TOOLS: list[tuple[str, str, dict, tuple]] = [
+    # Discovery (Plan 02) — 5
+    ("manitoba_search_datasets", "fetch_search_datasets", {"query": ""},
+     ({"results": [], "total": 0}, False)),
+    ("manitoba_get_dataset_details", "fetch_dataset_details", {"dataset_id": "abc"},
+     ({"details": {"id": "abc", "title": "T", "feature_server_url": None, "download_urls": []}}, False)),
+    ("manitoba_query_dataset", "fetch_query_dataset", {"dataset_url": "https://services.arcgis.com/mMUesHYPkXjaFGfS/arcgis/rest/services/Parks/FeatureServer"},
+     ({"data": [], "url": "https://services.arcgis.com/mMUesHYPkXjaFGfS/arcgis/rest/services/Parks/FeatureServer", "rows": 0}, False)),
+    ("manitoba_list_organizations", "fetch_organizations", {},
+     ({"organizations": []}, False)),
+    ("manitoba_list_categories", "fetch_categories", {},
+     ({"categories": []}, False)),
+    # Flood / hydrology (Plan 03) — 3
+    ("manitoba_get_flood_alerts", "fetch_flood_alerts", {},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    ("manitoba_get_river_stations", "fetch_river_stations", {},
+     ({"stations": [], "count": 0}, False)),
+    ("manitoba_get_provincial_waterways", "fetch_provincial_waterways", {},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    # Agriculture / drought (Plan 04) — 4
+    ("manitoba_get_drought_status", "fetch_drought_status", {},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    ("manitoba_get_ag_weather_stations", "fetch_ag_weather_stations", {},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    ("manitoba_get_livestock_prices", "fetch_livestock_prices", {"livestock": "cattle"},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    ("manitoba_get_crop_regions", "fetch_crop_regions", {},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    # Environment / parks / health (Plan 05) — 5
+    ("manitoba_get_provincial_parks", "fetch_provincial_parks", {},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    ("manitoba_get_fisheries_data", "fetch_fisheries_data", {},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    ("manitoba_get_provincial_forests", "fetch_provincial_forests", {},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    ("manitoba_get_surgical_wait_times", "fetch_surgical_wait_times", {},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    ("manitoba_get_health_facilities", "fetch_health_facilities", {},
+     ({"features": [], "count": 0, "truncated": False}, False)),
+    # Transport / 511 (Plan 06) — 3
+    ("manitoba_get_road_events", "fetch_road_events", {},
+     ([], False)),
+    ("manitoba_get_winter_road_conditions", "fetch_winter_road_conditions", {},
+     ([], False)),
+    ("manitoba_get_traffic_cameras", "fetch_traffic_cameras", {},
+     ([], False)),
+]
+
+# Sanity: count must equal 20 (5 + 3 + 4 + 5 + 3)
+assert len(ALL_MANITOBA_TOOLS) == 20, (
+    f"ALL_MANITOBA_TOOLS must have 20 entries (got {len(ALL_MANITOBA_TOOLS)}) — "
+    "adding or removing Manitoba tools requires updating this list in lockstep"
+)
+
+
+class TestManitobaEnvelopes:
+    """Parametrized envelope tests for all 20 Manitoba tools.
+
+    Plan 08 — verifies _meta envelope structure across all tools.
     """
 
-    pass
+    @pytest.mark.parametrize(
+        ("tool_name", "client_fn", "kwargs", "client_return"),
+        ALL_MANITOBA_TOOLS,
+        ids=[t[0] for t in ALL_MANITOBA_TOOLS],
+    )
+    @pytest.mark.asyncio
+    async def test_envelope_structure(
+        self, tool_name: str, client_fn: str, kwargs: dict, client_return: tuple
+    ):
+        """Every tool returns `_meta` with {source.api, source.url, cached, lang, timestamp}."""
+        from mcp_canada.modules.manitoba import tools
+
+        tool_fn = getattr(tools, tool_name)
+        with patch(
+            f"mcp_canada.modules.manitoba.tools._client.{client_fn}",
+            new=AsyncMock(return_value=client_return),
+        ):
+            result = await tool_fn(**kwargs, lang="en")
+
+        assert "_meta" in result, f"{tool_name} missing _meta envelope"
+        meta = result["_meta"]
+        for key in ("source", "cached", "lang", "timestamp"):
+            assert key in meta, f"{tool_name} _meta missing '{key}'"
+        assert "api" in meta["source"], f"{tool_name} _meta.source missing 'api'"
+        assert "url" in meta["source"], f"{tool_name} _meta.source missing 'url'"
+        assert meta["lang"] == "en", (
+            f"{tool_name} should default _meta.lang to 'en', got {meta['lang']!r}"
+        )
 
 
 class TestManitobaLangParam:
-    """Parametrized lang parameter tests for all Manitoba tools.
+    """Parametrized lang parameter tests for all 20 Manitoba tools.
 
-    Plan 08 fills — verifies lang='fr' passes through to envelope for all tools.
+    Plan 08 — verifies lang='fr' propagation to _meta.lang.
     """
 
-    pass
+    @pytest.mark.parametrize(
+        ("tool_name", "client_fn", "kwargs", "client_return"),
+        ALL_MANITOBA_TOOLS,
+        ids=[t[0] for t in ALL_MANITOBA_TOOLS],
+    )
+    @pytest.mark.asyncio
+    async def test_lang_propagation(
+        self, tool_name: str, client_fn: str, kwargs: dict, client_return: tuple
+    ):
+        """Every tool propagates `lang='fr'` to the `_meta.lang` field on success."""
+        from mcp_canada.modules.manitoba import tools
+
+        tool_fn = getattr(tools, tool_name)
+        with patch(
+            f"mcp_canada.modules.manitoba.tools._client.{client_fn}",
+            new=AsyncMock(return_value=client_return),
+        ):
+            result = await tool_fn(**kwargs, lang="fr")
+
+        assert result.get("_meta", {}).get("lang") == "fr", (
+            f"{tool_name} did not propagate lang='fr' to _meta.lang — got {result.get('_meta')}"
+        )

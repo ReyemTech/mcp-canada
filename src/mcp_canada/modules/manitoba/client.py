@@ -35,11 +35,11 @@ from typing import Any
 
 import httpx
 
-from mcp_canada.shared import arcgis_hub  # noqa: F401 — used by Plans 03/04/05
-from mcp_canada.shared.cache import cached_fetch  # noqa: F401 — used by Plans 02-06
+from mcp_canada.shared import arcgis_hub
+from mcp_canada.shared.cache import cached_fetch
 from mcp_canada.shared.http import api_get
-from mcp_canada.shared.parsers import fetch_and_parse  # noqa: F401 — used by Plans 02/03
-from mcp_canada.shared.rate_limiter import get_limiter  # noqa: F401 — used by Plans 02-06
+from mcp_canada.shared.parsers import fetch_and_parse
+from mcp_canada.shared.rate_limiter import get_limiter
 
 from .constants import (
     CACHE_KEY_PREFIX,  # noqa: F401
@@ -198,8 +198,43 @@ _511_limiter = get_limiter(RATE_GROUP_511, RATE_LIMIT_511)
 
 
 # ---------------------------------------------------------------------------
-# Discovery — Plan 02 fills bodies
+# Discovery — Plan 02
 # ---------------------------------------------------------------------------
+
+# File extensions/URL patterns that fetch_and_parse can handle
+_PARSEABLE_EXTENSIONS: frozenset[str] = frozenset(
+    {".csv", ".json", ".geojson", ".xlsx", ".xls"}
+)
+_PARSEABLE_FORMATS: frozenset[str] = frozenset(
+    {"CSV", "JSON", "GEOJSON", "XLSX", "XLS"}
+)
+
+
+def _is_feature_server_url(url: str) -> bool:
+    """Return True when the URL points to an ArcGIS FeatureServer (not MapServer)."""
+    return "/FeatureServer" in url
+
+
+def _is_parseable_url(url: str) -> bool:
+    """Return True when the URL extension is a format fetch_and_parse can handle."""
+    clean = url.split("?", 1)[0].rstrip("/").lower()
+    return any(clean.endswith(ext) for ext in _PARSEABLE_EXTENSIONS)
+
+
+def _flatten_hub_feature(feature: dict[str, Any]) -> dict[str, Any]:
+    """Flatten a single Hub Search API feature into a ManitobaDatasetSummary dict."""
+    props = feature.get("properties") or {}
+    return {
+        "id": feature.get("id", ""),
+        "title": props.get("title", ""),
+        "snippet": props.get("snippet"),
+        "type": props.get("type"),
+        "owner": props.get("owner"),
+        "url": props.get("url"),
+        "num_views": props.get("numViews"),
+        "modified": props.get("modified"),
+        "source": props.get("source"),
+    }
 
 
 async def fetch_search_datasets(
@@ -209,16 +244,106 @@ async def fetch_search_datasets(
     start: int = 0,
     lang: str = "en",
 ) -> tuple[dict[str, Any], bool]:
-    """Search Manitoba geoportal datasets via ArcGIS Hub Search API. Filled by Plan 02."""
-    raise NotImplementedError("Plan 02 implements")
+    """Search Manitoba geoportal datasets via ArcGIS Hub Search API.
+
+    Returns ({"results": [flat summaries], "total": N}, was_cached).
+    Hub Search API params: q (keyword), num (page size), start (offset),
+    optionally category for theme filtering.
+    """
+    params: dict[str, Any] = {
+        "q": query,
+        "num": min(max(num, 1), 100),
+        "start": max(start, 0),
+    }
+    if category:
+        params["categories"] = category
+
+    cache_key = f"{CACHE_KEY_PREFIX}search:{query}:{category}:{num}:{start}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        raw = await _hub_get(params)
+        features = raw.get("features", [])
+        total = raw.get("numberMatched", len(features))
+        return {
+            "results": [_flatten_hub_feature(f) for f in features],
+            "total": total,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_SEARCH, _fetch)
 
 
 async def fetch_dataset_details(
     item_id: str,
     lang: str = "en",
 ) -> tuple[dict[str, Any], bool]:
-    """Fetch full metadata for a Manitoba geoportal item by ID. Filled by Plan 02."""
-    raise NotImplementedError("Plan 02 implements")
+    """Fetch full metadata for a Manitoba geoportal item by ID.
+
+    Searches Hub by exact item_id match. Returns
+    ({"details": {feature_server_url, download_urls, metadata}}, was_cached).
+    Raises ValueError if no item found.
+    """
+    cache_key = f"{CACHE_KEY_PREFIX}details:{item_id}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        # Hub item detail: search by id
+        item_url = f"{HUB_SEARCH_URL}/{item_id}"
+        result = await api_get(
+            item_url,
+            {},
+            headers={"User-Agent": USER_AGENT},
+        )
+        if isinstance(result, dict) and "properties" in result:
+            # Single-item response shape (Hub item endpoint)
+            raw = result
+        elif isinstance(result, dict) and "features" in result:
+            # Search-response shape — pick first matching feature
+            features = result.get("features", [])
+            if not features:
+                raise ValueError(f"Dataset not found: {item_id}")
+            raw = features[0]
+        elif not isinstance(result, dict):
+            raise httpx.HTTPStatusError(
+                f"Hub returned non-dict for item {item_id}",
+                request=httpx.Request("GET", item_url),
+                response=httpx.Response(500),
+            )
+        else:
+            raise ValueError(f"Dataset not found: {item_id}")
+
+        props = raw.get("properties") or {}
+        svc_url = props.get("url", "")
+        # Detect FeatureServer URL
+        feature_server_url: str | None = svc_url if _is_feature_server_url(svc_url) else None
+        # Download URLs: links with rel=download or parseable extensions
+        download_urls: list[str] = []
+        links_raw = (result.get("links") or []) if isinstance(result, dict) else []
+        for link in links_raw:
+            href = link.get("href", "")
+            if href and _is_parseable_url(href):
+                download_urls.append(href)
+
+        details = {
+            "id": raw.get("id", item_id),
+            "title": props.get("title", ""),
+            "snippet": props.get("snippet"),
+            "description": props.get("description"),
+            "type": props.get("type"),
+            "owner": props.get("owner"),
+            "url": svc_url,
+            "feature_server_url": feature_server_url,
+            "download_urls": download_urls,
+            "tags": props.get("tags") or [],
+            "categories": props.get("categories") or [],
+            "modified": props.get("modified"),
+            "num_views": props.get("numViews"),
+            "access": props.get("access"),
+            "licence_info": props.get("licenseInfo"),
+        }
+        return {"details": details}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 async def fetch_query_dataset(
@@ -230,23 +355,116 @@ async def fetch_query_dataset(
     include_geometry: bool = False,
     lang: str = "en",
 ) -> tuple[dict[str, Any], bool]:
-    """Query a Manitoba FeatureServer or parse a file resource. Filled by Plan 02."""
-    raise NotImplementedError("Plan 02 implements")
+    """Query a Manitoba FeatureServer or parse a file resource via auto-router.
+
+    Routing:
+      - URL contains /FeatureServer → arcgis_hub.query_feature_service
+      - URL has CSV/JSON/GeoJSON/XLSX/XLS extension → fetch_and_parse
+      - otherwise (PDF, ZIP, KML, WMS, …) → metadata-only response with 'note'
+    """
+    url = feature_server_url
+    cache_key = f"{CACHE_KEY_PREFIX}query:{url}:{layer_id}:{where}:{out_fields}:{max_records}:{include_geometry}"
+
+    # FeatureServer branch
+    if _is_feature_server_url(url):
+        # Split trailing layer index if present (e.g. .../FeatureServer/0)
+        base = url
+        detected_layer = layer_id
+        clean = url.rstrip("/")
+        parts = clean.rsplit("/FeatureServer", 1)
+        if len(parts) == 2:
+            tail = parts[1].strip("/")
+            base = parts[0] + "/FeatureServer"
+            if tail:
+                try:
+                    detected_layer = int(tail.split("/")[0])
+                except ValueError:
+                    pass
+
+        async def _fetch_fs() -> dict[str, Any]:
+            await _hub_limiter.acquire()
+            rows, truncated = await arcgis_hub.query_feature_service(
+                base,
+                detected_layer,
+                where=where,
+                out_fields=out_fields,
+                include_geometry=include_geometry,
+                max_records=max_records,
+            )
+            return {"data": rows, "url": url, "rows": len(rows), "truncated": truncated}
+
+        return await cached_fetch(cache_key, CACHE_TTL_META, _fetch_fs)
+
+    # Parseable file branch
+    if _is_parseable_url(url):
+        async def _fetch_file() -> dict[str, Any]:
+            rows, _cached = await fetch_and_parse(url, ttl=CACHE_TTL_META)
+            truncated = len(rows) > max_records
+            return {
+                "data": rows[:max_records],
+                "url": url,
+                "rows": min(len(rows), max_records),
+                "truncated": truncated,
+            }
+
+        return await cached_fetch(cache_key, CACHE_TTL_META, _fetch_file)
+
+    # Metadata-only fallback (PDF, ZIP, KML, WMS, etc.)
+    return (
+        {
+            "url": url,
+            "note": "binary/archive resource — use URL directly or call manitoba_search_datasets to find a machine-readable format",
+        },
+        False,
+    )
 
 
 async def fetch_organizations(
     num: int = DEFAULT_PAGE_SIZE,
     lang: str = "en",
 ) -> tuple[dict[str, Any], bool]:
-    """List publishing organizations on the Manitoba geoportal. Filled by Plan 02."""
-    raise NotImplementedError("Plan 02 implements")
+    """List publishing organizations on the Manitoba geoportal.
+
+    Returns ({"organizations": [name, ...]}, was_cached).
+    Derives unique owner names from Hub Search results.
+    """
+    cache_key = f"{CACHE_KEY_PREFIX}orgs:all"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        raw = await _hub_get({"q": "", "num": min(num, 100), "start": 0})
+        features = raw.get("features", [])
+        owners: set[str] = set()
+        for f in features:
+            owner = (f.get("properties") or {}).get("owner")
+            if owner:
+                owners.add(owner)
+        return {"organizations": sorted(owners)}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 async def fetch_categories(
     lang: str = "en",
 ) -> tuple[dict[str, Any], bool]:
-    """List content categories/tags on the Manitoba geoportal. Filled by Plan 02."""
-    raise NotImplementedError("Plan 02 implements")
+    """List content categories/tags on the Manitoba geoportal.
+
+    Returns ({"categories": ["/Categories/Environment", ...]}, was_cached).
+    Derives unique category strings from Hub Search results.
+    """
+    cache_key = f"{CACHE_KEY_PREFIX}categories:all"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        raw = await _hub_get({"q": "", "num": 100, "start": 0})
+        features = raw.get("features", [])
+        all_cats: set[str] = set()
+        for f in features:
+            cats = (f.get("properties") or {}).get("categories") or []
+            all_cats.update(cats)
+        return {"categories": sorted(all_cats)}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 # ---------------------------------------------------------------------------

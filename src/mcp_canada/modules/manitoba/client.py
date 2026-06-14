@@ -982,37 +982,76 @@ async def fetch_health_facilities(
 
 async def fetch_road_events(
     event_type: str | None = None,
+    max_records: int = MAX_RECORDS,
     lang: str = "en",
 ) -> tuple[list[dict], bool]:
     """Fetch current road events from Manitoba 511 API v3 /events endpoint.
 
     KEY REQUIRED: reads MANITOBA_511_KEY from env. Raises Five11NotConfigured if absent.
-    Returns raw list of event dicts.
-    Filled by Plan 06.
+    Returns raw list of event dicts flattened from the 511 response.
+    Rate-limited to RATE_LIMIT_511 (2 r/s, documented limit 10/60s).
+
+    NOTE: 511 returns a JSON list at the top level — NOT an ArcGIS/CKAN envelope.
+    NEVER call arcgis_hub.query_feature_service for 511 endpoints.
     """
-    raise NotImplementedError("Plan 06 implements")
+    cache_key = f"{CACHE_KEY_PREFIX}511:events:{event_type}"
+
+    async def _fetch() -> list[dict]:
+        await _511_limiter.acquire()
+        rows = await _511_get("events")
+        if event_type:
+            rows = [r for r in rows if r.get("EventType") == event_type]
+        return rows[:max_records]
+
+    return await cached_fetch(cache_key, CACHE_TTL_LIVE, _fetch)
 
 
 async def fetch_winter_road_conditions(
     area_name: str | None = None,
+    max_records: int = MAX_RECORDS,
     lang: str = "en",
 ) -> tuple[list[dict], bool]:
     """Fetch winter road conditions from Manitoba 511 API v3 /winterroads endpoint.
 
     KEY REQUIRED: reads MANITOBA_511_KEY from env. Raises Five11NotConfigured if absent.
-    Seasonal — returns [] outside winter road season.
-    Filled by Plan 06.
+    Seasonal — returns [] outside winter road season (API returns empty list).
+    Optional area_name performs client-side filtering on AreaName field.
+    Rate-limited to RATE_LIMIT_511.
+
+    NOTE: 511 returns a JSON list at the top level — NOT an ArcGIS/CKAN envelope.
+    NEVER call arcgis_hub.query_feature_service for 511 endpoints.
     """
-    raise NotImplementedError("Plan 06 implements")
+    cache_key = f"{CACHE_KEY_PREFIX}511:winterroads:{area_name}"
+
+    async def _fetch() -> list[dict]:
+        await _511_limiter.acquire()
+        rows = await _511_get("winterroads")
+        if area_name:
+            rows = [r for r in rows if r.get("AreaName") == area_name]
+        return rows[:max_records]
+
+    return await cached_fetch(cache_key, CACHE_TTL_LIVE, _fetch)
 
 
 async def fetch_traffic_cameras(
+    max_records: int = MAX_RECORDS,
     lang: str = "en",
 ) -> tuple[list[dict], bool]:
     """Fetch traffic camera locations from Manitoba 511 API v3 /cameras endpoint.
 
     KEY REQUIRED: reads MANITOBA_511_KEY from env. Raises Five11NotConfigured if absent.
-    Camera locations are stable — cached 24h.
-    Filled by Plan 06.
+    Camera locations are stable — cached at CACHE_TTL_META (24h).
+    Each camera includes a Views array with Name and Url sub-entries.
+    Rate-limited to RATE_LIMIT_511.
+
+    NOTE: 511 returns a JSON list at the top level — NOT an ArcGIS/CKAN envelope.
+    NEVER call arcgis_hub.query_feature_service for 511 endpoints.
     """
-    raise NotImplementedError("Plan 06 implements")
+    cache_key = f"{CACHE_KEY_PREFIX}511:cameras"
+
+    async def _fetch() -> list[dict]:
+        await _511_limiter.acquire()
+        rows = await _511_get("cameras")
+        return rows[:max_records]
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)

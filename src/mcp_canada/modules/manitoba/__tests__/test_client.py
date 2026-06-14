@@ -1235,13 +1235,137 @@ class TestManitobaGetHealthFacilities:
 
 
 class TestManitoba511:
-    """Unit tests for 511 client functions (fetch_road_events, etc.). Plan 06 fills.
+    """Unit tests for 511 client functions (fetch_road_events, etc.). Plan 06."""
 
-    Must include:
-    - test_raises_five11_not_configured_when_no_key
-    - test_road_events_with_mocked_key
-    - test_winter_roads_with_mocked_key
-    - test_cameras_with_mocked_key
-    """
+    # ------------------------------------------------------------------
+    # Key-absent path: Five11NotConfigured must be raised
+    # ------------------------------------------------------------------
 
-    pass
+    @pytest.mark.asyncio
+    async def test_raises_five11_not_configured_when_no_key_road_events(self, monkeypatch):
+        """fetch_road_events raises Five11NotConfigured when MANITOBA_511_KEY absent."""
+        from mcp_canada.modules.manitoba.client import (
+            Five11NotConfigured,
+            fetch_road_events,
+        )
+
+        monkeypatch.delenv("MANITOBA_511_KEY", raising=False)
+        with pytest.raises(Five11NotConfigured):
+            await fetch_road_events()
+
+    @pytest.mark.asyncio
+    async def test_raises_five11_not_configured_when_no_key_winter_roads(self, monkeypatch):
+        """fetch_winter_road_conditions raises Five11NotConfigured when MANITOBA_511_KEY absent."""
+        from mcp_canada.modules.manitoba.client import (
+            Five11NotConfigured,
+            fetch_winter_road_conditions,
+        )
+
+        monkeypatch.delenv("MANITOBA_511_KEY", raising=False)
+        with pytest.raises(Five11NotConfigured):
+            await fetch_winter_road_conditions()
+
+    @pytest.mark.asyncio
+    async def test_raises_five11_not_configured_when_no_key_cameras(self, monkeypatch):
+        """fetch_traffic_cameras raises Five11NotConfigured when MANITOBA_511_KEY absent."""
+        from mcp_canada.modules.manitoba.client import (
+            Five11NotConfigured,
+            fetch_traffic_cameras,
+        )
+
+        monkeypatch.delenv("MANITOBA_511_KEY", raising=False)
+        with pytest.raises(Five11NotConfigured):
+            await fetch_traffic_cameras()
+
+    # ------------------------------------------------------------------
+    # Key-present path (mocked api_get): must return (list, bool) tuples
+    # ------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_road_events_with_mocked_key(self, monkeypatch):
+        """fetch_road_events(key present) returns (list_of_events, bool) tuple."""
+        from mcp_canada.modules.manitoba.client import fetch_road_events
+        from .conftest import SAMPLE_511_EVENTS
+
+        monkeypatch.setenv("MANITOBA_511_KEY", "test-api-key-12345")
+        with patch(
+            "mcp_canada.modules.manitoba.client.api_get",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_511_EVENTS,
+        ):
+            rows, was_cached = await fetch_road_events()
+        assert isinstance(rows, list)
+        assert isinstance(was_cached, bool)
+        assert len(rows) == 2
+        assert rows[0]["Id"] == "EVT-001"
+
+    @pytest.mark.asyncio
+    async def test_winter_roads_with_mocked_key(self, monkeypatch):
+        """fetch_winter_road_conditions(key present) returns (list, bool) tuple."""
+        from mcp_canada.modules.manitoba.client import fetch_winter_road_conditions
+        from .conftest import SAMPLE_511_WINTER_ROADS
+
+        monkeypatch.setenv("MANITOBA_511_KEY", "test-api-key-12345")
+        with patch(
+            "mcp_canada.modules.manitoba.client.api_get",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_511_WINTER_ROADS,
+        ):
+            rows, was_cached = await fetch_winter_road_conditions()
+        assert isinstance(rows, list)
+        assert isinstance(was_cached, bool)
+        assert len(rows) == 2
+        assert rows[0]["AreaName"] == "Northern"
+
+    @pytest.mark.asyncio
+    async def test_cameras_with_mocked_key(self, monkeypatch):
+        """fetch_traffic_cameras(key present) returns (list, bool) tuple."""
+        from mcp_canada.modules.manitoba.client import fetch_traffic_cameras
+        from .conftest import SAMPLE_511_CAMERAS
+
+        monkeypatch.setenv("MANITOBA_511_KEY", "test-api-key-12345")
+        with patch(
+            "mcp_canada.modules.manitoba.client.api_get",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_511_CAMERAS,
+        ):
+            rows, was_cached = await fetch_traffic_cameras()
+        assert isinstance(rows, list)
+        assert isinstance(was_cached, bool)
+        assert len(rows) == 2
+        # Views array is preserved (cameras include Views sub-list)
+        assert "Views" in rows[0]
+
+    @pytest.mark.asyncio
+    async def test_road_events_area_name_filter(self, monkeypatch):
+        """fetch_winter_road_conditions area_name= performs client-side filtering."""
+        from mcp_canada.modules.manitoba.client import fetch_winter_road_conditions
+        from .conftest import SAMPLE_511_WINTER_ROADS
+
+        monkeypatch.setenv("MANITOBA_511_KEY", "test-api-key-12345")
+        with patch(
+            "mcp_canada.modules.manitoba.client.api_get",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_511_WINTER_ROADS,
+        ):
+            rows, _ = await fetch_winter_road_conditions(area_name="Northern")
+        # All results should match the area filter
+        assert all(r.get("AreaName") == "Northern" for r in rows)
+
+    @pytest.mark.asyncio
+    async def test_511_never_calls_arcgis_hub(self, monkeypatch):
+        """511 client functions never call arcgis_hub.query_feature_service."""
+        from mcp_canada.modules.manitoba.client import fetch_road_events
+        from .conftest import SAMPLE_511_EVENTS
+
+        monkeypatch.setenv("MANITOBA_511_KEY", "test-api-key-12345")
+        with patch(
+            "mcp_canada.modules.manitoba.client.api_get",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_511_EVENTS,
+        ):
+            with patch(
+                "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            ) as mock_arcgis:
+                await fetch_road_events()
+        mock_arcgis.assert_not_called()

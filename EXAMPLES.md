@@ -798,6 +798,51 @@ Step 8: ds_query(sql="
 
 ---
 
+### 25. Manitoba Surgical Wait Times + StatCan Population — Health Access by Region
+
+> "Are Manitoba communities with longer surgical wait times also seeing population growth that could explain the pressure?"
+
+**APIs:** Manitoba geoportal (ArcGIS Hub) + Statistics Canada WDS + Datastore
+
+```
+Step 1: manitoba_get_surgical_wait_times(procedure="Cardiac")
+        → Annual average wait days for cardiac surgery by IndicatorDataArea
+
+Step 2: manitoba_get_surgical_wait_times(procedure="Hip")
+        → Annual average wait days for hip replacement (orthopedic)
+
+Step 3: sc_get_data_from_cube_pid_coord(
+          pid="17100005",
+          coord="1.35",
+          lastN=5)
+        → Manitoba population estimates (StatCan table 17-10-0005-01, Manitoba geo code)
+
+Step 4: ds_create_table(
+          table_name="mb_health_access",
+          columns=[
+            {name: "year",          type: "INTEGER"},
+            {name: "procedure",     type: "TEXT"},
+            {name: "avg_wait_days", type: "REAL"},
+            {name: "population",    type: "INTEGER"}
+          ])
+
+Step 5: ds_insert_data(table_name="mb_health_access", rows=[...joined from steps 1-3...])
+
+Step 6: ds_query(sql="
+          SELECT year,
+                 MAX(CASE WHEN procedure LIKE '%Cardiac%' THEN avg_wait_days END) AS cardiac_wait,
+                 MAX(CASE WHEN procedure LIKE '%Hip%' THEN avg_wait_days END) AS hip_wait,
+                 MAX(population) AS mb_population
+          FROM mb_health_access
+          GROUP BY year
+          ORDER BY year DESC")
+        → Year-over-year trend: wait times vs. provincial population growth
+```
+
+**The insight:** Manitoba publishes annual surgical wait averages through the geoportal ArcGIS Hub (Manitoba_Diagnostic_and_Surgical_Wait_Time_Averages FeatureServer); StatCan publishes provincial population estimates via WDS cube 17-10-0005-01. Neither API knows about the other. Stored in a local datastore and joined on `year`, you get a 5-year trend of health system pressure per capita — the kind of analysis Manitoba Health produces internally but doesn't publish combined. See `docs://manitoba/flood-data-guide` for why real-time ER wait times are NOT machine-readable (widget-only), and `data://manitoba/health-regions` for the 5 RHA coverage areas.
+
+---
+
 ## Key Patterns
 
 Three structural patterns make these examples work:

@@ -18,7 +18,7 @@
 
 ---
 
-**217 tools, ~87 prompts, and ~117 resources** across **9 federal APIs + 5 provincial APIs + 2 municipal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, York Region ArcGIS Hub data, British Columbia CKAN + WFS geospatial data, Quebec Données Québec CKAN + ArcGIS IQA data, Alberta open data + AER energy + WMBappServices wildfire + AHSGIS health + 511 Alberta transport, and persistent local storage. All bilingual (English/French).
+**237 tools, ~93 prompts, and ~124 resources** across **9 federal APIs + 6 provincial APIs + 2 municipal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, York Region ArcGIS Hub data, British Columbia CKAN + WFS geospatial data, Quebec Données Québec CKAN + ArcGIS IQA data, Alberta open data + AER energy + WMBappServices wildfire + AHSGIS health + 511 Alberta transport, Manitoba geoportal (ArcGIS Hub) + 511 Manitoba transport, and persistent local storage. All bilingual (English/French).
 
 > **First ArcGIS Hub module** — shared infrastructure in `shared/arcgis_hub.py` is reusable for future Canadian municipal modules (BC, Calgary, Edmonton, and other cities publishing via ArcGIS Hub).
 > **First OGC WFS module** — BC introduces WFS 2.0 (OGC) support via `shared/ogc.py`, making WFS the third portal technology alongside CKAN and ArcGIS Hub. See `docs://bc/wfs-query-guide` for the CKAN→WFS two-step workflow.
@@ -133,12 +133,13 @@ All tools accept `lang: "en" | "fr"` for bilingual support. Responses include a 
 | [Weather](docs/modules/weather.md) | Federal | 34 | 6 | 8 | Conditions, climate, air quality, hydrology, marine, radar — [MSC GeoMet](https://api.weather.gc.ca/) |
 | [Alberta](docs/modules/alberta.md) | Provincial | 24 | 6 | 7 | CKAN + AER energy + WMBappServices wildfire + AHSGIS health + 511 Alberta — [open.alberta.ca](https://open.alberta.ca) |
 | [British Columbia](docs/modules/british-columbia.md) | Provincial | 20 | 6 | 7 | CKAN + WFS geospatial — [BC Data Catalogue](https://catalogue.data.gov.bc.ca) |
+| [Manitoba](docs/modules/manitoba.md) | Provincial | 20 | 6 | 7 | ArcGIS Hub + 511 Manitoba — [geoportal.gov.mb.ca](https://geoportal.gov.mb.ca) |
 | [Ontario](docs/modules/ontario.md) | Provincial | 6 | 4 | 6 | 3,000+ provincial datasets — [Ontario Open Data](https://data.ontario.ca) |
 | [Quebec](docs/modules/quebec.md) | Provincial | 18 | 6 | 7 | Federated CKAN (139 orgs) — [Données Québec](https://www.donneesquebec.ca) |
 | [Toronto](docs/modules/toronto.md) | Municipal | 12 | 6 | 8 | TTC, neighbourhoods, 311, RentSafe — [Toronto Open Data](https://open.toronto.ca) |
 | [York Region](docs/modules/york-region.md) | Municipal | 27 | 5 | 8 | 4 ArcGIS Hub portals (York Region, Markham, Newmarket, Aurora) |
 | [Local Datastore](docs/modules/datastore.md) | Local | 6 | 4 | 6 | SQLite persistence for cross-API SQL JOINs — `~/.mcp-canada/datastore.db` |
-| **Total** | | **217** | **~87** | **~117** | |
+| **Total** | | **237** | **~93** | **~124** | |
 
 ---
 
@@ -196,6 +197,7 @@ src/mcp_canada/
     ├── toronto/           # 12 tools — City of Toronto Open Data Portal
     ├── york_region/       # 27 tools — York Region ArcGIS Hub (4 portals)
     ├── british_columbia/  # 20 tools — BC Data Catalogue + WFS
+    ├── manitoba/          # 20 tools — geoportal.gov.mb.ca ArcGIS Hub + 511 Manitoba
     ├── quebec/            # 18 tools — Données Québec CKAN
     ├── alberta/           # 24 tools — open.alberta.ca CKAN + AER + WMB + AHSGIS + 511
     ├── statcan/           # 15 tools — Statistics Canada WDS + SDMX

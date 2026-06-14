@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 18-04-PLAN.md — Manitoba agriculture/drought tools (4 @tool functions + client bodies + 33 tests)
-last_updated: "2026-06-14T04:48:35.731Z"
+stopped_at: Completed 18-05-PLAN.md — Manitoba environment/health/parks (5 @tool functions + client bodies + 46 tests)
+last_updated: "2026-06-14T04:56:31.637Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 12
   total_plans: 56
-  completed_plans: 52
+  completed_plans: 53
   percent: 0
 ---
 
@@ -100,6 +100,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 18-manitoba-government-open-data P02 | 6min | 2 tasks | 4 files |
 | Phase 18-manitoba-government-open-data P03 | 8min | 2 tasks | 4 files |
 | Phase 18-manitoba-government-open-data P04 | 5min | 2 tasks | 4 files |
+| Phase 18-manitoba-government-open-data P05 | 15min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -240,6 +241,9 @@ Recent decisions affecting current work:
 - [Phase 18-manitoba-government-open-data]: WATERWAY_TYPES validation in client (ValueError) — tool catches and maps to INVALID_INPUT with valid= list
 - [Phase 18-manitoba-government-open-data]: Drought bbox filter uses api_get direct (not arcgis_hub.query_feature_service) — geometry envelope params not exposed by query_feature_service; server-side Manitoba bbox intersection via /0/query endpoint
 - [Phase 18-manitoba-government-open-data]: HOG_PRICES_FS_URL=None degrades to empty success with note field — livestock='hog' returns {features:[],count:0,note:'...'} not UPSTREAM_ERROR; valid=['cattle','hog'] preserved in INVALID_INPUT
+- [Phase 18-manitoba-government-open-data]: fetch_fisheries_data focuses on 9 of 26 available fields (ID,Name,SurfaceArea,AvgDepth,SecchiDepth,FishingDivision,Species,Regulations,BoatLaunch) — reduces agent context cost
+- [Phase 18-manitoba-government-open-data]: manitoba_get_health_facilities passes rha= as community= to client — no dedicated RHA field in layer; Community_Name LIKE filter covers all RHA queries
+- [Phase 18-manitoba-government-open-data]: Emergency_Department_Availabili is the actual truncated ArcGIS field name — matched exactly as spike-confirmed for emergency_only=True filter
 
 ### Roadmap Evolution
 
@@ -267,6 +271,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-14T04:48:35.728Z
-Stopped at: Completed 18-04-PLAN.md — Manitoba agriculture/drought tools (4 @tool functions + client bodies + 33 tests)
+Last session: 2026-06-14T04:56:31.634Z
+Stopped at: Completed 18-05-PLAN.md — Manitoba environment/health/parks (5 @tool functions + client bodies + 46 tests)
 Resume file: None

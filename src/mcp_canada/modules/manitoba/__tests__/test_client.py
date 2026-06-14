@@ -341,23 +341,162 @@ class TestManitobaListCategories:
 class TestManitobaGetFloodAlerts:
     """Unit tests for fetch_flood_alerts.
 
-    Plan 03 fills — must include test_flood_alerts_empty_when_no_active_alerts
+    Must include test_flood_alerts_empty_when_no_active_alerts
     verifying that empty features list is correct (not an error).
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_features_and_count(self):
+        """fetch_flood_alerts returns {features, count, truncated} payload."""
+        from mcp_canada.modules.manitoba.client import fetch_flood_alerts
+        from .conftest import SAMPLE_FLOOD_ALERTS_ACTIVE
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_FLOOD_ALERTS_ACTIVE,
+        ):
+            data, cached = await fetch_flood_alerts()
+        assert "features" in data
+        assert "count" in data
+        assert "truncated" in data
+        assert isinstance(data["features"], list)
+        assert data["count"] == len(data["features"])
+
+    @pytest.mark.asyncio
+    async def test_flood_alerts_empty_when_no_active_alerts(self):
+        """CRITICAL: empty features list is a VALID result when no alerts active — not an error."""
+        from mcp_canada.modules.manitoba.client import fetch_flood_alerts
+        from .conftest import SAMPLE_FLOOD_ALERTS_EMPTY
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_FLOOD_ALERTS_EMPTY,
+        ):
+            # Must NOT raise; must return a valid (dict, bool) tuple
+            data, was_cached = await fetch_flood_alerts()
+        assert isinstance(data, dict)
+        assert "features" in data
+        assert data["features"] == []
+        assert data["count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_flood_alerts_active_returns_bilingual_fields(self):
+        """Active alerts contain Type_EN and Type_FR bilingual fields."""
+        from mcp_canada.modules.manitoba.client import fetch_flood_alerts
+        from .conftest import SAMPLE_FLOOD_ALERTS_ACTIVE
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_FLOOD_ALERTS_ACTIVE,
+        ):
+            data, _ = await fetch_flood_alerts()
+        first = data["features"][0]
+        assert "Type_EN" in first or "Type_FR" in first  # at least one bilingual field present
 
 
 class TestManitobaGetRiverStations:
     """Unit tests for fetch_river_stations (CSV source). Plan 03 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_stations_payload(self):
+        """fetch_river_stations returns {stations, count} payload from CSV."""
+        from mcp_canada.modules.manitoba.client import fetch_river_stations
+        from .conftest import SAMPLE_RIVER_STATIONS_FEATURES
+
+        rows, _ = SAMPLE_RIVER_STATIONS_FEATURES
+        with patch(
+            "mcp_canada.modules.manitoba.client.fetch_and_parse",
+            new_callable=AsyncMock,
+            return_value=(rows, False),
+        ):
+            data, cached = await fetch_river_stations()
+        assert "stations" in data
+        assert "count" in data
+        assert isinstance(data["stations"], list)
+
+    @pytest.mark.asyncio
+    async def test_returns_valid_payload_on_empty_csv(self):
+        """fetch_river_stations returns empty stations (not error) when CSV is empty."""
+        from mcp_canada.modules.manitoba.client import fetch_river_stations
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.fetch_and_parse",
+            new_callable=AsyncMock,
+            return_value=([], False),
+        ):
+            data, _ = await fetch_river_stations()
+        assert isinstance(data, dict)
+        assert data["stations"] == []
+        assert data["count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_station_has_alert_field(self):
+        """Each station row includes an alert status field."""
+        from mcp_canada.modules.manitoba.client import fetch_river_stations
+        from .conftest import SAMPLE_RIVER_STATIONS_FEATURES
+
+        rows, _ = SAMPLE_RIVER_STATIONS_FEATURES
+        with patch(
+            "mcp_canada.modules.manitoba.client.fetch_and_parse",
+            new_callable=AsyncMock,
+            return_value=(rows, False),
+        ):
+            data, _ = await fetch_river_stations()
+        # Stations should pass-through the alert field from the CSV
+        if data["stations"]:
+            assert "alert" in data["stations"][0]
 
 
 class TestManitobaGetWaterways:
     """Unit tests for fetch_provincial_waterways. Plan 03 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_all_waterways_no_filter(self):
+        """fetch_provincial_waterways returns {features, count, truncated} with no f_type filter."""
+        from mcp_canada.modules.manitoba.client import fetch_provincial_waterways
+        from .conftest import SAMPLE_WATERWAYS_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_WATERWAYS_FEATURES,
+        ):
+            data, cached = await fetch_provincial_waterways()
+        assert "features" in data
+        assert "count" in data
+        assert "truncated" in data
+
+    @pytest.mark.asyncio
+    async def test_applies_f_type_filter(self):
+        """fetch_provincial_waterways passes WHERE clause when f_type given."""
+        from mcp_canada.modules.manitoba.client import fetch_provincial_waterways
+
+        captured_kwargs: list[dict] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured_kwargs.append(kwargs)
+            return ([{"F_TYPE": "Floodway", "Name": "Red River Floodway"}], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            data, _ = await fetch_provincial_waterways(f_type="floodway")
+        assert len(captured_kwargs) == 1
+        # WHERE clause should reference the F_TYPE field
+        where_clause = captured_kwargs[0].get("where", "")
+        assert "F_TYPE" in where_clause or "Floodway" in where_clause
+
+    @pytest.mark.asyncio
+    async def test_invalid_f_type_raises_value_error(self):
+        """fetch_provincial_waterways raises ValueError for unknown f_type."""
+        from mcp_canada.modules.manitoba.client import fetch_provincial_waterways
+
+        with pytest.raises(ValueError, match="Invalid f_type"):
+            await fetch_provincial_waterways(f_type="swamp")
 
 
 class TestManitobaGetDroughtStatus:

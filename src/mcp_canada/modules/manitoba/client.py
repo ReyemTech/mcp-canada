@@ -54,24 +54,25 @@ from .constants import (
     DROUGHT_MONITOR_FS_URL,  # noqa: F401
     FIVE11_BASE_URL,
     FIVE11_KEY_ENV,
-    FLOOD_ALERTS_FS_URL,  # noqa: F401
+    FLOOD_ALERTS_FS_URL,
     HOG_PRICES_FS_URL,  # noqa: F401
     HUB_SEARCH_URL,
     MANITOBA_BBOX,  # noqa: F401
     MAX_RECORDS,
     PROVINCIAL_FORESTS_FS_URL,  # noqa: F401
     PROVINCIAL_PARKS_FS_URL,  # noqa: F401
-    PROVINCIAL_WATERWAYS_FS_URL,  # noqa: F401
+    PROVINCIAL_WATERWAYS_FS_URL,
     RATE_GROUP_511,
     RATE_GROUP_HUB,
     RATE_LIMIT_511,
     RATE_LIMIT_HUB,
-    RIVER_CONDITIONS_CSV_URL,  # noqa: F401
+    RIVER_CONDITIONS_CSV_URL,
     RURAL_HEALTH_FACILITIES_FS_URL,  # noqa: F401
     SURGICAL_WAIT_TIMES_FS_URL,  # noqa: F401
     USER_AGENT,
     WATERBODY_DATA_FS_URL,  # noqa: F401
     AG_WEATHER_STATIONS_FS_URL,  # noqa: F401
+    WATERWAY_TYPES,
 )
 
 from .schemas import (  # noqa: F401 — re-exported for downstream plans
@@ -478,11 +479,25 @@ async def fetch_flood_alerts(
 ) -> tuple[dict[str, Any], bool]:
     """Fetch active overland flood alerts from Overland_Flood_Alerts FeatureServer.
 
-    Returns {"features": [...], "count": N, "truncated": False} payload.
-    IMPORTANT: empty features list [] is CORRECT when no alerts are active — not an error.
-    Filled by Plan 03.
+    Returns {"features": [...], "count": N, "truncated": bool} payload.
+    CRITICAL: empty features list [] is CORRECT when no alerts are active — not an error.
+    Layer 0 fields: OBJECTID, Type_EN, Type_FR, Start_Date, End_Date, Shape__Area.
     """
-    raise NotImplementedError("Plan 03 implements")
+    cache_key = f"{CACHE_KEY_PREFIX}flood_alerts:{include_geometry}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            FLOOD_ALERTS_FS_URL,
+            layer_id=0,
+            where="1=1",
+            out_fields="Type_EN,Type_FR,Start_Date,End_Date,Shape__Area",
+            include_geometry=include_geometry,
+            max_records=MAX_RECORDS,
+        )
+        return {"features": features, "count": len(features), "truncated": truncated}
+
+    return await cached_fetch(cache_key, CACHE_TTL_LIVE, _fetch)
 
 
 async def fetch_river_stations(
@@ -494,9 +509,35 @@ async def fetch_river_stations(
 
     Source: RIVER_CONDITIONS_CSV_URL (www.manitoba.ca/floodinfo/.../agoldataV2.csv)
     Uses fetch_and_parse (CSV), NOT arcgis_hub.query_feature_service.
-    Filled by Plan 03.
+
+    NOTE: Returns station LOCATIONS + flood status only — NOT real-time water level
+    readings. For real-time HYDAT data use wateroffice.ec.gc.ca (ECCC).
+
+    alert values: "No Flooding" | "High Water Advisory" | "Flood Watch" |
+                  "Flood Warning" | "No Current Data"
     """
-    raise NotImplementedError("Plan 03 implements")
+    cache_key = f"{CACHE_KEY_PREFIX}river_stations:{province}:{alert_only}"
+
+    async def _fetch() -> dict[str, Any]:
+        rows, _cached = await fetch_and_parse(RIVER_CONDITIONS_CSV_URL, ttl=CACHE_TTL_LIVE)
+        stations: list[dict[str, Any]] = list(rows) if rows else []
+        # Optional province filter (CSV includes multi-province records)
+        if province:
+            prov_upper = province.upper()
+            stations = [
+                s for s in stations
+                if str(s.get("province", "")).upper() == prov_upper
+            ]
+        # Optional alert filter (exclude "No Flooding" / "No Current Data")
+        if alert_only:
+            inactive = {"no flooding", "no current data", ""}
+            stations = [
+                s for s in stations
+                if str(s.get("alert", "")).lower() not in inactive
+            ]
+        return {"stations": stations, "count": len(stations)}
+
+    return await cached_fetch(cache_key, CACHE_TTL_LIVE, _fetch)
 
 
 async def fetch_provincial_waterways(
@@ -507,10 +548,48 @@ async def fetch_provincial_waterways(
 ) -> tuple[dict[str, Any], bool]:
     """Fetch Manitoba provincial waterways from Provincial_Waterways FeatureServer.
 
-    f_type: "dike" | "floodway" | "dam" | "diversion" | "reservoir" | "waterway"
-    Filled by Plan 03.
+    f_type: one of WATERWAY_TYPES ("dike","floodway","dam","diversion","reservoir","waterway")
+    or None for all types. Raises ValueError for unknown f_type values.
+    Layer 0 fields: F_TYPE, Name, Watershed, WCW, LengthKM.
     """
-    raise NotImplementedError("Plan 03 implements")
+    # Validate f_type before any network call
+    if f_type is not None:
+        f_type_lower = f_type.lower()
+        if f_type_lower not in WATERWAY_TYPES:
+            raise ValueError(
+                f"Invalid f_type '{f_type}'. Must be one of: {', '.join(WATERWAY_TYPES)}"
+            )
+        # Map user-supplied lowercase value to title-case for WHERE clause
+        # (ArcGIS stores values as e.g. "Floodway", "Dike", "Dam", "Reservoir",
+        # "Waterway", "Diversion", "Detention Basin")
+        _F_TYPE_DISPLAY: dict[str, str] = {
+            "dike": "Dike",
+            "floodway": "Floodway",
+            "dam": "Dam",
+            "diversion": "Diversion",
+            "reservoir": "Reservoir",
+            "waterway": "Waterway",
+        }
+        display_val = _F_TYPE_DISPLAY.get(f_type_lower, f_type.title())
+    else:
+        display_val = None
+
+    cache_key = f"{CACHE_KEY_PREFIX}waterways:{f_type}:{max_records}:{include_geometry}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        where = f"F_TYPE='{display_val}'" if display_val else "1=1"
+        features, truncated = await arcgis_hub.query_feature_service(
+            PROVINCIAL_WATERWAYS_FS_URL,
+            layer_id=0,
+            where=where,
+            out_fields="F_TYPE,Name,Watershed,WCW,LengthKM",
+            include_geometry=include_geometry,
+            max_records=max_records,
+        )
+        return {"features": features, "count": len(features), "truncated": truncated}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 # ---------------------------------------------------------------------------

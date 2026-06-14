@@ -104,6 +104,82 @@ class TestSharedApiGetContract:
 class TestManitobaSearchDatasets:
     """Unit tests for fetch_search_datasets. Plan 02 fills."""
 
+    # ------------------------------------------------------------------
+    # Param-regression tests (Plan 09 — RED before fix, GREEN after)
+    # ------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_search_sends_ogc_params(self):
+        """fetch_search_datasets sends OGC 'limit' (not 'num') and no 'start' param."""
+        from mcp_canada.modules.manitoba.constants import DEFAULT_PAGE_SIZE
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.api_get",
+            new_callable=AsyncMock,
+            return_value=HUB_SEARCH_RAW,
+        ) as mock_api_get:
+            await fetch_search_datasets("parks")
+        mock_api_get.assert_called_once()
+        params = mock_api_get.call_args[0][1]
+        assert "limit" in params, f"Expected 'limit' in params, got: {params}"
+        assert params["limit"] == DEFAULT_PAGE_SIZE
+        assert params.get("q") == "parks"
+        assert "num" not in params, f"'num' must NOT be in params, got: {params}"
+        assert "start" not in params, f"'start' must NOT be in params, got: {params}"
+        assert "startindex" not in params, f"'startindex' must not appear when start==0, got: {params}"
+
+    @pytest.mark.asyncio
+    async def test_search_omits_startindex_when_start_zero(self):
+        """fetch_search_datasets omits 'startindex' when start=0 (startindex=0 is invalid live)."""
+        with patch(
+            "mcp_canada.modules.manitoba.client.api_get",
+            new_callable=AsyncMock,
+            return_value=HUB_SEARCH_RAW,
+        ) as mock_api_get:
+            await fetch_search_datasets("parks_zero_start", start=0)
+        mock_api_get.assert_called_once()
+        params = mock_api_get.call_args[0][1]
+        assert "startindex" not in params, (
+            f"startindex must be omitted when start==0 (live API returns 400), got: {params}"
+        )
+        assert "start" not in params
+
+    @pytest.mark.asyncio
+    async def test_search_sets_startindex_when_start_positive(self):
+        """fetch_search_datasets sends 'startindex' (1-based) when start > 0, not 'start'."""
+        with patch(
+            "mcp_canada.modules.manitoba.client.api_get",
+            new_callable=AsyncMock,
+            return_value=HUB_SEARCH_RAW,
+        ) as mock_api_get:
+            await fetch_search_datasets("parks_paged", start=10)
+        mock_api_get.assert_called_once()
+        params = mock_api_get.call_args[0][1]
+        assert "startindex" in params, (
+            f"Expected 'startindex' in params when start>0, got: {params}"
+        )
+        assert params["startindex"] == 10
+        assert "start" not in params, f"'start' must NOT be in params, got: {params}"
+
+    @pytest.mark.asyncio
+    async def test_search_passes_category_as_categories(self):
+        """fetch_search_datasets passes category value under 'categories' key."""
+        with patch(
+            "mcp_canada.modules.manitoba.client.api_get",
+            new_callable=AsyncMock,
+            return_value=HUB_SEARCH_RAW,
+        ) as mock_api_get:
+            await fetch_search_datasets("parks_cat", category="/Categories/Environment")
+        mock_api_get.assert_called_once()
+        params = mock_api_get.call_args[0][1]
+        assert params.get("categories") == "/Categories/Environment", (
+            f"Expected categories='/Categories/Environment' in params, got: {params}"
+        )
+
+    # ------------------------------------------------------------------
+    # Original tests (unchanged)
+    # ------------------------------------------------------------------
+
     @pytest.mark.asyncio
     async def test_returns_results_and_total(self):
         """fetch_search_datasets returns dict with results list and total count."""
@@ -272,6 +348,33 @@ class TestManitobaQueryDataset:
 class TestManitobaListOrgs:
     """Unit tests for fetch_organizations. Plan 02 fills."""
 
+    # ------------------------------------------------------------------
+    # Param-regression test (Plan 09 — RED before fix, GREEN after)
+    # ------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_orgs_send_ogc_params_no_blank_q(self):
+        """fetch_organizations sends 'limit' (not 'num'), no 'start', and no empty 'q'."""
+        with patch(
+            "mcp_canada.modules.manitoba.client.api_get",
+            new_callable=AsyncMock,
+            return_value=HUB_SEARCH_RAW,
+        ) as mock_api_get:
+            await fetch_organizations()
+        mock_api_get.assert_called_once()
+        params = mock_api_get.call_args[0][1]
+        assert "limit" in params, f"Expected 'limit' in params, got: {params}"
+        assert "num" not in params, f"'num' must NOT be in params, got: {params}"
+        assert "start" not in params, f"'start' must NOT be in params, got: {params}"
+        # Empty q="" causes HTTP 400 on the live API — must be omitted entirely
+        assert "q" not in params, (
+            f"Blank 'q' must be omitted (live API returns 400 for q=empty), got: {params}"
+        )
+
+    # ------------------------------------------------------------------
+    # Original tests (unchanged)
+    # ------------------------------------------------------------------
+
     @pytest.mark.asyncio
     async def test_returns_organizations_list(self):
         """fetch_organizations returns dict with organizations list."""
@@ -306,6 +409,33 @@ class TestManitobaListOrgs:
 
 class TestManitobaListCategories:
     """Unit tests for fetch_categories. Plan 02 fills."""
+
+    # ------------------------------------------------------------------
+    # Param-regression test (Plan 09 — RED before fix, GREEN after)
+    # ------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_categories_send_ogc_params_no_blank_q(self):
+        """fetch_categories sends 'limit' (not 'num'), no 'start', and no empty 'q'."""
+        with patch(
+            "mcp_canada.modules.manitoba.client.api_get",
+            new_callable=AsyncMock,
+            return_value=HUB_SEARCH_RAW,
+        ) as mock_api_get:
+            await fetch_categories()
+        mock_api_get.assert_called_once()
+        params = mock_api_get.call_args[0][1]
+        assert "limit" in params, f"Expected 'limit' in params, got: {params}"
+        assert "num" not in params, f"'num' must NOT be in params, got: {params}"
+        assert "start" not in params, f"'start' must NOT be in params, got: {params}"
+        # Empty q="" causes HTTP 400 on the live API — must be omitted entirely
+        assert "q" not in params, (
+            f"Blank 'q' must be omitted (live API returns 400 for q=empty), got: {params}"
+        )
+
+    # ------------------------------------------------------------------
+    # Original tests (unchanged)
+    # ------------------------------------------------------------------
 
     @pytest.mark.asyncio
     async def test_returns_categories_list(self):

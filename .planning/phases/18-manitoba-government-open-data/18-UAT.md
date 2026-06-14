@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 18-manitoba-government-open-data
 source: [18-01-SUMMARY.md, 18-02-SUMMARY.md, 18-03-SUMMARY.md, 18-04-SUMMARY.md, 18-05-SUMMARY.md, 18-06-SUMMARY.md, 18-07-SUMMARY.md, 18-08-SUMMARY.md]
 started: 2026-06-14T00:00:00Z
@@ -72,7 +72,14 @@ skipped: 0
   reason: "User reported: Live call returns HTTP 400 Bad Request from https://geoportal.gov.mb.ca/api/search/v1/collections/all/items?q=parks&num=10&start=0. Confirmed across manitoba_search_datasets, manitoba_list_organizations, manitoba_list_categories. The 15 curated FeatureServer tools all work live; only the 5 Hub-Search-based discovery tools fail. Unit tests passed because the Hub response was mocked — the real endpoint/params are wrong."
   severity: major
   test: 2
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "Discovery tools send ArcGIS-REST query params to an OGC API Records (Hub Search v1) endpoint. The host/path/flattening are correct — pure request-param bug: `num` must be `limit`; `start` must be `startindex` (1-based, omit when 0); empty `q=\"\"` is rejected and must be omitted. Live-confirmed on geoportal.gov.mb.ca 2026-06-14: `?q=parks&num=10&start=0`→400 vs `?q=parks&limit=10`→200. Tests masked it because test_client.py asserts only call_args[0][0] (URL), never the params dict. Affects 3 of 5 discovery tools; get_dataset_details (item endpoint) and query_dataset (FeatureServer path) are NOT affected."
+  artifacts:
+    - path: "src/mcp_canada/modules/manitoba/client.py"
+      issue: "fetch_search_datasets / fetch_organizations / fetch_categories send num/start params and a blank q to the Hub Search OGC endpoint"
+    - path: "src/mcp_canada/modules/manitoba/__tests__/test_client.py"
+      issue: "TestSharedApiGetContract / discovery tests assert only the URL, never the outgoing params dict — so the wrong params went undetected"
+  missing:
+    - "In fetch_search_datasets/fetch_organizations/fetch_categories: map outgoing params num→limit, start→startindex (1-based; omit when 0), and omit q when empty. Keep the public num/start tool signature unchanged for API stability."
+    - "Add request-param regression assertions (assert on call_args params dict, not just URL) so the contract is enforced — these would fail RED against current code."
+    - "Optional: clarifying comment on HUB_SEARCH_URL in constants.py (URL itself is correct)."
+  debug_session: ".planning/debug/manitoba-hub-search-400.md"

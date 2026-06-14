@@ -24,11 +24,13 @@ from fastmcp.tools import tool
 from mcp_canada.shared.envelope import make_error, make_response
 
 from . import client as _client
+from .client import Five11NotConfigured
 from .constants import (
     AG_WEATHER_STATIONS_FS_URL,
     CATTLE_PRICES_FS_URL,
     CROP_REGIONS_FS_URL,
     DROUGHT_MONITOR_FS_URL,
+    FIVE11_BASE_URL,
     FLOOD_ALERTS_FS_URL,
     HUB_BASE_URL,
     HUB_SEARCH_URL,
@@ -44,6 +46,7 @@ from .constants import (
 )
 
 # Source identifiers for the _meta envelope
+_API_NAME_511 = "manitoba-511"
 _API_NAME_HUB = "manitoba-geoportal-hub"
 _API_NAME_FLOOD = "manitoba-flood-alerts"
 _API_NAME_RIVER = "manitoba-river-conditions"
@@ -80,6 +83,10 @@ __all__ = [
     "manitoba_get_provincial_forests",
     "manitoba_get_surgical_wait_times",
     "manitoba_get_health_facilities",
+    # Transport / 511 (Plan 06)
+    "manitoba_get_road_events",
+    "manitoba_get_winter_road_conditions",
+    "manitoba_get_traffic_cameras",
 ]
 
 
@@ -709,6 +716,119 @@ async def manitoba_get_health_facilities(
         data=payload,
         api_name=_API_NAME_HEALTH_FACILITIES,
         api_url=RURAL_HEALTH_FACILITIES_FS_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Transport / 511 (Plan 06)
+# ---------------------------------------------------------------------------
+
+_NOT_CONFIGURED_MSG_EN = (
+    "Manitoba 511 API key not set. "
+    "Obtain a free developer key: sign up at https://www.manitoba511.ca/my511/register "
+    "then request an API key, and set the MANITOBA_511_KEY environment variable."
+)
+_NOT_CONFIGURED_MSG_FR = (
+    "Clé API Manitoba 511 non configurée. "
+    "Obtenez une clé gratuite: inscrivez-vous à https://www.manitoba511.ca/my511/register "
+    "puis demandez une clé API et définissez la variable d'environnement MANITOBA_511_KEY."
+)
+
+
+@tool
+async def manitoba_get_road_events(
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get current road events (closures, construction, incidents) from Manitoba 511 API v3.
+
+    Use for: Checking active road events on Manitoba highways — closures, construction zones, accidents, and other incidents from the Manitoba 511 Events endpoint. Requires MANITOBA_511_KEY environment variable (free developer key from https://www.manitoba511.ca/my511/register). Returns NOT_CONFIGURED error with registration instructions if key is absent. NOTE: Never calls ArcGIS FeatureServer — 511 is a custom REST API.
+
+    Keywords: manitoba road events closures construction incidents highway 511 transport traffic accidents closures PTH Trans-Canada real-time current road conditions
+    """
+    try:
+        rows, cached = await _client.fetch_road_events(lang=lang)
+    except Five11NotConfigured:
+        msg = _NOT_CONFIGURED_MSG_FR if lang == "fr" else _NOT_CONFIGURED_MSG_EN
+        return make_error("NOT_CONFIGURED", msg, lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur lors du chargement des événements routiers: {exc}"
+            if lang == "fr"
+            else f"Road events fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=rows,
+        api_name=_API_NAME_511,
+        api_url=f"{FIVE11_BASE_URL}/events",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def manitoba_get_winter_road_conditions(
+    area_name: str | None = None,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get winter road conditions on Manitoba's remote winter road network (seasonal).
+
+    Use for: Checking current conditions on Manitoba's seasonal winter roads — surface condition (Good/Fair/Poor), visibility, and polyline route data. Highest seasonal value for access to northern and remote communities (Island Lake, Berens River, etc.) when ice roads are open. Requires MANITOBA_511_KEY environment variable (free developer key). Optional area_name filters by AreaName field (e.g. 'Northern'). Returns empty list outside winter road season — this is normal. Returns NOT_CONFIGURED error if MANITOBA_511_KEY is absent.
+
+    Keywords: manitoba winter roads seasonal ice roads northern remote communities condition visibility snow drifting PTH 511 winter driving January February March
+    """
+    try:
+        rows, cached = await _client.fetch_winter_road_conditions(
+            area_name=area_name,
+            lang=lang,
+        )
+    except Five11NotConfigured:
+        msg = _NOT_CONFIGURED_MSG_FR if lang == "fr" else _NOT_CONFIGURED_MSG_EN
+        return make_error("NOT_CONFIGURED", msg, lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur lors du chargement des conditions des routes d'hiver: {exc}"
+            if lang == "fr"
+            else f"Winter road conditions fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=rows,
+        api_name=_API_NAME_511,
+        api_url=f"{FIVE11_BASE_URL}/winterroads",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def manitoba_get_traffic_cameras(
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Manitoba highway traffic camera locations and snapshot image URLs.
+
+    Use for: Retrieving Manitoba 511 traffic camera locations and live snapshot URLs. Each camera includes Location, coordinates, and a Views array with directional snapshot image URLs (North/South/East/West). Camera locations are stable — cached 24h. Requires MANITOBA_511_KEY environment variable (free developer key from https://www.manitoba511.ca/my511/register). Returns NOT_CONFIGURED error if key is absent. NOTE: Never calls ArcGIS FeatureServer — 511 is a custom REST API.
+
+    Keywords: manitoba traffic cameras 511 highway webcam snapshot images live view road conditions visual Perimeter Highway Trans-Canada PTH camera URL image
+    """
+    try:
+        rows, cached = await _client.fetch_traffic_cameras(lang=lang)
+    except Five11NotConfigured:
+        msg = _NOT_CONFIGURED_MSG_FR if lang == "fr" else _NOT_CONFIGURED_MSG_EN
+        return make_error("NOT_CONFIGURED", msg, lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur lors du chargement des caméras de trafic: {exc}"
+            if lang == "fr"
+            else f"Traffic cameras fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=rows,
+        api_name=_API_NAME_511,
+        api_url=f"{FIVE11_BASE_URL}/cameras",
         cached=cached,
         lang=lang,
     )

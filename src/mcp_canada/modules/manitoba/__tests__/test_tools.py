@@ -1317,24 +1317,184 @@ class TestManitobaGetHealthFacilities:
 
 
 class TestManitoba511RoadEvents:
-    """Tool unit tests for manitoba_get_road_events.
+    """Tool unit tests for manitoba_get_road_events."""
 
-    Plan 06 fills — must include test_returns_not_configured_without_key.
-    """
+    @pytest.mark.asyncio
+    async def test_returns_not_configured_without_key(self, monkeypatch):
+        """manitoba_get_road_events returns NOT_CONFIGURED error when MANITOBA_511_KEY absent."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_road_events
+        from mcp_canada.modules.manitoba.client import Five11NotConfigured
 
-    pass
+        monkeypatch.delenv("MANITOBA_511_KEY", raising=False)
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_road_events",
+            new_callable=AsyncMock,
+            side_effect=Five11NotConfigured("key not set"),
+        ):
+            result = await manitoba_get_road_events()
+        assert "error" in result
+        assert result["error"]["code"] == "NOT_CONFIGURED"
+        # Must NOT raise an exception — must return structured error
+        assert "MANITOBA_511_KEY" in result["error"]["message"] or "511" in result["error"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_with_mocked_key(self, monkeypatch):
+        """manitoba_get_road_events returns _meta envelope when key present and client succeeds."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_road_events
+
+        mock_rows = [
+            {"Id": "EVT-001", "EventType": "Construction", "RoadwayName": "Highway 1"},
+        ]
+        monkeypatch.setenv("MANITOBA_511_KEY", "test-key")
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_road_events",
+            new_callable=AsyncMock,
+            return_value=(mock_rows, False),
+        ):
+            result = await manitoba_get_road_events()
+        assert "_meta" in result
+        assert "data" in result
+        assert isinstance(result["data"], list)
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self, monkeypatch):
+        """lang parameter is reflected in _meta envelope for road events."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_road_events
+
+        monkeypatch.setenv("MANITOBA_511_KEY", "test-key")
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_road_events",
+            new_callable=AsyncMock,
+            return_value=([], False),
+        ):
+            result = await manitoba_get_road_events(lang="fr")
+        assert result.get("_meta", {}).get("lang") == "fr"
+
+    @pytest.mark.asyncio
+    async def test_not_configured_error_in_french(self, monkeypatch):
+        """NOT_CONFIGURED error message is bilingual when lang=fr."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_road_events
+        from mcp_canada.modules.manitoba.client import Five11NotConfigured
+
+        monkeypatch.delenv("MANITOBA_511_KEY", raising=False)
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_road_events",
+            new_callable=AsyncMock,
+            side_effect=Five11NotConfigured("key not set"),
+        ):
+            result = await manitoba_get_road_events(lang="fr")
+        assert "error" in result
+        assert result["error"]["code"] == "NOT_CONFIGURED"
 
 
 class TestManitoba511WinterRoads:
-    """Tool unit tests for manitoba_get_winter_road_conditions. Plan 06 fills."""
+    """Tool unit tests for manitoba_get_winter_road_conditions."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_not_configured_without_key(self, monkeypatch):
+        """manitoba_get_winter_road_conditions returns NOT_CONFIGURED when key absent."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_winter_road_conditions
+        from mcp_canada.modules.manitoba.client import Five11NotConfigured
+
+        monkeypatch.delenv("MANITOBA_511_KEY", raising=False)
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_winter_road_conditions",
+            new_callable=AsyncMock,
+            side_effect=Five11NotConfigured("key not set"),
+        ):
+            result = await manitoba_get_winter_road_conditions()
+        assert "error" in result
+        assert result["error"]["code"] == "NOT_CONFIGURED"
+
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_with_mocked_key(self, monkeypatch):
+        """manitoba_get_winter_road_conditions returns _meta envelope when key present."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_winter_road_conditions
+
+        mock_rows = [
+            {"Id": "WR-001", "AreaName": "Northern", "RoadwayName": "Winter Road to Island Lake"},
+        ]
+        monkeypatch.setenv("MANITOBA_511_KEY", "test-key")
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_winter_road_conditions",
+            new_callable=AsyncMock,
+            return_value=(mock_rows, False),
+        ):
+            result = await manitoba_get_winter_road_conditions()
+        assert "_meta" in result
+        assert "data" in result
+        assert isinstance(result["data"], list)
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through(self, monkeypatch):
+        """lang parameter is reflected in _meta envelope for winter roads."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_winter_road_conditions
+
+        monkeypatch.setenv("MANITOBA_511_KEY", "test-key")
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_winter_road_conditions",
+            new_callable=AsyncMock,
+            return_value=([], False),
+        ):
+            result = await manitoba_get_winter_road_conditions(lang="fr")
+        assert result.get("_meta", {}).get("lang") == "fr"
 
 
 class TestManitoba511Cameras:
-    """Tool unit tests for manitoba_get_traffic_cameras. Plan 06 fills."""
+    """Tool unit tests for manitoba_get_traffic_cameras."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_not_configured_without_key(self, monkeypatch):
+        """manitoba_get_traffic_cameras returns NOT_CONFIGURED when key absent."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_traffic_cameras
+        from mcp_canada.modules.manitoba.client import Five11NotConfigured
+
+        monkeypatch.delenv("MANITOBA_511_KEY", raising=False)
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_traffic_cameras",
+            new_callable=AsyncMock,
+            side_effect=Five11NotConfigured("key not set"),
+        ):
+            result = await manitoba_get_traffic_cameras()
+        assert "error" in result
+        assert result["error"]["code"] == "NOT_CONFIGURED"
+
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_with_mocked_key(self, monkeypatch):
+        """manitoba_get_traffic_cameras returns _meta envelope when key present."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_traffic_cameras
+
+        mock_rows = [
+            {
+                "Id": "CAM-001",
+                "Location": "Perimeter Hwy & Main",
+                "Views": [{"Name": "North", "Url": "https://example.com/cam.jpg"}],
+            }
+        ]
+        monkeypatch.setenv("MANITOBA_511_KEY", "test-key")
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_traffic_cameras",
+            new_callable=AsyncMock,
+            return_value=(mock_rows, False),
+        ):
+            result = await manitoba_get_traffic_cameras()
+        assert "_meta" in result
+        assert "data" in result
+        assert isinstance(result["data"], list)
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through(self, monkeypatch):
+        """lang parameter is reflected in _meta envelope for traffic cameras."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_traffic_cameras
+
+        monkeypatch.setenv("MANITOBA_511_KEY", "test-key")
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_traffic_cameras",
+            new_callable=AsyncMock,
+            return_value=([], False),
+        ):
+            result = await manitoba_get_traffic_cameras(lang="fr")
+        assert result.get("_meta", {}).get("lang") == "fr"
 
 
 class TestManitobaEnvelopes:

@@ -169,6 +169,29 @@
 - [x] **AB-26**: Agent can get all Alberta provincial parks and protected areas from GeoDiscover boundary/parks_protected_areas_alberta FeatureServer
 - [x] **AB-27**: All Alberta tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, alberta_ prefix), are discoverable via discover_tools, and 6 prompts + 7 resources are auto-discovered by FileSystemProvider
 
+### Manitoba Government Open Data
+
+Primary portal is **geoportal.gov.mb.ca** ArcGIS Hub (ArcGIS Online org `mMUesHYPkXjaFGfS`) — NOT a CKAN instance. Follows the Alberta Phase 17 / York Region Phase 14 ArcGIS Hub pattern via `shared/arcgis_hub.py`. Module prefix `manitoba_`.
+
+- **MB-01**: Agent can search Manitoba's geoportal.gov.mb.ca ArcGIS Hub catalogue by keyword with optional category filter and pagination (Hub Search API `/api/search/v1/collections/all/items`)
+- **MB-02**: Agent can get full details for a Manitoba dataset by ID, including FeatureServer URL, download URLs, and metadata (ArcGIS Hub item detail endpoint)
+- **MB-03**: Agent can query a Manitoba dataset via auto-router — routes ESRI FeatureServer → arcgis_hub.query_feature_service; CSV/JSON/GeoJSON/XLSX → fetch_and_parse; other → metadata-only (same hybrid router as Alberta Phase 17)
+- **MB-04**: Agent can list Manitoba government organizations publishing on the geoportal (ArcGIS Hub groups/organizations endpoint)
+- **MB-05**: Agent can list dataset categories/tags on the Manitoba geoportal (ArcGIS Hub tags/categories)
+- **MB-06**: Agent can get Manitoba provincial parks and protected areas (93 parks, bilingual NAME_E/NOM_F, polygon boundaries) from `Manitoba_Parks` FeatureServer with optional park_type filter
+- **MB-07**: Agent can get flood alerts (overland flooding watch/warning polygons, bilingual Type_EN/Type_FR) from `Overland_Flood_Alerts` FeatureServer — returns empty when no alerts active (correct, not an error)
+- **MB-08**: Agent can get Manitoba river/hydrometric station locations with flood watch/warning status from the Manitoba River Conditions and Forecasts FeatureServer (station discovery, not real-time level readings)
+- **MB-09**: Agent can get provincial waterways (dikes, floodways, diversions, dams, reservoirs — F_TYPE coded domain) from `Provincial_Waterways` FeatureServer with optional f_type filter
+- **MB-10**: Agent can get current drought monitor status for Manitoba (D0-D4 polygon classes) from `Canada_USA_Drought_Monitor` FeatureServer with default Manitoba bbox filter
+- **MB-11**: Agent can get Manitoba agricultural weather station locations (100+ stations with AgRegion and per-station URL to live hourly readings) from `WeatherStations` FeatureServer
+- **MB-12**: Agent can get Manitoba cattle/hog market prices (current year and historical weekly prices) from the `MB_Cattle_Prices_Current_year` FeatureServer + hog price service, dispatched by livestock param
+- **MB-13**: Agent can get crop reporting region boundaries for Manitoba (bilingual REGION/RÉGION fields) from `MbAg_Crop_Reporting_Regions` FeatureServer
+- **MB-14**: Agent can get Manitoba diagnostic and surgical wait time averages by procedure and year from `Manitoba_Diagnostic_and_Surgical_Wait_Time_Averages` FeatureServer
+- **MB-15**: Agent can get Manitoba fisheries/waterbody reference data (350+ water bodies with species, fishing regulations, stocking records, Secchi depth) from `Manitoba_Waterbody_Data` FeatureServer
+- **MB-16**: Agent can get Manitoba provincial forest boundaries from `Manitoba_Provincial_Forests___Version_6` FeatureServer; AND agent can get Manitoba rural health care facilities (ED/acute care/PCH flags by RHA) from the Rural Health Care Facilities FeatureServer (URL resolved in Wave 0)
+- **MB-17**: Transport / Manitoba 511 — agent can get road events, winter road conditions, and traffic cameras from Manitoba 511 API v3 (key required). Tools ship with NOT_CONFIGURED behaviour when MANITOBA_511_KEY env var is absent; live integration deferred if key is not freely obtainable (resolved in Wave 0 spike)
+- **MB-18**: All Manitoba tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, manitoba_ prefix), are discoverable via discover_tools, and 6 prompts + 7 resources are auto-discovered by FileSystemProvider
+
 ## v2 Requirements
 
 ### Extended Datastore
@@ -201,6 +224,9 @@
 | Toronto building permits curated tool | 232K+ active permits too large for client-side filter; use toronto_search_datasets discovery instead |
 | Toronto budget curated tool | Annual XLSX with no datastore access; discoverable via toronto_search_datasets |
 | Toronto 2021 neighbourhood profiles | XLSX-only (158-model), not datastore-active; use 2016 CSV (140-model) instead |
+| Manitoba Hydro / energy domain | hydro.mb.ca water levels are HTML-only (no API/CSV); dropped — substituted by drought monitor + ag weather |
+| Manitoba Land Initiative (mli.gov.mb.ca) | Retired 2022-02-09; superseded by geoportal.gov.mb.ca |
+| Manitoba Hydrologic Forecast Centre flood bulletins | PDF/HTML only — no machine-readable endpoint; use Overland_Flood_Alerts FeatureServer instead |
 
 ## Traceability
 
@@ -328,6 +354,24 @@
 | AB-25 | Phase 17 | Complete |
 | AB-26 | Phase 17 | Complete |
 | AB-27 | Phase 17 | Complete |
+| MB-01 | Phase 18 | Planned |
+| MB-02 | Phase 18 | Planned |
+| MB-03 | Phase 18 | Planned |
+| MB-04 | Phase 18 | Planned |
+| MB-05 | Phase 18 | Planned |
+| MB-06 | Phase 18 | Planned |
+| MB-07 | Phase 18 | Planned |
+| MB-08 | Phase 18 | Planned |
+| MB-09 | Phase 18 | Planned |
+| MB-10 | Phase 18 | Planned |
+| MB-11 | Phase 18 | Planned |
+| MB-12 | Phase 18 | Planned |
+| MB-13 | Phase 18 | Planned |
+| MB-14 | Phase 18 | Planned |
+| MB-15 | Phase 18 | Planned |
+| MB-16 | Phase 18 | Planned |
+| MB-17 | Phase 18 | Planned |
+| MB-18 | Phase 18 | Planned |
 
 **Coverage:**
 - v1 requirements: 73 total (added 27 Alberta requirements in Phase 17)
@@ -338,8 +382,9 @@
 - Ontario requirements: 8 total (Phase 12)
 - Toronto requirements: 12 total (Phase 13)
 - Alberta requirements: 27 total (Phase 17)
+- Manitoba requirements: 18 total (Phase 18)
 - Prompts & Resources requirements: 20 total (Phase 40)
 
 ---
 *Requirements defined: 2026-04-07*
-*Last updated: 2026-04-17 after Phase 17 planning*
+*Last updated: 2026-06-13 after Phase 18 planning (added MB-01…MB-18)*

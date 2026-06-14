@@ -225,13 +225,20 @@ Plans:
 
 ### Phase 18: Manitoba Government Open Data
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Add Manitoba's provincial open data as a new `manitoba` module via the geoportal.gov.mb.ca ArcGIS Hub (org mMUesHYPkXjaFGfS) — 5 Hub discovery tools + ~15 curated FeatureServer tools across flood/hydrology, agriculture & drought, environment/parks, regional health, and conditional Manitoba 511 transport, with 6 bilingual prompts + 7 resources. ArcGIS Hub pattern (Alberta Phase 17 / York Region Phase 14), NOT CKAN.
+**Requirements**: MB-01, MB-02, MB-03, MB-04, MB-05, MB-06, MB-07, MB-08, MB-09, MB-10, MB-11, MB-12, MB-13, MB-14, MB-15, MB-16, MB-17, MB-18
 **Depends on:** Phase 17
-**Plans:** 0 plans
+**Plans:** 8 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 18 to break down)
+- [ ] 18-01-PLAN.md — Module scaffold (7 files + test scaffolds, stubs, fixtures) + Wave 0 spike (511 key + resolve 3 FeatureServer URLs)
+- [ ] 18-02-PLAN.md — 5 ArcGIS Hub discovery tools (search, details, query auto-router, organizations, categories)
+- [ ] 18-03-PLAN.md — 3 flood/hydrology tools (flood alerts, river stations, provincial waterways)
+- [ ] 18-04-PLAN.md — 4 agriculture/drought tools (drought monitor, ag weather stations, livestock prices, crop regions)
+- [ ] 18-05-PLAN.md — 5 environment/health/parks tools (parks, surgical wait times, fisheries, forests, health facilities)
+- [ ] 18-06-PLAN.md — 3 transport tools (511 road events, winter conditions, cameras — conditional, NOT_CONFIGURED fallback)
+- [ ] 18-07-PLAN.md — 6 bilingual prompts + 7 resources (Phase 40 pattern)
+- [ ] 18-08-PLAN.md — Parametrized envelope/lang tests + integration tests + README/MODULES/CLAUDE/EXAMPLES sync + 95% coverage gate
 
 ### Phase 19: Saskatchewan Government Open Data
 

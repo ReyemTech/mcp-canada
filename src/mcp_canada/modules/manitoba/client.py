@@ -248,14 +248,17 @@ async def fetch_search_datasets(
     """Search Manitoba geoportal datasets via ArcGIS Hub Search API.
 
     Returns ({"results": [flat summaries], "total": N}, was_cached).
-    Hub Search API params: q (keyword), num (page size), start (offset),
-    optionally category for theme filtering.
+    OGC API Records params (NOT ArcGIS-REST): limit (page size), startindex
+    (1-based offset; omitted when 0), q (keyword; omitted when blank).
+    Public signature retains num/start for API stability.
     """
-    params: dict[str, Any] = {
-        "q": query,
-        "num": min(max(num, 1), 100),
-        "start": max(start, 0),
-    }
+    # OGC API Records requires limit/startindex, NOT num/start (ArcGIS-REST).
+    # Empty q="" causes HTTP 400 on the live OGC endpoint — omit when blank.
+    params: dict[str, Any] = {"limit": min(max(num, 1), 100)}
+    if query:
+        params["q"] = query                   # omit q when blank (empty q -> 400)
+    if start and start > 0:
+        params["startindex"] = start          # 1-based; omit when 0 (startindex=0 invalid)
     if category:
         params["categories"] = category
 
@@ -433,7 +436,8 @@ async def fetch_organizations(
 
     async def _fetch() -> dict[str, Any]:
         await _hub_limiter.acquire()
-        raw = await _hub_get({"q": "", "num": min(num, 100), "start": 0})
+        # OGC API Records: use limit (not num/start); omit q (empty q -> 400)
+        raw = await _hub_get({"limit": min(num, 100)})
         features = raw.get("features", [])
         owners: set[str] = set()
         for f in features:
@@ -457,7 +461,8 @@ async def fetch_categories(
 
     async def _fetch() -> dict[str, Any]:
         await _hub_limiter.acquire()
-        raw = await _hub_get({"q": "", "num": 100, "start": 0})
+        # OGC API Records: use limit (not num/start); omit q (empty q -> 400)
+        raw = await _hub_get({"limit": 100})
         features = raw.get("features", [])
         all_cats: set[str] = set()
         for f in features:

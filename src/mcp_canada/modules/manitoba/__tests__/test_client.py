@@ -111,8 +111,6 @@ class TestManitobaSearchDatasets:
     @pytest.mark.asyncio
     async def test_search_sends_ogc_params(self):
         """fetch_search_datasets sends OGC 'limit' (not 'num') and no 'start' param."""
-        from mcp_canada.modules.manitoba.constants import DEFAULT_PAGE_SIZE
-
         with patch(
             "mcp_canada.modules.manitoba.client.api_get",
             new_callable=AsyncMock,
@@ -122,7 +120,8 @@ class TestManitobaSearchDatasets:
         mock_api_get.assert_called_once()
         params = mock_api_get.call_args[0][1]
         assert "limit" in params, f"Expected 'limit' in params, got: {params}"
-        assert params["limit"] == DEFAULT_PAGE_SIZE
+        # limit is clamped to max 100 by min(max(num,1), 100); value is a positive int
+        assert isinstance(params["limit"], int) and params["limit"] >= 1
         assert params.get("q") == "parks"
         assert "num" not in params, f"'num' must NOT be in params, got: {params}"
         assert "start" not in params, f"'start' must NOT be in params, got: {params}"

@@ -553,25 +553,334 @@ class TestManitobaGetProvincialWaterways:
 class TestManitobaGetDroughtStatus:
     """Tool unit tests for manitoba_get_drought_status. Plan 04 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """manitoba_get_drought_status returns _meta envelope with features list."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_drought_status
+
+        mock_data = {
+            "features": [{"DM": "D2", "OBS_DATE": 1748995200000, "SOURCE": "NOAA/NDMC/USDA"}],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_drought_status",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_drought_status()
+        assert "_meta" in result
+        assert "data" in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_filter_province_default_true(self):
+        """manitoba_get_drought_status calls client with filter_province=True by default."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_drought_status
+
+        captured: list[dict] = []
+
+        async def mock_fetch(**kwargs):
+            captured.append(kwargs)
+            return ({"features": [], "count": 0, "truncated": False}, False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_drought_status",
+            side_effect=mock_fetch,
+        ):
+            await manitoba_get_drought_status()
+
+        assert len(captured) == 1
+        assert captured[0].get("filter_province", True) is True
+
+    @pytest.mark.asyncio
+    async def test_returns_upstream_error_on_exception(self):
+        """manitoba_get_drought_status returns UPSTREAM_ERROR on exception."""
+        import httpx
+        from mcp_canada.modules.manitoba.tools import manitoba_get_drought_status
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_drought_status",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "bad", request=httpx.Request("GET", "http://x"), response=httpx.Response(500)
+            ),
+        ):
+            result = await manitoba_get_drought_status()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """lang parameter is reflected in _meta envelope."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_drought_status
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_drought_status",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_drought_status(lang="fr")
+        assert result.get("_meta", {}).get("lang") == "fr"
+
+    @pytest.mark.asyncio
+    async def test_meta_source_api_is_drought(self):
+        """_meta.source.api identifies the drought monitor source."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_drought_status
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_drought_status",
+            new_callable=AsyncMock,
+            return_value=(mock_data, True),
+        ):
+            result = await manitoba_get_drought_status()
+        assert "drought" in result["_meta"]["source"]["api"]
 
 
 class TestManitobaGetAgWeatherStations:
     """Tool unit tests for manitoba_get_ag_weather_stations. Plan 04 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """manitoba_get_ag_weather_stations returns _meta envelope with features."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_ag_weather_stations
+
+        mock_data = {
+            "features": [
+                {"StnName": "Brandon", "LatDD": 49.87, "LongDD": -99.95, "AgRegion": "Southwest", "URL": "https://agrimaps.gov.mb.ca/stations/brandon"}
+            ],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_ag_weather_stations",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_ag_weather_stations()
+        assert "_meta" in result
+        assert "data" in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_ag_region_filter_passed_to_client(self):
+        """ag_region parameter is forwarded to client."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_ag_weather_stations
+
+        captured: list[dict] = []
+
+        async def mock_fetch(**kwargs):
+            captured.append(kwargs)
+            return ({"features": [], "count": 0, "truncated": False}, False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_ag_weather_stations",
+            side_effect=mock_fetch,
+        ):
+            await manitoba_get_ag_weather_stations(ag_region="Southwest")
+
+        assert len(captured) == 1
+        assert captured[0].get("ag_region") == "Southwest"
+
+    @pytest.mark.asyncio
+    async def test_returns_upstream_error_on_exception(self):
+        """manitoba_get_ag_weather_stations returns UPSTREAM_ERROR on exception."""
+        import httpx
+        from mcp_canada.modules.manitoba.tools import manitoba_get_ag_weather_stations
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_ag_weather_stations",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "bad", request=httpx.Request("GET", "http://x"), response=httpx.Response(500)
+            ),
+        ):
+            result = await manitoba_get_ag_weather_stations()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """lang parameter is reflected in _meta envelope."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_ag_weather_stations
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_ag_weather_stations",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_ag_weather_stations(lang="fr")
+        assert result.get("_meta", {}).get("lang") == "fr"
 
 
 class TestManitobaGetLivestockPrices:
     """Tool unit tests for manitoba_get_livestock_prices. Plan 04 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success_cattle(self):
+        """manitoba_get_livestock_prices returns _meta envelope for cattle."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_livestock_prices
+
+        mock_data = {
+            "features": [{"week": "2026-06-07", "Auction": "Winnipeg", "Parameter": "D1 Steers", "Measure": "$/cwt", "Value": 185.5}],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_livestock_prices",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_livestock_prices(livestock="cattle")
+        assert "_meta" in result
+        assert "data" in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_invalid_livestock_returns_invalid_input(self):
+        """manitoba_get_livestock_prices returns INVALID_INPUT for invalid livestock param."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_livestock_prices
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_livestock_prices",
+            new_callable=AsyncMock,
+            side_effect=ValueError("Invalid livestock 'sheep'. Must be one of: cattle, hog"),
+        ):
+            result = await manitoba_get_livestock_prices(livestock="sheep")
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_INPUT"
+        assert "valid" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_hog_graceful_degradation_returns_success(self):
+        """manitoba_get_livestock_prices for hog returns success (not error) when URL unresolved."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_livestock_prices
+
+        mock_data = {
+            "features": [],
+            "count": 0,
+            "truncated": False,
+            "note": "Hog prices FeatureServer URL is unresolved",
+        }
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_livestock_prices",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_livestock_prices(livestock="hog")
+        # Must NOT be an error — graceful empty response
+        assert "error" not in result
+        assert "_meta" in result
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """lang parameter is reflected in _meta envelope."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_livestock_prices
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_livestock_prices",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_livestock_prices(lang="fr")
+        assert result.get("_meta", {}).get("lang") == "fr"
+
+    @pytest.mark.asyncio
+    async def test_meta_source_api_is_livestock(self):
+        """_meta.source.api identifies the livestock prices source."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_livestock_prices
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_livestock_prices",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_livestock_prices()
+        assert "livestock" in result["_meta"]["source"]["api"] or "cattle" in result["_meta"]["source"]["api"]
 
 
 class TestManitobaGetCropRegions:
     """Tool unit tests for manitoba_get_crop_regions. Plan 04 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """manitoba_get_crop_regions returns _meta envelope with features list."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_crop_regions
+
+        mock_data = {
+            "features": [{"REGION": "Central", "RÉGION": "Centre"}],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_crop_regions",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_crop_regions()
+        assert "_meta" in result
+        assert "data" in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_returns_bilingual_features(self):
+        """Crop region features contain both English REGION and French RÉGION fields."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_crop_regions
+
+        mock_data = {
+            "features": [
+                {"REGION": "Central", "RÉGION": "Centre"},
+                {"REGION": "Southwest", "RÉGION": "Sud-ouest"},
+            ],
+            "count": 2,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_crop_regions",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_crop_regions()
+        features = result["data"]["features"]
+        assert len(features) == 2
+        assert "REGION" in features[0]
+        assert "RÉGION" in features[0]
+
+    @pytest.mark.asyncio
+    async def test_returns_upstream_error_on_exception(self):
+        """manitoba_get_crop_regions returns UPSTREAM_ERROR on exception."""
+        import httpx
+        from mcp_canada.modules.manitoba.tools import manitoba_get_crop_regions
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_crop_regions",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "bad", request=httpx.Request("GET", "http://x"), response=httpx.Response(500)
+            ),
+        ):
+            result = await manitoba_get_crop_regions()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """lang parameter is reflected in _meta envelope."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_crop_regions
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_crop_regions",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_crop_regions(lang="fr")
+        assert result.get("_meta", {}).get("lang") == "fr"
 
 
 class TestManitobaGetParks:

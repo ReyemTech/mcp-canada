@@ -25,6 +25,10 @@ from mcp_canada.shared.envelope import make_error, make_response
 
 from . import client as _client
 from .constants import (
+    AG_WEATHER_STATIONS_FS_URL,
+    CATTLE_PRICES_FS_URL,
+    CROP_REGIONS_FS_URL,
+    DROUGHT_MONITOR_FS_URL,
     FLOOD_ALERTS_FS_URL,
     HUB_BASE_URL,
     HUB_SEARCH_URL,
@@ -38,6 +42,10 @@ _API_NAME_HUB = "manitoba-geoportal-hub"
 _API_NAME_FLOOD = "manitoba-flood-alerts"
 _API_NAME_RIVER = "manitoba-river-conditions"
 _API_NAME_WATERWAYS = "manitoba-provincial-waterways"
+_API_NAME_DROUGHT = "manitoba-drought-monitor"
+_API_NAME_AG_WEATHER = "manitoba-ag-weather-stations"
+_API_NAME_LIVESTOCK = "manitoba-livestock-prices"
+_API_NAME_CROP_REGIONS = "manitoba-crop-reporting-regions"
 
 __all__ = [
     # Discovery (Plan 02)
@@ -50,6 +58,11 @@ __all__ = [
     "manitoba_get_flood_alerts",
     "manitoba_get_river_stations",
     "manitoba_get_provincial_waterways",
+    # Agriculture / drought (Plan 04)
+    "manitoba_get_drought_status",
+    "manitoba_get_ag_weather_stations",
+    "manitoba_get_livestock_prices",
+    "manitoba_get_crop_regions",
 ]
 
 
@@ -343,6 +356,142 @@ async def manitoba_get_provincial_waterways(
         data=payload,
         api_name=_API_NAME_WATERWAYS,
         api_url=PROVINCIAL_WATERWAYS_FS_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Agriculture / Drought (Plan 04)
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def manitoba_get_drought_status(
+    filter_province: bool = True,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get current drought monitor status for Manitoba from the Canada/USA Drought Monitor layer.
+
+    Use for: Checking current drought intensity (D0-D4) across Manitoba. Returns polygon features from the Canada_USA_Drought_Monitor FeatureServer filtered to Manitoba by default (Pitfall: this is a continental layer — filter_province=True applies Manitoba bounding box to avoid returning all of North America). D0=Abnormally Dry, D1=Moderate, D2=Severe, D3=Extreme, D4=Exceptional drought.
+
+    Keywords: manitoba drought monitor D0 D1 D2 D3 D4 intensity polygon agricultural dry conditions prairie drought severity weekly status
+    """
+    try:
+        payload, cached = await _client.fetch_drought_status(
+            filter_province=filter_province,
+            lang=lang,
+        )
+    except Exception as exc:
+        msg = (
+            f"Erreur lors du chargement du moniteur de sécheresse: {exc}"
+            if lang == "fr"
+            else f"Drought monitor fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=payload,
+        api_name=_API_NAME_DROUGHT,
+        api_url=DROUGHT_MONITOR_FS_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def manitoba_get_ag_weather_stations(
+    ag_region: str | None = None,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Manitoba agricultural weather station locations and live data links.
+
+    Use for: Finding Manitoba Agriculture weather monitoring station locations and accessing live hourly readings per station. Returns StnName, coordinates (LatDD/LongDD), Elevation, AgRegion, and URL (links to live hourly weather data page at agrimaps.gov.mb.ca per station). Optional ag_region filter (e.g. 'Southwest', 'Central', 'Northwest', 'Southeast', 'Interlake').
+
+    Keywords: manitoba agriculture weather stations hourly data AgRegion temperature precipitation ag climate monitoring Brandon Winnipeg Southwest Central farm weather
+    """
+    try:
+        payload, cached = await _client.fetch_ag_weather_stations(
+            ag_region=ag_region,
+            lang=lang,
+        )
+    except Exception as exc:
+        msg = (
+            f"Erreur lors du chargement des stations météo agricoles: {exc}"
+            if lang == "fr"
+            else f"Agricultural weather stations fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=payload,
+        api_name=_API_NAME_AG_WEATHER,
+        api_url=AG_WEATHER_STATIONS_FS_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def manitoba_get_livestock_prices(
+    livestock: str = "cattle",
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Manitoba weekly livestock market prices from Manitoba Agriculture.
+
+    Use for: Retrieving weekly cattle or hog market prices from Manitoba Agriculture auctions. livestock='cattle' returns current year weekly prices from MB_Cattle_Prices_Current_year (auction, grade/parameter, $/cwt). livestock='hog' is provisionally supported but the hog FeatureServer URL was unresolved during spike — returns an empty result with a note if unresolved. Fields: week, Auction, Parameter, Measure, Value.
+
+    Keywords: manitoba livestock prices cattle hog market auction weekly agriculture $/cwt grade steer heifer feeder market prices Winnipeg Brandon
+    """
+    try:
+        payload, cached = await _client.fetch_livestock_prices(
+            livestock=livestock,
+            lang=lang,
+        )
+    except ValueError as exc:
+        msg = (
+            "Type de bétail invalide. Options valides: cattle, hog"
+            if lang == "fr"
+            else str(exc)
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=["cattle", "hog"])
+    except Exception as exc:
+        msg = (
+            f"Erreur lors du chargement des prix du bétail: {exc}"
+            if lang == "fr"
+            else f"Livestock prices fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=payload,
+        api_name=_API_NAME_LIVESTOCK,
+        api_url=CATTLE_PRICES_FS_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def manitoba_get_crop_regions(
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Manitoba crop reporting region boundaries with bilingual region names.
+
+    Use for: Retrieving Manitoba Agriculture's 5 crop reporting region boundary polygons with bilingual names (REGION in English, RÉGION in French). Used to contextualize seasonal crop reports, yield estimates, and weather summaries published by Manitoba Agriculture. Regions: Central, Southwest, Northwest, Southeast, Interlake.
+
+    Keywords: manitoba crop reporting regions boundaries bilingual agriculture REGION RÉGION polygon seasonal crop zones Central Southwest Northwest Southeast Interlake
+    """
+    try:
+        payload, cached = await _client.fetch_crop_regions(lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur lors du chargement des régions agricoles: {exc}"
+            if lang == "fr"
+            else f"Crop regions fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=payload,
+        api_name=_API_NAME_CROP_REGIONS,
+        api_url=CROP_REGIONS_FS_URL,
         cached=cached,
         lang=lang,
     )

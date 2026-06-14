@@ -776,31 +776,462 @@ class TestManitobaGetCropRegions:
 class TestManitobaGetParks:
     """Unit tests for fetch_provincial_parks. Plan 05 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_features_count_truncated(self):
+        """fetch_provincial_parks returns {features, count, truncated} payload."""
+        from mcp_canada.modules.manitoba.client import fetch_provincial_parks
+        from .conftest import SAMPLE_PARKS_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_PARKS_FEATURES,
+        ):
+            data, cached = await fetch_provincial_parks()
+        assert "features" in data
+        assert "count" in data
+        assert "truncated" in data
+        assert data["count"] == len(data["features"])
+
+    @pytest.mark.asyncio
+    async def test_returns_bilingual_name_fields(self):
+        """Parks features include NAME_E (English) and NOM_F (French) fields."""
+        from mcp_canada.modules.manitoba.client import fetch_provincial_parks
+        from .conftest import SAMPLE_PARKS_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_PARKS_FEATURES,
+        ):
+            data, _ = await fetch_provincial_parks()
+        if data["features"]:
+            feat = data["features"][0]
+            assert "NAME_E" in feat
+            assert "NOM_F" in feat
+
+    @pytest.mark.asyncio
+    async def test_park_type_filter_applied(self):
+        """fetch_provincial_parks builds WHERE TYPE_E=... clause for park_type filter."""
+        from mcp_canada.modules.manitoba.client import fetch_provincial_parks
+
+        captured: list[dict] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured.append(kwargs)
+            return ([], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_provincial_parks(park_type="Provincial")
+
+        assert len(captured) == 1
+        where = captured[0].get("where", "")
+        assert "TYPE_E" in where or "Provincial" in where
+
+    @pytest.mark.asyncio
+    async def test_no_park_type_returns_all(self):
+        """fetch_provincial_parks with no park_type returns all parks (WHERE 1=1)."""
+        from mcp_canada.modules.manitoba.client import fetch_provincial_parks
+        from .conftest import SAMPLE_PARKS_FEATURES
+
+        captured: list[dict] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured.append(kwargs)
+            return SAMPLE_PARKS_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_provincial_parks()
+
+        assert captured[0].get("where", "") == "1=1"
+
+    @pytest.mark.asyncio
+    async def test_queries_parks_fs_url(self):
+        """fetch_provincial_parks calls query_feature_service with PROVINCIAL_PARKS_FS_URL."""
+        from mcp_canada.modules.manitoba.client import fetch_provincial_parks
+        from mcp_canada.modules.manitoba.constants import PROVINCIAL_PARKS_FS_URL
+
+        captured_urls: list[str] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured_urls.append(url)
+            return ([], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_provincial_parks()
+
+        assert len(captured_urls) == 1
+        assert PROVINCIAL_PARKS_FS_URL in captured_urls[0] or captured_urls[0] == PROVINCIAL_PARKS_FS_URL
 
 
 class TestManitobaGetFisheriesData:
     """Unit tests for fetch_fisheries_data. Plan 05 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_features_count_truncated(self):
+        """fetch_fisheries_data returns {features, count, truncated} payload."""
+        from mcp_canada.modules.manitoba.client import fetch_fisheries_data
+        from .conftest import SAMPLE_FISHERIES_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_FISHERIES_FEATURES,
+        ):
+            data, cached = await fetch_fisheries_data()
+        assert "features" in data
+        assert "count" in data
+        assert "truncated" in data
+        assert data["count"] == len(data["features"])
+
+    @pytest.mark.asyncio
+    async def test_features_include_species_and_regulations(self):
+        """Fisheries features include Species and Regulations fields."""
+        from mcp_canada.modules.manitoba.client import fetch_fisheries_data
+        from .conftest import SAMPLE_FISHERIES_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_FISHERIES_FEATURES,
+        ):
+            data, _ = await fetch_fisheries_data()
+        if data["features"]:
+            feat = data["features"][0]
+            # Should include species and regulations from the 26-field focused subset
+            assert "Species" in feat or "Regulations" in feat or "Name" in feat
+
+    @pytest.mark.asyncio
+    async def test_name_query_filter_applied(self):
+        """fetch_fisheries_data builds WHERE Name LIKE ... clause for name_query."""
+        from mcp_canada.modules.manitoba.client import fetch_fisheries_data
+
+        captured: list[dict] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured.append(kwargs)
+            return ([], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_fisheries_data(name_query="Lake Winnipeg")
+
+        assert len(captured) == 1
+        where = captured[0].get("where", "")
+        assert "Lake Winnipeg" in where or "Name" in where or "LIKE" in where
+
+    @pytest.mark.asyncio
+    async def test_fishing_division_filter_applied(self):
+        """fetch_fisheries_data filters by FishingDivision when provided."""
+        from mcp_canada.modules.manitoba.client import fetch_fisheries_data
+
+        captured: list[dict] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured.append(kwargs)
+            return ([], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_fisheries_data(fishing_division="Division 1")
+
+        assert len(captured) == 1
+        where = captured[0].get("where", "")
+        assert "Division 1" in where or "FishingDivision" in where
+
+    @pytest.mark.asyncio
+    async def test_queries_waterbody_fs_url(self):
+        """fetch_fisheries_data calls query_feature_service with WATERBODY_DATA_FS_URL."""
+        from mcp_canada.modules.manitoba.client import fetch_fisheries_data
+        from mcp_canada.modules.manitoba.constants import WATERBODY_DATA_FS_URL
+
+        captured_urls: list[str] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured_urls.append(url)
+            return ([], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_fisheries_data()
+
+        assert len(captured_urls) == 1
+        assert WATERBODY_DATA_FS_URL in captured_urls[0] or captured_urls[0] == WATERBODY_DATA_FS_URL
 
 
 class TestManitobaGetForests:
     """Unit tests for fetch_provincial_forests. Plan 05 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_features_count_truncated(self):
+        """fetch_provincial_forests returns {features, count, truncated} payload."""
+        from mcp_canada.modules.manitoba.client import fetch_provincial_forests
+        from .conftest import SAMPLE_FORESTS_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_FORESTS_FEATURES,
+        ):
+            data, cached = await fetch_provincial_forests()
+        assert "features" in data
+        assert "count" in data
+        assert "truncated" in data
+        assert data["count"] == len(data["features"])
+
+    @pytest.mark.asyncio
+    async def test_queries_forests_fs_url(self):
+        """fetch_provincial_forests calls query_feature_service with PROVINCIAL_FORESTS_FS_URL."""
+        from mcp_canada.modules.manitoba.client import fetch_provincial_forests
+        from mcp_canada.modules.manitoba.constants import PROVINCIAL_FORESTS_FS_URL
+
+        captured_urls: list[str] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured_urls.append(url)
+            return ([], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_provincial_forests()
+
+        assert len(captured_urls) == 1
+        assert PROVINCIAL_FORESTS_FS_URL in captured_urls[0] or captured_urls[0] == PROVINCIAL_FORESTS_FS_URL
+
+    @pytest.mark.asyncio
+    async def test_include_geometry_false_by_default(self):
+        """fetch_provincial_forests defaults to include_geometry=False."""
+        from mcp_canada.modules.manitoba.client import fetch_provincial_forests
+
+        captured: list[dict] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured.append(kwargs)
+            return ([], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_provincial_forests()
+
+        assert captured[0].get("include_geometry", True) is False
 
 
 class TestManitobaGetWaitTimes:
     """Unit tests for fetch_surgical_wait_times. Plan 05 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_features_count_truncated(self):
+        """fetch_surgical_wait_times returns {features, count, truncated} payload."""
+        from mcp_canada.modules.manitoba.client import fetch_surgical_wait_times
+        from .conftest import SAMPLE_WAIT_TIMES_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_WAIT_TIMES_FEATURES,
+        ):
+            data, cached = await fetch_surgical_wait_times()
+        assert "features" in data
+        assert "count" in data
+        assert "truncated" in data
+        assert data["count"] == len(data["features"])
+
+    @pytest.mark.asyncio
+    async def test_features_include_year_procedure_avg_wait(self):
+        """Wait time features include Year, IndicatorDataArea, Average_Wait fields."""
+        from mcp_canada.modules.manitoba.client import fetch_surgical_wait_times
+        from .conftest import SAMPLE_WAIT_TIMES_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_WAIT_TIMES_FEATURES,
+        ):
+            data, _ = await fetch_surgical_wait_times()
+        if data["features"]:
+            feat = data["features"][0]
+            assert "Year" in feat
+            assert "IndicatorDataArea" in feat
+            assert "Average_Wait" in feat
+
+    @pytest.mark.asyncio
+    async def test_year_filter_applied(self):
+        """fetch_surgical_wait_times builds WHERE Year=... clause for year filter."""
+        from mcp_canada.modules.manitoba.client import fetch_surgical_wait_times
+
+        captured: list[dict] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured.append(kwargs)
+            return ([], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_surgical_wait_times(year=2021)
+
+        where = captured[0].get("where", "")
+        assert "Year" in where or "2021" in where
+
+    @pytest.mark.asyncio
+    async def test_procedure_filter_applied(self):
+        """fetch_surgical_wait_times builds WHERE with LIKE clause for procedure."""
+        from mcp_canada.modules.manitoba.client import fetch_surgical_wait_times
+
+        captured: list[dict] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured.append(kwargs)
+            return ([], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_surgical_wait_times(procedure="Cardiac surgery")
+
+        where = captured[0].get("where", "")
+        assert "Cardiac surgery" in where or "IndicatorDataArea" in where or "LIKE" in where
+
+    @pytest.mark.asyncio
+    async def test_queries_wait_times_fs_url(self):
+        """fetch_surgical_wait_times calls query_feature_service with SURGICAL_WAIT_TIMES_FS_URL."""
+        from mcp_canada.modules.manitoba.client import fetch_surgical_wait_times
+        from mcp_canada.modules.manitoba.constants import SURGICAL_WAIT_TIMES_FS_URL
+
+        captured_urls: list[str] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured_urls.append(url)
+            return ([], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_surgical_wait_times()
+
+        assert len(captured_urls) == 1
+        assert SURGICAL_WAIT_TIMES_FS_URL in captured_urls[0] or captured_urls[0] == SURGICAL_WAIT_TIMES_FS_URL
 
 
 class TestManitobaGetHealthFacilities:
     """Unit tests for fetch_health_facilities. Plan 05 fills."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_features_count_truncated(self):
+        """fetch_health_facilities returns {features, count, truncated} payload."""
+        from mcp_canada.modules.manitoba.client import fetch_health_facilities
+        from .conftest import SAMPLE_HEALTH_FACILITIES_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_HEALTH_FACILITIES_FEATURES,
+        ):
+            data, cached = await fetch_health_facilities()
+        assert "features" in data
+        assert "count" in data
+        assert "truncated" in data
+        assert data["count"] == len(data["features"])
+
+    @pytest.mark.asyncio
+    async def test_features_include_community_and_facility(self):
+        """Health facility features include Community_Name and Facility_Name fields."""
+        from mcp_canada.modules.manitoba.client import fetch_health_facilities
+        from .conftest import SAMPLE_HEALTH_FACILITIES_FEATURES
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_HEALTH_FACILITIES_FEATURES,
+        ):
+            data, _ = await fetch_health_facilities()
+        if data["features"]:
+            feat = data["features"][0]
+            assert "Community_Name" in feat or "Facility_Name" in feat
+
+    @pytest.mark.asyncio
+    async def test_community_filter_applied(self):
+        """fetch_health_facilities builds WHERE with Community_Name filter."""
+        from mcp_canada.modules.manitoba.client import fetch_health_facilities
+
+        captured: list[dict] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured.append(kwargs)
+            return ([], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_health_facilities(community="Selkirk")
+
+        where = captured[0].get("where", "")
+        assert "Selkirk" in where or "Community_Name" in where
+
+    @pytest.mark.asyncio
+    async def test_emergency_only_filter_applied(self):
+        """fetch_health_facilities builds WHERE clause for emergency_only=True."""
+        from mcp_canada.modules.manitoba.client import fetch_health_facilities
+
+        captured: list[dict] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured.append(kwargs)
+            return ([], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_health_facilities(emergency_only=True)
+
+        where = captured[0].get("where", "")
+        # Should filter for facilities with emergency departments available
+        assert "Emergency" in where or "Yes" in where or "1=1" not in where
+
+    @pytest.mark.asyncio
+    async def test_queries_rural_health_facilities_fs_url(self):
+        """fetch_health_facilities calls query_feature_service with RURAL_HEALTH_FACILITIES_FS_URL."""
+        from mcp_canada.modules.manitoba.client import fetch_health_facilities
+        from mcp_canada.modules.manitoba.constants import RURAL_HEALTH_FACILITIES_FS_URL
+
+        captured_urls: list[str] = []
+
+        async def mock_qfs(url, layer_id, **kwargs):
+            captured_urls.append(url)
+            return ([], False)
+
+        with patch(
+            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            side_effect=mock_qfs,
+        ):
+            await fetch_health_facilities()
+
+        assert len(captured_urls) == 1
+        assert RURAL_HEALTH_FACILITIES_FS_URL in captured_urls[0] or captured_urls[0] == RURAL_HEALTH_FACILITIES_FS_URL
 
 
 class TestManitoba511:

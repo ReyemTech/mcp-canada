@@ -799,9 +799,24 @@ async def fetch_provincial_parks(
 
     park_type: one of PARK_TYPES tuple values or None for all 93 parks.
     Bilingual NAME_E/NOM_F fields.
-    Filled by Plan 05.
+    Layer 0 fields: NAME_E, NOM_F, BIOME, O_AREA, TYPE_E, TYPE_F, STATUS_E, PROTDATE, PRK_CLSS, URL.
     """
-    raise NotImplementedError("Plan 05 implements")
+    where = f"TYPE_E='{park_type}'" if park_type else "1=1"
+    cache_key = f"{CACHE_KEY_PREFIX}parks:{park_type}:{max_records}:{include_geometry}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            PROVINCIAL_PARKS_FS_URL,
+            layer_id=0,
+            where=where,
+            out_fields="NAME_E,NOM_F,BIOME,O_AREA,TYPE_E,TYPE_F,STATUS_E,PROTDATE,PRK_CLSS,URL",
+            include_geometry=include_geometry,
+            max_records=max_records,
+        )
+        return {"features": features, "count": len(features), "truncated": truncated}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 async def fetch_fisheries_data(
@@ -813,9 +828,38 @@ async def fetch_fisheries_data(
     """Fetch Manitoba waterbody/fisheries data from Manitoba_Waterbody_Data FeatureServer.
 
     350+ water bodies with fishing regulations, species, stocking records, Secchi depth.
-    Filled by Plan 05.
+    Focused field subset from the 26 available fields.
+
+    name_query: filter by Name LIKE '%name_query%'
+    fishing_division: filter by FishingDivision field
+    Layer 0 fields (focused subset): ID, Name, SurfaceArea, AvgDepth, SecchiDepth,
+    FishingDivision, Species, Regulations, BoatLaunch.
     """
-    raise NotImplementedError("Plan 05 implements")
+    where_parts: list[str] = []
+    if name_query:
+        # Escape single quotes defensively
+        safe_name = name_query.replace("'", "''")
+        where_parts.append(f"Name LIKE '%{safe_name}%'")
+    if fishing_division:
+        safe_div = fishing_division.replace("'", "''")
+        where_parts.append(f"FishingDivision='{safe_div}'")
+    where = " AND ".join(where_parts) if where_parts else "1=1"
+
+    cache_key = f"{CACHE_KEY_PREFIX}fisheries:{name_query}:{fishing_division}:{max_records}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            WATERBODY_DATA_FS_URL,
+            layer_id=0,
+            where=where,
+            out_fields="ID,Name,SurfaceArea,AvgDepth,SecchiDepth,FishingDivision,Species,Regulations,BoatLaunch",
+            include_geometry=False,
+            max_records=max_records,
+        )
+        return {"features": features, "count": len(features), "truncated": truncated}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 async def fetch_provincial_forests(
@@ -825,9 +869,24 @@ async def fetch_provincial_forests(
 ) -> tuple[dict[str, Any], bool]:
     """Fetch Manitoba provincial forests from Manitoba_Provincial_Forests___Version_6 FeatureServer.
 
-    Filled by Plan 05.
+    Returns provincial forest management unit boundaries.
+    Layer 0: administrative forest regions.
     """
-    raise NotImplementedError("Plan 05 implements")
+    cache_key = f"{CACHE_KEY_PREFIX}forests:{max_records}:{include_geometry}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            PROVINCIAL_FORESTS_FS_URL,
+            layer_id=0,
+            where="1=1",
+            out_fields="*",
+            include_geometry=include_geometry,
+            max_records=max_records,
+        )
+        return {"features": features, "count": len(features), "truncated": truncated}
+
+    return await cached_fetch(cache_key, CACHE_TTL_STATIC, _fetch)
 
 
 async def fetch_surgical_wait_times(
@@ -839,9 +898,35 @@ async def fetch_surgical_wait_times(
     """Fetch Manitoba diagnostic/surgical wait time averages from FeatureServer.
 
     Annual averages by Year and IndicatorDataArea (procedure type).
-    Filled by Plan 05.
+    Layer 0 fields: Year, IndicatorDataArea, Average_Wait.
+    MaxRecordCount 1000 at source; up to 32,000 records covering many procedures.
+
+    year: optional integer year filter (e.g. 2021)
+    procedure: optional LIKE filter on IndicatorDataArea (e.g. "Cardiac surgery")
     """
-    raise NotImplementedError("Plan 05 implements")
+    where_parts: list[str] = []
+    if year is not None:
+        where_parts.append(f"Year={year}")
+    if procedure:
+        safe_proc = procedure.replace("'", "''")
+        where_parts.append(f"IndicatorDataArea LIKE '%{safe_proc}%'")
+    where = " AND ".join(where_parts) if where_parts else "1=1"
+
+    cache_key = f"{CACHE_KEY_PREFIX}wait_times:{year}:{procedure}:{max_records}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            SURGICAL_WAIT_TIMES_FS_URL,
+            layer_id=0,
+            where=where,
+            out_fields="Year,IndicatorDataArea,Average_Wait",
+            include_geometry=False,
+            max_records=max_records,
+        )
+        return {"features": features, "count": len(features), "truncated": truncated}
+
+    return await cached_fetch(cache_key, CACHE_TTL_ANNUAL, _fetch)
 
 
 async def fetch_health_facilities(
@@ -852,10 +937,42 @@ async def fetch_health_facilities(
 ) -> tuple[dict[str, Any], bool]:
     """Fetch Manitoba rural health care facilities from FeatureServer.
 
-    Spike-resolved URL: Rural_Health_Care_Facilities_in_Manitoba/FeatureServer/0
-    Filled by Plan 05.
+    Spike-resolved URL: Rural_Health_Care_Facilities_in_Manitoba/FeatureServer/0.
+    Layer 0 MaxRecordCount: 2000.
+
+    community: optional filter by Community_Name (e.g. "Selkirk", "Portage la Prairie")
+    emergency_only: if True, filter to facilities with Emergency_Department_Availabili='Yes'
+    Layer 0 fields: Community_Name, Facility_Name, Lat, Long,
+    Emergency_Department_Availabili, Percentage_of_Time_Open__2015_,
+    Nearest_Alternate_Emergency_Dep, Acute_Care_Availability, Acute_Care_Number_of_Beds.
     """
-    raise NotImplementedError("Plan 05 implements")
+    where_parts: list[str] = []
+    if community:
+        safe_comm = community.replace("'", "''")
+        where_parts.append(f"Community_Name LIKE '%{safe_comm}%'")
+    if emergency_only:
+        where_parts.append("Emergency_Department_Availabili='Yes'")
+    where = " AND ".join(where_parts) if where_parts else "1=1"
+
+    cache_key = f"{CACHE_KEY_PREFIX}health_facilities:{community}:{emergency_only}:{max_records}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            RURAL_HEALTH_FACILITIES_FS_URL,
+            layer_id=0,
+            where=where,
+            out_fields=(
+                "Community_Name,Facility_Name,Lat,Long,"
+                "Emergency_Department_Availabili,Percentage_of_Time_Open__2015_,"
+                "Nearest_Alternate_Emergency_Dep,Acute_Care_Availability,Acute_Care_Number_of_Beds"
+            ),
+            include_geometry=False,
+            max_records=max_records,
+        )
+        return {"features": features, "count": len(features), "truncated": truncated}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 # ---------------------------------------------------------------------------

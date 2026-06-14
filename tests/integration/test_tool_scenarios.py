@@ -2082,3 +2082,53 @@ class TestManitobaToolScenarios:
         else:
             # Key was present — either live data or UPSTREAM_ERROR is acceptable
             assert "_meta" in data or "error" in data
+
+    # ------------------------------------------------------------------
+    # Plan 09 gap-closure: live OGC param fix for 3 discovery tools
+    # These call the REAL geoportal — mocks masked the bug, so a live
+    # check is the only reliable acceptance test.
+    # ------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_search_datasets_live(self, mcp_server):
+        """'Search the Manitoba geoportal for parks' — live OGC Hub Search (was HTTP 400 before fix)."""
+        data = await call_tool(mcp_server, "manitoba_search_datasets", {"query": "parks"})
+        assert "_meta" in data or "error" in data
+        assert "error" not in data, (
+            f"Live search must not return error after OGC param fix: {data.get('error')}"
+        )
+        assert data["_meta"]["source"]["api"] == "manitoba-geoportal-hub"
+        payload = data["data"]
+        assert "results" in payload and isinstance(payload["results"], list)
+        assert payload["total"] >= 1, "'parks' must return at least 1 live dataset"
+        assert len(payload["results"]) >= 1
+        first = payload["results"][0]
+        assert "id" in first and "title" in first
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_list_organizations_live(self, mcp_server):
+        """'Who publishes data on the Manitoba geoportal?' — live OGC Hub Search (was HTTP 400)."""
+        data = await call_tool(mcp_server, "manitoba_list_organizations", {})
+        assert "error" not in data, (
+            f"Live orgs must not return error after OGC param fix: {data.get('error')}"
+        )
+        assert data["_meta"]["source"]["api"] == "manitoba-geoportal-hub"
+        orgs = data["data"]["organizations"]
+        assert isinstance(orgs, list) and len(orgs) >= 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_list_categories_live(self, mcp_server):
+        """'What dataset categories exist on the Manitoba geoportal?' — live OGC Hub Search (was HTTP 400)."""
+        data = await call_tool(mcp_server, "manitoba_list_categories", {})
+        assert "error" not in data, (
+            f"Live categories must not return error after OGC param fix: {data.get('error')}"
+        )
+        assert data["_meta"]["source"]["api"] == "manitoba-geoportal-hub"
+        cats = data["data"]["categories"]
+        assert isinstance(cats, list) and len(cats) >= 1

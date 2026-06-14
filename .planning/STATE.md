@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 18-02-PLAN.md — Manitoba discovery tools (5 @tool functions + client bodies + 39 tests)
-last_updated: "2026-06-14T04:32:20.469Z"
+stopped_at: Completed 18-03-PLAN.md — Manitoba flood/hydrology tools (3 @tool functions + client bodies + 20 tests)
+last_updated: "2026-06-14T04:40:40.904Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 12
   total_plans: 56
-  completed_plans: 50
+  completed_plans: 51
   percent: 0
 ---
 
@@ -98,6 +98,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 17 P09 | 392 | 3 tasks | 6 files |
 | Phase 18-manitoba-government-open-data P01 | 10min | 3 tasks | 13 files |
 | Phase 18-manitoba-government-open-data P02 | 6min | 2 tasks | 4 files |
+| Phase 18-manitoba-government-open-data P03 | 8min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -233,6 +234,9 @@ Recent decisions affecting current work:
 - [Phase 18-manitoba-government-open-data]: fetch_query_dataset takes feature_server_url directly (not package_id) — no CKAN layer in Manitoba; agents have URL from get_dataset_details
 - [Phase 18-manitoba-government-open-data]: fetch_organizations/categories derive from Hub search results (unique owners/categories) — Manitoba Hub has no dedicated orgs endpoint
 - [Phase 18-manitoba-government-open-data]: _hub_get Hub-JSON contract enforced by TestSharedApiGetContract: never inspects .get('success') — Hub Search returns {features, numberMatched} directly
+- [Phase 18-manitoba-government-open-data]: fetch_river_stations uses fetch_and_parse(RIVER_CONDITIONS_CSV_URL) — spike confirmed no FeatureServer backing the River Conditions web app
+- [Phase 18-manitoba-government-open-data]: Empty flood alert {features:[]} is a valid success response — no alert period is the normal off-season state; tool must NOT convert this to an error
+- [Phase 18-manitoba-government-open-data]: WATERWAY_TYPES validation in client (ValueError) — tool catches and maps to INVALID_INPUT with valid= list
 
 ### Roadmap Evolution
 
@@ -260,6 +264,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-14T04:32:20.465Z
-Stopped at: Completed 18-02-PLAN.md — Manitoba discovery tools (5 @tool functions + client bodies + 39 tests)
+Last session: 2026-06-14T04:40:40.901Z
+Stopped at: Completed 18-03-PLAN.md — Manitoba flood/hydrology tools (3 @tool functions + client bodies + 20 tests)
 Resume file: None

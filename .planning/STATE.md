@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 18-01-PLAN.md — Manitoba Wave 0 scaffold + spike
-last_updated: "2026-06-14T04:23:29.782Z"
+stopped_at: Completed 18-02-PLAN.md — Manitoba discovery tools (5 @tool functions + client bodies + 39 tests)
+last_updated: "2026-06-14T04:32:20.469Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 12
   total_plans: 56
-  completed_plans: 49
+  completed_plans: 50
   percent: 0
 ---
 
@@ -97,6 +97,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 17-alberta-government-open-data P08 | 6min | 2 tasks | 3 files |
 | Phase 17 P09 | 392 | 3 tasks | 6 files |
 | Phase 18-manitoba-government-open-data P01 | 10min | 3 tasks | 13 files |
+| Phase 18-manitoba-government-open-data P02 | 6min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -229,6 +230,9 @@ Recent decisions affecting current work:
 - [Phase 18-manitoba-government-open-data]: RIVER_CONDITIONS_CSV_URL replaces FS URL — spike proved River Conditions web app uses live CSV (not FeatureServer); Plan 03 uses fetch_and_parse
 - [Phase 18-manitoba-government-open-data]: HOG_PRICES_FS_URL=None typed as str|None — hog prices service not found in mMUesHYPkXjaFGfS org; Plan 04 investigates
 - [Phase 18-manitoba-government-open-data]: Manitoba 511 key GATED — account signup + explicit key request; tools return NOT_CONFIGURED via Five11NotConfigured exception pattern
+- [Phase 18-manitoba-government-open-data]: fetch_query_dataset takes feature_server_url directly (not package_id) — no CKAN layer in Manitoba; agents have URL from get_dataset_details
+- [Phase 18-manitoba-government-open-data]: fetch_organizations/categories derive from Hub search results (unique owners/categories) — Manitoba Hub has no dedicated orgs endpoint
+- [Phase 18-manitoba-government-open-data]: _hub_get Hub-JSON contract enforced by TestSharedApiGetContract: never inspects .get('success') — Hub Search returns {features, numberMatched} directly
 
 ### Roadmap Evolution
 
@@ -256,6 +260,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-14T04:23:19.535Z
-Stopped at: Completed 18-01-PLAN.md — Manitoba Wave 0 scaffold + spike
+Last session: 2026-06-14T04:32:20.465Z
+Stopped at: Completed 18-02-PLAN.md — Manitoba discovery tools (5 @tool functions + client bodies + 39 tests)
 Resume file: None

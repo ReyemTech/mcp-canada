@@ -53,7 +53,7 @@ class TestSharedApiGetContract:
             new_callable=AsyncMock,
             return_value=hub_response,
         ) as mock_api_get:
-            result = await _hub_get({"q": "parks"})
+            await _hub_get({"q": "parks"})
         mock_api_get.assert_called_once()
         # First positional arg should be HUB_SEARCH_URL
         from mcp_canada.modules.manitoba.constants import HUB_SEARCH_URL
@@ -543,7 +543,6 @@ class TestManitobaGetDroughtStatus:
         # Must have called api_get with geometry params
         assert len(captured_calls) == 1
         call = captured_calls[0]
-        params_str = str(call["params"])
         # Geometry envelope param must be present
         assert "geometry" in call["params"]
         assert "geometryType" in call["params"]
@@ -1245,7 +1244,6 @@ class TestManitoba511:
     async def test_raises_five11_not_configured_when_no_key_road_events(self, monkeypatch):
         """fetch_road_events raises Five11NotConfigured when MANITOBA_511_KEY absent."""
         from mcp_canada.modules.manitoba.client import (
-            Five11NotConfigured,
             fetch_road_events,
         )
 
@@ -1257,7 +1255,6 @@ class TestManitoba511:
     async def test_raises_five11_not_configured_when_no_key_winter_roads(self, monkeypatch):
         """fetch_winter_road_conditions raises Five11NotConfigured when MANITOBA_511_KEY absent."""
         from mcp_canada.modules.manitoba.client import (
-            Five11NotConfigured,
             fetch_winter_road_conditions,
         )
 
@@ -1269,7 +1266,6 @@ class TestManitoba511:
     async def test_raises_five11_not_configured_when_no_key_cameras(self, monkeypatch):
         """fetch_traffic_cameras raises Five11NotConfigured when MANITOBA_511_KEY absent."""
         from mcp_canada.modules.manitoba.client import (
-            Five11NotConfigured,
             fetch_traffic_cameras,
         )
 

@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-Add Manitoba's provincial open data surface to mcp-canada as a new `manitoba` module. Primary catalogue: **data.manitoba.ca** (CKAN — confirm exact `/api/3/action/` base path during research). Delivers the 5 standard CKAN discovery tools plus a **balanced spread** of curated tools across Manitoba's high-value data domains, following the same shape established by BC (Phase 15), Quebec (Phase 16), and Alberta (Phase 17).
+Add Manitoba's provincial open data surface to mcp-canada as a new `manitoba` module. Primary catalogue: **geoportal.gov.mb.ca** ("Data MB"), an **ArcGIS Hub** powered by ArcGIS Online org `mMUesHYPkXjaFGfS`. (Research correction 2026-06-13: `data.manitoba.ca` CKAN is unreachable and Manitoba Land Initiative is retired; Manitoba's machine-readable portal is ArcGIS Hub, so this module follows the **Alberta Phase 17 / York Region Phase 14 ArcGIS Hub pattern** via `shared/arcgis_hub.py`, NOT the CKAN pattern.) Delivers 5 standard ArcGIS-Hub discovery tools plus a **balanced spread** of curated FeatureServer tools across Manitoba's high-value data domains, following the same shape established by BC (Phase 15), Quebec (Phase 16), and Alberta (Phase 17).
 
 Manitoba municipalities (Winnipeg = Phase 32; Brandon and others to be added to the roadmap as needed) are explicitly deferred to their own future phases. Federal sources remain out of scope for this provincial phase.
 
@@ -17,34 +17,31 @@ Manitoba municipalities (Winnipeg = Phase 32; Brandon and others to be added to 
 
 ### Signature data domains — balanced, no single anchor
 - **No single signature anchor** (unlike Alberta, which went deep on AER energy). Mirror BC's even curation density across Manitoba's relevant domains rather than going deep on one.
-- **In-scope domains (even spread):**
-  1. **Flood forecasting / hydrology** — Red River / Assiniboine flood outlooks, river levels, spring flood forecasts. Manitoba's defining hazard and the most distinctive domain; no other province module covers it. Research must confirm machine-readable availability (Manitoba Infrastructure / Hydrologic Forecasting publishes flood bulletins — verify CKAN vs. HTML-only).
-  2. **Manitoba Hydro / energy** — electricity generation, water flows, energy stats. Manitoba is ~97% hydroelectric (a real distinguisher) but **public machine-readable Hydro data may be thin — research risk.** Curate only what exists cleanly; do not pad.
-  3. **Transport / 511 Manitoba** — road conditions, winter highway status, closures/construction. Seasonal, high agent value (parity with Alberta 511). Confirm raw data feed vs. scraping during research.
-  4. **Agriculture** — crop reports, seasonal production, livestock, soil/moisture. Prairie staple, reliably on CKAN.
-  5. **Regional health** — hospitals/facilities by Regional Health Authority (WRHA et al.), ER/wait data if published. Parity with Alberta AHS / Quebec MSSS.
-  6. **Environment / water** — air quality, Lake Winnipeg water quality, provincial water monitoring, parks/recreation. Parity with BC/Alberta environment tools.
-- Curation bar per domain: curate the seasonal/high-volume queries (flood forecasts, road conditions) and the Manitoba-distinguishing data (flood/hydro), mirror what BC already exposes for the rest (parks, hospitals, air quality), and leave everything else to `manitoba_search_datasets` (no curation).
+- **In-scope domains (even spread)** — domain #2 corrected after research (Hydro dropped, drought/weather substituted):
+  1. **Flood / hydrology** — overland flood alerts (Watch/Warning polygons), river conditions & hydrometric stations, provincial waterways (dikes/floodways/dams/reservoirs). Manitoba's defining hazard. CONFIRMED machine-readable via ArcGIS Hub (`Overland_Flood_Alerts`, `Provincial_Waterways` FeatureServers); flood bulletins themselves are PDF/HTML and out of scope.
+  2. **Agriculture & climate** (replaces Manitoba Hydro/energy — **DROPPED**: hydro.mb.ca water levels are HTML-only, no API) — agricultural weather stations (100+), cattle/hog market prices, crop reporting regions, drought monitor (D0–D4). All CONFIRMED live on ArcGIS Hub.
+  3. **Transport / 511 Manitoba** — road conditions, winter roads, closures/construction. **Conditional**: Manitoba 511 API v3 requires a free developer key (unlike Alberta's keyless feed). Plan transport tools to ship only if the key is freely obtainable in Wave 0; otherwise defer.
+  4. **Regional health** — diagnostic & surgical wait times (CONFIRMED live), rural health facilities (service URL to resolve in Wave 0). Parity with Alberta AHS / Quebec MSSS.
+  5. **Environment / parks** — provincial parks (93, bilingual), waterbody/fisheries reference data (350+ water bodies), provincial forests. CONFIRMED live on ArcGIS Hub.
+- Curation bar per domain: curate the seasonal/high-volume queries (flood alerts, road conditions) and the Manitoba-distinguishing data (flood, drought, prairie ag/markets), and leave everything else to the discovery tools (search/detail/query).
 
 ### Module breadth / size
 - **Target: mid-band ~14-18 tools.** 5 standard CKAN discovery tools + ~9-13 curated across the 6 balanced domains.
 - Matches BC's density (~15); deliberately **not** Alberta's 24 — Manitoba's portal is smaller and less data-rich, so padding thin domains is the failure mode to avoid.
 - Final count locked during planning based on how many agent-friendly datasets research actually surfaces per domain.
 
-### Platform architecture / geospatial access
-- Primary portal: **data.manitoba.ca** CKAN. Module prefix `manitoba_` (full-name pattern, consistent with `alberta_`, `quebec_`, `ontario_`, `toronto_`). Module name: `manitoba`.
-- **Geospatial: let research confirm.** Inspect the **Manitoba Land Initiative (mli.gov.mb.ca)** and any provincial ArcGIS Hub. Planner then picks:
-  - **CKAN-only** (Quebec Phase 16 pattern) — geospatial via CKAN file resources (CSV/GeoJSON/Shapefile) through `shared/parsers.fetch_and_parse()`, OR
-  - **Two-step CKAN→geospatial router** (BC/Alberta pattern) — `manitoba_query_dataset` auto-detects a live WFS/ArcGIS endpoint and queries it, else falls back to file-resource parsing. Reuses `shared/ogc.py` (WFS) or `shared/arcgis_hub.py` (ArcGIS Hub).
-- Decision deferred to planning, driven by what MLI actually exposes (clean REST/WFS endpoint vs. file downloads only). Honor the no-scraping discipline: if a portal isn't a clean REST/JSON/CSV/XLSX/GeoJSON surface, defer that tool rather than scrape HTML.
+### Platform architecture / geospatial access (CORRECTED after research)
+- Primary portal: **geoportal.gov.mb.ca** ArcGIS Hub (ArcGIS Online org `mMUesHYPkXjaFGfS`; base services URL `https://services.arcgis.com/mMUesHYPkXjaFGfS/arcgis/rest/services/`). Module prefix `manitoba_` (full-name pattern). Module name: `manitoba`.
+- **Geospatial: RESOLVED — ArcGIS Hub pattern** (Alberta Phase 17 / York Region Phase 14). Reuse `shared/arcgis_hub.py` unchanged for all FeatureServer queries. No CKAN, no WFS, no MLI (retired). `shared/parsers.fetch_and_parse()` remains the fallback for any CSV/JSON/GeoJSON file resources surfaced by Hub items.
+- Discovery tools become **ArcGIS Hub search/detail/query** (Hub Search API `/api/search/v1/...`) rather than CKAN `/api/3/action/`. The query tool auto-routes: ESRI FeatureServer → `arcgis_hub.query_feature_service`; CSV/JSON/GeoJSON/XLSX → `fetch_and_parse`; else metadata-only.
+- Honor the no-scraping discipline: HTML-only or PDF-only sources (Manitoba Hydro water levels, Hydrologic Forecast Centre bulletins) are deferred, not scraped.
 
-### Federation / default scope policy
-- **Match the portal, document in docstring.** Let research determine whether data.manitoba.ca is federated (multi-org like Quebec's 139) or provincial-only (like BC bcgov).
-- Return all orgs by default, expose an `organization` filter param, and document the portal's federated/provincial nature in the `manitoba_search_datasets` docstring — same handling Alberta used.
+### Default scope policy
+- Discovery tools search the ArcGIS Hub catalogue by keyword/category/tag with pagination; org/group listing via Hub groups endpoint. Document the geoportal's ArcGIS-Hub nature in the `manitoba_search_datasets` docstring. (CKAN federation question is moot — not a CKAN portal.)
 
-### Discovery tools (5 standard CKAN, like every prior provincial module)
+### Discovery tools (5 standard, ArcGIS Hub flavor — mirrors York Region/Alberta)
 - `manitoba_search_datasets`, `manitoba_get_dataset_details`, `manitoba_query_dataset`, `manitoba_list_organizations`, `manitoba_list_categories`
-- `manitoba_query_dataset` implements the geospatial router if research adopts the two-step pattern.
+- `manitoba_query_dataset` implements the ArcGIS-Hub/file auto-router described above.
 
 ### Prompts and Resources (Phase 40 pattern, from day 1)
 - **6 bilingual prompts** (3 guided + 3 quick lookups). Suggested set, refine during planning:

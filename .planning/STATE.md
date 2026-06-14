@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Phase 18 context gathered
-last_updated: "2026-06-14T03:23:35.780Z"
+stopped_at: Completed 18-01-PLAN.md — Manitoba Wave 0 scaffold + spike
+last_updated: "2026-06-14T04:23:29.782Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 12
-  total_plans: 48
-  completed_plans: 48
+  total_plans: 56
+  completed_plans: 49
   percent: 0
 ---
 
@@ -96,6 +96,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 17-alberta-government-open-data P07 | 6min | 2 tasks | 4 files |
 | Phase 17-alberta-government-open-data P08 | 6min | 2 tasks | 3 files |
 | Phase 17 P09 | 392 | 3 tasks | 6 files |
+| Phase 18-manitoba-government-open-data P01 | 10min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -225,6 +226,9 @@ Recent decisions affecting current work:
 - [Phase 17-alberta-government-open-data]: Plan 08: Kept alberta quick-lookup prompts at lang-only signatures — honors Plan 01 'signatures locked at Wave 0' invariant and matches BC/Quebec precedent
 - [Phase 17-alberta-government-open-data]: Plan 08: AB-23 water-licence guidance placed in docs://alberta/wildfire-data-guide as documentation-only — resources too large (87MB+ active, 169MB+ inactive) for alberta_query_dataset; agents directed to external download tools
 - [Phase 17]: Phase 17 closed: 24 alberta tools covered by 48 parametrized envelope/lang tests + 11 live-API integration scenarios through MCP Client; coverage 96.84%; AB-XX matrix 1-26 implemented + AB-27 convention compliance verified
+- [Phase 18-manitoba-government-open-data]: RIVER_CONDITIONS_CSV_URL replaces FS URL — spike proved River Conditions web app uses live CSV (not FeatureServer); Plan 03 uses fetch_and_parse
+- [Phase 18-manitoba-government-open-data]: HOG_PRICES_FS_URL=None typed as str|None — hog prices service not found in mMUesHYPkXjaFGfS org; Plan 04 investigates
+- [Phase 18-manitoba-government-open-data]: Manitoba 511 key GATED — account signup + explicit key request; tools return NOT_CONFIGURED via Five11NotConfigured exception pattern
 
 ### Roadmap Evolution
 
@@ -252,6 +256,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-14T03:23:35.777Z
-Stopped at: Phase 18 context gathered
-Resume file: .planning/phases/18-manitoba-government-open-data/18-CONTEXT.md
+Last session: 2026-06-14T04:23:19.535Z
+Stopped at: Completed 18-01-PLAN.md — Manitoba Wave 0 scaffold + spike
+Resume file: None

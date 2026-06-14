@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 18-05-PLAN.md — Manitoba environment/health/parks (5 @tool functions + client bodies + 46 tests)
-last_updated: "2026-06-14T04:56:31.637Z"
+stopped_at: Completed 18-06-PLAN.md — Manitoba transport/511 (3 @tool functions + client bodies + 18 tests)
+last_updated: "2026-06-14T05:03:11.580Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 12
   total_plans: 56
-  completed_plans: 53
+  completed_plans: 54
   percent: 0
 ---
 
@@ -101,6 +101,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 18-manitoba-government-open-data P03 | 8min | 2 tasks | 4 files |
 | Phase 18-manitoba-government-open-data P04 | 5min | 2 tasks | 4 files |
 | Phase 18-manitoba-government-open-data P05 | 15min | 2 tasks | 4 files |
+| Phase 18-manitoba-government-open-data P06 | 4min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -244,6 +245,8 @@ Recent decisions affecting current work:
 - [Phase 18-manitoba-government-open-data]: fetch_fisheries_data focuses on 9 of 26 available fields (ID,Name,SurfaceArea,AvgDepth,SecchiDepth,FishingDivision,Species,Regulations,BoatLaunch) — reduces agent context cost
 - [Phase 18-manitoba-government-open-data]: manitoba_get_health_facilities passes rha= as community= to client — no dedicated RHA field in layer; Community_Name LIKE filter covers all RHA queries
 - [Phase 18-manitoba-government-open-data]: Emergency_Department_Availabili is the actual truncated ArcGIS field name — matched exactly as spike-confirmed for emergency_only=True filter
+- [Phase 18-manitoba-government-open-data]: Manitoba 511 key GATED (confirmed spike): tools return NOT_CONFIGURED via Five11NotConfigured; live integration deferred until free key confirmed
+- [Phase 18-manitoba-government-open-data]: Plan 06: area_name filter for winter roads is client-side (511 API has no server-side area param); camera locations cached at CACHE_TTL_META (24h)
 
 ### Roadmap Evolution
 
@@ -271,6 +274,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-14T04:56:31.634Z
-Stopped at: Completed 18-05-PLAN.md — Manitoba environment/health/parks (5 @tool functions + client bodies + 46 tests)
+Last session: 2026-06-14T05:03:11.576Z
+Stopped at: Completed 18-06-PLAN.md — Manitoba transport/511 (3 @tool functions + client bodies + 18 tests)
 Resume file: None

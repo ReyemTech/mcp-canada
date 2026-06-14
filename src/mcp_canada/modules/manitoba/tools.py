@@ -3,7 +3,10 @@
 5 discovery tools (Plan 02): manitoba_search_datasets, manitoba_get_dataset_details,
 manitoba_query_dataset, manitoba_list_organizations, manitoba_list_categories.
 
-Plans 03-06 add curated tools.
+3 flood/hydrology tools (Plan 03): manitoba_get_flood_alerts,
+manitoba_get_river_stations, manitoba_get_provincial_waterways.
+
+Plans 04-06 add curated tools.
 
 Every @tool:
   - Uses standalone `@tool` from fastmcp.tools (NEVER @mcp.tool)
@@ -21,10 +24,20 @@ from fastmcp.tools import tool
 from mcp_canada.shared.envelope import make_error, make_response
 
 from . import client as _client
-from .constants import HUB_BASE_URL, HUB_SEARCH_URL
+from .constants import (
+    FLOOD_ALERTS_FS_URL,
+    HUB_BASE_URL,
+    HUB_SEARCH_URL,
+    PROVINCIAL_WATERWAYS_FS_URL,
+    RIVER_CONDITIONS_CSV_URL,
+    WATERWAY_TYPES,
+)
 
 # Source identifiers for the _meta envelope
 _API_NAME_HUB = "manitoba-geoportal-hub"
+_API_NAME_FLOOD = "manitoba-flood-alerts"
+_API_NAME_RIVER = "manitoba-river-conditions"
+_API_NAME_WATERWAYS = "manitoba-provincial-waterways"
 
 __all__ = [
     # Discovery (Plan 02)
@@ -33,6 +46,10 @@ __all__ = [
     "manitoba_query_dataset",
     "manitoba_list_organizations",
     "manitoba_list_categories",
+    # Flood / hydrology (Plan 03)
+    "manitoba_get_flood_alerts",
+    "manitoba_get_river_stations",
+    "manitoba_get_provincial_waterways",
 ]
 
 
@@ -214,6 +231,118 @@ async def manitoba_list_categories(
         data=payload,
         api_name=_API_NAME_HUB,
         api_url=HUB_SEARCH_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Flood / Hydrology (Plan 03)
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def manitoba_get_flood_alerts(
+    include_geometry: bool = True,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get current overland flood watch and warning polygons for Manitoba.
+
+    Use for: Checking active flood alerts in Manitoba — returns bilingual Type_EN/Type_FR watch/warning polygons from Manitoba Infrastructure's Overland_Flood_Alerts layer. Returns empty features list when no alerts are active (this is NORMAL, not an error). Flood bulletin PDFs from the Hydrologic Forecast Centre are NOT available here.
+
+    Keywords: manitoba flood alerts watch warning overland polygons bilingual flood zone active current hydrology emergency Manitoba Infrastructure
+    """
+    try:
+        payload, cached = await _client.fetch_flood_alerts(
+            include_geometry=include_geometry,
+            lang=lang,
+        )
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur lors du chargement des alertes: {exc}"
+            if lang == "fr"
+            else f"Flood alerts fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=payload,
+        api_name=_API_NAME_FLOOD,
+        api_url=FLOOD_ALERTS_FS_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def manitoba_get_river_stations(
+    alert_only: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Manitoba river and hydrometric station locations with flood status.
+
+    Use for: Finding river monitoring station locations and current flood status across Manitoba. Returns station points with alert field (No Flooding / High Water Advisory / Flood Watch / Flood Warning). NOTE: Returns station LOCATIONS and status only, NOT real-time water level readings — for actual HYDAT level/flow data use wateroffice.ec.gc.ca (ECCC). Set alert_only=True to return only stations with active warnings.
+
+    Keywords: manitoba river stations hydrometric flood watch warning alert locations water level status monitoring Red River Assiniboine CSV
+    """
+    try:
+        payload, cached = await _client.fetch_river_stations(
+            alert_only=alert_only,
+            lang=lang,
+        )
+    except Exception as exc:
+        msg = (
+            f"Erreur lors du chargement des stations: {exc}"
+            if lang == "fr"
+            else f"River stations fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=payload,
+        api_name=_API_NAME_RIVER,
+        api_url=RIVER_CONDITIONS_CSV_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def manitoba_get_provincial_waterways(
+    f_type: str | None = None,
+    max_records: int = 5000,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Manitoba provincial waterway infrastructure — dikes, floodways, dams, diversions, and reservoirs.
+
+    Use for: Querying Manitoba's water control infrastructure from the Provincial_Waterways layer. Filter by f_type to get specific infrastructure: 'dike', 'floodway', 'dam', 'diversion', 'reservoir', or 'waterway'. Fields: F_TYPE, Name, Watershed, WCW (Water Control Works number), LengthKM. Includes the Red River Floodway (47 km) and Portage Diversion.
+
+    Keywords: manitoba waterways dike floodway dam diversion reservoir water control infrastructure watershed Red River Portage Diversion WCW LengthKM
+    """
+    try:
+        payload, cached = await _client.fetch_provincial_waterways(
+            f_type=f_type,
+            max_records=min(max(max_records, 1), 5000),
+            include_geometry=include_geometry,
+            lang=lang,
+        )
+    except ValueError as exc:
+        msg = (
+            f"Type de voie navigable invalide. Options valides: {', '.join(WATERWAY_TYPES)}"
+            if lang == "fr"
+            else str(exc)
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=list(WATERWAY_TYPES))
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur lors du chargement des voies navigables: {exc}"
+            if lang == "fr"
+            else f"Waterways fetch failed: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        data=payload,
+        api_name=_API_NAME_WATERWAYS,
+        api_url=PROVINCIAL_WATERWAYS_FS_URL,
         cached=cached,
         lang=lang,
     )

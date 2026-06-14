@@ -359,24 +359,195 @@ class TestManitobaListCategories:
 
 
 class TestManitobaGetFloodAlerts:
-    """Tool unit tests for manitoba_get_flood_alerts.
+    """Tool unit tests for manitoba_get_flood_alerts."""
 
-    Plan 03 fills — must include test_empty_flood_alerts_returns_success_not_error.
-    """
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_active_alerts(self):
+        """manitoba_get_flood_alerts returns _meta envelope with features list."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_flood_alerts
 
-    pass
+        mock_data = {"features": [{"Type_EN": "Warning", "Type_FR": "Avertissement"}], "count": 1, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_flood_alerts",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_flood_alerts()
+        assert "_meta" in result
+        assert "data" in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_empty_flood_alerts_returns_success_not_error(self):
+        """CRITICAL: empty flood alerts must return success response (not error) when no alerts active."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_flood_alerts
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_flood_alerts",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_flood_alerts()
+        # Must NOT return an error envelope
+        assert "error" not in result, "Empty flood alerts must NOT return an error — it is a normal result"
+        assert "_meta" in result
+        assert result["data"]["features"] == []
+        assert result["data"]["count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """lang parameter is reflected in _meta envelope."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_flood_alerts
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_flood_alerts",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_flood_alerts(lang="fr")
+        assert result.get("_meta", {}).get("lang") == "fr"
+
+    @pytest.mark.asyncio
+    async def test_returns_upstream_error_on_exception(self):
+        """manitoba_get_flood_alerts returns UPSTREAM_ERROR on HTTPStatusError."""
+        import httpx
+        from mcp_canada.modules.manitoba.tools import manitoba_get_flood_alerts
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_flood_alerts",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "bad", request=httpx.Request("GET", "http://x"), response=httpx.Response(500)
+            ),
+        ):
+            result = await manitoba_get_flood_alerts()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestManitobaGetRiverStations:
-    """Tool unit tests for manitoba_get_river_stations. Plan 03 fills."""
+    """Tool unit tests for manitoba_get_river_stations."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """manitoba_get_river_stations returns _meta envelope with stations list."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_river_stations
+
+        mock_data = {
+            "stations": [
+                {"stationName": "Red River at Emerson", "alert": "No Flooding"}
+            ],
+            "count": 1,
+        }
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_river_stations",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_river_stations()
+        assert "_meta" in result
+        assert "data" in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_returns_upstream_error_on_exception(self):
+        """manitoba_get_river_stations returns UPSTREAM_ERROR on exception."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_river_stations
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_river_stations",
+            new_callable=AsyncMock,
+            side_effect=Exception("CSV fetch failed"),
+        ):
+            result = await manitoba_get_river_stations()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through(self):
+        """lang parameter is reflected in _meta envelope."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_river_stations
+
+        mock_data = {"stations": [], "count": 0}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_river_stations",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_river_stations(lang="fr")
+        assert result.get("_meta", {}).get("lang") == "fr"
 
 
 class TestManitobaGetProvincialWaterways:
-    """Tool unit tests for manitoba_get_provincial_waterways. Plan 03 fills."""
+    """Tool unit tests for manitoba_get_provincial_waterways."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """manitoba_get_provincial_waterways returns _meta envelope with features."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_provincial_waterways
+
+        mock_data = {
+            "features": [{"F_TYPE": "Floodway", "Name": "Red River Floodway"}],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_provincial_waterways",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_provincial_waterways()
+        assert "_meta" in result
+        assert "data" in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_invalid_f_type_returns_invalid_input_error(self):
+        """manitoba_get_provincial_waterways returns INVALID_INPUT for unknown f_type."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_provincial_waterways
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_provincial_waterways",
+            new_callable=AsyncMock,
+            side_effect=ValueError("Invalid f_type 'swamp'. Must be one of: dike, floodway, dam, diversion, reservoir, waterway"),
+        ):
+            result = await manitoba_get_provincial_waterways(f_type="swamp")
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_INPUT"
+        assert "valid" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_returns_upstream_error_on_http_exception(self):
+        """manitoba_get_provincial_waterways returns UPSTREAM_ERROR on HTTPStatusError."""
+        import httpx
+        from mcp_canada.modules.manitoba.tools import manitoba_get_provincial_waterways
+
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_provincial_waterways",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "bad", request=httpx.Request("GET", "http://x"), response=httpx.Response(500)
+            ),
+        ):
+            result = await manitoba_get_provincial_waterways()
+        assert "error" in result
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through(self):
+        """lang parameter is reflected in _meta envelope."""
+        from mcp_canada.modules.manitoba.tools import manitoba_get_provincial_waterways
+
+        mock_data = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.manitoba.tools._client.fetch_provincial_waterways",
+            new_callable=AsyncMock,
+            return_value=(mock_data, False),
+        ):
+            result = await manitoba_get_provincial_waterways(lang="fr")
+        assert result.get("_meta", {}).get("lang") == "fr"
 
 
 class TestManitobaGetDroughtStatus:

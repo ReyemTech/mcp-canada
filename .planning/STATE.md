@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 18-06-PLAN.md — Manitoba transport/511 (3 @tool functions + client bodies + 18 tests)
-last_updated: "2026-06-14T05:03:11.580Z"
+stopped_at: Completed 18-07-PLAN.md — Manitoba prompts (6) + resources (7), 36 tests, 97.99% coverage
+last_updated: "2026-06-14T05:13:03.392Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 12
   total_plans: 56
-  completed_plans: 54
+  completed_plans: 55
   percent: 0
 ---
 
@@ -102,6 +102,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 18-manitoba-government-open-data P04 | 5min | 2 tasks | 4 files |
 | Phase 18-manitoba-government-open-data P05 | 15min | 2 tasks | 4 files |
 | Phase 18-manitoba-government-open-data P06 | 4min | 2 tasks | 4 files |
+| Phase 18-manitoba-government-open-data P07 | 7min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -247,6 +248,8 @@ Recent decisions affecting current work:
 - [Phase 18-manitoba-government-open-data]: Emergency_Department_Availabili is the actual truncated ArcGIS field name — matched exactly as spike-confirmed for emergency_only=True filter
 - [Phase 18-manitoba-government-open-data]: Manitoba 511 key GATED (confirmed spike): tools return NOT_CONFIGURED via Five11NotConfigured; live integration deferred until free key confirmed
 - [Phase 18-manitoba-government-open-data]: Plan 06: area_name filter for winter roads is client-side (511 API has no server-side area param); camera locations cached at CACHE_TTL_META (24h)
+- [Phase 18-manitoba-government-open-data]: Resources have ZERO function parameters (no lang) — lang param would promote to ResourceTemplate and drop from resources/list
+- [Phase 18-manitoba-government-open-data]: data://manitoba/major-rivers includes Red River Floodway as a sixth entry — critical flood infrastructure reference
 
 ### Roadmap Evolution
 
@@ -274,6 +277,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-14T05:03:11.576Z
-Stopped at: Completed 18-06-PLAN.md — Manitoba transport/511 (3 @tool functions + client bodies + 18 tests)
+Last session: 2026-06-14T05:13:03.389Z
+Stopped at: Completed 18-07-PLAN.md — Manitoba prompts (6) + resources (7), 36 tests, 97.99% coverage
 Resume file: None

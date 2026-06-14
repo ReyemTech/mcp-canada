@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 18-08-PLAN.md — Manitoba parametrized+integration tests, docs sync, 96.75% coverage, Phase 18 closed
-last_updated: "2026-06-14T06:47:31.741Z"
+stopped_at: Completed 18-09-PLAN.md — Manitoba Hub Search gap closure, OGC param fix, 96.76% coverage
+last_updated: "2026-06-14T18:12:29.420Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 13
-  total_plans: 56
-  completed_plans: 56
+  total_plans: 57
+  completed_plans: 57
   percent: 0
 ---
 
@@ -104,6 +104,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 18-manitoba-government-open-data P06 | 4min | 2 tasks | 4 files |
 | Phase 18-manitoba-government-open-data P07 | 7min | 2 tasks | 3 files |
 | Phase 18-manitoba-government-open-data P08 | 7min | 2 tasks | 7 files |
+| Phase 18-manitoba-government-open-data P09 | 4min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -252,6 +253,7 @@ Recent decisions affecting current work:
 - [Phase 18-manitoba-government-open-data]: Resources have ZERO function parameters (no lang) — lang param would promote to ResourceTemplate and drop from resources/list
 - [Phase 18-manitoba-government-open-data]: data://manitoba/major-rivers includes Red River Floodway as a sixth entry — critical flood infrastructure reference
 - [Phase 18]: ALL_MANITOBA_TOOLS count=20 (5+3+4+5+3) matches tools.py __all__; 511 NOT_CONFIGURED integration test pops env var to guarantee deterministic result without needing real key
+- [Phase 18-manitoba-government-open-data]: Manitoba Hub Search uses OGC API Records params (limit/startindex) not ArcGIS-REST (num/start); blank q= omitted (not sent empty); startindex omitted when 0
 
 ### Roadmap Evolution
 
@@ -279,6 +281,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-14T05:50:38.986Z
-Stopped at: Completed 18-08-PLAN.md — Manitoba parametrized+integration tests, docs sync, 96.75% coverage, Phase 18 closed
+Last session: 2026-06-14T18:12:29.417Z
+Stopped at: Completed 18-09-PLAN.md — Manitoba Hub Search gap closure, OGC param fix, 96.76% coverage
 Resume file: None

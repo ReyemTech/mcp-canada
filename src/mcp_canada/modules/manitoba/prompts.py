@@ -10,7 +10,6 @@ Guided workflow prompts return list[Message]; quick lookup prompts return str.
 
 from typing import Annotated, Literal  # noqa: F401 — used by Plan 07
 
-from fastmcp.prompts import prompt  # noqa: F401 — used by Plan 07
-from fastmcp.prompts.prompt import Message  # noqa: F401 — used by Plan 07
+from fastmcp.prompts import Message, prompt  # noqa: F401 — used by Plan 07
 
 # Prompt definitions added by Plan 07.

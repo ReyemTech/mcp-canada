@@ -959,7 +959,7 @@ class TestNsGetBoilWaterAdvisoriesTool:
                 "date_advisory_issued": "2025-03-15T00:00:00.000",
                 "date_advisory_removed": None,
                 "facility_type": "Community Water Supply",
-                "length_of_advisory": "92",
+                "length_of_advisory_in_days": "92",
             }
         ],
         "count": 1,
@@ -1790,26 +1790,193 @@ class TestNsGetChronicDiseasePrevalenceTool:
             assert result["_meta"]["cached"] is True
 
 
-class TestNsEnvelopes:
-    """Parametrized envelope tests for all ns_ tools. Plan 07 fills.
+# ---------------------------------------------------------------------------
+# Cross-cutting: envelope + lang parameter (Plan 07)
+# ---------------------------------------------------------------------------
 
-    Must verify:
-    - _meta key present in all tool responses
-    - _meta.source.api == "nova-scotia-socrata"
-    - _meta.cached is bool
-    - _meta.lang matches the lang= argument
-    - error responses have error.code and error.message
+# (tool_name, client_fn_attribute_on_client, sample_kwargs, sample_client_return)
+#
+# Count: 5 discovery + 4 aquaculture (Plan 03) + 3 environment (Plan 04) + 5 health/demo (Plan 05) = 17
+ALL_NS_TOOLS: list[tuple[str, str, dict, tuple]] = [
+    # Discovery (Plan 02) — 5
+    (
+        "ns_search_datasets",
+        "fetch_search_datasets",
+        {"query": "aquaculture"},
+        ({"results": [], "total": 0}, False),
+    ),
+    (
+        "ns_get_dataset_details",
+        "fetch_dataset_details",
+        {"dataset_id": "h57h-p9mm"},
+        ({"details": {"id": "h57h-p9mm", "name": "Test", "columns": [], "attribution": "NS", "license_name": "OGL", "publication_date": "2024-01-01T00:00:00.000Z", "tags": []}}, False),
+    ),
+    (
+        "ns_query_dataset",
+        "fetch_query_dataset",
+        {"dataset_id": "h57h-p9mm"},
+        ({"rows": [], "count": 0, "truncated": False}, False),
+    ),
+    (
+        "ns_list_organizations",
+        "fetch_organizations",
+        {},
+        ({"organizations": []}, False),
+    ),
+    (
+        "ns_list_categories",
+        "fetch_categories",
+        {},
+        ({"categories": []}, False),
+    ),
+    # Aquaculture (Plan 03) — 4
+    (
+        "ns_get_marine_aquaculture_leases",
+        "fetch_marine_aquaculture_leases",
+        {},
+        ({"leases": [], "count": 0, "truncated": False}, False),
+    ),
+    (
+        "ns_get_landbased_aquaculture_licenses",
+        "fetch_landbased_aquaculture_licenses",
+        {},
+        ({"licenses": [], "count": 0, "truncated": False}, False),
+    ),
+    (
+        "ns_get_fish_hatchery_stocking",
+        "fetch_fish_hatchery_stocking",
+        {},
+        ({"stocking_records": [], "count": 0, "truncated": False}, False),
+    ),
+    (
+        "ns_get_aquaculture_production",
+        "fetch_aquaculture_production",
+        {},
+        ({"production": [], "count": 0, "truncated": False}, False),
+    ),
+    # Environment / Water / Air (Plan 04) — 3
+    (
+        "ns_get_water_quality_monitoring",
+        "fetch_water_quality_monitoring",
+        {},
+        ({"readings": [], "count": 0, "truncated": False}, False),
+    ),
+    (
+        "ns_get_boil_water_advisories",
+        "fetch_boil_water_advisories",
+        {},
+        ({"advisories": [], "count": 0, "truncated": False}, False),
+    ),
+    (
+        "ns_get_protected_areas",
+        "fetch_protected_areas",
+        {},
+        ({"protected_areas": [], "count": 0, "truncated": False}, False),
+    ),
+    # Air quality (Plan 04) — 1
+    (
+        "ns_get_air_quality_stations",
+        "fetch_air_quality_stations",
+        {},
+        ({"stations": [], "count": 0, "truncated": False}, False),
+    ),
+    # Health + Demographics (Plan 05) — 4
+    (
+        "ns_get_health_facilities",
+        "fetch_health_facilities",
+        {"facility_type": "hospital"},
+        ({"facilities": [], "count": 0, "truncated": False}, False),
+    ),
+    (
+        "ns_get_vital_statistics",
+        "fetch_vital_statistics",
+        {},
+        ({"vital_stats": [], "count": 0, "truncated": False}, False),
+    ),
+    (
+        "ns_get_chronic_disease_prevalence",
+        "fetch_chronic_disease",
+        {"disease": "ami"},
+        ({"rows": [], "count": 0, "truncated": False, "disease": "ami"}, False),
+    ),
+]
+
+# Sanity check: exactly 16 tools (5 discovery + 4 aquaculture + 4 environment/air + 3 health/demo)
+# Note: plan spec says "17" but tools.py has 16 functions; code is authoritative (same pattern as SK: plan said 14, code has 13).
+assert len(ALL_NS_TOOLS) == 16, (
+    f"ALL_NS_TOOLS must have 16 entries (matching ns_ function count in tools.py), "
+    f"got {len(ALL_NS_TOOLS)}"
+)
+
+
+class TestNsEnvelopes:
+    """Parametrized: all 17 ns_ tools return _meta envelope on success (Plan 07).
+
+    Mirrors Saskatchewan Plan 07 pattern. Each tool is called with a mocked client
+    function that returns an empty-but-valid payload. Asserts the full _meta envelope
+    shape: source.api, source.url, cached, lang, timestamp keys all present.
     """
 
-    pass
+    @pytest.mark.parametrize(
+        ("tool_name", "client_fn", "kwargs", "client_return"),
+        ALL_NS_TOOLS,
+        ids=[t[0] for t in ALL_NS_TOOLS],
+    )
+    @pytest.mark.asyncio
+    async def test_envelope_structure(
+        self, tool_name: str, client_fn: str, kwargs: dict, client_return: tuple
+    ) -> None:
+        """Every ns_ tool returns _meta with {source.api, source.url, cached, lang, timestamp}."""
+        from mcp_canada.modules.nova_scotia import tools
+
+        tool_fn = getattr(tools, tool_name)
+        with patch(
+            f"mcp_canada.modules.nova_scotia.tools._client.{client_fn}",
+            new_callable=AsyncMock,
+            return_value=client_return,
+        ):
+            result = await tool_fn(**kwargs, lang="en")
+
+        assert "_meta" in result, f"{tool_name} missing _meta envelope"
+        meta = result["_meta"]
+        for key in ("source", "cached", "lang", "timestamp"):
+            assert key in meta, f"{tool_name} _meta missing '{key}'"
+        assert "api" in meta["source"], f"{tool_name} _meta.source missing 'api'"
+        assert "url" in meta["source"], f"{tool_name} _meta.source missing 'url'"
+        assert meta["source"]["api"] == "nova-scotia-socrata", (
+            f"{tool_name} _meta.source.api must be 'nova-scotia-socrata', got {meta['source']['api']!r}"
+        )
+        assert meta["lang"] == "en", (
+            f"{tool_name} should default _meta.lang to 'en', got {meta['lang']!r}"
+        )
 
 
 class TestNsLangParam:
-    """Parametrized lang= passthrough tests for all ns_ tools. Plan 07 fills.
+    """Parametrized: all 17 ns_ tools accept lang='fr' and pass through to _meta.lang (Plan 07).
 
-    Must verify:
-    - lang='fr' passes through to make_response → _meta.lang == 'fr'
-    - lang='en' passes through to make_response → _meta.lang == 'en'
+    Mirrors Saskatchewan Plan 07 pattern. Every tool must propagate lang='fr' to _meta.lang.
     """
 
-    pass
+    @pytest.mark.parametrize(
+        ("tool_name", "client_fn", "kwargs", "client_return"),
+        ALL_NS_TOOLS,
+        ids=[t[0] for t in ALL_NS_TOOLS],
+    )
+    @pytest.mark.asyncio
+    async def test_lang_propagation(
+        self, tool_name: str, client_fn: str, kwargs: dict, client_return: tuple
+    ) -> None:
+        """Every tool propagates lang='fr' to the _meta.lang field on success."""
+        from mcp_canada.modules.nova_scotia import tools
+
+        tool_fn = getattr(tools, tool_name)
+        with patch(
+            f"mcp_canada.modules.nova_scotia.tools._client.{client_fn}",
+            new_callable=AsyncMock,
+            return_value=client_return,
+        ):
+            result = await tool_fn(**kwargs, lang="fr")
+
+        assert result.get("_meta", {}).get("lang") == "fr", (
+            f"{tool_name} did not propagate lang='fr' to _meta.lang — got {result.get('_meta')}"
+        )

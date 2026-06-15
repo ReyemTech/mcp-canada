@@ -540,7 +540,7 @@ async def fetch_boil_water_advisories(
         rows = await _soql(
             DS_BOIL_WATER_ADVISORIES,
             where=where,
-            select="site_name,county,date_advisory_issued,date_advisory_removed,facility_type,length_of_advisory",
+            select="site_name,county,date_advisory_issued,date_advisory_removed,facility_type,length_of_advisory_in_days",
             order="date_advisory_issued DESC",
             limit=limit,
         )

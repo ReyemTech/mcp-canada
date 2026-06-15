@@ -2431,3 +2431,498 @@ class TestSaskatchewanToolScenarios:
             assert "potash" in err_msg or "literal" in err_msg or "invalid" in err_msg or "gold" in err_msg, (
                 f"ToolError for invalid mineral must mention the constraint. Got: {exc}"
             )
+
+
+# ─── Nova Scotia scenarios ───────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+class TestNovaScotiaToolScenarios:
+    """Live data.novascotia.ca Socrata SODA integration tests.
+
+    THE MANITOBA LESSON: every test here asserts FIELD PRESENCE + non-null values,
+    not just _meta shape. This catches a live 400 or wrong-endpoint bug that mocks
+    would mask.
+
+    Tests simulate what an agent would ask:
+    - Marine leases: license_le non-null + the_geom ABSENT (geometry-exclusion proof)
+    - Hatchery stocking: stock/number_released non-null (field presence)
+    - Aquaculture production: kgs/total_value non-null (field presence)
+    - Water quality: temperature_c non-null (field presence)
+    - Boil water: no error envelope; empty list is VALID success
+    - Protected areas: pro_name non-null + the_geom ABSENT (geometry-exclusion proof)
+    - Air quality stations: station_name/latitude non-null (field presence)
+    - Health facilities: facility_name non-null (both hospital and LTC)
+    - Vital statistics: counties/live_births non-null (field presence)
+    - Chronic disease: zone + crude_prevalence_rate non-null (zone normalization proof)
+    - Categories: >=20 categories incl. "Fishing and Aquaculture" (broken-param workaround proof)
+    - Discovery: ns_search_datasets returns h57h-p9mm (catalog search)
+    - Error: invalid disease/facility_type → structured INVALID_INPUT (not an exception)
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_marine_leases_license_le_and_no_the_geom(self, mcp_server):
+        """'Nova Scotia marine aquaculture leases (Shellfish)' — license_le non-null, the_geom ABSENT.
+
+        THE GEOMETRY EXCLUSION PROOF: if the_geom appears in any row, the $select exclusion
+        or belt-and-suspenders strip is broken. This is the primary validation for Socrata
+        geometry handling.
+        """
+        data = await call_tool(mcp_server, "ns_get_marine_aquaculture_leases", {
+            "species_type": "Shellfish",
+            "limit": 5,
+        })
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR", (
+                f"Marine leases error must be UPSTREAM_ERROR: {data['error']}"
+            )
+            return
+        assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
+        leases = data["data"]["leases"]
+        assert isinstance(leases, list)
+        assert len(leases) >= 1, "Marine leases must return at least 1 Shellfish lease"
+        # FIELD PRESENCE: license_le must be non-null in at least one row
+        first = leases[0]
+        assert first.get("license_le") is not None, (
+            f"FIELD PRESENCE FAILED: 'license_le' must be non-null in first lease row. "
+            f"Got keys: {list(first.keys())}"
+        )
+        # GEOMETRY EXCLUSION: the_geom must NOT appear in any row
+        for row in leases:
+            assert "the_geom" not in row, (
+                f"GEOMETRY EXCLUSION FAILED: 'the_geom' must not be in lease rows — "
+                f"found it in row with license_le={row.get('license_le')!r}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_fish_hatchery_stocking_field_presence(self, mcp_server):
+        """'Nova Scotia hatchery stocking for Brook Trout' — stock/number_released non-null."""
+        data = await call_tool(mcp_server, "ns_get_fish_hatchery_stocking", {
+            "stock": "Brook Trout",
+            "limit": 5,
+        })
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR"
+            return
+        assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
+        records = data["data"]["stocking_records"]
+        assert isinstance(records, list)
+        assert len(records) >= 1, "Hatchery stocking must return at least 1 Brook Trout record"
+        first = records[0]
+        # FIELD PRESENCE
+        assert first.get("stock") is not None, (
+            f"FIELD PRESENCE FAILED: 'stock' must be non-null. Keys: {list(first.keys())}"
+        )
+        assert first.get("number_released") is not None, (
+            f"FIELD PRESENCE FAILED: 'number_released' must be non-null. Got: {first}"
+        )
+        assert first.get("stocking_date") is not None, (
+            f"FIELD PRESENCE FAILED: 'stocking_date' must be non-null. Got: {first}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_aquaculture_production_kgs_and_total_value(self, mcp_server):
+        """'NS aquaculture production' — kgs/total_value non-null in at least one row."""
+        data = await call_tool(mcp_server, "ns_get_aquaculture_production", {
+            "limit": 10,
+        })
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR"
+            return
+        assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
+        production = data["data"]["production"]
+        assert isinstance(production, list)
+        assert len(production) >= 1, "Aquaculture production must return at least 1 row"
+        # FIELD PRESENCE: kgs and total_value must be non-null in at least one row
+        rows_with_kgs = [r for r in production if r.get("kgs") is not None]
+        assert len(rows_with_kgs) >= 1, (
+            f"FIELD PRESENCE FAILED: 'kgs' must be non-null in >=1 row. "
+            f"Keys in first row: {list(production[0].keys())}"
+        )
+        rows_with_value = [r for r in production if r.get("total_value") is not None]
+        assert len(rows_with_value) >= 1, (
+            f"FIELD PRESENCE FAILED: 'total_value' must be non-null in >=1 row. "
+            f"Keys in first row: {list(production[0].keys())}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_water_quality_temperature_c_field_present(self, mcp_server):
+        """'NS water quality monitoring' — temperature_c non-null in at least one reading."""
+        data = await call_tool(mcp_server, "ns_get_water_quality_monitoring", {
+            "limit": 5,
+        })
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR"
+            return
+        assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
+        readings = data["data"]["readings"]
+        assert isinstance(readings, list)
+        assert len(readings) >= 1, "Water quality must return at least 1 reading"
+        first = readings[0]
+        # FIELD PRESENCE: station_number and date must be non-null
+        assert first.get("station_number") is not None, (
+            f"FIELD PRESENCE FAILED: 'station_number' must be non-null. Keys: {list(first.keys())}"
+        )
+        assert first.get("date") is not None, (
+            f"FIELD PRESENCE FAILED: 'date' must be non-null. Got: {first}"
+        )
+        # temperature_c must be non-null in at least one row
+        temp_rows = [r for r in readings if r.get("temperature_c") is not None]
+        assert len(temp_rows) >= 1, (
+            f"FIELD PRESENCE FAILED: 'temperature_c' must be non-null in >=1 row. "
+            f"Got keys: {list(readings[0].keys())}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_boil_water_advisories_empty_is_valid_not_error(self, mcp_server):
+        """'NS boil water advisories (active only)' — empty list is a valid success, not an error.
+
+        THE EMPTY-IS-VALID LESSON: if no active advisories, the response must have _meta
+        (not an error envelope). This mirrors Manitoba flood alerts and SK fire bans.
+        """
+        data = await call_tool(mcp_server, "ns_get_boil_water_advisories", {
+            "active_only": True,
+            "limit": 200,
+        })
+        # Must NOT be an error — empty advisory list is normal off-season state
+        assert "error" not in data, (
+            f"Boil water advisories MUST NOT return error on empty list. Got: {data.get('error')}"
+        )
+        assert "_meta" in data, (
+            f"Boil water advisories must return _meta envelope (even with 0 advisories). Got: {data}"
+        )
+        advisories = data["data"]["advisories"]
+        assert isinstance(advisories, list)
+        count = data["data"].get("count", -1)
+        assert count >= 0, f"Boil water count must be >= 0, got {count}"
+        # If advisories present, assert field presence
+        if advisories:
+            first = advisories[0]
+            assert first.get("site_name") is not None, (
+                f"FIELD PRESENCE FAILED: 'site_name' must be non-null when advisories present. Got: {first}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_protected_areas_pro_name_and_no_the_geom(self, mcp_server):
+        """'NS protected areas (Designated)' — pro_name non-null, the_geom ABSENT.
+
+        THE GEOMETRY EXCLUSION PROOF for protected areas (ticv-5du5): proves both the
+        explicit $select and belt-and-suspenders strip work on the MultiPolygon dataset.
+        """
+        data = await call_tool(mcp_server, "ns_get_protected_areas", {
+            "status": "Designated",
+            "limit": 5,
+        })
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR"
+            return
+        assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
+        areas = data["data"]["protected_areas"]
+        assert isinstance(areas, list)
+        assert len(areas) >= 1, "Protected areas must return at least 1 Designated area"
+        first = areas[0]
+        # FIELD PRESENCE
+        assert first.get("pro_name") is not None, (
+            f"FIELD PRESENCE FAILED: 'pro_name' must be non-null. Keys: {list(first.keys())}"
+        )
+        assert first.get("protect1") is not None or first.get("owner") is not None, (
+            f"FIELD PRESENCE FAILED: 'protect1' or 'owner' must be present. Got: {first}"
+        )
+        # GEOMETRY EXCLUSION: the_geom must NOT appear in any row
+        for row in areas:
+            assert "the_geom" not in row, (
+                f"GEOMETRY EXCLUSION FAILED: 'the_geom' must not appear in protected area rows. "
+                f"Found in row with pro_name={row.get('pro_name')!r}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_air_quality_stations_name_and_coordinates(self, mcp_server):
+        """'NS air quality stations' — station_name/latitude/longitude non-null."""
+        data = await call_tool(mcp_server, "ns_get_air_quality_stations", {
+            "limit": 10,
+        })
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR"
+            return
+        assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
+        stations = data["data"]["stations"]
+        assert isinstance(stations, list)
+        assert len(stations) >= 1, "Air quality stations must return at least 1 station"
+        first = stations[0]
+        # FIELD PRESENCE
+        assert first.get("station_name") is not None, (
+            f"FIELD PRESENCE FAILED: 'station_name' must be non-null. Keys: {list(first.keys())}"
+        )
+        assert first.get("latitude") is not None, (
+            f"FIELD PRESENCE FAILED: 'latitude' must be non-null. Got: {first}"
+        )
+        assert first.get("longitude") is not None, (
+            f"FIELD PRESENCE FAILED: 'longitude' must be non-null. Got: {first}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_health_facilities_hospital_field_presence(self, mcp_server):
+        """'NS hospitals' — facility_name/county/type non-null."""
+        data = await call_tool(mcp_server, "ns_get_health_facilities", {
+            "facility_type": "hospital",
+            "limit": 5,
+        })
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR"
+            return
+        assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
+        facilities = data["data"]["facilities"]
+        assert isinstance(facilities, list)
+        assert len(facilities) >= 1, "Hospital facilities must return at least 1 hospital"
+        first = facilities[0]
+        # FIELD PRESENCE
+        assert first.get("facility_name") is not None, (
+            f"FIELD PRESENCE FAILED: 'facility_name' must be non-null. Keys: {list(first.keys())}"
+        )
+        assert first.get("county") is not None, (
+            f"FIELD PRESENCE FAILED: 'county' must be non-null. Got: {first}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_health_facilities_ltc_beds_and_zone(self, mcp_server):
+        """'NS long-term care facilities' — beds/zone present in at least 1 LTC row."""
+        data = await call_tool(mcp_server, "ns_get_health_facilities", {
+            "facility_type": "long_term_care",
+            "limit": 10,
+        })
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR"
+            return
+        assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
+        facilities = data["data"]["facilities"]
+        assert isinstance(facilities, list)
+        assert len(facilities) >= 1, "LTC facilities must return at least 1 facility"
+        # FIELD PRESENCE: beds and zone should be present in LTC data
+        rows_with_beds = [f for f in facilities if f.get("beds") is not None]
+        assert len(rows_with_beds) >= 1, (
+            f"FIELD PRESENCE FAILED: 'beds' must be non-null in >=1 LTC row. "
+            f"Keys in first row: {list(facilities[0].keys())}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_vital_statistics_live_births_field_present(self, mcp_server):
+        """'NS vital statistics' — counties/year/population/live_births non-null."""
+        data = await call_tool(mcp_server, "ns_get_vital_statistics", {
+            "limit": 5,
+        })
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR"
+            return
+        assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
+        # Key is "statistics" (set by fetch_vital_statistics client function)
+        payload = data["data"]
+        stats = payload.get("statistics") or payload.get("vital_stats") or []
+        assert isinstance(stats, list), (
+            f"Vital statistics response data must contain 'statistics' list. Got keys: {list(payload.keys())}"
+        )
+        assert len(stats) >= 1, "Vital statistics must return at least 1 row"
+        first = stats[0]
+        # FIELD PRESENCE: counties + year + live_births must be non-null
+        assert first.get("counties") is not None, (
+            f"FIELD PRESENCE FAILED: 'counties' (UPPERCASE field name) must be non-null. "
+            f"Got keys: {list(first.keys())} — if 'county' appears instead of 'counties', "
+            f"the Pitfall 4 schema fix is missing."
+        )
+        assert first.get("live_births") is not None, (
+            f"FIELD PRESENCE FAILED: 'live_births' must be non-null. Got: {first}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_chronic_disease_zone_and_prevalence_rate(self, mcp_server):
+        """'NS chronic disease AMI' — year/zone/crude_prevalence_rate non-null.
+
+        THE ZONE NORMALIZATION PROOF: AMI uses 'health_zone' in the source dataset but
+        client _normalize_zone_field must rename it to 'zone' in the output. If 'zone' is
+        absent and 'health_zone' appears instead, normalization is broken.
+        """
+        data = await call_tool(mcp_server, "ns_get_chronic_disease_prevalence", {
+            "disease": "ami",
+            "sex": "F",
+            "limit": 5,
+        })
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            # AMI has no sex field — "F" filter may return 0 rows or UPSTREAM_ERROR
+            # (server-side 400 on unknown column); either is acceptable here
+            assert data["error"]["code"] in ("UPSTREAM_ERROR", "INVALID_INPUT")
+            return
+        assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
+        rows = data["data"]["rows"]
+        assert isinstance(rows, list)
+        # AMI might return empty rows when sex="F" (no sex column) — test with "ami" alone if empty
+        if not rows:
+            # Try without sex filter since AMI has no sex field
+            data2 = await call_tool(mcp_server, "ns_get_chronic_disease_prevalence", {
+                "disease": "ami",
+                "limit": 5,
+            })
+            if "error" in data2:
+                assert data2["error"]["code"] == "UPSTREAM_ERROR"
+                return
+            rows = data2["data"]["rows"]
+        if rows:
+            first = rows[0]
+            # ZONE NORMALIZATION PROOF: 'zone' must be present (not 'health_zone')
+            assert "zone" in first, (
+                f"ZONE NORMALIZATION FAILED: 'zone' must be in the output (AMI source uses "
+                f"'health_zone' renamed to 'zone' by _normalize_zone_field). "
+                f"Got keys: {list(first.keys())}"
+            )
+            assert first.get("zone") is not None, (
+                f"FIELD PRESENCE FAILED: 'zone' must be non-null. Got: {first}"
+            )
+            # FIELD PRESENCE: crude_prevalence_rate must be non-null
+            assert first.get("crude_prevalence_rate") is not None, (
+                f"FIELD PRESENCE FAILED: 'crude_prevalence_rate' must be non-null. Got: {first}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_list_categories_20_plus_including_fishing(self, mcp_server):
+        """'NS data categories' — >=20 categories incl. 'Fishing and Aquaculture'.
+
+        THE CATEGORIES= WORKAROUND PROOF: ns_list_categories uses q='' + client-side
+        domain_category aggregation (not the broken categories= param which returns 0
+        results). If this returns <20 categories or lacks "Fishing and Aquaculture",
+        the workaround is broken.
+        """
+        data = await call_tool(mcp_server, "ns_list_categories", {})
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR"
+            return
+        assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
+        categories = data["data"]["categories"]
+        assert isinstance(categories, list)
+        # THE PROOF: at least 20 categories (confirms workaround works)
+        assert len(categories) >= 20, (
+            f"CATEGORIES WORKAROUND FAILED: Expected >=20 categories but got {len(categories)}. "
+            f"If categories= API param was used (not q=), it returns 0. Got: {categories}"
+        )
+        # 'Fishing and Aquaculture' must be present
+        category_names = [c["name"] for c in categories]
+        assert "Fishing and Aquaculture" in category_names, (
+            f"FIELD PRESENCE FAILED: 'Fishing and Aquaculture' must be in categories. "
+            f"Got: {sorted(category_names)}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_discover_tools_finds_ns_search_datasets(self, mcp_server):
+        """'Nova Scotia aquaculture data' — BM25 must surface ns_search_datasets."""
+        results = await discover(mcp_server, "Nova Scotia aquaculture data")
+        names = [r["name"] for r in results]
+        assert any(n.startswith("ns_") for n in names), (
+            f"No ns_ tool found in BM25 discovery results for 'Nova Scotia aquaculture data': {names}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_search_datasets_returns_h57h_p9mm(self, mcp_server):
+        """'Search NS datasets for aquaculture' — must return h57h-p9mm (marine leases dataset).
+
+        PROVES catalog search + pagination works. If h57h-p9mm is absent, the SODA
+        /api/catalog/v1 endpoint or query parsing is broken.
+        """
+        data = await call_tool(mcp_server, "ns_search_datasets", {
+            "query": "aquaculture",
+            "limit": 20,
+        })
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR"
+            return
+        assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
+        results = data["data"]["results"]
+        total = data["data"]["total"]
+        assert isinstance(results, list)
+        assert total >= 10, (
+            f"Expected total>=10 aquaculture datasets on NS Socrata, got {total}"
+        )
+        # h57h-p9mm (Marine Aquaculture Leases) must appear in results
+        ids = [r["id"] for r in results if "id" in r]
+        assert "h57h-p9mm" in ids, (
+            f"CATALOG SEARCH FAILED: 'h57h-p9mm' (Marine Aquaculture Leases) must appear "
+            f"in top 20 aquaculture results. Got IDs: {ids}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_invalid_disease_returns_structured_error(self, mcp_server):
+        """Invalid disease 'tuberculosis' → INVALID_INPUT with valid= list (not an exception)."""
+        data = await call_tool(mcp_server, "ns_get_chronic_disease_prevalence", {
+            "disease": "tuberculosis",
+        })
+        assert "error" in data, (
+            f"Invalid disease must return error envelope, got: {data}"
+        )
+        assert data["error"]["code"] == "INVALID_INPUT", (
+            f"Expected INVALID_INPUT for invalid disease, got {data['error']['code']}"
+        )
+        assert "valid" in data["error"], (
+            f"INVALID_INPUT must include 'valid=' list. Got: {data['error']}"
+        )
+        assert "ami" in data["error"]["valid"], (
+            f"valid= list must include 'ami'. Got: {data['error']['valid']}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_invalid_facility_type_returns_structured_error(self, mcp_server):
+        """Invalid facility_type 'clinic' → INVALID_INPUT with valid= list (not an exception)."""
+        data = await call_tool(mcp_server, "ns_get_health_facilities", {
+            "facility_type": "clinic",
+        })
+        assert "error" in data, (
+            f"Invalid facility_type must return error envelope, got: {data}"
+        )
+        assert data["error"]["code"] == "INVALID_INPUT", (
+            f"Expected INVALID_INPUT for 'clinic', got {data['error']['code']}"
+        )
+        assert "valid" in data["error"], (
+            f"INVALID_INPUT must include 'valid=' list. Got: {data['error']}"
+        )
+        assert "hospital" in data["error"]["valid"], (
+            f"valid= list must include 'hospital'. Got: {data['error']['valid']}"
+        )

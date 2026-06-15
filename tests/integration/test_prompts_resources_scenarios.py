@@ -1023,3 +1023,121 @@ class TestSaskatchewanPromptsResources:
         assert "{" in content and "}" in content, (
             "template://saskatchewan/wildfire-report must contain {placeholder} syntax"
         )
+
+
+# ─── Nova Scotia prompts + resources ─────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+class TestNovaScotiaPromptsResources:
+    """Integration tests for Nova Scotia MCP prompts and resources.
+
+    Verifies:
+    - All 6 ns_ prompts are discoverable via list_prompts()
+    - All 7 ns_ resources are readable via read_resource()
+    - Resource content is well-formed (JSON or markdown)
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_ns_prompts_discoverable(self, mcp_server):
+        """All 6 Nova Scotia prompts appear in list_prompts()."""
+        prompts = await list_prompts(mcp_server)
+        names = {p.name for p in prompts}
+        expected_ns_prompts = {
+            "ns_explore_aquaculture_data",
+            "ns_health_zone_analysis",
+            "ns_water_quality_analysis",
+            "ns_quick_find_dataset",
+            "ns_quick_protected_areas",
+            "ns_quick_vital_stats",
+        }
+        for prompt_name in expected_ns_prompts:
+            assert prompt_name in names, (
+                f"Nova Scotia prompt '{prompt_name}' not found in list_prompts(). "
+                f"NS prompts present: {sorted(n for n in names if n.startswith('ns_'))}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_ns_categories_resource_is_json(self, mcp_server):
+        """data://ns/categories returns valid JSON with category list."""
+        content = await read_resource(mcp_server, "data://ns/categories")
+        assert content, "data://ns/categories returned empty content"
+        data = json.loads(content)
+        assert isinstance(data, (dict, list)), (
+            "data://ns/categories must return valid JSON (dict or list)"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_ns_health_zones_resource_is_json(self, mcp_server):
+        """data://ns/health-zones returns valid JSON with zone info."""
+        content = await read_resource(mcp_server, "data://ns/health-zones")
+        assert content, "data://ns/health-zones returned empty content"
+        data = json.loads(content)
+        assert isinstance(data, (dict, list)), (
+            "data://ns/health-zones must return valid JSON"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_ns_fishing_areas_resource_is_json(self, mcp_server):
+        """data://ns/fishing-areas returns valid JSON with species type info."""
+        content = await read_resource(mcp_server, "data://ns/fishing-areas")
+        assert content, "data://ns/fishing-areas returned empty content"
+        data = json.loads(content)
+        assert isinstance(data, (dict, list)), (
+            "data://ns/fishing-areas must return valid JSON"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_ns_departments_resource_is_json(self, mcp_server):
+        """data://ns/departments returns valid JSON with NS government departments."""
+        content = await read_resource(mcp_server, "data://ns/departments")
+        assert content, "data://ns/departments returned empty content"
+        data = json.loads(content)
+        assert isinstance(data, (dict, list)), (
+            "data://ns/departments must return valid JSON"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_ns_socrata_guide_is_markdown(self, mcp_server):
+        """docs://ns/socrata-guide returns markdown with SoQL documentation."""
+        content = await read_resource(mcp_server, "docs://ns/socrata-guide")
+        assert content, "docs://ns/socrata-guide returned empty content"
+        assert "#" in content, "docs://ns/socrata-guide must be markdown with headings"
+        assert "SoQL" in content or "soql" in content.lower(), (
+            "docs://ns/socrata-guide must document SoQL query syntax"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_ns_portal_guide_is_markdown(self, mcp_server):
+        """docs://ns/portal-guide returns markdown documenting the Socrata portal."""
+        content = await read_resource(mcp_server, "docs://ns/portal-guide")
+        assert content, "docs://ns/portal-guide returned empty content"
+        assert "#" in content, "docs://ns/portal-guide must be markdown with headings"
+        assert "Socrata" in content or "socrata" in content.lower(), (
+            "docs://ns/portal-guide must document Socrata as the portal technology"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_ns_aquaculture_report_template_has_placeholders(self, mcp_server):
+        """template://ns/aquaculture-report returns markdown with {placeholder} syntax."""
+        content = await read_resource(mcp_server, "template://ns/aquaculture-report")
+        assert content, "template://ns/aquaculture-report returned empty content"
+        assert "{" in content and "}" in content, (
+            "template://ns/aquaculture-report must contain {placeholder} syntax"
+        )

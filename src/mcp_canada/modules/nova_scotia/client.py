@@ -294,7 +294,7 @@ async def fetch_organizations() -> tuple[dict[str, Any], bool]:
 
         organizations = sorted(
             [{"name": k, "dataset_count": v} for k, v in org_counts.items()],
-            key=lambda x: (-x["dataset_count"], x["name"]),
+            key=lambda x: (-int(x["dataset_count"]), str(x["name"])),
         )
         return {"organizations": organizations}
 
@@ -332,7 +332,7 @@ async def fetch_categories() -> tuple[dict[str, Any], bool]:
 
         categories = sorted(
             [{"name": k, "count": v} for k, v in cat_counts.items()],
-            key=lambda x: (-x["count"], x["name"]),
+            key=lambda x: (-int(x["count"]), str(x["name"])),
         )
         return {"categories": categories}
 

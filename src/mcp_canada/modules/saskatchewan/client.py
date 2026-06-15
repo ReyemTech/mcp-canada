@@ -436,13 +436,52 @@ async def fetch_crop_yields(
 ) -> tuple[dict[str, Any], bool]:
     """Fetch estimated crop yields by region from Saskatchewan FeatureServers.
 
-    region: "provincial" → Province Summary FS; "southeast"/"southwest"/"central"/
-    "northeast"/"northwest" → Regions Only FS.
+    region: "provincial" → Province Summary FS (where="1=1"); one of 5 non-provincial
+    crop regions → Regions Only FS with where="Region='<Title-cased region>'".
     16 crop types: HRSW, Durum, Oat, Barley, Canola, Mustard, Soybean, Pea, Lentil,
     Chickpea, Canary_seed, Flax, Winter_wheat, Fall_rye, Other_wheat_.
-    Filled by Plan 03.
+    Raises ValueError for unknown region (tool catches and returns INVALID_INPUT).
     """
-    raise NotImplementedError("Plan 03 implements")
+    from .constants import CROP_REGIONS  # local import to keep module-level imports lean
+
+    region_lower = region.lower()
+    if region_lower not in CROP_REGIONS:
+        raise ValueError(
+            f"Unknown region: {region!r}. Valid: {list(CROP_REGIONS)}"
+        )
+
+    if region_lower == "provincial":
+        fs_url = CROP_YIELDS_PROVINCE_FS_URL
+        where = "1=1"
+    else:
+        fs_url = CROP_YIELDS_REGIONS_FS_URL
+        where = f"Region='{region_lower.title()}'"
+
+    # 16 crop fields + Region
+    out_fields = (
+        "Region,HRSW,Durum,Oat,Barley,Canola,Mustard,Soybean,Pea,Lentil,"
+        "Chickpea,Canary_seed,Flax,Winter_wheat,Fall_rye,Other_wheat_"
+    )
+    cache_key = f"{CACHE_KEY_PREFIX}crop_yields:{region_lower}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            fs_url,
+            layer_id=0,
+            where=where,
+            out_fields=out_fields,
+            include_geometry=False,
+            max_records=max_records,
+        )
+        return {
+            "features": features,
+            "count": len(features),
+            "truncated": truncated,
+            "region": region_lower,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_ANNUAL, _fetch)
 
 
 async def fetch_grain_elevators(
@@ -454,9 +493,31 @@ async def fetch_grain_elevators(
     Default filter: PR='SK' (Saskatchewan only).
     railway: optional filter on Railway field (CN, CP, SHORTLINE).
     Fields: Station, PR, Railway, Licensee, Elevator_type, Capacity_tonne.
-    Filled by Plan 03.
     """
-    raise NotImplementedError("Plan 03 implements")
+    where = "PR='SK'"
+    if railway:
+        where += f" AND Railway='{railway}'"
+
+    out_fields = "Station,PR,Railway,Licensee,Elevator_type,Capacity_tonne"
+    cache_key = f"{CACHE_KEY_PREFIX}grain_elevators:{railway or 'all'}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            GRAIN_ELEVATORS_FS_URL,
+            layer_id=0,
+            where=where,
+            out_fields=out_fields,
+            include_geometry=False,
+            max_records=max_records,
+        )
+        return {
+            "features": features,
+            "count": len(features),
+            "truncated": truncated,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 async def fetch_mineral_mines(
@@ -468,9 +529,37 @@ async def fetch_mineral_mines(
     mineral: one of "potash", "uranium", "helium", "coal" — routes to MINERAL_MINES_FS_URLS.
     Raises ValueError for unknown mineral (tool layer catches and maps to INVALID_INPUT).
     Fields: Commodity, Name, Status, Mine_Type, Company, Mine_Site, Regulation, DateOpened, Website.
-    Filled by Plan 03.
     """
-    raise NotImplementedError("Plan 03 implements")
+    mineral_lower = mineral.lower()
+    fs_url = MINERAL_MINES_FS_URLS.get(mineral_lower)
+    if fs_url is None:
+        raise ValueError(
+            f"Unknown mineral: {mineral!r}. Valid: {list(MINERAL_MINES_FS_URLS)}"
+        )
+
+    out_fields = (
+        "Commodity,Name,Status,Mine_Type,Company,Mine_Site,Regulation,DateOpened,Website"
+    )
+    cache_key = f"{CACHE_KEY_PREFIX}mineral_mines:{mineral_lower}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            fs_url,
+            layer_id=0,
+            where="1=1",
+            out_fields=out_fields,
+            include_geometry=False,
+            max_records=max_records,
+        )
+        return {
+            "features": features,
+            "count": len(features),
+            "truncated": truncated,
+            "mineral": mineral_lower,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 # ---------------------------------------------------------------------------

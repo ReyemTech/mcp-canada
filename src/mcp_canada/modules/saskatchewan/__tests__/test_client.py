@@ -551,7 +551,110 @@ class TestSaskGetCropYields:
     "southeast" routes to CROP_YIELDS_REGIONS_FS_URL with WHERE Region='Southeast'.
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_provincial_routes_to_province_summary_fs(self):
+        """region='provincial' calls query_feature_service with CROP_YIELDS_PROVINCE_FS_URL."""
+        from mcp_canada.modules.saskatchewan.client import fetch_crop_yields
+        from mcp_canada.modules.saskatchewan.constants import CROP_YIELDS_PROVINCE_FS_URL
+        from .conftest import SAMPLE_ARCGIS_CROP_YIELDS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_CROP_YIELDS,
+        ) as mock_qfs:
+            data, cached = await fetch_crop_yields(region="provincial")
+        mock_qfs.assert_called_once()
+        call_kwargs = mock_qfs.call_args
+        # First positional arg is the FS URL
+        assert call_kwargs[0][0] == CROP_YIELDS_PROVINCE_FS_URL, (
+            f"Expected CROP_YIELDS_PROVINCE_FS_URL, got {call_kwargs[0][0]}"
+        )
+        # Where should be 1=1 for provincial
+        assert call_kwargs[1].get("where") == "1=1"
+
+    @pytest.mark.asyncio
+    async def test_provincial_returns_features_and_count(self):
+        """fetch_crop_yields returns dict with features, count, region keys."""
+        from mcp_canada.modules.saskatchewan.client import fetch_crop_yields
+        from .conftest import SAMPLE_ARCGIS_CROP_YIELDS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_CROP_YIELDS,
+        ):
+            data, cached = await fetch_crop_yields(region="provincial")
+        assert "features" in data
+        assert "count" in data
+        assert "region" in data
+        assert data["region"] == "provincial"
+        # Canola field must be present in returned rows
+        assert any("Canola" in row for row in data["features"])
+
+    @pytest.mark.asyncio
+    async def test_southeast_routes_to_regions_only_fs(self):
+        """region='southeast' calls query_feature_service with CROP_YIELDS_REGIONS_FS_URL."""
+        from mcp_canada.modules.saskatchewan.client import fetch_crop_yields
+        from mcp_canada.modules.saskatchewan.constants import CROP_YIELDS_REGIONS_FS_URL
+        from .conftest import SAMPLE_ARCGIS_CROP_YIELDS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_CROP_YIELDS,
+        ) as mock_qfs:
+            data, cached = await fetch_crop_yields(region="southeast")
+        mock_qfs.assert_called_once()
+        call_kwargs = mock_qfs.call_args
+        assert call_kwargs[0][0] == CROP_YIELDS_REGIONS_FS_URL, (
+            f"Expected CROP_YIELDS_REGIONS_FS_URL, got {call_kwargs[0][0]}"
+        )
+        # Where clause should filter by Region='Southeast' (Title-cased)
+        assert call_kwargs[1].get("where") == "Region='Southeast'"
+
+    @pytest.mark.asyncio
+    async def test_northwest_region_title_case_where_clause(self):
+        """region='northwest' produces WHERE Region='Northwest' (title-cased)."""
+        from mcp_canada.modules.saskatchewan.client import fetch_crop_yields
+        from .conftest import SAMPLE_ARCGIS_CROP_YIELDS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_CROP_YIELDS,
+        ) as mock_qfs:
+            await fetch_crop_yields(region="northwest")
+        where = mock_qfs.call_args[1].get("where")
+        assert where == "Region='Northwest'", f"Expected Region='Northwest', got: {where}"
+
+    @pytest.mark.asyncio
+    async def test_unknown_region_raises_value_error(self):
+        """fetch_crop_yields raises ValueError for unknown region (tool maps to INVALID_INPUT)."""
+        from mcp_canada.modules.saskatchewan.client import fetch_crop_yields
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+        ):
+            with pytest.raises(ValueError, match="region"):
+                await fetch_crop_yields(region="bogusregion")
+
+    @pytest.mark.asyncio
+    async def test_explicit_out_fields_sent(self):
+        """fetch_crop_yields sends explicit out_fields including Region and Canola."""
+        from mcp_canada.modules.saskatchewan.client import fetch_crop_yields
+        from .conftest import SAMPLE_ARCGIS_CROP_YIELDS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_CROP_YIELDS,
+        ) as mock_qfs:
+            await fetch_crop_yields(region="provincial")
+        out_fields = mock_qfs.call_args[1].get("out_fields", "")
+        assert "Canola" in out_fields, f"Expected Canola in out_fields, got: {out_fields}"
+        assert "Region" in out_fields, f"Expected Region in out_fields, got: {out_fields}"
 
 
 class TestSaskGetGrainElevators:
@@ -560,7 +663,99 @@ class TestSaskGetGrainElevators:
     Plan 03 fills.
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_default_where_clause_is_sk(self):
+        """fetch_grain_elevators defaults to where=PR='SK'."""
+        from mcp_canada.modules.saskatchewan.client import fetch_grain_elevators
+        from .conftest import SAMPLE_ARCGIS_GRAIN_ELEVATORS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_GRAIN_ELEVATORS,
+        ) as mock_qfs:
+            data, cached = await fetch_grain_elevators()
+        mock_qfs.assert_called_once()
+        where = mock_qfs.call_args[1].get("where")
+        assert where == "PR='SK'", f"Expected PR='SK', got: {where}"
+
+    @pytest.mark.asyncio
+    async def test_railway_filter_appends_to_where(self):
+        """fetch_grain_elevators with railway='CN' produces where=\"PR='SK' AND Railway='CN'\"."""
+        from mcp_canada.modules.saskatchewan.client import fetch_grain_elevators
+        from .conftest import SAMPLE_ARCGIS_GRAIN_ELEVATORS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_GRAIN_ELEVATORS,
+        ) as mock_qfs:
+            await fetch_grain_elevators(railway="CN")
+        where = mock_qfs.call_args[1].get("where")
+        assert where == "PR='SK' AND Railway='CN'", f"Expected CN filter, got: {where}"
+
+    @pytest.mark.asyncio
+    async def test_shortline_railway_filter(self):
+        """fetch_grain_elevators with railway='SHORTLINE' appends correctly."""
+        from mcp_canada.modules.saskatchewan.client import fetch_grain_elevators
+        from .conftest import SAMPLE_ARCGIS_GRAIN_ELEVATORS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_GRAIN_ELEVATORS,
+        ) as mock_qfs:
+            await fetch_grain_elevators(railway="SHORTLINE")
+        where = mock_qfs.call_args[1].get("where")
+        assert "SHORTLINE" in where, f"Expected SHORTLINE in where, got: {where}"
+
+    @pytest.mark.asyncio
+    async def test_uses_grain_elevators_fs_url(self):
+        """fetch_grain_elevators calls query_feature_service with GRAIN_ELEVATORS_FS_URL."""
+        from mcp_canada.modules.saskatchewan.client import fetch_grain_elevators
+        from mcp_canada.modules.saskatchewan.constants import GRAIN_ELEVATORS_FS_URL
+        from .conftest import SAMPLE_ARCGIS_GRAIN_ELEVATORS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_GRAIN_ELEVATORS,
+        ) as mock_qfs:
+            await fetch_grain_elevators()
+        assert mock_qfs.call_args[0][0] == GRAIN_ELEVATORS_FS_URL
+
+    @pytest.mark.asyncio
+    async def test_returns_features_and_count(self):
+        """fetch_grain_elevators returns dict with features, count, truncated."""
+        from mcp_canada.modules.saskatchewan.client import fetch_grain_elevators
+        from .conftest import SAMPLE_ARCGIS_GRAIN_ELEVATORS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_GRAIN_ELEVATORS,
+        ):
+            data, cached = await fetch_grain_elevators()
+        assert "features" in data
+        assert "count" in data
+        assert "truncated" in data
+        assert data["count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_explicit_out_fields_sent(self):
+        """fetch_grain_elevators sends explicit out_fields including Station and Capacity_tonne."""
+        from mcp_canada.modules.saskatchewan.client import fetch_grain_elevators
+        from .conftest import SAMPLE_ARCGIS_GRAIN_ELEVATORS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_GRAIN_ELEVATORS,
+        ) as mock_qfs:
+            await fetch_grain_elevators()
+        out_fields = mock_qfs.call_args[1].get("out_fields", "")
+        assert "Station" in out_fields
+        assert "Capacity_tonne" in out_fields
 
 
 class TestSaskGetMineralMines:
@@ -570,7 +765,127 @@ class TestSaskGetMineralMines:
     ValueError for unknown mineral.
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_potash_routes_to_potash_fs_url(self):
+        """fetch_mineral_mines(mineral='potash') routes to Potash_2024_06_13 FS URL."""
+        from mcp_canada.modules.saskatchewan.client import fetch_mineral_mines
+        from mcp_canada.modules.saskatchewan.constants import MINERAL_MINES_FS_URLS
+        from .conftest import SAMPLE_ARCGIS_MINERAL_MINES
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_MINERAL_MINES,
+        ) as mock_qfs:
+            data, cached = await fetch_mineral_mines(mineral="potash")
+        assert mock_qfs.call_args[0][0] == MINERAL_MINES_FS_URLS["potash"]
+
+    @pytest.mark.asyncio
+    async def test_uranium_routes_to_uranium_fs_url(self):
+        """fetch_mineral_mines(mineral='uranium') routes to Uranium_2024_06_13 FS URL."""
+        from mcp_canada.modules.saskatchewan.client import fetch_mineral_mines
+        from mcp_canada.modules.saskatchewan.constants import MINERAL_MINES_FS_URLS
+        from .conftest import SAMPLE_ARCGIS_MINERAL_MINES
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_MINERAL_MINES,
+        ) as mock_qfs:
+            await fetch_mineral_mines(mineral="uranium")
+        assert mock_qfs.call_args[0][0] == MINERAL_MINES_FS_URLS["uranium"]
+
+    @pytest.mark.asyncio
+    async def test_helium_routes_to_helium_fs_url(self):
+        """fetch_mineral_mines(mineral='helium') routes to Helium_2024_12_31 FS URL."""
+        from mcp_canada.modules.saskatchewan.client import fetch_mineral_mines
+        from mcp_canada.modules.saskatchewan.constants import MINERAL_MINES_FS_URLS
+        from .conftest import SAMPLE_ARCGIS_MINERAL_MINES
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_MINERAL_MINES,
+        ) as mock_qfs:
+            await fetch_mineral_mines(mineral="helium")
+        assert mock_qfs.call_args[0][0] == MINERAL_MINES_FS_URLS["helium"]
+
+    @pytest.mark.asyncio
+    async def test_coal_routes_to_coal_fs_url(self):
+        """fetch_mineral_mines(mineral='coal') routes to Coal_2024_06_13 FS URL."""
+        from mcp_canada.modules.saskatchewan.client import fetch_mineral_mines
+        from mcp_canada.modules.saskatchewan.constants import MINERAL_MINES_FS_URLS
+        from .conftest import SAMPLE_ARCGIS_MINERAL_MINES
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_MINERAL_MINES,
+        ) as mock_qfs:
+            await fetch_mineral_mines(mineral="coal")
+        assert mock_qfs.call_args[0][0] == MINERAL_MINES_FS_URLS["coal"]
+
+    @pytest.mark.asyncio
+    async def test_unknown_mineral_raises_value_error(self):
+        """fetch_mineral_mines raises ValueError for unknown mineral type."""
+        from mcp_canada.modules.saskatchewan.client import fetch_mineral_mines
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+        ):
+            with pytest.raises(ValueError, match="mineral"):
+                await fetch_mineral_mines(mineral="gold")
+
+    @pytest.mark.asyncio
+    async def test_returns_features_count_and_mineral(self):
+        """fetch_mineral_mines returns dict with features, count, truncated, mineral."""
+        from mcp_canada.modules.saskatchewan.client import fetch_mineral_mines
+        from .conftest import SAMPLE_ARCGIS_MINERAL_MINES
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_MINERAL_MINES,
+        ):
+            data, cached = await fetch_mineral_mines(mineral="potash")
+        assert "features" in data
+        assert "count" in data
+        assert "mineral" in data
+        assert data["mineral"] == "potash"
+
+    @pytest.mark.asyncio
+    async def test_explicit_out_fields_sent(self):
+        """fetch_mineral_mines sends explicit out_fields including Name, Company, Status."""
+        from mcp_canada.modules.saskatchewan.client import fetch_mineral_mines
+        from .conftest import SAMPLE_ARCGIS_MINERAL_MINES
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_MINERAL_MINES,
+        ) as mock_qfs:
+            await fetch_mineral_mines(mineral="potash")
+        out_fields = mock_qfs.call_args[1].get("out_fields", "")
+        assert "Name" in out_fields
+        assert "Company" in out_fields
+        assert "Status" in out_fields
+        assert "DateOpened" in out_fields
+
+    @pytest.mark.asyncio
+    async def test_case_insensitive_mineral_lookup(self):
+        """fetch_mineral_mines handles uppercase mineral input via .lower() dispatch."""
+        from mcp_canada.modules.saskatchewan.client import fetch_mineral_mines
+        from mcp_canada.modules.saskatchewan.constants import MINERAL_MINES_FS_URLS
+        from .conftest import SAMPLE_ARCGIS_MINERAL_MINES
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_MINERAL_MINES,
+        ) as mock_qfs:
+            await fetch_mineral_mines(mineral="POTASH")
+        assert mock_qfs.call_args[0][0] == MINERAL_MINES_FS_URLS["potash"]
 
 
 class TestSaskGetFireBans:

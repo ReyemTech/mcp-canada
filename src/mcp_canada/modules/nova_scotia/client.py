@@ -486,8 +486,33 @@ async def fetch_water_quality_monitoring(
     since: str | None = None,
     limit: int = MAX_RECORDS,
 ) -> tuple[dict[str, Any], bool]:
-    """Surface water quality continuous readings (bkfi-mjgw). Filled by Plan 04."""
-    raise NotImplementedError("Plan 04 implements")
+    """Surface water quality continuous readings (bkfi-mjgw).
+
+    Uses explicit $select (station_number, date, time, temperature_c, ph,
+    specific_conductance_s_cm, dissolved_oxygen_mg_l) and $order=date DESC.
+    Optional station_number filter and since (ISO date string) filter.
+    Data is current through 2024-12; use CACHE_TTL_SEARCH (1h) since data is not live.
+    """
+    where_parts: list[str] = []
+    if station_number:
+        where_parts.append(f"station_number='{station_number}'")
+    if since:
+        where_parts.append(f"date > '{since}'")
+    where = " AND ".join(where_parts) or None
+
+    cache_key = f"{CACHE_KEY_PREFIX}water_quality:{station_number or 'all'}:{since or 'all'}:{limit}"
+
+    async def fetcher() -> dict[str, Any]:
+        rows = await _soql(
+            DS_SURFACE_WATER_QUALITY_CONTINUOUS,
+            where=where,
+            select="station_number,date,time,temperature_c,ph,specific_conductance_s_cm,dissolved_oxygen_mg_l",
+            order="date DESC",
+            limit=limit,
+        )
+        return {"readings": rows, "count": len(rows), "truncated": len(rows) >= limit}
+
+    return await cached_fetch(cache_key, CACHE_TTL_SEARCH, fetcher)
 
 
 async def fetch_boil_water_advisories(
@@ -495,24 +520,95 @@ async def fetch_boil_water_advisories(
     active_only: bool = False,
     limit: int = MAX_RECORDS,
 ) -> tuple[dict[str, Any], bool]:
-    """Boil water advisories (7t68-9xmm). Active filter = IS NULL. Filled by Plan 04."""
-    raise NotImplementedError("Plan 04 implements")
+    """Boil water advisories (7t68-9xmm).
+
+    Uses explicit $select and $order=date_advisory_issued DESC.
+    active_only=True applies ACTIVE_ADVISORY_FILTER ("date_advisory_removed IS NULL")
+    — spike-confirmed (82 active advisories; empty-string comparison causes type-mismatch error).
+    An empty advisories list is a VALID success (off-season or no active advisories), NOT an error.
+    """
+    where_parts: list[str] = []
+    if active_only:
+        where_parts.append(ACTIVE_ADVISORY_FILTER)
+    if county:
+        where_parts.append(f"county='{county}'")
+    where = " AND ".join(where_parts) or None
+
+    cache_key = f"{CACHE_KEY_PREFIX}boil_water:{county or 'all'}:{active_only}:{limit}"
+
+    async def fetcher() -> dict[str, Any]:
+        rows = await _soql(
+            DS_BOIL_WATER_ADVISORIES,
+            where=where,
+            select="site_name,county,date_advisory_issued,date_advisory_removed,facility_type,length_of_advisory",
+            order="date_advisory_issued DESC",
+            limit=limit,
+        )
+        # Empty rows list is valid — no active advisories is a normal off-season state
+        return {"advisories": rows, "count": len(rows), "truncated": len(rows) >= limit}
+
+    return await cached_fetch(cache_key, CACHE_TTL_LIVE, fetcher)
 
 
 async def fetch_protected_areas(
     status: str | None = None,
     limit: int = MAX_RECORDS,
 ) -> tuple[dict[str, Any], bool]:
-    """Protected areas system (ticv-5du5); $select excludes the_geom. Filled by Plan 04."""
-    raise NotImplementedError("Plan 04 implements")
+    """Protected areas system (ticv-5du5).
+
+    Uses explicit $select that EXCLUDES the_geom (Pitfall 5 — geometry is MultiPolygon
+    and bloats responses significantly). Optional status SoQL filter; $order=pro_name ASC.
+    To retrieve polygon boundaries, use fetch_query_dataset with include_geometry=True.
+    """
+    where = f"status='{status}'" if status else None
+
+    cache_key = f"{CACHE_KEY_PREFIX}protected_areas:{status or 'all'}:{limit}"
+
+    async def fetcher() -> dict[str, Any]:
+        rows = await _soql(
+            DS_PROTECTED_AREAS,
+            where=where,
+            # Explicit $select EXCLUDES the_geom — geometry exclusion is primary defense
+            select="objectid,pro_name,protect1,symbol,owner,authority,status,web_url,ha_gis",
+            order="pro_name ASC",
+            limit=limit,
+        )
+        # Belt-and-suspenders: strip the_geom from any row in case API returns it unexpectedly
+        rows = [{k: v for k, v in row.items() if k != "the_geom"} for row in rows]
+        return {"protected_areas": rows, "count": len(rows), "truncated": len(rows) >= limit}
+
+    return await cached_fetch(cache_key, CACHE_TTL_ANNUAL, fetcher)
 
 
 async def fetch_air_quality_stations(
     city: str | None = None,
     limit: int = MAX_RECORDS,
 ) -> tuple[dict[str, Any], bool]:
-    """Air quality monitoring stations catalog (3bbm-drnh). Filled by Plan 04."""
-    raise NotImplementedError("Plan 04 implements")
+    """Air quality monitoring stations catalog (3bbm-drnh).
+
+    Returns the STATION CATALOG only (name, city, coordinates, measurements, monitoring_period).
+    Individual pollutant time series (O3, PM2.5, SO2, CO by station) are in 20+ separate
+    per-station datasets — use ns_query_dataset with the specific dataset ID to read them.
+    Optional city filter; no explicit $order (small catalog, stable reference data).
+    """
+    where = f"city='{city}'" if city else None
+
+    cache_key = f"{CACHE_KEY_PREFIX}air_quality_stations:{city or 'all'}:{limit}"
+
+    async def fetcher() -> dict[str, Any]:
+        rows = await _soql(
+            DS_AIR_QUALITY_STATIONS,
+            where=where,
+            select=(
+                "national_air_pollution_surveillance_network_id,"
+                "station_name,province,city,country,latitude,longitude,"
+                "measurements,monitoring_period"
+            ),
+            limit=limit,
+        )
+        return {"stations": rows, "count": len(rows), "truncated": len(rows) >= limit}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, fetcher)
 
 
 # ---------------------------------------------------------------------------

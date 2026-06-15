@@ -895,7 +895,165 @@ class TestSaskGetFireBans:
     empty features=[] does NOT raise.
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_urban_scope_dispatches_to_layer_0(self):
+        """fetch_fire_bans(ban_scope='urban') calls query_feature_service with layer_id=0."""
+        from mcp_canada.modules.saskatchewan.client import fetch_fire_bans
+        from mcp_canada.modules.saskatchewan.constants import FIRE_BAN_FS_URL
+        from .conftest import SAMPLE_ARCGIS_FIRE_BANS_ACTIVE
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_FIRE_BANS_ACTIVE,
+        ) as mock_qfs:
+            data, cached = await fetch_fire_bans(ban_scope="urban")
+        mock_qfs.assert_called_once()
+        # First positional arg is FS URL
+        assert mock_qfs.call_args[0][0] == FIRE_BAN_FS_URL, (
+            f"Expected FIRE_BAN_FS_URL, got {mock_qfs.call_args[0][0]}"
+        )
+        # Second positional arg is layer_id
+        assert mock_qfs.call_args[0][1] == 0, (
+            f"Expected layer_id=0 for 'urban', got {mock_qfs.call_args[0][1]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_rural_scope_dispatches_to_layer_2(self):
+        """fetch_fire_bans(ban_scope='rural') calls query_feature_service with layer_id=2."""
+        from mcp_canada.modules.saskatchewan.client import fetch_fire_bans
+        from .conftest import SAMPLE_ARCGIS_FIRE_BANS_ACTIVE
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_FIRE_BANS_ACTIVE,
+        ) as mock_qfs:
+            await fetch_fire_bans(ban_scope="rural")
+        assert mock_qfs.call_args[0][1] == 2, (
+            f"Expected layer_id=2 for 'rural', got {mock_qfs.call_args[0][1]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_provincial_scope_dispatches_to_layer_3(self):
+        """fetch_fire_bans(ban_scope='provincial') calls query_feature_service with layer_id=3."""
+        from mcp_canada.modules.saskatchewan.client import fetch_fire_bans
+        from .conftest import SAMPLE_ARCGIS_FIRE_BANS_ACTIVE
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_FIRE_BANS_ACTIVE,
+        ) as mock_qfs:
+            await fetch_fire_bans(ban_scope="provincial")
+        assert mock_qfs.call_args[0][1] == 3, (
+            f"Expected layer_id=3 for 'provincial', got {mock_qfs.call_args[0][1]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_parks_scope_dispatches_to_layer_8(self):
+        """fetch_fire_bans(ban_scope='parks') calls query_feature_service with layer_id=8."""
+        from mcp_canada.modules.saskatchewan.client import fetch_fire_bans
+        from .conftest import SAMPLE_ARCGIS_FIRE_BANS_ACTIVE
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_FIRE_BANS_ACTIVE,
+        ) as mock_qfs:
+            await fetch_fire_bans(ban_scope="parks")
+        assert mock_qfs.call_args[0][1] == 8, (
+            f"Expected layer_id=8 for 'parks', got {mock_qfs.call_args[0][1]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_empty_fire_bans_is_valid_success_not_error(self):
+        """CRITICAL: empty fire bans (off-season) returns valid payload count==0, never raises.
+
+        This mirrors Manitoba flood alerts: no active bans is a NORMAL state, not an error.
+        """
+        from mcp_canada.modules.saskatchewan.client import fetch_fire_bans
+        from .conftest import SAMPLE_ARCGIS_FIRE_BANS_EMPTY
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_FIRE_BANS_EMPTY,
+        ):
+            data, cached = await fetch_fire_bans(ban_scope="urban")
+
+        # Must NOT raise — empty list is a valid payload
+        assert "features" in data, "Empty fire bans must return payload with 'features' key"
+        assert data["features"] == [], f"Expected empty features list, got: {data['features']}"
+        assert data["count"] == 0, f"Expected count==0 for empty bans, got: {data['count']}"
+        assert "scope" in data, "Payload must include 'scope' key"
+
+    @pytest.mark.asyncio
+    async def test_active_fire_bans_returns_features_and_count(self):
+        """fetch_fire_bans returns dict with features, count, truncated, scope keys."""
+        from mcp_canada.modules.saskatchewan.client import fetch_fire_bans
+        from .conftest import SAMPLE_ARCGIS_FIRE_BANS_ACTIVE
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_FIRE_BANS_ACTIVE,
+        ):
+            data, cached = await fetch_fire_bans(ban_scope="urban")
+
+        assert "features" in data
+        assert "count" in data
+        assert "truncated" in data
+        assert "scope" in data
+        assert data["scope"] == "urban"
+        assert data["count"] == 2
+        assert len(data["features"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_unknown_ban_scope_raises_value_error(self):
+        """fetch_fire_bans raises ValueError for unknown ban_scope (tool maps to INVALID_INPUT)."""
+        from mcp_canada.modules.saskatchewan.client import fetch_fire_bans
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+        ):
+            with pytest.raises(ValueError, match="ban_scope"):
+                await fetch_fire_bans(ban_scope="forest")
+
+    @pytest.mark.asyncio
+    async def test_fire_ban_where_clause_is_1_equals_1(self):
+        """fetch_fire_bans always uses where='1=1' (no filtering — return all active bans)."""
+        from mcp_canada.modules.saskatchewan.client import fetch_fire_bans
+        from .conftest import SAMPLE_ARCGIS_FIRE_BANS_ACTIVE
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_FIRE_BANS_ACTIVE,
+        ) as mock_qfs:
+            await fetch_fire_bans(ban_scope="urban")
+        where = mock_qfs.call_args[1].get("where")
+        assert where == "1=1", f"Expected where='1=1', got: {where}"
+
+    @pytest.mark.asyncio
+    async def test_fire_ban_uses_spsa_not_hub_url(self):
+        """fetch_fire_bans calls the SPSA FS URL (gis.saskatchewan.ca/egis), NOT the Hub org."""
+        from mcp_canada.modules.saskatchewan.client import fetch_fire_bans
+        from mcp_canada.modules.saskatchewan.constants import FIRE_BAN_FS_URL
+        from .conftest import SAMPLE_ARCGIS_FIRE_BANS_ACTIVE
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_FIRE_BANS_ACTIVE,
+        ) as mock_qfs:
+            await fetch_fire_bans(ban_scope="urban")
+        url = mock_qfs.call_args[0][0]
+        assert "gis.saskatchewan.ca/egis" in url, (
+            f"Fire ban must use SPSA server (gis.saskatchewan.ca/egis), got: {url}"
+        )
+        assert url == FIRE_BAN_FS_URL
 
 
 class TestSaskGetHistoricWildfires:
@@ -904,7 +1062,123 @@ class TestSaskGetHistoricWildfires:
     Plan 04 fills.
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_no_filters_uses_1_equals_1_where(self):
+        """fetch_historic_wildfires with no filters uses where='1=1'."""
+        from mcp_canada.modules.saskatchewan.client import fetch_historic_wildfires
+        from .conftest import SAMPLE_ARCGIS_WILDFIRES
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WILDFIRES,
+        ) as mock_qfs:
+            data, cached = await fetch_historic_wildfires()
+        where = mock_qfs.call_args[1].get("where")
+        assert where == "1=1", f"Expected where='1=1' with no filters, got: {where}"
+
+    @pytest.mark.asyncio
+    async def test_year_filter_composes_where_clause(self):
+        """fetch_historic_wildfires(year=2017) produces where='YEAR=2017'."""
+        from mcp_canada.modules.saskatchewan.client import fetch_historic_wildfires
+        from .conftest import SAMPLE_ARCGIS_WILDFIRES
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WILDFIRES,
+        ) as mock_qfs:
+            await fetch_historic_wildfires(year=2017)
+        where = mock_qfs.call_args[1].get("where")
+        assert "YEAR=2017" in where, f"Expected YEAR=2017 in where, got: {where}"
+
+    @pytest.mark.asyncio
+    async def test_cause_filter_uses_like_clause(self):
+        """fetch_historic_wildfires(cause='Lightning') produces CAUSE1 LIKE '%Lightning%'."""
+        from mcp_canada.modules.saskatchewan.client import fetch_historic_wildfires
+        from .conftest import SAMPLE_ARCGIS_WILDFIRES
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WILDFIRES,
+        ) as mock_qfs:
+            await fetch_historic_wildfires(cause="Lightning")
+        where = mock_qfs.call_args[1].get("where")
+        assert "CAUSE1 LIKE '%Lightning%'" in where, (
+            f"Expected CAUSE1 LIKE clause, got: {where}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_year_and_cause_both_compose_correctly(self):
+        """fetch_historic_wildfires(year=2017, cause='Lightning') composes year AND cause."""
+        from mcp_canada.modules.saskatchewan.client import fetch_historic_wildfires
+        from .conftest import SAMPLE_ARCGIS_WILDFIRES
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WILDFIRES,
+        ) as mock_qfs:
+            await fetch_historic_wildfires(year=2017, cause="Lightning")
+        where = mock_qfs.call_args[1].get("where")
+        assert "YEAR=2017" in where, f"Expected YEAR=2017 in where, got: {where}"
+        assert "CAUSE1 LIKE '%Lightning%'" in where, (
+            f"Expected CAUSE1 LIKE in where, got: {where}"
+        )
+        # must be joined with AND
+        assert "AND" in where, f"Expected AND conjunction in where, got: {where}"
+
+    @pytest.mark.asyncio
+    async def test_uses_wildfire_boundaries_fs_url(self):
+        """fetch_historic_wildfires calls WILDFIRE_BOUNDARIES_FS_URL (primary Hub org)."""
+        from mcp_canada.modules.saskatchewan.client import fetch_historic_wildfires
+        from mcp_canada.modules.saskatchewan.constants import WILDFIRE_BOUNDARIES_FS_URL
+        from .conftest import SAMPLE_ARCGIS_WILDFIRES
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WILDFIRES,
+        ) as mock_qfs:
+            await fetch_historic_wildfires()
+        assert mock_qfs.call_args[0][0] == WILDFIRE_BOUNDARIES_FS_URL, (
+            f"Expected WILDFIRE_BOUNDARIES_FS_URL, got: {mock_qfs.call_args[0][0]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_returns_features_count_truncated(self):
+        """fetch_historic_wildfires returns dict with features, count, truncated."""
+        from mcp_canada.modules.saskatchewan.client import fetch_historic_wildfires
+        from .conftest import SAMPLE_ARCGIS_WILDFIRES
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WILDFIRES,
+        ):
+            data, cached = await fetch_historic_wildfires()
+        assert "features" in data
+        assert "count" in data
+        assert "truncated" in data
+        assert data["count"] == 2
+        assert data["features"][0]["FIRENAME"] == "PORCUPINE LAKE FIRE"
+
+    @pytest.mark.asyncio
+    async def test_explicit_out_fields_include_key_wildfire_fields(self):
+        """fetch_historic_wildfires sends out_fields including YEAR, FIRENAME, CAUSE1, HECTARES."""
+        from mcp_canada.modules.saskatchewan.client import fetch_historic_wildfires
+        from .conftest import SAMPLE_ARCGIS_WILDFIRES
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WILDFIRES,
+        ) as mock_qfs:
+            await fetch_historic_wildfires()
+        out_fields = mock_qfs.call_args[1].get("out_fields", "")
+        for field in ("YEAR", "FIRENAME", "CAUSE1", "HECTARES"):
+            assert field in out_fields, f"Expected {field} in out_fields, got: {out_fields}"
 
 
 class TestSaskGetAirQuality:
@@ -913,7 +1187,108 @@ class TestSaskGetAirQuality:
     Plan 04 fills.
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_no_community_uses_1_equals_1_where(self):
+        """fetch_air_quality with no community filter uses where='1=1'."""
+        from mcp_canada.modules.saskatchewan.client import fetch_air_quality
+        from .conftest import SAMPLE_ARCGIS_AIR_QUALITY
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_AIR_QUALITY,
+        ) as mock_qfs:
+            data, cached = await fetch_air_quality()
+        where = mock_qfs.call_args[1].get("where")
+        assert where == "1=1", f"Expected where='1=1' with no community, got: {where}"
+
+    @pytest.mark.asyncio
+    async def test_community_filter_composes_where_clause(self):
+        """fetch_air_quality(community='Regina') produces where=\"COMMUNITY='Regina'\"."""
+        from mcp_canada.modules.saskatchewan.client import fetch_air_quality
+        from .conftest import SAMPLE_ARCGIS_AIR_QUALITY
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_AIR_QUALITY,
+        ) as mock_qfs:
+            await fetch_air_quality(community="Regina")
+        where = mock_qfs.call_args[1].get("where")
+        assert where == "COMMUNITY='Regina'", (
+            f"Expected COMMUNITY='Regina', got: {where}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_uses_air_quality_fs_url(self):
+        """fetch_air_quality calls AIR_QUALITY_FS_URL (primary Hub org)."""
+        from mcp_canada.modules.saskatchewan.client import fetch_air_quality
+        from mcp_canada.modules.saskatchewan.constants import AIR_QUALITY_FS_URL
+        from .conftest import SAMPLE_ARCGIS_AIR_QUALITY
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_AIR_QUALITY,
+        ) as mock_qfs:
+            await fetch_air_quality()
+        assert mock_qfs.call_args[0][0] == AIR_QUALITY_FS_URL, (
+            f"Expected AIR_QUALITY_FS_URL, got: {mock_qfs.call_args[0][0]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_returns_features_with_aqhi_field(self):
+        """fetch_air_quality returns features with AQHI (weather.gc.ca URL) present."""
+        from mcp_canada.modules.saskatchewan.client import fetch_air_quality
+        from .conftest import SAMPLE_ARCGIS_AIR_QUALITY
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_AIR_QUALITY,
+        ):
+            data, cached = await fetch_air_quality()
+        assert "features" in data
+        assert "count" in data
+        assert "truncated" in data
+        assert data["count"] == 2
+        # AQHI field must be present
+        first = data["features"][0]
+        assert "AQHI" in first, f"Expected AQHI in feature, got keys: {list(first.keys())}"
+        assert "weather.gc.ca" in first["AQHI"], (
+            f"Expected AQHI to be a weather.gc.ca URL, got: {first['AQHI']}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_explicit_out_fields_include_key_air_quality_fields(self):
+        """fetch_air_quality sends out_fields including COMMUNITY, PM2_5, NO2, O3, AQHI, DATETIME."""
+        from mcp_canada.modules.saskatchewan.client import fetch_air_quality
+        from .conftest import SAMPLE_ARCGIS_AIR_QUALITY
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_AIR_QUALITY,
+        ) as mock_qfs:
+            await fetch_air_quality()
+        out_fields = mock_qfs.call_args[1].get("out_fields", "")
+        for field in ("COMMUNITY", "PM2_5", "NO2", "O3", "AQHI", "DATETIME"):
+            assert field in out_fields, f"Expected {field} in out_fields, got: {out_fields}"
+
+    @pytest.mark.asyncio
+    async def test_saskatoon_community_filter(self):
+        """fetch_air_quality(community='Saskatoon') produces where=\"COMMUNITY='Saskatoon'\"."""
+        from mcp_canada.modules.saskatchewan.client import fetch_air_quality
+        from .conftest import SAMPLE_ARCGIS_AIR_QUALITY
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_AIR_QUALITY,
+        ) as mock_qfs:
+            await fetch_air_quality(community="Saskatoon")
+        where = mock_qfs.call_args[1].get("where")
+        assert where == "COMMUNITY='Saskatoon'", f"Expected COMMUNITY='Saskatoon', got: {where}"
 
 
 class TestSaskGetWSAStations:

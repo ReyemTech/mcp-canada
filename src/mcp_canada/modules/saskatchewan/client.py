@@ -574,11 +574,37 @@ async def fetch_fire_bans(
     """Fetch current fire bans from SPSA Public_Fire_Ban FeatureServer (separate REST server).
 
     ban_scope dispatches to FIRE_BAN_LAYERS: "urban"→0, "rural"→2, "provincial"→3, "parks"→8.
-    NOTE: SPSA uses gis.saskatchewan.ca/egis NOT the main Hub org.
-    CRITICAL: empty features list [] is CORRECT when no bans active — NOT an error.
-    Filled by Plan 04.
+    NOTE: SPSA uses gis.saskatchewan.ca/egis NOT the main Hub org — FIRE_BAN_FS_URL directly.
+    CRITICAL: empty features list [] is CORRECT when no bans are active (off-season) — NOT an error.
+    Same pattern as Manitoba flood alerts (Phase 18).
     """
-    raise NotImplementedError("Plan 04 implements")
+    if ban_scope not in FIRE_BAN_LAYERS:
+        raise ValueError(
+            f"Unknown ban_scope: {ban_scope!r}. Valid: {list(FIRE_BAN_LAYERS)}"
+        )
+
+    layer_id = FIRE_BAN_LAYERS[ban_scope]
+    cache_key = f"{CACHE_KEY_PREFIX}fire_bans:{ban_scope}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _spsa_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            FIRE_BAN_FS_URL,
+            layer_id,
+            where="1=1",
+            out_fields="UMTYPE,Municipali,Fire_Depar,Start_Date,Contact_Nu,Type,Comment",
+            include_geometry=False,
+            max_records=max_records,
+        )
+        # Empty features is VALID (no active bans in off-season) — never an error
+        return {
+            "features": features,
+            "count": len(features),
+            "truncated": truncated,
+            "scope": ban_scope,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_ALERTS, _fetch)
 
 
 async def fetch_historic_wildfires(
@@ -588,12 +614,38 @@ async def fetch_historic_wildfires(
 ) -> tuple[dict[str, Any], bool]:
     """Fetch historic wildfire boundaries from Historic_Wildfire_Boundaries FeatureServer.
 
-    year: optional integer year filter (e.g. 2017).
-    cause: optional filter on CAUSE1 (Lightning/Human/Unknown).
+    year: optional integer year filter (e.g. 2017) → WHERE YEAR=<int>.
+    cause: optional filter on CAUSE1 (Lightning/Human/Unknown) → CAUSE1 LIKE '%..%'.
+    Composed with AND when both provided; "1=1" when neither.
     Fields: YEAR, FIRENAME, CAUSE1, HECTARES, STATUS, STARTDATE, OUTDATE, TYPE.
-    Filled by Plan 04.
     """
-    raise NotImplementedError("Plan 04 implements")
+    # Build WHERE clause
+    clauses: list[str] = []
+    if year is not None:
+        clauses.append(f"YEAR={year}")
+    if cause is not None:
+        clauses.append(f"CAUSE1 LIKE '%{cause}%'")
+    where = " AND ".join(clauses) if clauses else "1=1"
+
+    cache_key = f"{CACHE_KEY_PREFIX}wildfires:{year}:{cause}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            WILDFIRE_BOUNDARIES_FS_URL,
+            0,
+            where=where,
+            out_fields="YEAR,FIRENAME,CAUSE1,HECTARES,STATUS,STARTDATE,OUTDATE,TYPE",
+            include_geometry=False,
+            max_records=max_records,
+        )
+        return {
+            "features": features,
+            "count": len(features),
+            "truncated": truncated,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 async def fetch_air_quality(
@@ -603,11 +655,32 @@ async def fetch_air_quality(
     """Fetch hourly ambient air quality readings from Hourly_Ambient_Air_Quality FeatureServer.
 
     community: optional filter (Regina/Saskatoon/Prince Albert/Estevan/Swift Current/Buffalo Narrows).
-    Returns live current readings (15min cache TTL).
-    Fields: COMMUNITY, STATIONID, PM2_5, NO2, O3, SO2, CO, H2S, AQHI (URL link), DATETIME.
-    Filled by Plan 04.
+    Returns live current readings (15min cache TTL — data refreshes hourly on the FeatureServer).
+    AQHI field is a weather.gc.ca URL link (not a numeric value).
+    Fields: COMMUNITY, STATIONID, PM2_5, NO2, O3, PM10, SO2, CO, H2S, AQHI, DATETIME.
     """
-    raise NotImplementedError("Plan 04 implements")
+    where = f"COMMUNITY='{community}'" if community else "1=1"
+    cache_key = f"{CACHE_KEY_PREFIX}air_quality:{community or 'all'}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            AIR_QUALITY_FS_URL,
+            0,
+            where=where,
+            out_fields=(
+                "COMMUNITY,STATIONID,PM2_5,NO2,O3,PM10,SO2,CO,H2S,AQHI,DATETIME"
+            ),
+            include_geometry=False,
+            max_records=max_records,
+        )
+        return {
+            "features": features,
+            "count": len(features),
+            "truncated": truncated,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_LIVE, _fetch)
 
 
 # ---------------------------------------------------------------------------

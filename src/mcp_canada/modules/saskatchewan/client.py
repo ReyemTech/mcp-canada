@@ -152,22 +152,78 @@ async def _hub_get(params: dict[str, Any] | None = None) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Discovery — Plan 02 fills bodies
+# Discovery — Plan 02
 # ---------------------------------------------------------------------------
+
+# File extensions that fetch_and_parse can handle
+_PARSEABLE_EXTENSIONS: frozenset[str] = frozenset(
+    {".csv", ".json", ".geojson", ".xlsx", ".xls"}
+)
+
+
+def _is_feature_server_url(url: str) -> bool:
+    """Return True when the URL points to an ArcGIS FeatureServer (not MapServer)."""
+    return "/FeatureServer" in url
+
+
+def _is_parseable_url(url: str) -> bool:
+    """Return True when the URL extension is a format fetch_and_parse can handle."""
+    clean = url.split("?", 1)[0].rstrip("/").lower()
+    return any(clean.endswith(ext) for ext in _PARSEABLE_EXTENSIONS)
+
+
+def _flatten_hub_feature(feature: dict[str, Any]) -> dict[str, Any]:
+    """Flatten a single Hub Search API feature into a SaskatchewanDatasetSummary dict."""
+    props = feature.get("properties") or {}
+    return {
+        "id": feature.get("id", ""),
+        "title": props.get("title", ""),
+        "snippet": props.get("snippet"),
+        "type": props.get("type"),
+        "owner": props.get("owner"),
+        "url": props.get("url"),
+        "num_views": props.get("numViews"),
+        "modified": props.get("modified"),
+        "source": props.get("source"),
+    }
 
 
 async def fetch_search_datasets(
     query: str = "",
     limit: int = 10,
     offset: int = 0,
+    category: str | None = None,
 ) -> tuple[dict[str, Any], bool]:
     """Search Saskatchewan GeoHub datasets via ArcGIS Hub Search API.
 
     Returns ({"results": [flat summaries], "total": N}, was_cached).
     OGC API Records params: limit (page size), startindex (offset in shared helper).
-    Filled by Plan 02.
+    Empty query omits 'q' (empty q -> HTTP 400 live). startindex omitted when 0
+    (startindex=0 returns malformed body live).
     """
-    raise NotImplementedError("Plan 02 implements")
+    # OGC API Records requires limit/startindex, NOT num/start (ArcGIS-REST).
+    # Empty q="" causes HTTP 400 on the live OGC endpoint — omit when blank.
+    params: dict[str, Any] = {"limit": min(max(limit, 1), 100)}
+    if query:
+        params["q"] = query                   # omit q when blank (empty q -> 400)
+    if offset and offset > 0:
+        params["startindex"] = offset         # 1-based; omit when 0 (startindex=0 invalid)
+    if category:
+        params["categories"] = category
+
+    cache_key = f"{CACHE_KEY_PREFIX}search:{query}:{category}:{limit}:{offset}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        raw = await _hub_get(params)
+        features = raw.get("features", [])
+        total = raw.get("numberMatched", len(features))
+        return {
+            "results": [_flatten_hub_feature(f) for f in features],
+            "total": total,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_SEARCH, _fetch)
 
 
 async def fetch_dataset_details(
@@ -175,10 +231,72 @@ async def fetch_dataset_details(
 ) -> tuple[dict[str, Any], bool]:
     """Fetch full metadata for a Saskatchewan GeoHub item by ID.
 
-    Returns ({"details": {feature_server_url, download_urls, metadata}}, was_cached).
-    Filled by Plan 02.
+    GETs /collections/all/items/{id}; returns
+    ({"details": {feature_server_url, download_urls, metadata}}, was_cached).
+    Raises ValueError if no item found.
     """
-    raise NotImplementedError("Plan 02 implements")
+    cache_key = f"{CACHE_KEY_PREFIX}details:{dataset_id}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        item_url = f"{HUB_SEARCH_URL}/{dataset_id}"
+        result = await api_get(
+            item_url,
+            {},
+            headers={"User-Agent": USER_AGENT},
+        )
+        if isinstance(result, dict) and "properties" in result:
+            # Single-item response shape (Hub item endpoint)
+            raw = result
+        elif isinstance(result, dict) and "features" in result:
+            # Search-response shape — pick first matching feature
+            features = result.get("features", [])
+            if not features:
+                raise ValueError(f"Dataset not found: {dataset_id}")
+            raw = features[0]
+        elif not isinstance(result, dict):
+            raise httpx.HTTPStatusError(
+                f"Hub returned non-dict for item {dataset_id}",
+                request=httpx.Request("GET", item_url),
+                response=httpx.Response(500),
+            )
+        else:
+            raise ValueError(f"Dataset not found: {dataset_id}")
+
+        props = raw.get("properties") or {}
+        svc_url = props.get("url", "")
+        # Detect FeatureServer URL
+        feature_server_url: str | None = (
+            svc_url if _is_feature_server_url(svc_url) else None
+        )
+        # Download URLs: parseable file extensions
+        download_urls: list[str] = []
+        links_raw = (result.get("links") or []) if isinstance(result, dict) else []
+        for link in links_raw:
+            href = link.get("href", "")
+            if href and _is_parseable_url(href):
+                download_urls.append(href)
+
+        details = {
+            "id": raw.get("id", dataset_id),
+            "title": props.get("title", ""),
+            "snippet": props.get("snippet"),
+            "description": props.get("description"),
+            "type": props.get("type"),
+            "owner": props.get("owner"),
+            "url": svc_url,
+            "feature_server_url": feature_server_url,
+            "download_urls": download_urls,
+            "tags": props.get("tags") or [],
+            "categories": props.get("categories") or [],
+            "modified": props.get("modified"),
+            "num_views": props.get("numViews"),
+            "access": props.get("access"),
+            "licence_info": props.get("licenseInfo"),
+        }
+        return {"details": details}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 async def fetch_query_dataset(
@@ -191,11 +309,72 @@ async def fetch_query_dataset(
 ) -> tuple[dict[str, Any], bool]:
     """Query a Saskatchewan FeatureServer or auto-route to fetch_and_parse for file resources.
 
-    Routing: FeatureServer URL → arcgis_hub.query_feature_service;
-    CSV/JSON/GeoJSON/XLSX extension → fetch_and_parse; other → metadata-only.
-    Filled by Plan 02.
+    Routing:
+      - URL contains /FeatureServer → arcgis_hub.query_feature_service
+      - URL has CSV/JSON/GeoJSON/XLSX/XLS extension → fetch_and_parse
+      - otherwise (PDF, ZIP, KML, WMS, …) → metadata-only response with 'note'
     """
-    raise NotImplementedError("Plan 02 implements")
+    url = feature_server_url
+    cache_key = (
+        f"{CACHE_KEY_PREFIX}query:{url}:{layer_id}:{where}:"
+        f"{out_fields}:{max_records}:{include_geometry}"
+    )
+
+    # FeatureServer branch
+    if _is_feature_server_url(url):
+        # Split trailing layer index if present (e.g. .../FeatureServer/0)
+        base = url
+        detected_layer = layer_id
+        clean = url.rstrip("/")
+        parts = clean.rsplit("/FeatureServer", 1)
+        if len(parts) == 2:
+            tail = parts[1].strip("/")
+            base = parts[0] + "/FeatureServer"
+            if tail:
+                try:
+                    detected_layer = int(tail.split("/")[0])
+                except ValueError:
+                    pass
+
+        async def _fetch_fs() -> dict[str, Any]:
+            await _hub_limiter.acquire()
+            rows, truncated = await arcgis_hub.query_feature_service(
+                base,
+                detected_layer,
+                where=where,
+                out_fields=out_fields,
+                include_geometry=include_geometry,
+                max_records=max_records,
+            )
+            return {"data": rows, "url": url, "rows": len(rows), "truncated": truncated}
+
+        return await cached_fetch(cache_key, CACHE_TTL_META, _fetch_fs)
+
+    # Parseable file branch
+    if _is_parseable_url(url):
+        async def _fetch_file() -> dict[str, Any]:
+            rows, _cached = await fetch_and_parse(url, ttl=CACHE_TTL_META)
+            truncated = len(rows) > max_records
+            return {
+                "data": rows[:max_records],
+                "url": url,
+                "rows": min(len(rows), max_records),
+                "truncated": truncated,
+            }
+
+        return await cached_fetch(cache_key, CACHE_TTL_META, _fetch_file)
+
+    # Metadata-only fallback (PDF, ZIP, KML, WMS, etc.)
+    return (
+        {
+            "url": url,
+            "note": (
+                "binary/archive resource — use URL directly or call "
+                "saskatchewan_search_datasets to find a machine-readable format"
+            ),
+        },
+        False,
+    )
 
 
 async def fetch_organizations(
@@ -205,9 +384,22 @@ async def fetch_organizations(
 
     Returns ({"organizations": [name, ...]}, was_cached).
     Derives unique owner names from Hub Search results.
-    Filled by Plan 02.
     """
-    raise NotImplementedError("Plan 02 implements")
+    cache_key = f"{CACHE_KEY_PREFIX}orgs:all"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        # OGC API Records: use limit (not num/start); omit q (empty q -> 400)
+        raw = await _hub_get({"limit": min(num, 100)})
+        features = raw.get("features", [])
+        owners: set[str] = set()
+        for f in features:
+            owner = (f.get("properties") or {}).get("owner")
+            if owner:
+                owners.add(owner)
+        return {"organizations": sorted(owners)}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 async def fetch_categories(
@@ -216,9 +408,21 @@ async def fetch_categories(
 
     Returns ({"categories": ["/Categories/Environment", ...]}, was_cached).
     Derives unique category strings from Hub Search results.
-    Filled by Plan 02.
     """
-    raise NotImplementedError("Plan 02 implements")
+    cache_key = f"{CACHE_KEY_PREFIX}categories:all"
+
+    async def _fetch() -> dict[str, Any]:
+        await _hub_limiter.acquire()
+        # OGC API Records: use limit (not num/start); omit q (empty q -> 400)
+        raw = await _hub_get({"limit": 100})
+        features = raw.get("features", [])
+        all_cats: set[str] = set()
+        for f in features:
+            cats = (f.get("properties") or {}).get("categories") or []
+            all_cats.update(cats)
+        return {"categories": sorted(all_cats)}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 # ---------------------------------------------------------------------------

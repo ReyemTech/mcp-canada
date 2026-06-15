@@ -621,12 +621,68 @@ async def fetch_health_facilities(
     county: str | None = None,
     limit: int = MAX_RECORDS,
 ) -> tuple[dict[str, Any], bool]:
-    """Hospital or LTC facilities dispatched by facility_type. Filled by Plan 05.
+    """Hospital or LTC/RCF facilities dispatched by facility_type.
 
-    facility_type: "hospital" → DS_HOSPITALS (tmfr-3h8a)
+    facility_type: "hospital"       → DS_HOSPITALS (tmfr-3h8a)
                    "long_term_care" → DS_LTC_RCF_FACILITIES (x76a-axw2)
+
+    Both datasets are normalized to a common flat facility shape:
+    facility_name, address, town, county, type, zone, beds,
+    x_coordinate, y_coordinate, facility_category.
+
+    facility_category is set to the requested facility_type so callers
+    can distinguish hospital vs LTC rows in mixed results.
+
+    Raises:
+        ValueError: If facility_type is not "hospital" or "long_term_care".
     """
-    raise NotImplementedError("Plan 05 implements")
+    _VALID_FACILITY_TYPES = {"hospital", "long_term_care"}
+    if facility_type not in _VALID_FACILITY_TYPES:
+        raise ValueError(
+            f"Invalid facility_type '{facility_type}'. Must be one of: {sorted(_VALID_FACILITY_TYPES)}"
+        )
+
+    if facility_type == "hospital":
+        dataset_id = DS_HOSPITALS
+        # Hospitals: facility_name, address, town, county, type, x_coordinate, y_coordinate
+        # (zone and beds not available in hospital dataset)
+        select = "facility_name,address,town,county,type,x_coordinate,y_coordinate"
+    else:
+        dataset_id = DS_LTC_RCF_FACILITIES
+        # LTC: facility_name, address, town, county, zone, nursing_homes_nh_no_of_beds→beds,
+        #       x_coordinate, y_coordinate
+        select = "facility_name,address,town,county,zone,nursing_homes_nh_no_of_beds,x_coordinate,y_coordinate"
+
+    where = f"county='{county}'" if county else None
+    cache_key = f"{CACHE_KEY_PREFIX}health_facilities:{facility_type}:{county or 'all'}:{limit}"
+
+    async def fetcher() -> dict[str, Any]:
+        rows = await _soql(
+            dataset_id,
+            where=where,
+            select=select,
+            order="county ASC",
+            limit=limit,
+        )
+        # Normalize rows to the common facility shape
+        normalized: list[dict[str, Any]] = []
+        for row in rows:
+            facility: dict[str, Any] = {
+                "facility_name": row.get("facility_name"),
+                "address": row.get("address"),
+                "town": row.get("town"),
+                "county": row.get("county"),
+                "type": row.get("type"),
+                "zone": row.get("zone"),  # None for hospitals
+                "beds": row.get("nursing_homes_nh_no_of_beds"),  # None for hospitals
+                "x_coordinate": row.get("x_coordinate"),
+                "y_coordinate": row.get("y_coordinate"),
+                "facility_category": facility_type,
+            }
+            normalized.append(facility)
+        return {"facilities": normalized, "count": len(normalized), "truncated": len(normalized) >= limit}
+
+    return await cached_fetch(cache_key, CACHE_TTL_ANNUAL, fetcher)
 
 
 async def fetch_vital_statistics(
@@ -634,8 +690,40 @@ async def fetch_vital_statistics(
     year: str | None = None,
     limit: int = MAX_RECORDS,
 ) -> tuple[dict[str, Any], bool]:
-    """Annual vital statistics by county (r794-fttm). Filled by Plan 05."""
-    raise NotImplementedError("Plan 05 implements")
+    """Annual vital statistics by county (r794-fttm).
+
+    IMPORTANT (Pitfall 3 + 4 from 20-RESEARCH.md):
+    - year column is TEXT — use quoted string comparison: year='2020' NOT year=2020.
+    - county names in the dataset are UPPERCASE (e.g., 'ANNAPOLIS', 'HALIFAX').
+
+    Returns statistics with fields: counties, year, population, live_births,
+    birth_rate, deaths, death_rate, excess_of_births_over_deaths, natural_increase_rate.
+    """
+    where_parts: list[str] = []
+    if county:
+        # Pitfall 4: county names are UPPERCASE in the dataset
+        where_parts.append(f"counties='{county}'")
+    if year:
+        # Pitfall 3: year is TEXT column — must use quoted string comparison
+        where_parts.append(f"year='{year}'")
+    where = " AND ".join(where_parts) or None
+
+    cache_key = f"{CACHE_KEY_PREFIX}vital_statistics:{county or 'all'}:{year or 'all'}:{limit}"
+
+    async def fetcher() -> dict[str, Any]:
+        rows = await _soql(
+            DS_BIRTHS_DEATHS,
+            where=where,
+            select=(
+                "counties,year,population,live_births,birth_rate,"
+                "deaths,death_rate,excess_of_births_over_deaths,natural_increase_rate"
+            ),
+            order="year DESC",
+            limit=limit,
+        )
+        return {"statistics": rows, "count": len(rows), "truncated": len(rows) >= limit}
+
+    return await cached_fetch(cache_key, CACHE_TTL_ANNUAL, fetcher)
 
 
 async def fetch_chronic_disease(
@@ -645,10 +733,52 @@ async def fetch_chronic_disease(
     year: str | None = None,
     limit: int = MAX_RECORDS,
 ) -> tuple[dict[str, Any], bool]:
-    """Chronic disease prevalence dispatched by disease type. Filled by Plan 05.
+    """Chronic disease prevalence dispatched by disease type.
 
-    dispatch dict: CHRONIC_DISEASE_DATASETS[disease] → dataset ID.
-    Normalizes health_zone→zone (AMI) and agegroup→age_group (diabetes/COPD).
-    Skips sex filter for AMI (no sex field in that dataset).
+    Dispatches via CHRONIC_DISEASE_DATASETS[disease] → dataset ID.
+    Applies _normalize_zone_field to every returned row (health_zone→zone,
+    agegroup→age_group per CHRONIC_DISEASE_ZONE_FIELD / CHRONIC_DISEASE_AGE_FIELD maps).
+    Injects 'disease' key into every row.
+    Skips sex filter for AMI (CHRONIC_DISEASE_HAS_SEX['ami'] is False).
+
+    Raises:
+        ValueError: If disease is not a key in CHRONIC_DISEASE_DATASETS.
     """
-    raise NotImplementedError("Plan 05 implements")
+    if disease not in CHRONIC_DISEASE_DATASETS:
+        raise ValueError(
+            f"Invalid disease '{disease}'. Must be one of: {sorted(CHRONIC_DISEASE_DATASETS)}"
+        )
+
+    dataset_id = CHRONIC_DISEASE_DATASETS[disease]
+    # Source zone field name (health_zone for AMI, zone for others)
+    zone_source_field = CHRONIC_DISEASE_ZONE_FIELD.get(disease, "zone")
+    has_sex = CHRONIC_DISEASE_HAS_SEX.get(disease, True)
+
+    where_parts: list[str] = []
+    if health_zone:
+        # Filter on the SOURCE field name (before normalization)
+        where_parts.append(f"{zone_source_field}='{health_zone}'")
+    if sex and has_sex:
+        # Skip sex filter for AMI (no sex field in the dataset)
+        where_parts.append(f"sex='{sex}'")
+    if year:
+        where_parts.append(f"year='{year}'")
+    where = " AND ".join(where_parts) or None
+
+    cache_key = (
+        f"{CACHE_KEY_PREFIX}chronic_disease:{disease}:"
+        f"{health_zone or 'all'}:{sex or 'all'}:{year or 'all'}:{limit}"
+    )
+
+    async def fetcher() -> dict[str, Any]:
+        rows = await _soql(
+            dataset_id,
+            where=where,
+            order="year ASC",
+            limit=limit,
+        )
+        # Normalize zone/age_group fields and inject disease key
+        normalized = [_normalize_zone_field(row, disease=disease) for row in rows]
+        return {"rows": normalized, "count": len(normalized), "truncated": len(normalized) >= limit}
+
+    return await cached_fetch(cache_key, CACHE_TTL_ANNUAL, fetcher)

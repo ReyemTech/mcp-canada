@@ -1463,32 +1463,529 @@ class TestNsGetAirQualityStations:
 
 
 class TestNsGetHealthFacilities:
-    """fetch_health_facilities dispatches to DS_HOSPITALS or DS_LTC_RCF_FACILITIES. Plan 05 fills."""
+    """fetch_health_facilities dispatches to DS_HOSPITALS or DS_LTC_RCF_FACILITIES."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_hospital_queries_ds_hospitals(self) -> None:
+        """facility_type='hospital' passes DS_HOSPITALS ('tmfr-3h8a') to socrata.query_dataset."""
+        from .conftest import SAMPLE_HOSPITALS_ROWS
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_HOSPITALS_ROWS)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            data, was_cached = await fetch_health_facilities(facility_type="hospital")
+
+            call_args = mock_socrata.query_dataset.call_args[0]
+            assert "tmfr-3h8a" in call_args
+            assert "facilities" in data
+            assert data["count"] == len(SAMPLE_HOSPITALS_ROWS)
+            assert was_cached is False
+
+    @pytest.mark.asyncio
+    async def test_ltc_queries_ds_ltc_rcf_facilities(self) -> None:
+        """facility_type='long_term_care' passes DS_LTC_RCF_FACILITIES ('x76a-axw2') to socrata.query_dataset."""
+        from .conftest import SAMPLE_LTC_ROWS
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_LTC_ROWS)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            data, was_cached = await fetch_health_facilities(facility_type="long_term_care")
+
+            call_args = mock_socrata.query_dataset.call_args[0]
+            assert "x76a-axw2" in call_args
+            assert "facilities" in data
+            assert data["count"] == len(SAMPLE_LTC_ROWS)
+            assert was_cached is False
+
+    @pytest.mark.asyncio
+    async def test_invalid_facility_type_raises_value_error(self) -> None:
+        """Invalid facility_type raises ValueError (secondary guard; tool double-guards)."""
+        from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+        with pytest.raises(ValueError):
+            await fetch_health_facilities(facility_type="clinic")
+
+    @pytest.mark.asyncio
+    async def test_hospital_rows_have_common_keys(self) -> None:
+        """Hospital rows include facility_name, county, facility_category."""
+        from .conftest import SAMPLE_HOSPITALS_ROWS
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_HOSPITALS_ROWS)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            data, _ = await fetch_health_facilities(facility_type="hospital")
+
+            for row in data["facilities"]:
+                assert "facility_name" in row, f"facility_name missing from hospital row: {row}"
+                assert "county" in row, f"county missing from hospital row: {row}"
+                assert "facility_category" in row, f"facility_category missing from hospital row: {row}"
+                assert row["facility_category"] == "hospital"
+
+    @pytest.mark.asyncio
+    async def test_ltc_rows_have_common_keys(self) -> None:
+        """LTC rows include facility_name, county, facility_category."""
+        from .conftest import SAMPLE_LTC_ROWS
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_LTC_ROWS)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            data, _ = await fetch_health_facilities(facility_type="long_term_care")
+
+            for row in data["facilities"]:
+                assert "facility_name" in row
+                assert "county" in row
+                assert "facility_category" in row
+                assert row["facility_category"] == "long_term_care"
+
+    @pytest.mark.asyncio
+    async def test_county_filter_builds_where_clause(self) -> None:
+        """county filter builds $where with county='...'."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            await fetch_health_facilities(facility_type="hospital", county="Halifax")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            where = call_kwargs.get("where", "") or ""
+            assert "Halifax" in where
+
+    @pytest.mark.asyncio
+    async def test_no_county_filter_where_is_none(self) -> None:
+        """Without county filter, where is None."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            await fetch_health_facilities(facility_type="hospital")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("where") is None
+
+    @pytest.mark.asyncio
+    async def test_truncated_true_when_rows_equals_limit(self) -> None:
+        """truncated=True when len(facilities) >= limit."""
+        rows = [{"facility_name": f"Hosp {i}", "county": "Halifax", "type": "Community"} for i in range(3)]
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=rows)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            data, _ = await fetch_health_facilities(facility_type="hospital", limit=3)
+
+            assert data["truncated"] is True
 
 
 class TestNsGetVitalStatistics:
-    """fetch_vital_statistics filters by county/year; county names are UPPERCASE in dataset. Plan 05 fills."""
+    """fetch_vital_statistics filters by county/year; county names are UPPERCASE in dataset."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_statistics_count_truncated(self) -> None:
+        """Returns statistics list with count and truncated flag."""
+        from .conftest import SAMPLE_VITAL_STATS_ROWS
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_VITAL_STATS_ROWS)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_vital_statistics
+
+            data, was_cached = await fetch_vital_statistics()
+
+            assert "statistics" in data
+            assert data["count"] == len(SAMPLE_VITAL_STATS_ROWS)
+            assert data["truncated"] is False
+            assert was_cached is False
+
+    @pytest.mark.asyncio
+    async def test_year_filter_uses_string_comparison(self) -> None:
+        """year filter uses quoted string: $where=year='2020' (Pitfall 3 — year is TEXT column)."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_vital_statistics
+
+            await fetch_vital_statistics(year="2020")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            where = call_kwargs.get("where", "") or ""
+            assert "year='2020'" in where, f"Expected year='2020' in where, got: {where!r}"
+
+    @pytest.mark.asyncio
+    async def test_county_filter_builds_where(self) -> None:
+        """county filter produces $where=counties='ANNAPOLIS'."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_vital_statistics
+
+            await fetch_vital_statistics(county="ANNAPOLIS")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            where = call_kwargs.get("where", "") or ""
+            assert "ANNAPOLIS" in where
+
+    @pytest.mark.asyncio
+    async def test_combined_filters_joined_with_and(self) -> None:
+        """year + county filters joined with AND."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_vital_statistics
+
+            await fetch_vital_statistics(county="HALIFAX", year="2019")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            where = call_kwargs.get("where", "") or ""
+            assert "HALIFAX" in where
+            assert "year='2019'" in where
+            assert "AND" in where
+
+    @pytest.mark.asyncio
+    async def test_no_filters_where_is_none(self) -> None:
+        """Without filters, where is None."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_vital_statistics
+
+            await fetch_vital_statistics()
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("where") is None
+
+    @pytest.mark.asyncio
+    async def test_order_is_year_desc(self) -> None:
+        """Default order is 'year DESC'."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_vital_statistics
+
+            await fetch_vital_statistics()
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("order") == "year DESC"
+
+    @pytest.mark.asyncio
+    async def test_passes_correct_dataset_id(self) -> None:
+        """Passes DS_BIRTHS_DEATHS ('r794-fttm') to socrata.query_dataset."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_vital_statistics
+
+            await fetch_vital_statistics()
+
+            call_args = mock_socrata.query_dataset.call_args[0]
+            assert "r794-fttm" in call_args
+
+    @pytest.mark.asyncio
+    async def test_select_contains_expected_fields(self) -> None:
+        """$select contains counties, year, population, live_births, deaths."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_vital_statistics
+
+            await fetch_vital_statistics()
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            select = call_kwargs.get("select", "") or ""
+            for field in ["counties", "year", "population", "live_births", "deaths"]:
+                assert field in select, f"{field} must be in $select"
 
 
 class TestNsGetChronicDiseasePrevalence:
-    """fetch_chronic_disease dispatches by disease; normalizes zone/age_group/sex. Plan 05 fills."""
+    """fetch_chronic_disease dispatches by disease; normalizes zone/age_group/sex."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_ami_queries_correct_dataset(self) -> None:
+        """disease='ami' queries dataset '24qf-ntke'."""
+        from .conftest import SAMPLE_CHRONIC_DISEASE_ROWS_AMI
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_CHRONIC_DISEASE_ROWS_AMI)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_chronic_disease
+
+            data, was_cached = await fetch_chronic_disease(disease="ami")
+
+            call_args = mock_socrata.query_dataset.call_args[0]
+            assert "24qf-ntke" in call_args
+            assert "rows" in data
+            assert was_cached is False
+
+    @pytest.mark.asyncio
+    async def test_diabetes_queries_correct_dataset(self) -> None:
+        """disease='diabetes' queries dataset 'cumi-sw99'."""
+        from .conftest import SAMPLE_CHRONIC_DISEASE_ROWS_DIABETES
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_CHRONIC_DISEASE_ROWS_DIABETES)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_chronic_disease
+
+            data, _ = await fetch_chronic_disease(disease="diabetes")
+
+            call_args = mock_socrata.query_dataset.call_args[0]
+            assert "cumi-sw99" in call_args
+
+    @pytest.mark.asyncio
+    async def test_invalid_disease_raises_value_error(self) -> None:
+        """Invalid disease raises ValueError."""
+        from mcp_canada.modules.nova_scotia.client import fetch_chronic_disease
+
+        with pytest.raises(ValueError):
+            await fetch_chronic_disease(disease="flu")
+
+    @pytest.mark.asyncio
+    async def test_ami_rows_normalized_health_zone_to_zone(self) -> None:
+        """AMI rows: health_zone renamed to zone; zone key present in output."""
+        from .conftest import SAMPLE_CHRONIC_DISEASE_ROWS_AMI
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_CHRONIC_DISEASE_ROWS_AMI)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_chronic_disease
+
+            data, _ = await fetch_chronic_disease(disease="ami")
+
+            for row in data["rows"]:
+                assert "zone" in row, f"zone must be present after normalization, got keys: {list(row.keys())}"
+                assert "health_zone" not in row, "health_zone must be renamed to zone"
+
+    @pytest.mark.asyncio
+    async def test_diabetes_rows_normalized_agegroup_to_age_group(self) -> None:
+        """Diabetes rows: agegroup renamed to age_group; zone key unchanged."""
+        from .conftest import SAMPLE_CHRONIC_DISEASE_ROWS_DIABETES
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_CHRONIC_DISEASE_ROWS_DIABETES)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_chronic_disease
+
+            data, _ = await fetch_chronic_disease(disease="diabetes")
+
+            for row in data["rows"]:
+                assert "zone" in row, f"zone must be present in diabetes rows, keys: {list(row.keys())}"
+                assert "age_group" in row, f"age_group must be normalized from agegroup"
+                assert "agegroup" not in row, "agegroup must be renamed to age_group"
+
+    @pytest.mark.asyncio
+    async def test_each_row_has_disease_key(self) -> None:
+        """Every returned row has a 'disease' key matching the requested disease."""
+        from .conftest import SAMPLE_CHRONIC_DISEASE_ROWS_AMI
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_CHRONIC_DISEASE_ROWS_AMI)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_chronic_disease
+
+            data, _ = await fetch_chronic_disease(disease="ami")
+
+            for row in data["rows"]:
+                assert row.get("disease") == "ami"
+
+    @pytest.mark.asyncio
+    async def test_sex_filter_skipped_for_ami(self) -> None:
+        """sex filter NOT included in $where for AMI (no sex field in AMI dataset)."""
+        from .conftest import SAMPLE_CHRONIC_DISEASE_ROWS_AMI
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_CHRONIC_DISEASE_ROWS_AMI)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_chronic_disease
+
+            await fetch_chronic_disease(disease="ami", sex="F")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            where = call_kwargs.get("where", "") or ""
+            # sex='F' must NOT be in the where clause for AMI
+            assert "sex=" not in where, f"sex filter must be skipped for AMI, where was: {where!r}"
+
+    @pytest.mark.asyncio
+    async def test_sex_filter_applied_for_diabetes(self) -> None:
+        """sex='F' filter IS applied in $where for diabetes (which has a sex field)."""
+        from .conftest import SAMPLE_CHRONIC_DISEASE_ROWS_DIABETES
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_CHRONIC_DISEASE_ROWS_DIABETES)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_chronic_disease
+
+            await fetch_chronic_disease(disease="diabetes", sex="F")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            where = call_kwargs.get("where", "") or ""
+            assert "sex='F'" in where, f"sex filter must be in where for diabetes, got: {where!r}"
+
+    @pytest.mark.asyncio
+    async def test_year_filter_applied_as_string(self) -> None:
+        """year filter uses string comparison: year='2018'."""
+        from .conftest import SAMPLE_CHRONIC_DISEASE_ROWS_AMI
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_CHRONIC_DISEASE_ROWS_AMI)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_chronic_disease
+
+            await fetch_chronic_disease(disease="ami", year="2018")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            where = call_kwargs.get("where", "") or ""
+            assert "year='2018'" in where, f"year='2018' must be in where, got: {where!r}"
+
+    @pytest.mark.asyncio
+    async def test_health_zone_filter_applied_on_source_field(self) -> None:
+        """health_zone filter uses source field name (health_zone for AMI, zone for others)."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_chronic_disease
+
+            await fetch_chronic_disease(disease="ami", health_zone="Zone 1 - Western")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            where = call_kwargs.get("where", "") or ""
+            # For AMI, health_zone is the source field name
+            assert "Zone 1 - Western" in where
+
+    @pytest.mark.asyncio
+    async def test_hypertension_rows_pass_through_non_standard_fields(self) -> None:
+        """Hypertension rows: hypertension_count and prevalence_rate pass through intact."""
+        from .conftest import SAMPLE_CHRONIC_DISEASE_ROWS_HYPERTENSION
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_CHRONIC_DISEASE_ROWS_HYPERTENSION)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_chronic_disease
+
+            data, _ = await fetch_chronic_disease(disease="hypertension")
+
+            for row in data["rows"]:
+                assert "hypertension_count" in row
+                assert "prevalence_rate" in row
+                assert row.get("disease") == "hypertension"
+
+    @pytest.mark.asyncio
+    async def test_order_is_year_asc(self) -> None:
+        """Default order for chronic disease is 'year ASC'."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_chronic_disease
+
+            await fetch_chronic_disease(disease="asthma")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("order") == "year ASC"
+
+    @pytest.mark.asyncio
+    async def test_returns_count_and_truncated(self) -> None:
+        """Returns rows, count, truncated in response."""
+        from .conftest import SAMPLE_CHRONIC_DISEASE_ROWS_AMI
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_CHRONIC_DISEASE_ROWS_AMI)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_chronic_disease
+
+            data, _ = await fetch_chronic_disease(disease="ami")
+
+            assert "rows" in data
+            assert "count" in data
+            assert "truncated" in data
+            assert data["count"] == len(SAMPLE_CHRONIC_DISEASE_ROWS_AMI)
 
 
 class TestNormalizeZoneField:
-    """_normalize_zone_field normalizes health_zone→zone and agegroup→age_group. Plan 05 fills.
+    """_normalize_zone_field normalizes health_zone→zone and agegroup→age_group."""
 
-    Must test all 5 disease normalization cases:
-    - ami: health_zone → zone; no sex field preserved
-    - diabetes: agegroup → age_group; zone unchanged
-    - copd: agegroup → age_group; zone unchanged
-    - hypertension: zone unchanged; age_group unchanged; hypertension_count/prevalence_rate passed through
-    - asthma: zone unchanged; age_group unchanged
-    """
+    def test_ami_health_zone_renamed_to_zone(self) -> None:
+        """AMI row: health_zone key renamed to zone."""
+        from mcp_canada.modules.nova_scotia.client import _normalize_zone_field
 
-    pass
+        row = {"health_zone": "Zone 1 - Western", "age_group": "50 to 69", "prevalence": "1847"}
+        result = _normalize_zone_field(row, disease="ami")
+
+        assert "zone" in result
+        assert result["zone"] == "Zone 1 - Western"
+        assert "health_zone" not in result
+
+    def test_diabetes_agegroup_renamed_to_age_group(self) -> None:
+        """Diabetes row: agegroup key renamed to age_group; zone unchanged."""
+        from mcp_canada.modules.nova_scotia.client import _normalize_zone_field
+
+        row = {"zone": "Zone 4 - Central", "agegroup": "20 to 29", "sex": "F", "prevalence": "223"}
+        result = _normalize_zone_field(row, disease="diabetes")
+
+        assert "age_group" in result
+        assert result["age_group"] == "20 to 29"
+        assert "agegroup" not in result
+        assert result["zone"] == "Zone 4 - Central"
+
+    def test_copd_agegroup_renamed_to_age_group(self) -> None:
+        """COPD row: agegroup renamed to age_group."""
+        from mcp_canada.modules.nova_scotia.client import _normalize_zone_field
+
+        row = {"zone": "Zone 2 - Northern", "agegroup": "30 to 49"}
+        result = _normalize_zone_field(row, disease="copd")
+
+        assert "age_group" in result
+        assert "agegroup" not in result
+
+    def test_hypertension_zone_and_age_group_unchanged(self) -> None:
+        """Hypertension row: zone and age_group are already standard names; pass through intact."""
+        from mcp_canada.modules.nova_scotia.client import _normalize_zone_field
+
+        row = {"zone": "Zone 4 - Central", "age_group": "20 to 29", "hypertension_count": "367", "prevalence_rate": "1.22"}
+        result = _normalize_zone_field(row, disease="hypertension")
+
+        assert result["zone"] == "Zone 4 - Central"
+        assert result["age_group"] == "20 to 29"
+        assert result["hypertension_count"] == "367"
+        assert result["prevalence_rate"] == "1.22"
+
+    def test_asthma_zone_and_age_group_unchanged(self) -> None:
+        """Asthma row: zone and age_group already standard; pass through."""
+        from mcp_canada.modules.nova_scotia.client import _normalize_zone_field
+
+        row = {"zone": "Zone 3 - Eastern", "age_group": "18 to 30", "sex": "M"}
+        result = _normalize_zone_field(row, disease="asthma")
+
+        assert result["zone"] == "Zone 3 - Eastern"
+        assert result["age_group"] == "18 to 30"
+        assert "agegroup" not in result
+        assert "health_zone" not in result
+
+    def test_disease_key_injected(self) -> None:
+        """_normalize_zone_field always injects the disease key into the result."""
+        from mcp_canada.modules.nova_scotia.client import _normalize_zone_field
+
+        row = {"zone": "Zone 1 - Western"}
+        result = _normalize_zone_field(row, disease="asthma")
+
+        assert result["disease"] == "asthma"
+
+    def test_both_ami_and_diabetes_end_up_with_zone_key(self) -> None:
+        """Both AMI (health_zone) and diabetes (zone) rows end with 'zone' key after normalization."""
+        from mcp_canada.modules.nova_scotia.client import _normalize_zone_field
+
+        ami_row = {"health_zone": "Zone 1 - Western", "age_group": "50 to 69"}
+        diabetes_row = {"zone": "Zone 4 - Central", "agegroup": "20 to 29"}
+
+        ami_normalized = _normalize_zone_field(ami_row, disease="ami")
+        diabetes_normalized = _normalize_zone_field(diabetes_row, disease="diabetes")
+
+        assert "zone" in ami_normalized
+        assert "zone" in diabetes_normalized

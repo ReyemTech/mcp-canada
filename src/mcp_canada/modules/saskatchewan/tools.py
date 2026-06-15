@@ -23,11 +23,14 @@ from mcp_canada.shared.envelope import make_error, make_response
 
 from . import client as _client
 from .constants import (
+    AIR_QUALITY_FS_URL,
+    FIRE_BAN_LAYERS,
     GRAIN_ELEVATORS_FS_URL,
     HUB_BASE_URL,
     HUB_ORG_BASE,
     HUB_SEARCH_URL,
     MINERAL_MINES_FS_URLS,
+    WILDFIRE_BOUNDARIES_FS_URL,
 )
 
 # Source identifier for the _meta envelope (all discovery tools)
@@ -44,6 +47,10 @@ __all__ = [
     "saskatchewan_get_crop_yields",
     "saskatchewan_get_grain_elevators",
     "saskatchewan_get_mineral_mines",
+    # Environment (Plan 04)
+    "saskatchewan_get_fire_bans",
+    "saskatchewan_get_historic_wildfires",
+    "saskatchewan_get_air_quality",
 ]
 
 
@@ -407,6 +414,143 @@ async def saskatchewan_get_mineral_mines(
         payload,
         api_name=_API_NAME_HUB,
         api_url=f"{fs_url}/0",
+        cached=cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Environment (Plan 04)
+# ---------------------------------------------------------------------------
+
+_API_NAME_SPSA = "saskatchewan-spsa-firebans"
+_BAN_SCOPES = tuple(FIRE_BAN_LAYERS.keys())  # ("urban", "rural", "provincial", "parks")
+
+
+@tool
+async def saskatchewan_get_fire_bans(
+    ban_scope: Literal["urban", "rural", "provincial", "parks"] = "urban",
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get current Saskatchewan fire ban status by scope from the SPSA Public Fire Ban FeatureServer.
+
+    Use for: Checking active fire bans in Saskatchewan by municipality type or jurisdiction. Dispatches ban_scope to SPSA layers: urban=0, rural=2, provincial=3, parks=8. NOTE: An empty result means NO ACTIVE BANS (normal off-season state) — this is NOT an error. NOTE: SPSA data is on a separate ArcGIS REST server (gis.saskatchewan.ca/egis), not the main Hub.
+
+    Keywords: saskatchewan fire ban SPSA urban rural provincial parks open burning restriction wildfire prevention alert level active municipality
+    """
+    valid = list(_BAN_SCOPES)
+
+    # Double-guard: pre-check enum before calling client (mirrors Alberta ST3 pattern)
+    if ban_scope not in _BAN_SCOPES:
+        msg = (
+            f"Portée invalide: {ban_scope!r}. Valeurs valides: {valid}"
+            if lang == "fr"
+            else f"Invalid ban_scope: {ban_scope!r}. Valid: {valid}"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=valid)
+
+    from .constants import FIRE_BAN_FS_URL
+    try:
+        payload, cached = await _client.fetch_fire_bans(ban_scope=ban_scope)
+    except ValueError as exc:
+        msg = (
+            f"Portée invalide: {exc}"
+            if lang == "fr"
+            else f"Invalid ban_scope: {exc}"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=valid)
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur du serveur SPSA: {exc.response.status_code}"
+            if lang == "fr"
+            else f"SPSA server error: {exc.response.status_code}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur inattendue: {exc}"
+            if lang == "fr"
+            else f"Unexpected error: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    # Empty features is a valid success (no active bans in off-season) — make_response, NOT make_error
+    return make_response(
+        payload,
+        api_name=_API_NAME_SPSA,
+        api_url=f"{FIRE_BAN_FS_URL}/{FIRE_BAN_LAYERS[ban_scope]}",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def saskatchewan_get_historic_wildfires(
+    year: int | None = None,
+    cause: str | None = None,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Saskatchewan historic wildfire boundaries with optional year and cause filters.
+
+    Use for: Researching historical wildfires in Saskatchewan by year or ignition cause. Returns wildfire boundary records with fire name, year, cause (Lightning/Human/Unknown), area in hectares, status, start and out dates. Filters compose: year AND cause when both provided; all records when neither.
+
+    Keywords: saskatchewan historic wildfire boundaries year cause lightning human hectares fire name status crown ground boundaries history
+    """
+    try:
+        payload, cached = await _client.fetch_historic_wildfires(year=year, cause=cause)
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur du géoportail Saskatchewan: {exc.response.status_code}"
+            if lang == "fr"
+            else f"Saskatchewan geoportal error: {exc.response.status_code}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur inattendue: {exc}"
+            if lang == "fr"
+            else f"Unexpected error: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        payload,
+        api_name=_API_NAME_HUB,
+        api_url=f"{WILDFIRE_BOUNDARIES_FS_URL}/0",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def saskatchewan_get_air_quality(
+    community: str | None = None,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get current hourly ambient air quality readings from Saskatchewan monitoring stations.
+
+    Use for: Checking live air quality levels (PM2.5, NO2, O3, SO2, CO, H2S) across Saskatchewan communities. Optional community filter: Regina, Saskatoon, Prince Albert, Estevan, Swift Current, or Buffalo Narrows. NOTE: AQHI field is a weather.gc.ca URL link (not a numeric value). Data refreshes hourly; cached for 15 minutes.
+
+    Keywords: saskatchewan air quality PM2.5 NO2 O3 SO2 CO H2S AQHI Regina Saskatoon live hourly monitoring station ambient pollution environment
+    """
+    try:
+        payload, cached = await _client.fetch_air_quality(community=community)
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur du géoportail Saskatchewan: {exc.response.status_code}"
+            if lang == "fr"
+            else f"Saskatchewan geoportal error: {exc.response.status_code}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur inattendue: {exc}"
+            if lang == "fr"
+            else f"Unexpected error: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        payload,
+        api_name=_API_NAME_HUB,
+        api_url=f"{AIR_QUALITY_FS_URL}/0",
         cached=cached,
         lang=lang,
     )

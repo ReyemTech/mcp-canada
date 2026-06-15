@@ -645,7 +645,133 @@ class TestSaskGetFireBansTool:
     invalid ban_scope → INVALID_INPUT.
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success_with_active_bans(self):
+        """saskatchewan_get_fire_bans returns _meta envelope when bans are active."""
+        import json
+        payload = {
+            "features": [
+                {"UMTYPE": "Urban Municipality", "Municipali": "Arborfield",
+                 "Type": "Ban", "Comment": "Level 1 Fire Ban"},
+            ],
+            "count": 1,
+            "truncated": False,
+            "scope": "urban",
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_fire_bans",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_fire_bans(ban_scope="urban")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "_meta" in data, f"Expected _meta envelope, got keys: {list(data.keys())}"
+        assert "spsa" in data["_meta"]["source"]["api"], (
+            f"Expected api name to contain 'spsa', got: {data['_meta']['source']['api']}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_empty_fire_bans_is_valid_make_response_not_error(self):
+        """CRITICAL: empty features=[] returns make_response (count=0), NOT make_error.
+
+        Off-season with no active bans is a valid state. Tool must NOT convert this to an error.
+        """
+        import json
+        payload = {
+            "features": [],
+            "count": 0,
+            "truncated": False,
+            "scope": "provincial",
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_fire_bans",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_fire_bans(ban_scope="provincial")
+        data = json.loads(result) if isinstance(result, str) else result
+        # Must be a success envelope (_meta), NOT an error envelope
+        assert "_meta" in data, (
+            f"Empty fire bans MUST return make_response with _meta, not an error. Got: {data}"
+        )
+        assert "error" not in data, (
+            f"Empty fire bans must NOT return make_error. Got: {data}"
+        )
+        assert data["data"]["count"] == 0, (
+            f"Expected count=0 for empty bans, got: {data['data'].get('count')}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_invalid_ban_scope_returns_invalid_input(self):
+        """saskatchewan_get_fire_bans returns INVALID_INPUT for unknown ban_scope."""
+        import json
+        result = await tools.saskatchewan_get_fire_bans(ban_scope="forest")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "error" in data, f"Expected error response for unknown ban_scope, got: {data}"
+        assert data["error"]["code"] == "INVALID_INPUT"
+        # valid list must contain the 4 ban scope options
+        valid = data["error"].get("valid", [])
+        assert "urban" in valid, f"Expected 'urban' in valid list, got: {valid}"
+        assert "rural" in valid
+        assert "provincial" in valid
+        assert "parks" in valid
+
+    @pytest.mark.asyncio
+    async def test_invalid_ban_scope_fr_error_message(self):
+        """saskatchewan_get_fire_bans returns French error message when lang='fr'."""
+        import json
+        result = await tools.saskatchewan_get_fire_bans(ban_scope="forest", lang="fr")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "error" in data
+        assert data["error"]["code"] == "INVALID_INPUT"
+
+    @pytest.mark.asyncio
+    async def test_upstream_error_on_http_exception(self):
+        """saskatchewan_get_fire_bans returns UPSTREAM_ERROR on HTTP exception."""
+        import json
+        import httpx
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_fire_bans",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "503",
+                request=httpx.Request("GET", "https://gis.saskatchewan.ca/egis/rest/services"),
+                response=httpx.Response(503),
+            ),
+        ):
+            result = await tools.saskatchewan_get_fire_bans(ban_scope="urban")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "error" in data
+        assert data["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """saskatchewan_get_fire_bans passes lang='fr' through to _meta envelope."""
+        import json
+        payload = {"features": [], "count": 0, "truncated": False, "scope": "urban"}
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_fire_bans",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_fire_bans(ban_scope="urban", lang="fr")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert data["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_all_four_valid_ban_scopes_succeed(self):
+        """All 4 valid ban_scope values (urban/rural/provincial/parks) return _meta envelope."""
+        import json
+        for scope in ("urban", "rural", "provincial", "parks"):
+            payload = {"features": [], "count": 0, "truncated": False, "scope": scope}
+            with patch(
+                "mcp_canada.modules.saskatchewan.tools._client.fetch_fire_bans",
+                new_callable=AsyncMock,
+                return_value=(payload, False),
+            ):
+                result = await tools.saskatchewan_get_fire_bans(ban_scope=scope)
+            data = json.loads(result) if isinstance(result, str) else result
+            assert "_meta" in data, f"Expected _meta for ban_scope={scope!r}, got: {data}"
 
 
 class TestSaskGetHistoricWildfiresTool:
@@ -654,16 +780,234 @@ class TestSaskGetHistoricWildfiresTool:
     Plan 04 fills.
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """saskatchewan_get_historic_wildfires returns _meta envelope on success."""
+        import json
+        payload = {
+            "features": [
+                {"YEAR": 2017, "FIRENAME": "PORCUPINE LAKE FIRE",
+                 "CAUSE1": "Lightning", "HECTARES": 12450.5, "STATUS": "Out"}
+            ],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_historic_wildfires",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_historic_wildfires()
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "_meta" in data, f"Expected _meta envelope, got keys: {list(data.keys())}"
+        assert data["_meta"]["source"]["api"] == "saskatchewan-geohub"
+
+    @pytest.mark.asyncio
+    async def test_year_filter_passed_to_client(self):
+        """saskatchewan_get_historic_wildfires passes year= to client function."""
+        import json
+        payload = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_historic_wildfires",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ) as mock_client:
+            await tools.saskatchewan_get_historic_wildfires(year=2017)
+        mock_client.assert_called_once()
+        call_kwargs = mock_client.call_args[1]
+        assert call_kwargs.get("year") == 2017, (
+            f"Expected year=2017 passed to client, got: {call_kwargs}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_cause_filter_passed_to_client(self):
+        """saskatchewan_get_historic_wildfires passes cause= to client function."""
+        import json
+        payload = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_historic_wildfires",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ) as mock_client:
+            await tools.saskatchewan_get_historic_wildfires(cause="Lightning")
+        mock_client.assert_called_once()
+        call_kwargs = mock_client.call_args[1]
+        assert call_kwargs.get("cause") == "Lightning", (
+            f"Expected cause='Lightning' passed to client, got: {call_kwargs}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_data_contains_features(self):
+        """saskatchewan_get_historic_wildfires wraps payload under data key."""
+        import json
+        payload = {
+            "features": [{"YEAR": 2017, "FIRENAME": "PORCUPINE LAKE FIRE"}],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_historic_wildfires",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_historic_wildfires(year=2017)
+        data = json.loads(result) if isinstance(result, str) else result
+        assert data["data"]["features"][0]["FIRENAME"] == "PORCUPINE LAKE FIRE"
+
+    @pytest.mark.asyncio
+    async def test_upstream_error_on_http_exception(self):
+        """saskatchewan_get_historic_wildfires returns UPSTREAM_ERROR on HTTP exception."""
+        import json
+        import httpx
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_historic_wildfires",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "503",
+                request=httpx.Request("GET", "https://services3.arcgis.com/"),
+                response=httpx.Response(503),
+            ),
+        ):
+            result = await tools.saskatchewan_get_historic_wildfires()
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "error" in data
+        assert data["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """saskatchewan_get_historic_wildfires passes lang='fr' through to _meta envelope."""
+        import json
+        payload = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_historic_wildfires",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_historic_wildfires(lang="fr")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert data["_meta"]["lang"] == "fr"
 
 
 class TestSaskGetAirQualityTool:
     """saskatchewan_get_air_quality tool tests.
 
-    Plan 04 fills: invalid community → INVALID_INPUT with valid=AIR_QUALITY_COMMUNITIES.
+    Plan 04 fills.
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """saskatchewan_get_air_quality returns _meta envelope on success."""
+        import json
+        payload = {
+            "features": [
+                {"COMMUNITY": "Regina", "STATIONID": "SK_REGINA_01",
+                 "PM2_5": 7.2, "NO2": 12.5, "O3": 31.0,
+                 "AQHI": "https://weather.gc.ca/airquality/pages/sk-1_metric_e.html",
+                 "DATETIME": "2026-06-15T14:00:00"},
+            ],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_air_quality",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_air_quality()
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "_meta" in data, f"Expected _meta envelope, got keys: {list(data.keys())}"
+        assert data["_meta"]["source"]["api"] == "saskatchewan-geohub"
+
+    @pytest.mark.asyncio
+    async def test_community_filter_passed_to_client(self):
+        """saskatchewan_get_air_quality passes community= to client function."""
+        import json
+        payload = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_air_quality",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ) as mock_client:
+            await tools.saskatchewan_get_air_quality(community="Regina")
+        mock_client.assert_called_once()
+        call_kwargs = mock_client.call_args[1]
+        assert call_kwargs.get("community") == "Regina", (
+            f"Expected community='Regina' passed to client, got: {call_kwargs}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_aqhi_field_present_in_response_data(self):
+        """saskatchewan_get_air_quality response includes AQHI field (weather.gc.ca URL)."""
+        import json
+        payload = {
+            "features": [
+                {"COMMUNITY": "Saskatoon",
+                 "AQHI": "https://weather.gc.ca/airquality/pages/sk-2_metric_e.html",
+                 "PM2_5": 5.8},
+            ],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_air_quality",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_air_quality(community="Saskatoon")
+        data = json.loads(result) if isinstance(result, str) else result
+        first = data["data"]["features"][0]
+        assert "AQHI" in first, f"Expected AQHI in feature, got: {list(first.keys())}"
+        assert "weather.gc.ca" in first["AQHI"]
+
+    @pytest.mark.asyncio
+    async def test_upstream_error_on_http_exception(self):
+        """saskatchewan_get_air_quality returns UPSTREAM_ERROR on HTTP exception."""
+        import json
+        import httpx
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_air_quality",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "503",
+                request=httpx.Request("GET", "https://services3.arcgis.com/"),
+                response=httpx.Response(503),
+            ),
+        ):
+            result = await tools.saskatchewan_get_air_quality()
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "error" in data
+        assert data["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """saskatchewan_get_air_quality passes lang='fr' through to _meta envelope."""
+        import json
+        payload = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_air_quality",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_air_quality(lang="fr")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert data["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_no_community_calls_client_with_none(self):
+        """saskatchewan_get_air_quality with no community passes community=None to client."""
+        import json
+        payload = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_air_quality",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ) as mock_client:
+            await tools.saskatchewan_get_air_quality()
+        mock_client.assert_called_once()
+        call_kwargs = mock_client.call_args[1]
+        assert call_kwargs.get("community") is None, (
+            f"Expected community=None when not provided, got: {call_kwargs}"
+        )
 
 
 # ---------------------------------------------------------------------------

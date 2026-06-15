@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 20-nova-scotia-government-open-data
 source: [20-01-SUMMARY.md, 20-02-SUMMARY.md, 20-03-SUMMARY.md, 20-04-SUMMARY.md, 20-05-SUMMARY.md, 20-06-SUMMARY.md, 20-07-SUMMARY.md]
 started: 2026-06-15T00:00:00Z
@@ -78,7 +78,18 @@ skipped: 0
   reason: "User reported: ns_get_health_facilities returns HTTP 400 for BOTH valid facility types live. The shared $select uses normalized field names but the hospital dataset (tmfr-3h8a) uses raw column 'facility' + the_geom (no x/y), and the LTC dataset (x76a-axw2) has no county/type columns. The single shared $select references non-existent columns on each dataset → 400. Mocked unit tests + integration tests passed because the mock/fixture used the normalized shape, not the real raw Socrata schema."
   severity: major
   test: 7
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "fetch_health_facilities dispatches to two datasets with incompatible raw schemas but builds ONE set of SoQL params from normalized field names that exist on neither raw dataset → 400 before normalization runs. Hospital tmfr-3h8a raw cols: facility/address/town/county/type/the_geom (no facility_name, no x/y). LTC x76a-axw2 raw cols: facility_name/address/town/postal_code/facility_type/zone/x_coordinate/y_coordinate (HAS zone, but NO county, NO type). The shared $select/$order='county ASC'/county= filter all reference non-existent columns. Per-dataset SoQL → both 200 (live-confirmed 2026-06-15). TESTS MISSED IT for two reasons: (1) conftest fixtures use post-normalization shape so the wrong $select was never validated; (2) the live integration scenarios treat error.code=='UPSTREAM_ERROR' as an acceptable pass and return early — swallowing the 400. Same mock-vs-real class as Manitoba Phase 18."
+  artifacts:
+    - path: "src/mcp_canada/modules/nova_scotia/client.py"
+      issue: "fetch_health_facilities uses one shared $select/$order/county-filter for two incompatible raw schemas"
+    - path: "src/mcp_canada/modules/nova_scotia/__tests__/conftest.py"
+      issue: "SAMPLE_HOSPITALS_ROWS / SAMPLE_LTC_ROWS use post-normalization shape, not the real raw Socrata schema"
+    - path: "tests/integration/test_tool_scenarios.py"
+      issue: "NS health-facility scenarios treat UPSTREAM_ERROR as a pass and return early, swallowing the live 400"
+  missing:
+    - "constants.py: per-dataset HOSPITAL_SELECT/HOSPITAL_ORDER and LTC_SELECT/LTC_ORDER (LTC orders by town, not county)"
+    - "client.py: branch select/order/county-filter per facility_type; skip county filter for LTC; normalize AFTER fetch (hospital facility→facility_name + derive x/y from the_geom.coordinates then strip the_geom; LTC facility_type→type, county=None, beds from nursing_homes_nh_no_of_beds; coerce coord/beds strings to numbers)"
+    - "conftest.py: replace both fixtures with REAL RAW schemas for both datasets"
+    - "test_client.py: add TestNsGetHealthFacilities asserting per-dataset $select/$order/filter + raw→normalized mapping (fails RED today)"
+    - "integration test: remove the UPSTREAM_ERROR early-out for both NS health scenarios so a live 400 fails the suite"
+  debug_session: ".planning/debug/ns-health-facilities-400.md"

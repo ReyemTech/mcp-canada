@@ -1279,21 +1279,170 @@ class TestSaskGetWSAReservoirsTool:
 # Cross-cutting: envelope + lang parameter (Plan 07)
 # ---------------------------------------------------------------------------
 
+# (tool_name, client_fn_attribute_on_client, sample_kwargs, sample_client_return)
+#
+# Count: 5 discovery + 3 agriculture+mining + 3 environment + 2 water = 14
+ALL_SASKATCHEWAN_TOOLS: list[tuple[str, str, dict, tuple]] = [
+    # Discovery (Plan 02) — 5
+    (
+        "saskatchewan_search_datasets",
+        "fetch_search_datasets",
+        {"query": "crops"},
+        ({"results": [], "total": 0}, False),
+    ),
+    (
+        "saskatchewan_get_dataset_details",
+        "fetch_dataset_details",
+        {"dataset_id": "abc123"},
+        ({"details": {"id": "abc123", "title": "X", "feature_server_url": None, "download_urls": []}}, False),
+    ),
+    (
+        "saskatchewan_query_dataset",
+        "fetch_query_dataset",
+        {"dataset_id": "https://services3.arcgis.com/zcv98lgAl8xQ04cW/arcgis/rest/services/Crop/FeatureServer"},
+        ({"data": [], "url": "https://example.com/FeatureServer", "rows": 0, "truncated": False}, False),
+    ),
+    (
+        "saskatchewan_list_organizations",
+        "fetch_organizations",
+        {},
+        ({"organizations": []}, False),
+    ),
+    (
+        "saskatchewan_list_categories",
+        "fetch_categories",
+        {},
+        ({"categories": []}, False),
+    ),
+    # Agriculture + Mining (Plan 03) — 3
+    (
+        "saskatchewan_get_crop_yields",
+        "fetch_crop_yields",
+        {"region": "provincial"},
+        ({"features": [], "count": 0, "truncated": False, "region": "provincial"}, False),
+    ),
+    (
+        "saskatchewan_get_grain_elevators",
+        "fetch_grain_elevators",
+        {},
+        ({"features": [], "count": 0, "truncated": False}, False),
+    ),
+    (
+        "saskatchewan_get_mineral_mines",
+        "fetch_mineral_mines",
+        {"mineral": "potash"},
+        ({"features": [], "count": 0, "truncated": False, "mineral": "potash"}, False),
+    ),
+    # Environment (Plan 04) — 3
+    (
+        "saskatchewan_get_fire_bans",
+        "fetch_fire_bans",
+        {"ban_scope": "urban"},
+        ({"features": [], "count": 0, "truncated": False, "scope": "urban"}, False),
+    ),
+    (
+        "saskatchewan_get_historic_wildfires",
+        "fetch_historic_wildfires",
+        {},
+        ({"features": [], "count": 0, "truncated": False}, False),
+    ),
+    (
+        "saskatchewan_get_air_quality",
+        "fetch_air_quality",
+        {},
+        ({"features": [], "count": 0, "truncated": False}, False),
+    ),
+    # Water / WSA (Plan 05) — 2
+    (
+        "saskatchewan_get_wsa_stations",
+        "fetch_wsa_stations",
+        {},
+        ({"features": [], "count": 0, "truncated": False}, False),
+    ),
+    (
+        "saskatchewan_get_wsa_reservoirs",
+        "fetch_wsa_reservoirs",
+        {},
+        ({"features": [], "count": 0, "truncated": False}, False),
+    ),
+]
+
+# Sanity check: exactly 13 tools (5 discovery + 3 agri+mining + 3 environment + 2 water)
+# Note: plan documentation says "14 tools" but __all__ in tools.py has 13 entries.
+# Cross-checked against 19-05-SUMMARY.md table: 5+3+3+2=13. All 13 in this list.
+assert len(ALL_SASKATCHEWAN_TOOLS) == 13, (
+    f"ALL_SASKATCHEWAN_TOOLS must have 13 entries (matching __all__ in tools.py), "
+    f"got {len(ALL_SASKATCHEWAN_TOOLS)}"
+)
+
 
 class TestSaskEnvelopes:
-    """Parametrized: all 14 tools return _meta envelope on success.
+    """Parametrized: all 13 saskatchewan_ tools return _meta envelope on success (Plan 07).
 
-    Plan 07 fills: parametrize over ALL_SASKATCHEWAN_TOOLS list; mock client layer;
-    assert "_meta" in result and result["_meta"]["source"]["api"] expected.
+    Mirrors Alberta Plan 09 pattern. Each tool is called with a mocked client function
+    that returns an empty-but-valid payload. Asserts the full _meta envelope shape:
+    source.api, source.url, cached, lang, timestamp keys all present.
     """
 
-    pass
+    @pytest.mark.parametrize(
+        ("tool_name", "client_fn", "kwargs", "client_return"),
+        ALL_SASKATCHEWAN_TOOLS,
+        ids=[t[0] for t in ALL_SASKATCHEWAN_TOOLS],
+    )
+    @pytest.mark.asyncio
+    async def test_envelope_structure(
+        self, tool_name: str, client_fn: str, kwargs: dict, client_return: tuple
+    ):
+        """Every tool returns _meta with {source.api, source.url, cached, lang, timestamp}."""
+        import json
+
+        tool_fn = getattr(tools, tool_name)
+        with patch(
+            f"mcp_canada.modules.saskatchewan.tools._client.{client_fn}",
+            new_callable=AsyncMock,
+            return_value=client_return,
+        ):
+            result = await tool_fn(**kwargs, lang="en")
+
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "_meta" in data, f"{tool_name} missing _meta envelope"
+        meta = data["_meta"]
+        for key in ("source", "cached", "lang", "timestamp"):
+            assert key in meta, f"{tool_name} _meta missing '{key}'"
+        assert "api" in meta["source"], f"{tool_name} _meta.source missing 'api'"
+        assert "url" in meta["source"], f"{tool_name} _meta.source missing 'url'"
+        assert meta["lang"] == "en", (
+            f"{tool_name} should default _meta.lang to 'en', got {meta['lang']!r}"
+        )
 
 
 class TestSaskLangParam:
-    """Parametrized: all 14 tools accept lang='fr' and pass through to envelope.
+    """Parametrized: all 13 tools accept lang='fr' and pass through to _meta.lang (Plan 07).
 
-    Plan 07 fills: parametrize over ALL_SASKATCHEWAN_TOOLS; assert _meta.lang == 'fr'.
+    Mirrors Alberta Plan 09 pattern. Every tool must propagate lang='fr' to _meta.lang.
     """
 
-    pass
+    @pytest.mark.parametrize(
+        ("tool_name", "client_fn", "kwargs", "client_return"),
+        ALL_SASKATCHEWAN_TOOLS,
+        ids=[t[0] for t in ALL_SASKATCHEWAN_TOOLS],
+    )
+    @pytest.mark.asyncio
+    async def test_lang_propagation(
+        self, tool_name: str, client_fn: str, kwargs: dict, client_return: tuple
+    ):
+        """Every tool propagates lang='fr' to the _meta.lang field on success."""
+        import json
+
+        tool_fn = getattr(tools, tool_name)
+        with patch(
+            f"mcp_canada.modules.saskatchewan.tools._client.{client_fn}",
+            new_callable=AsyncMock,
+            return_value=client_return,
+        ):
+            result = await tool_fn(**kwargs, lang="fr")
+
+        data = json.loads(result) if isinstance(result, str) else result
+        assert data.get("_meta", {}).get("lang") == "fr", (
+            f"{tool_name} did not propagate lang='fr' to _meta.lang — got {data.get('_meta')}"
+        )

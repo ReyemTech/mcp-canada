@@ -877,3 +877,149 @@ class TestManitobaPromptsResources:
         assert "{" in content and "}" in content, (
             "template://manitoba/flood-report must contain {placeholder} syntax for agents"
         )
+
+
+class TestSaskatchewanPromptsResources:
+    """Integration tests for Saskatchewan prompts (6) and resources (7).
+
+    Verifies discovery via list_prompts() / list_resources() and content via read_resource()
+    through the full MCP Client layer (FileSystemProvider auto-discovery).
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_six_prompts_discoverable(self, mcp_server):
+        """Saskatchewan's 6 prompts (3 guided + 3 quick lookups) appear in prompts/list."""
+        prompts = await list_prompts(mcp_server)
+        names = {p.name for p in prompts}
+        expected = [
+            "saskatchewan_explore_agriculture",
+            "saskatchewan_explore_environment",
+            "saskatchewan_explore_water",
+            "saskatchewan_quick_dataset_search",
+            "saskatchewan_fire_ban_status_now",
+            "saskatchewan_crop_yield_lookup",
+        ]
+        for prompt_name in expected:
+            assert prompt_name in names, (
+                f"Missing Saskatchewan prompt: {prompt_name}. "
+                f"saskatchewan_ prompts found: "
+                f"{sorted(n for n in names if n.startswith('saskatchewan_'))}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_seven_resources_discoverable(self, mcp_server):
+        """Saskatchewan's 7 resources (3 data:// + 2 docs:// + 2 template://) appear in list."""
+        resources = await list_resources(mcp_server)
+        uris = {str(r.uri) for r in resources}
+        expected_uris = [
+            "data://saskatchewan/crop-regions",
+            "data://saskatchewan/major-basins",
+            "data://saskatchewan/health-regions",
+            "docs://saskatchewan/portal-guide",
+            "docs://saskatchewan/agriculture-data-guide",
+            "template://saskatchewan/dataset-report",
+            "template://saskatchewan/wildfire-report",
+        ]
+        for uri in expected_uris:
+            assert uri in uris, (
+                f"Missing Saskatchewan resource URI: {uri}. "
+                f"saskatchewan/ URIs found: {sorted(u for u in uris if '/saskatchewan/' in u)}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_crop_regions_resource_returns_valid_json(self, mcp_server):
+        """data://saskatchewan/crop-regions returns JSON with 5 SK crop reporting regions."""
+        content = await read_resource(mcp_server, "data://saskatchewan/crop-regions")
+        assert content, "data://saskatchewan/crop-regions returned empty content"
+        parsed = json.loads(content)
+        assert isinstance(parsed, dict)
+        # Should contain 5 regions: southeast, southwest, central, northeast, northwest
+        raw = json.dumps(parsed)
+        assert "southeast" in raw.lower() or "Southeast" in raw, (
+            "crop-regions must include Southeast region"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_major_basins_resource_returns_valid_json(self, mcp_server):
+        """data://saskatchewan/major-basins returns JSON with SK river basin entries."""
+        content = await read_resource(mcp_server, "data://saskatchewan/major-basins")
+        assert content, "data://saskatchewan/major-basins returned empty content"
+        parsed = json.loads(content)
+        raw = json.dumps(parsed)
+        # Should contain major SK basins like Saskatchewan River
+        assert "Saskatchewan" in raw or "saskatchewan" in raw.lower(), (
+            "major-basins must reference Saskatchewan River basin"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_health_regions_resource_returns_valid_json(self, mcp_server):
+        """data://saskatchewan/health-regions returns JSON with SHA (2017 merged authority)."""
+        content = await read_resource(mcp_server, "data://saskatchewan/health-regions")
+        assert content, "data://saskatchewan/health-regions returned empty content"
+        parsed = json.loads(content)
+        raw = json.dumps(parsed)
+        # Saskatchewan merged to single SHA in 2017
+        assert "SHA" in raw or "Saskatchewan Health Authority" in raw, (
+            "health-regions must reference the Saskatchewan Health Authority (SHA)"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_portal_guide_documents_multi_org(self, mcp_server):
+        """docs://saskatchewan/portal-guide must document all 3 portal servers (Hub + WSA + SPSA)."""
+        content = await read_resource(mcp_server, "docs://saskatchewan/portal-guide")
+        assert content, "docs://saskatchewan/portal-guide returned empty content"
+        assert "#" in content, "portal-guide must be markdown with headings"
+        # Must document the two ArcGIS Hub org IDs
+        assert "zcv98lgAl8xQ04cW" in content, (
+            "portal-guide must document the primary Hub org ID (zcv98lgAl8xQ04cW)"
+        )
+        assert "7MBdlVpjqbfBhQer" in content, (
+            "portal-guide must document the WSA org ID (7MBdlVpjqbfBhQer)"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_agriculture_data_guide_is_markdown(self, mcp_server):
+        """docs://saskatchewan/agriculture-data-guide returns markdown about crop yields."""
+        content = await read_resource(mcp_server, "docs://saskatchewan/agriculture-data-guide")
+        assert content, "docs://saskatchewan/agriculture-data-guide returned empty content"
+        assert "#" in content, "agriculture-data-guide must be markdown with headings"
+        # Must document crop yields tool
+        assert "crop" in content.lower() or "Crop" in content, (
+            "agriculture-data-guide must document crop yield data"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_dataset_report_template_has_placeholders(self, mcp_server):
+        """template://saskatchewan/dataset-report returns markdown with {placeholder} syntax."""
+        content = await read_resource(mcp_server, "template://saskatchewan/dataset-report")
+        assert content, "template://saskatchewan/dataset-report returned empty content"
+        assert "{" in content and "}" in content, (
+            "template://saskatchewan/dataset-report must contain {placeholder} syntax"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_wildfire_report_template_has_placeholders(self, mcp_server):
+        """template://saskatchewan/wildfire-report returns markdown with {placeholder} syntax."""
+        content = await read_resource(mcp_server, "template://saskatchewan/wildfire-report")
+        assert content, "template://saskatchewan/wildfire-report returned empty content"
+        assert "{" in content and "}" in content, (
+            "template://saskatchewan/wildfire-report must contain {placeholder} syntax"
+        )

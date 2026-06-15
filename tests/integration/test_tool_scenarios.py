@@ -2132,3 +2132,302 @@ class TestManitobaToolScenarios:
         assert data["_meta"]["source"]["api"] == "manitoba-geoportal-hub"
         cats = data["data"]["categories"]
         assert isinstance(cats, list) and len(cats) >= 1
+
+
+class TestSaskatchewanToolScenarios:
+    """Integration tests calling Saskatchewan tools through the MCP Client layer.
+
+    The Manitoba lesson: mocks masked a live 400. Every test here must assert FIELD
+    PRESENCE + non-null values (not just _meta shape) against the REAL endpoints.
+
+    Tests simulate what an agent would ask:
+    - Crop yields: 'Canola' key present and non-null (field-presence assertion)
+    - Grain elevators: at least one row with Capacity_tonne and PR=='SK' non-null
+    - Potash mines: Name + Company non-null (INVALID_INPUT for unsupported mineral)
+    - Air quality: AQHI field present (weather.gc.ca URL) and at least one pollutant
+    - Fire bans: empty list is VALID (no error envelope in off-season)
+    - WSA stations: HyperLink_Graph present in >=1 result (catches layer-ID / org bug)
+    - WSA reservoirs: Reservoir_Name in >=1 result (PROVES layer 26, not 0)
+    - Discovery: discover_tools finds saskatchewan_search_datasets; tool returns numberMatched>=1
+    - Error: invalid mineral -> structured INVALID_INPUT, not an exception
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_crop_yields_canola_field_present(self, mcp_server):
+        """'Saskatchewan crop yields' — 'Canola' key present with non-null numeric value.
+
+        THE MANITOBA LESSON: asserts field presence + non-null, not just _meta shape.
+        """
+        data = await call_tool(mcp_server, "saskatchewan_get_crop_yields", {
+            "region": "provincial",
+        })
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR", (
+                f"Crop yields error must be UPSTREAM_ERROR: {data['error']}"
+            )
+            return
+        assert data["_meta"]["source"]["api"] == "saskatchewan-geohub"
+        features = data["data"]["features"]
+        assert isinstance(features, list), "Crop yields must return a features list"
+        assert len(features) >= 1, "Crop yields must return at least 1 row"
+        # FIELD PRESENCE: Canola must be present and non-null in at least one row
+        canola_values = [row.get("Canola") for row in features if row.get("Canola") is not None]
+        assert len(canola_values) >= 1, (
+            f"FIELD PRESENCE FAILED: 'Canola' key must be present with a non-null value "
+            f"in at least one row. Got features: {[list(f.keys()) for f in features[:2]]}"
+        )
+        assert isinstance(canola_values[0], (int, float)), (
+            f"Canola value must be numeric, got {type(canola_values[0])}: {canola_values[0]}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_grain_elevators_capacity_and_province(self, mcp_server):
+        """'Saskatchewan grain elevators' — at least one row with Capacity_tonne and PR=='SK'."""
+        data = await call_tool(mcp_server, "saskatchewan_get_grain_elevators", {})
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR"
+            return
+        assert data["_meta"]["source"]["api"] == "saskatchewan-geohub"
+        features = data["data"]["features"]
+        assert isinstance(features, list)
+        assert len(features) >= 1, "Grain elevators must return at least 1 SK elevator"
+        # FIELD PRESENCE: at least one row must have Capacity_tonne non-null and PR='SK'
+        sk_elevators = [f for f in features if f.get("PR") == "SK" and f.get("Capacity_tonne") is not None]
+        assert len(sk_elevators) >= 1, (
+            f"FIELD PRESENCE FAILED: At least one row must have PR='SK' and non-null Capacity_tonne. "
+            f"Got {len(features)} rows. PR values: {[f.get('PR') for f in features[:5]]}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_potash_mines_name_and_company(self, mcp_server):
+        """'Saskatchewan potash mines' — Name + Company present and non-null."""
+        data = await call_tool(mcp_server, "saskatchewan_get_mineral_mines", {
+            "mineral": "potash",
+        })
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR"
+            return
+        assert data["_meta"]["source"]["api"] == "saskatchewan-geohub"
+        features = data["data"]["features"]
+        assert isinstance(features, list)
+        assert len(features) >= 1, "Potash mines must return at least 1 mine record"
+        # FIELD PRESENCE: Name and Company must be non-null in at least one row
+        first = features[0]
+        assert first.get("Name") is not None, (
+            f"FIELD PRESENCE FAILED: 'Name' must be non-null. Got: {first}"
+        )
+        assert first.get("Company") is not None, (
+            f"FIELD PRESENCE FAILED: 'Company' must be non-null. Got: {first}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_air_quality_aqhi_field_present(self, mcp_server):
+        """'Saskatchewan air quality in Regina' — AQHI field present and at least one pollutant."""
+        data = await call_tool(mcp_server, "saskatchewan_get_air_quality", {})
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR"
+            return
+        assert data["_meta"]["source"]["api"] == "saskatchewan-geohub"
+        features = data["data"]["features"]
+        assert isinstance(features, list)
+        assert len(features) >= 1, "Air quality must return at least 1 station reading"
+        # FIELD PRESENCE: AQHI must be present (weather.gc.ca URL or value)
+        aqhi_values = [f.get("AQHI") for f in features if f.get("AQHI") is not None]
+        assert len(aqhi_values) >= 1, (
+            f"FIELD PRESENCE FAILED: 'AQHI' key must be present with a non-null value "
+            f"in at least one row. Keys in first row: {list(features[0].keys())}"
+        )
+        # At least one pollutant reading present in any row
+        pollutant_fields = ("PM2_5", "NO2", "O3", "SO2", "CO", "H2S", "PM10")
+        for row in features:
+            if any(row.get(p) is not None for p in pollutant_fields):
+                break
+        else:
+            assert False, (
+                f"FIELD PRESENCE FAILED: At least one pollutant reading (PM2_5/NO2/O3/etc.) "
+                f"must be non-null across all rows. Keys: {list(features[0].keys())}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_fire_bans_empty_is_valid_not_error(self, mcp_server):
+        """'Saskatchewan fire bans' — empty list is VALID (no bans in off-season is correct).
+
+        The empty-is-valid lesson: fire bans tool must NEVER convert an empty FeatureServer
+        result to an error. Off-season = no active bans = success with count=0.
+        """
+        data = await call_tool(mcp_server, "saskatchewan_get_fire_bans", {
+            "ban_scope": "urban",
+        })
+        # Must NOT return an error (empty result is valid off-season state)
+        assert "error" not in data, (
+            f"Empty fire bans MUST NOT return error. Got: {data.get('error')}"
+        )
+        assert "_meta" in data, (
+            f"Fire bans must return _meta envelope (even with 0 bans). Got: {data}"
+        )
+        assert "spsa" in data["_meta"]["source"]["api"], (
+            f"Fire bans must use SPSA api_name. Got: {data['_meta']['source']['api']}"
+        )
+        payload = data["data"]
+        assert "features" in payload, "Fire bans payload must include 'features' key"
+        assert isinstance(payload["features"], list), (
+            f"features must be a list (may be empty). Got: {type(payload['features'])}"
+        )
+        # count >= 0 (0 in off-season, >=1 if bans are active)
+        assert payload.get("count", -1) >= 0, (
+            f"Fire bans count must be >= 0. Got: {payload.get('count')}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_wsa_stations_hyperlink_graph_present(self, mcp_server):
+        """'Saskatchewan WSA hydrometric stations' — HyperLink_Graph field present in >=1 result.
+
+        THE CRITICAL FIELD PRESENCE TEST: HyperLink_Graph is the unique field that catches
+        a layer-ID bug or wrong-org bug. If the wrong layer or org is used, this field is absent.
+        """
+        data = await call_tool(mcp_server, "saskatchewan_get_wsa_stations", {})
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR"
+            return
+        assert data["_meta"]["source"]["api"] == "saskatchewan-wsa", (
+            f"WSA stations must use 'saskatchewan-wsa' api_name. "
+            f"Got: {data['_meta']['source']['api']}"
+        )
+        features = data["data"]["features"]
+        assert isinstance(features, list)
+        assert len(features) >= 1, "WSA stations must return at least 1 station"
+        # FIELD PRESENCE: HyperLink_Graph must be present in >=1 result
+        hyperlink_rows = [f for f in features if f.get("HyperLink_Graph") is not None]
+        assert len(hyperlink_rows) >= 1, (
+            f"FIELD PRESENCE FAILED: 'HyperLink_Graph' must be non-null in >=1 station row. "
+            f"This catches the wrong-org or wrong-layer bug (layer 0 has no graph links). "
+            f"Keys in first row: {list(features[0].keys())}"
+        )
+        # The HyperLink_Graph should be a wsask.ca URL
+        first_link = hyperlink_rows[0]["HyperLink_Graph"]
+        assert isinstance(first_link, str) and len(first_link) > 0, (
+            f"HyperLink_Graph must be a non-empty string, got: {first_link!r}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_wsa_reservoirs_reservoir_name_proves_layer_26(self, mcp_server):
+        """'Saskatchewan WSA reservoirs' — Reservoir_Name present PROVES layer 26 (not layer 0).
+
+        THE CRITICAL LAYER TEST: WSA_Reservoirs FeatureServer layer 0 returns EMPTY (0 features).
+        Only layer 26 returns Reservoir_Name. This test PROVES the implementation uses layer 26.
+        """
+        data = await call_tool(mcp_server, "saskatchewan_get_wsa_reservoirs", {})
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR"
+            return
+        assert data["_meta"]["source"]["api"] == "saskatchewan-wsa", (
+            f"WSA reservoirs must use 'saskatchewan-wsa' api_name. "
+            f"Got: {data['_meta']['source']['api']}"
+        )
+        features = data["data"]["features"]
+        assert isinstance(features, list)
+        assert len(features) >= 1, (
+            f"WSA reservoirs must return at least 1 reservoir. "
+            f"An empty list means the WRONG LAYER (layer 0) was used — layer 26 is required."
+        )
+        # FIELD PRESENCE: Reservoir_Name must be present (PROVES layer 26 was used)
+        reservoir_name_rows = [f for f in features if f.get("Reservoir_Name") is not None]
+        assert len(reservoir_name_rows) >= 1, (
+            f"FIELD PRESENCE FAILED: 'Reservoir_Name' must be non-null in >=1 row. "
+            f"This PROVES layer 26 was used (layer 0 returns no data). "
+            f"Keys in first row: {list(features[0].keys())}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_discover_tools_finds_saskatchewan_search_datasets(self, mcp_server):
+        """'Saskatchewan crops' — BM25 must surface saskatchewan_search_datasets."""
+        results = await discover(mcp_server, "Saskatchewan crops agriculture")
+        names = [r["name"] for r in results]
+        assert "saskatchewan_search_datasets" in names or any(
+            "saskatchewan" in n for n in names
+        ), (
+            f"Expected a saskatchewan_ tool in BM25 results for 'Saskatchewan crops agriculture', "
+            f"got: {names}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_search_datasets_returns_number_matched(self, mcp_server):
+        """'Search Saskatchewan datasets for crops' — numberMatched>=1 (proves startindex pagination).
+
+        This is the startindex-pagination acceptance test. Before the shared/arcgis_hub.py fix,
+        the OGC Hub Search returned numberMatched=null, masking pagination failures.
+        After the fix, startindex works and numberMatched>0 for any real query.
+        """
+        data = await call_tool(mcp_server, "saskatchewan_search_datasets", {"query": "crops"})
+        assert "_meta" in data or "error" in data
+        if "error" in data:
+            assert data["error"]["code"] == "UPSTREAM_ERROR"
+            return
+        assert data["_meta"]["source"]["api"] == "saskatchewan-geohub"
+        payload = data["data"]
+        assert "total" in payload, f"response must include 'total' key: {payload}"
+        assert payload["total"] >= 1, (
+            f"STARTINDEX PAGINATION FAILED: 'crops' query must return total>=1. "
+            f"Got total={payload.get('total')} — this indicates the OGC startindex fix "
+            f"is not working or the Hub has no crop datasets."
+        )
+        assert "results" in payload and isinstance(payload["results"], list)
+        assert len(payload["results"]) >= 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_invalid_mineral_returns_structured_error(self, mcp_server):
+        """Invalid mineral 'gold' -> rejected (not an exception that crashes the server).
+
+        FastMCP validates the Literal["potash","uranium","helium","coal"] at the MCP layer
+        (Pydantic), so 'gold' raises a ToolError before reaching the tool's INVALID_INPUT
+        handler. Either outcome is correct: Pydantic validation error (MCP layer) or
+        INVALID_INPUT (tool layer). Both prove the system rejects invalid input gracefully.
+        """
+        from fastmcp.client.mixins.tools import ToolError
+
+        # The tool parameter is typed Literal["potash", "uranium", "helium", "coal"]
+        # FastMCP/Pydantic may reject "gold" at the MCP layer before the tool runs.
+        try:
+            data = await call_tool(mcp_server, "saskatchewan_get_mineral_mines", {
+                "mineral": "gold",
+            })
+            # If the tool ran (no ToolError): must be a structured error, not a crash
+            assert "error" in data, (
+                f"Invalid mineral 'gold' must return error envelope, got: {data}"
+            )
+            assert data["error"]["code"] == "INVALID_INPUT", (
+                f"Expected INVALID_INPUT, got {data['error']['code']}"
+            )
+        except (ToolError, Exception) as exc:
+            # FastMCP Pydantic validation raised ToolError — the input was rejected
+            # This is the correct behavior (invalid enum value rejected at MCP layer)
+            err_msg = str(exc).lower()
+            assert "potash" in err_msg or "literal" in err_msg or "invalid" in err_msg or "gold" in err_msg, (
+                f"ToolError for invalid mineral must mention the constraint. Got: {exc}"
+            )

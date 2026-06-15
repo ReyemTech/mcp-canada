@@ -243,13 +243,19 @@ Plans:
 
 ### Phase 19: Saskatchewan Government Open Data
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Add Saskatchewan's provincial open data as a new `saskatchewan` module via the geohub.saskatchewan.ca ArcGIS Hub (primary org `zcv98lgAl8xQ04cW`), the separate WSA org (`7MBdlVpjqbfBhQer`), and the SPSA wildfire REST server (`gis.saskatchewan.ca/egis`) — a lean 14 tools (5 Hub discovery + 9 curated) across agriculture (crop yields, grain elevators), energy/mining (potash/uranium/helium/coal), environment (fire bans, historic wildfires, air quality), and water (WSA hydrometric stations, reservoirs), with 6 bilingual prompts + 7 resources. ArcGIS Hub pattern (Manitoba Phase 18 / Alberta Phase 17), NOT CKAN. Wave 0 fixes the shared `arcgis_hub.py` startindex pagination bug (benefits York/Alberta/Manitoba too). Transport (511 key-gated) and Health (no public SHA FeatureServer) are deferred — no NOT_CONFIGURED stubs.
+**Requirements**: SK-01, SK-02, SK-03, SK-04, SK-05, SK-06, SK-07, SK-08, SK-09, SK-10, SK-11, SK-12, SK-13, SK-14, SK-15
 **Depends on:** Phase 18
-**Plans:** 0 plans
+**Plans:** 7 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 19 to break down)
+- [ ] 19-01-PLAN.md — Wave 0: shared/arcgis_hub.py startindex fix + York/Alberta/Manitoba no-regression check + module scaffold (7 files + test scaffolds, constants for 3 bases, ~14 client stubs) + spike (WSA water-quality layer 19 + Petroleum 400)
+- [ ] 19-02-PLAN.md — 5 ArcGIS Hub discovery tools (search/details/query auto-router/orgs/categories) with OGC params (limit/startindex, omit blank q) + TestSharedApiGetContract
+- [ ] 19-03-PLAN.md — Agriculture (crop yields, grain elevators) + Energy/mining (mineral mines dispatch: potash/uranium/helium/coal) — 3 curated tools
+- [ ] 19-04-PLAN.md — Environment (fire bans via SPSA, historic wildfires, air quality) — 3 curated tools
+- [ ] 19-05-PLAN.md — Water/WSA (hydrometric stations, reservoirs layer 26) — 2 curated tools
+- [ ] 19-06-PLAN.md — 6 bilingual prompts + 7 resources (Phase 40 pattern), portal-guide documents multi-org architecture + deferred domains
+- [ ] 19-07-PLAN.md — Parametrized envelope/lang tests + LIVE field-presence integration (Manitoba lesson) + README/MODULES/CLAUDE/EXAMPLES sync + 95% coverage gate
 
 ### Phase 20: Nova Scotia Government Open Data
 

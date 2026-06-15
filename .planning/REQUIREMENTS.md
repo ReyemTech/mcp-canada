@@ -192,6 +192,26 @@ Primary portal is **geoportal.gov.mb.ca** ArcGIS Hub (ArcGIS Online org `mMUesHY
 - **MB-17**: Transport / Manitoba 511 — agent can get road events, winter road conditions, and traffic cameras from Manitoba 511 API v3 (key required). Tools ship with NOT_CONFIGURED behaviour when MANITOBA_511_KEY env var is absent; live integration deferred if key is not freely obtainable (resolved in Wave 0 spike)
 - **MB-18**: All Manitoba tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, manitoba_ prefix), are discoverable via discover_tools, and 6 prompts + 7 resources are auto-discovered by FileSystemProvider
 
+### Saskatchewan Government Open Data
+
+Primary portal is **geohub.saskatchewan.ca** ArcGIS Hub (ArcGIS Online org `zcv98lgAl8xQ04cW`) — NOT a CKAN instance (`data.saskatchewan.ca` does not exist). Water infrastructure is on the separate WSA ArcGIS Hub (org `7MBdlVpjqbfBhQer`); wildfire/fire-ban data is on the SPSA ArcGIS REST server (`gis.saskatchewan.ca/egis`). Follows the Manitoba Phase 18 / Alberta Phase 17 ArcGIS Hub pattern via `shared/arcgis_hub.py`. Module prefix `saskatchewan_`. Transport (Highway Hotline 511) is DEFERRED — key-gated; no NOT_CONFIGURED stubs. Health is DEFERRED — no public SHA facility FeatureServer.
+
+- **SK-01**: Agent can search Saskatchewan's geohub.saskatchewan.ca ArcGIS Hub catalogue by keyword with optional category filter and pagination (Hub Search API `/api/search/v1/collections/all/items`, OGC API Records `limit`/`startindex` params)
+- **SK-02**: Agent can get full details for a Saskatchewan GeoHub dataset by ID, including FeatureServer URL, download links, and metadata (ArcGIS Hub item detail endpoint)
+- **SK-03**: Agent can query a Saskatchewan dataset via auto-router — routes ESRI FeatureServer → arcgis_hub.query_feature_service; CSV/JSON/GeoJSON/XLSX → fetch_and_parse; other → metadata-only (same hybrid router as Alberta Phase 17 / Manitoba Phase 18)
+- **SK-04**: Agent can list Saskatchewan government organizations publishing on the geoportal (ArcGIS Hub organizations endpoint)
+- **SK-05**: Agent can list dataset categories on the Saskatchewan geoportal (ArcGIS Hub tags/categories)
+- **SK-06**: Agent can get estimated crop yields by crop type and region (provincial summary + 5 crop reporting regions: Southeast, Southwest, Central, Northeast, Northwest; 16 crop types incl. Canola, HRSW, Durum, Lentil, Chickpea, Pea) from the `Provincial_Estimated_Crop_Yields` FeatureServers
+- **SK-07**: Agent can get grain elevator locations for Saskatchewan (station, railway, licensee, capacity in tonnes) from the `Western_Canada_Grain_Elevator_2024` FeatureServer with default `where=PR='SK'` and optional railway filter
+- **SK-08**: Agent can get potash mine locations with company, status, mine type, and date opened from the Saskatchewan mineral deposit index `Potash_2024_06_13` FeatureServer
+- **SK-09**: Agent can get mineral mine locations dispatched by mineral type (potash, uranium, helium, coal) from the dated Saskatchewan mineral deposit FeatureServers, returning Name, Company, Status, Mine_Type, DateOpened
+- **SK-10**: Agent can get current live ambient air quality readings (hourly) across Saskatchewan monitoring stations (PM2.5, NO2, O3, SO2, CO, H2S, AQHI link) from the `Hourly_Ambient_Air_Quality` FeatureServer with optional community filter
+- **SK-11**: Agent can get current fire ban status dispatched by ban_scope (urban/rural/provincial/parks → layers 0/2/3/8) from the SPSA `Public_Fire_Ban` FeatureServer (`gis.saskatchewan.ca/egis` — separate REST server, not the Hub); empty result in off-season is valid, not an error
+- **SK-12**: Agent can get historical wildfire boundaries for Saskatchewan with optional year/cause filters (YEAR, FIRENAME, CAUSE1, HECTARES, STATUS) from the `Historic_Wildfire_Boundaries` FeatureServer
+- **SK-13**: Agent can get WSA hydrometric gauging station locations with major basin, station class, operated-by, and HyperLink_Graph URL to live readings from the `Hydrometric_Gauging_Stations_V2` FeatureServer (WSA org `7MBdlVpjqbfBhQer`, `where=Province='SK'`)
+- **SK-14**: Agent can get WSA reservoir locations with reservoir names and dam names from the `WSA_Reservoirs` FeatureServer (WSA org, layer 26 — NOT layer 0)
+- **SK-15**: All Saskatchewan tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, saskatchewan_ prefix), are discoverable via discover_tools, and 6 prompts + 7 resources are auto-discovered by FileSystemProvider
+
 ## v2 Requirements
 
 ### Extended Datastore
@@ -372,6 +392,21 @@ Primary portal is **geoportal.gov.mb.ca** ArcGIS Hub (ArcGIS Online org `mMUesHY
 | MB-16 | Phase 18 | Planned |
 | MB-17 | Phase 18 | Planned |
 | MB-18 | Phase 18 | Planned |
+| SK-01 | Phase 19 | Planned |
+| SK-02 | Phase 19 | Planned |
+| SK-03 | Phase 19 | Planned |
+| SK-04 | Phase 19 | Planned |
+| SK-05 | Phase 19 | Planned |
+| SK-06 | Phase 19 | Planned |
+| SK-07 | Phase 19 | Planned |
+| SK-08 | Phase 19 | Planned |
+| SK-09 | Phase 19 | Planned |
+| SK-10 | Phase 19 | Planned |
+| SK-11 | Phase 19 | Planned |
+| SK-12 | Phase 19 | Planned |
+| SK-13 | Phase 19 | Planned |
+| SK-14 | Phase 19 | Planned |
+| SK-15 | Phase 19 | Planned |
 
 **Coverage:**
 - v1 requirements: 73 total (added 27 Alberta requirements in Phase 17)
@@ -383,8 +418,9 @@ Primary portal is **geoportal.gov.mb.ca** ArcGIS Hub (ArcGIS Online org `mMUesHY
 - Toronto requirements: 12 total (Phase 13)
 - Alberta requirements: 27 total (Phase 17)
 - Manitoba requirements: 18 total (Phase 18)
+- Saskatchewan requirements: 15 total (Phase 19)
 - Prompts & Resources requirements: 20 total (Phase 40)
 
 ---
 *Requirements defined: 2026-04-07*
-*Last updated: 2026-06-13 after Phase 18 planning (added MB-01…MB-18)*
+*Last updated: 2026-06-15 after Phase 19 planning (added SK-01…SK-15)*

@@ -2,7 +2,7 @@
 
 > Canadian government data becomes dramatically more powerful when you can query multiple APIs in a single conversation.
 
-These examples show what happens when an AI agent can reach across **8 federal APIs + a shared datastore** simultaneously — producing insights that no single database can surface alone. Each example is a real prompt you can give your agent today.
+These examples show what happens when an AI agent can reach across **federal + provincial APIs + a shared datastore** simultaneously — producing insights that no single database can surface alone. Each example is a real prompt you can give your agent today.
 
 ---
 
@@ -14,6 +14,7 @@ These examples show what happens when an AI agent can reach across **8 federal A
 - [Food & Nutrition](#food--nutrition)
 - [Developer Patterns](#developer-patterns)
 - [Cross-Module SQL Queries](#cross-module-sql-queries)
+- [Saskatchewan: Prairie Grain Squeeze](#26-the-prairie-grain-squeeze-saskatchewan-crop-yields--elevator-capacity-vs-statcan-agriculture-data)
 
 ---
 
@@ -843,6 +844,44 @@ Step 6: ds_query(sql="
 
 ---
 
+### 26. The Prairie Grain Squeeze: Saskatchewan Crop Yields + Elevator Capacity vs StatCan Agriculture Data
+
+> "Saskatchewan is Canada's breadbasket. Show me how canola and lentil yields correlate with grain elevator capacity — and cross-reference with StatCan's national agriculture production series."
+
+**APIs:** Saskatchewan Government Open Data + Statistics Canada WDS + Local Datastore
+
+```sql
+Step 1: saskatchewan_get_crop_yields(region="provincial")
+        → Provincial estimated yields (bu/acre) for 16 crops: HRSW, Durum, Canola, Lentil, Chickpea...
+
+Step 2: ds_store(table_name="sk_crop_yields", data=<yields_data>)
+        → Persisted to local SQLite: columns region, Canola, HRSW, Lentil, Chickpea, etc.
+
+Step 3: saskatchewan_get_grain_elevators(railway="CN")
+        → CN-served grain elevator stations in SK: Station, Licensee, Capacity_tonne
+
+Step 4: ds_store(table_name="sk_grain_elevators", data=<elevators_data>)
+        → Stored: Station, PR, Railway, Licensee, Elevator_type, Capacity_tonne
+
+Step 5: sc_get_series_observations(vectorIds="v51537015", latestN=5)
+        → StatCan WDS: Canada total canola production (tonnes), last 5 years
+
+Step 6: ds_query(sql="
+          SELECT
+            cy.Canola AS sk_canola_yield_bu_per_acre,
+            cy.Lentil AS sk_lentil_yield_bu_per_acre,
+            (SELECT SUM(ge.Capacity_tonne)
+             FROM sk_grain_elevators ge
+             WHERE ge.PR = 'SK' AND ge.Railway = 'CN') AS cn_elevator_capacity_tonne
+          FROM sk_crop_yields cy
+          WHERE cy.Region = 'Provincial'")
+        → Single row: this year's SK yields side-by-side with CN network storage capacity
+```
+
+**The insight:** Saskatchewan produces roughly 34% of Canada's canola and holds 90% of the world's potash reserves. Grain elevator capacity is a physical bottleneck: when yields spike (drought recovery year), CN/CP elevator throughput constrains export timing. This query — combining the Government of Saskatchewan's FeatureServer crop estimates, the Western Canada Grain Elevator 2024 dataset, and StatCan national production series — surfaces the yield-to-storage ratio that grain traders model internally but no public API exposes directly. Use `data://saskatchewan/crop-regions` for the 5 regional breakdowns and `docs://saskatchewan/agriculture-data-guide` for caveats on the annual crop estimate cycle.
+
+---
+
 ## Key Patterns
 
 Three structural patterns make these examples work:
@@ -864,7 +903,7 @@ uvx mcp-canada
 # Or load specific modules
 uvx mcp-canada --modules bank_of_canada,open_parliament,recalls
 
-# 100 tools. 8 APIs + 1 local datastore. Zero auth tokens. One command.
+# 250 tools. 16 APIs + 1 local datastore. Zero auth tokens. One command.
 ```
 
 Add to Claude Desktop, Claude Code, or any MCP-compatible agent — then try any prompt above.

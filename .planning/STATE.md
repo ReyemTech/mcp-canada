@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 19-05-PLAN.md
-last_updated: "2026-06-15T15:29:48.870Z"
+stopped_at: Completed 19-06-PLAN.md
+last_updated: "2026-06-15T15:40:10.943Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 13
   total_plans: 64
-  completed_plans: 62
+  completed_plans: 63
   percent: 0
 ---
 
@@ -110,6 +110,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 19-saskatchewan-government-open-data P03 | 18min | 2 tasks | 4 files |
 | Phase 19-saskatchewan-government-open-data P04 | 6min | 2 tasks | 4 files |
 | Phase 19-saskatchewan-government-open-data P05 | 3min | 2 tasks | 4 files |
+| Phase 19-saskatchewan-government-open-data P06 | 8min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -273,6 +274,8 @@ Recent decisions affecting current work:
 - [Phase 19-saskatchewan-government-open-data]: Empty fire bans payload explicitly tested as valid success (count=0, _meta envelope) not error — same lesson as Manitoba flood alerts
 - [Phase 19-saskatchewan-government-open-data]: api_name='saskatchewan-wsa' for WSA tools (distinguishes WSA org from Hub in _meta envelope)
 - [Phase 19-saskatchewan-government-open-data]: WSA_RESERVOIRS_LAYER=26 used as constant in client call and api_url; layer 26 pinned via call_args assertion in test
+- [Phase 19-saskatchewan-government-open-data]: Message.content is TextContent (not str) — access via m.content.text in tests (matches Manitoba pattern)
+- [Phase 19-saskatchewan-government-open-data]: Resources are ZERO-parameter — lang param would promote to ResourceTemplate and drop from resources/list; deferred domains (transport key-gated, health no public FeatureServer) surfaced in portal-guide and health-regions data resource
 
 ### Roadmap Evolution
 
@@ -300,6 +303,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-15T15:29:48.866Z
-Stopped at: Completed 19-05-PLAN.md
+Last session: 2026-06-15T15:40:10.938Z
+Stopped at: Completed 19-06-PLAN.md
 Resume file: None

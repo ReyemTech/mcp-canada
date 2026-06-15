@@ -1018,19 +1018,261 @@ class TestSaskGetAirQualityTool:
 class TestSaskGetWSAStationsTool:
     """saskatchewan_get_wsa_stations tool tests.
 
-    Plan 05 fills.
+    Plan 05 fills: _meta envelope; api='saskatchewan-wsa'; lang passthrough;
+    HyperLink_Graph present in response; optional basin= passed to client.
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """saskatchewan_get_wsa_stations returns _meta envelope with api='saskatchewan-wsa'."""
+        import json
+        payload = {
+            "features": [
+                {
+                    "Station_Number": "05MB006",
+                    "Station_Name": "ASSINIBOINE RIVER AT ESTERHAZY",
+                    "Province": "SK",
+                    "Major_Basin": "Assiniboine River",
+                    "Station_Class": "Primary",
+                    "Operated_By": "Water Survey of Canada - SK",
+                    "HyperLink_Graph": "https://www.wsask.ca/hydrographs/05MB006-hrly.html",
+                }
+            ],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_wsa_stations",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_wsa_stations()
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "_meta" in data, f"Expected _meta envelope, got: {list(data.keys())}"
+        assert data["_meta"]["source"]["api"] == "saskatchewan-wsa", (
+            f"Expected api='saskatchewan-wsa', got: {data['_meta']['source']['api']}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_hyperlink_graph_present_in_response_data(self):
+        """saskatchewan_get_wsa_stations response includes HyperLink_Graph URL."""
+        import json
+        payload = {
+            "features": [
+                {
+                    "Station_Number": "05MB006",
+                    "HyperLink_Graph": "https://www.wsask.ca/hydrographs/05MB006-hrly.html",
+                }
+            ],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_wsa_stations",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_wsa_stations()
+        data = json.loads(result) if isinstance(result, str) else result
+        first = data["data"]["features"][0]
+        assert "HyperLink_Graph" in first, (
+            f"Expected HyperLink_Graph in station data, got: {list(first.keys())}"
+        )
+        assert "wsask.ca" in first["HyperLink_Graph"], (
+            f"Expected wsask.ca URL in HyperLink_Graph, got: {first['HyperLink_Graph']}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_basin_filter_passed_to_client(self):
+        """saskatchewan_get_wsa_stations passes basin= to client function."""
+        import json
+        payload = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_wsa_stations",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ) as mock_client:
+            await tools.saskatchewan_get_wsa_stations(basin="Assiniboine")
+        mock_client.assert_called_once()
+        call_kwargs = mock_client.call_args[1]
+        assert call_kwargs.get("basin") == "Assiniboine", (
+            f"Expected basin='Assiniboine' passed to client, got: {call_kwargs}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """saskatchewan_get_wsa_stations passes lang='fr' through to _meta envelope."""
+        import json
+        payload = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_wsa_stations",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_wsa_stations(lang="fr")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert data["_meta"]["lang"] == "fr", (
+            f"Expected lang='fr' in _meta, got: {data['_meta']['lang']}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_upstream_error_on_http_exception(self):
+        """saskatchewan_get_wsa_stations returns UPSTREAM_ERROR on HTTP exception."""
+        import json
+        import httpx
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_wsa_stations",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "503",
+                request=httpx.Request("GET", "https://services1.arcgis.com/7MBdlVpjqbfBhQer"),
+                response=httpx.Response(503),
+            ),
+        ):
+            result = await tools.saskatchewan_get_wsa_stations()
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "error" in data, f"Expected error response, got: {data}"
+        assert data["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_no_basin_calls_client_with_none(self):
+        """saskatchewan_get_wsa_stations with no basin passes basin=None to client."""
+        import json
+        payload = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_wsa_stations",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ) as mock_client:
+            await tools.saskatchewan_get_wsa_stations()
+        mock_client.assert_called_once()
+        call_kwargs = mock_client.call_args[1]
+        assert call_kwargs.get("basin") is None, (
+            f"Expected basin=None when no basin provided, got: {call_kwargs}"
+        )
 
 
 class TestSaskGetWSAReservoirsTool:
     """saskatchewan_get_wsa_reservoirs tool tests.
 
-    Plan 05 fills.
+    Plan 05 fills: _meta envelope; api='saskatchewan-wsa'; lang passthrough;
+    Reservoir_Name + Dam_Name present in response data.
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """saskatchewan_get_wsa_reservoirs returns _meta envelope with api='saskatchewan-wsa'."""
+        import json
+        payload = {
+            "features": [
+                {
+                    "Reservoir_Name": "ADMIRAL RESERVOIR",
+                    "Dam_Name": "ADMIRAL DAM",
+                    "Imagery_Date": "2024-05-15",
+                    "Water_Level_MASL": 671.3,
+                }
+            ],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_wsa_reservoirs",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_wsa_reservoirs()
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "_meta" in data, f"Expected _meta envelope, got: {list(data.keys())}"
+        assert data["_meta"]["source"]["api"] == "saskatchewan-wsa", (
+            f"Expected api='saskatchewan-wsa', got: {data['_meta']['source']['api']}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_reservoir_and_dam_name_present_in_response_data(self):
+        """saskatchewan_get_wsa_reservoirs response includes Reservoir_Name and Dam_Name."""
+        import json
+        payload = {
+            "features": [
+                {
+                    "Reservoir_Name": "ADMIRAL RESERVOIR",
+                    "Dam_Name": "ADMIRAL DAM",
+                    "Water_Level_MASL": 671.3,
+                }
+            ],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_wsa_reservoirs",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_wsa_reservoirs()
+        data = json.loads(result) if isinstance(result, str) else result
+        first = data["data"]["features"][0]
+        assert "Reservoir_Name" in first, (
+            f"Expected Reservoir_Name in reservoir data, got: {list(first.keys())}"
+        )
+        assert first["Reservoir_Name"] == "ADMIRAL RESERVOIR"
+        assert "Dam_Name" in first, f"Expected Dam_Name in reservoir data"
+        assert first["Dam_Name"] == "ADMIRAL DAM"
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """saskatchewan_get_wsa_reservoirs passes lang='fr' through to _meta envelope."""
+        import json
+        payload = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_wsa_reservoirs",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_wsa_reservoirs(lang="fr")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert data["_meta"]["lang"] == "fr", (
+            f"Expected lang='fr' in _meta, got: {data['_meta']['lang']}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_upstream_error_on_http_exception(self):
+        """saskatchewan_get_wsa_reservoirs returns UPSTREAM_ERROR on HTTP exception."""
+        import json
+        import httpx
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_wsa_reservoirs",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "503",
+                request=httpx.Request("GET", "https://services1.arcgis.com/7MBdlVpjqbfBhQer"),
+                response=httpx.Response(503),
+            ),
+        ):
+            result = await tools.saskatchewan_get_wsa_reservoirs()
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "error" in data, f"Expected error response, got: {data}"
+        assert data["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_data_contains_features_and_count(self):
+        """saskatchewan_get_wsa_reservoirs wraps payload under data key with features."""
+        import json
+        payload = {
+            "features": [
+                {"Reservoir_Name": "ADMIRAL RESERVOIR", "Dam_Name": "ADMIRAL DAM"},
+                {"Reservoir_Name": "ANGLIN LAKE RESERVOIR", "Dam_Name": "ANGLIN LAKE DAM"},
+            ],
+            "count": 2,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_wsa_reservoirs",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_wsa_reservoirs()
+        data = json.loads(result) if isinstance(result, str) else result
+        assert data["data"]["count"] == 2
+        assert len(data["data"]["features"]) == 2
 
 
 # ---------------------------------------------------------------------------

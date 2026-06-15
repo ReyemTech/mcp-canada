@@ -31,10 +31,16 @@ from .constants import (
     HUB_SEARCH_URL,
     MINERAL_MINES_FS_URLS,
     WILDFIRE_BOUNDARIES_FS_URL,
+    WSA_RESERVOIRS_FS_URL,
+    WSA_RESERVOIRS_LAYER,
+    WSA_STATIONS_FS_URL,
+    WSA_STATIONS_LAYER,
 )
 
 # Source identifier for the _meta envelope (all discovery tools)
 _API_NAME_HUB = "saskatchewan-geohub"
+# WSA org has a separate api source name to distinguish it in the _meta envelope
+_API_NAME_WSA = "saskatchewan-wsa"
 
 __all__ = [
     # Discovery (Plan 02)
@@ -51,6 +57,9 @@ __all__ = [
     "saskatchewan_get_fire_bans",
     "saskatchewan_get_historic_wildfires",
     "saskatchewan_get_air_quality",
+    # Water / WSA (Plan 05)
+    "saskatchewan_get_wsa_stations",
+    "saskatchewan_get_wsa_reservoirs",
 ]
 
 
@@ -551,6 +560,82 @@ async def saskatchewan_get_air_quality(
         payload,
         api_name=_API_NAME_HUB,
         api_url=f"{AIR_QUALITY_FS_URL}/0",
+        cached=cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Water / WSA (Plan 05)
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def saskatchewan_get_wsa_stations(
+    basin: str | None = None,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get WSA hydrometric gauging station locations with basin, station class, and live graph links.
+
+    Use for: Retrieving Water Security Agency (WSA) hydrometric gauging station data for Saskatchewan. Returns Station_Number, Station_Name, Major_Basin, Station_Class, Operated_By, and HyperLink_Graph — a URL linking to the live hourly hydrograph at wsask.ca (e.g., wsask.ca/hydrographs/05MB006-hrly.html). Optional basin= filter narrows by Major_Basin (e.g., 'Assiniboine', 'North Saskatchewan', 'Qu Appelle'). NOTE: Uses WSA org (services1.arcgis.com/7MBdlVpjqbfBhQer), NOT the primary Saskatchewan GeoHub org.
+
+    Keywords: saskatchewan WSA water hydrometric gauging station basin river flow discharge level graph live wsask hydrograph water security agency
+    """
+    try:
+        payload, cached = await _client.fetch_wsa_stations(basin=basin)
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur du serveur WSA: {exc.response.status_code}"
+            if lang == "fr"
+            else f"WSA server error: {exc.response.status_code}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur inattendue: {exc}"
+            if lang == "fr"
+            else f"Unexpected error: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        payload,
+        api_name=_API_NAME_WSA,
+        api_url=f"{WSA_STATIONS_FS_URL}/{WSA_STATIONS_LAYER}",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def saskatchewan_get_wsa_reservoirs(
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get WSA reservoir locations with reservoir name, dam name, and water level (MASL).
+
+    Use for: Retrieving Water Security Agency (WSA) reservoir and dam information across Saskatchewan. Returns Reservoir_Name, Dam_Name, Imagery_Date, and Water_Level_MASL (metres above sea level). IMPORTANT: Data is at layer 26 of the WSA_Reservoirs FeatureServer — NOT layer 0 (layer 0 is empty). NOTE: Uses WSA org (services1.arcgis.com/7MBdlVpjqbfBhQer), NOT the primary Saskatchewan GeoHub org.
+
+    Keywords: saskatchewan WSA water reservoir dam level MASL water security agency flood storage infrastructure irrigation lake impoundment
+    """
+    try:
+        payload, cached = await _client.fetch_wsa_reservoirs()
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur du serveur WSA: {exc.response.status_code}"
+            if lang == "fr"
+            else f"WSA server error: {exc.response.status_code}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur inattendue: {exc}"
+            if lang == "fr"
+            else f"Unexpected error: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        payload,
+        api_name=_API_NAME_WSA,
+        api_url=f"{WSA_RESERVOIRS_FS_URL}/{WSA_RESERVOIRS_LAYER}",
         cached=cached,
         lang=lang,
     )

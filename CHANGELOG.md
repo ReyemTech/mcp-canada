@@ -2,6 +2,114 @@
 
 <!-- CHANGELOG -->
 
+## v0.9.0 (2026-06-15)
+
+### Bug Fixes
+
+- **19-01**: Fix shared/arcgis_hub.py pagination param offset→startindex
+  ([`9ba9687`](https://github.com/ReyemTech/mcp-canada/commit/9ba96879df6cb122c7e7da49fc945736b75d18da))
+
+### Chores
+
+- Sync uv.lock after release
+  ([`a9982b3`](https://github.com/ReyemTech/mcp-canada/commit/a9982b384fcf4bb159874e1e5296918d6bb1a6e8))
+
+### Code Style
+
+- **19**: Clean ruff warnings in saskatchewan module (unused imports/f-strings)
+  ([`f3d667f`](https://github.com/ReyemTech/mcp-canada/commit/f3d667fba39bef19b576eaa4aa0858fc1180d362))
+
+### Documentation
+
+- **19**: Capture phase context
+  ([`1e701ab`](https://github.com/ReyemTech/mcp-canada/commit/1e701ab18da8bbbb20677883b0436a201730f89a))
+
+- **19**: Create Saskatchewan phase plan (7 plans, 14 tools, SK-01…SK-15)
+  ([`0919b4e`](https://github.com/ReyemTech/mcp-canada/commit/0919b4e0a991b270c8ec1364fa7e02cec129ef94))
+
+- **19**: Research finds geohub.saskatchewan.ca ArcGIS Hub — SHIP; add validation strategy
+  ([`3731db6`](https://github.com/ReyemTech/mcp-canada/commit/3731db6927b717848a557dd01529d0c68d99f796))
+
+- **19**: Research phase — Saskatchewan ArcGIS Hub confirmed SHIP, 14 tools
+  ([`5945fe8`](https://github.com/ReyemTech/mcp-canada/commit/5945fe835eee1d7a86085c9b248892bbbce82c4a))
+
+- **19-01**: Complete Saskatchewan Wave 0 — shared startindex fix + module scaffold
+  ([`420281c`](https://github.com/ReyemTech/mcp-canada/commit/420281c71f0d144be2be50a1de35b34217b8d106))
+
+- **19-01**: Record Wave 0 spike verdicts for Saskatchewan uncertain sources
+  ([`74e94cd`](https://github.com/ReyemTech/mcp-canada/commit/74e94cde93235aed585a7677f40728b4237548c1))
+
+- **19-02**: Complete Saskatchewan discovery tools plan — 5 tools, OGC params pinned, 47 tests GREEN
+  ([`9490222`](https://github.com/ReyemTech/mcp-canada/commit/9490222ff92b663f9675c633f90f9796b8a96c03))
+
+- **19-03**: Complete Saskatchewan agriculture+mining plan — SK-06/07/08/09
+  ([`9e5779d`](https://github.com/ReyemTech/mcp-canada/commit/9e5779d39d0da899bb708bcd615aefb0fc19d36f))
+
+- **19-04**: Complete Saskatchewan environment plan — SK-10/11/12 fire bans/wildfires/air quality
+  ([`5ed21a4`](https://github.com/ReyemTech/mcp-canada/commit/5ed21a482578de15c2f7837ed83cbf6a42d09a0a))
+
+- **19-05**: Complete Saskatchewan WSA water tools plan — SK-13 + SK-14
+  ([`e4c6db8`](https://github.com/ReyemTech/mcp-canada/commit/e4c6db8218097b91a93371c884b538a9a2634533))
+
+- **19-06**: Complete Saskatchewan prompts and resources plan
+  ([`adec6fe`](https://github.com/ReyemTech/mcp-canada/commit/adec6fead8aaa412481913a5cf9dfcd94cbb48f6))
+
+- **19-07**: Complete Saskatchewan phase — SUMMARY.md + STATE.md + ROADMAP.md
+  ([`2cbf848`](https://github.com/ReyemTech/mcp-canada/commit/2cbf848f137c806ca47782a04e0fc62a7beba067))
+
+- **19-07**: Sync README/MODULES/CLAUDE/EXAMPLES for Saskatchewan + coverage gate
+  ([`40e3221`](https://github.com/ReyemTech/mcp-canada/commit/40e3221f091a474820434f013d84ecf17caffc49))
+
+- **phase-19**: Complete phase execution
+  ([`d65453a`](https://github.com/ReyemTech/mcp-canada/commit/d65453aafc169d81b75b4df6062a160bfae83acf))
+
+- **state**: Record phase 19 context session
+  ([`f1263e4`](https://github.com/ReyemTech/mcp-canada/commit/f1263e421f39b7812e998cbefd0d5635db1a327f))
+
+### Features
+
+- **19-01**: Scaffold Saskatchewan module — 7 files + test scaffolds (Wave 0)
+  ([`fb74eaf`](https://github.com/ReyemTech/mcp-canada/commit/fb74eaf53748d150016b146c661cd0d0dee8ab35))
+
+- **19-02**: Implement 5 discovery @tool functions + tool tests
+  ([`29d79f9`](https://github.com/ReyemTech/mcp-canada/commit/29d79f93e14f76e9c93c4917eac00bb64a27ad38))
+
+- **19-02**: Implement 5 discovery client bodies with OGC params + param-regression tests
+  ([`f598579`](https://github.com/ReyemTech/mcp-canada/commit/f59857917f6e44b78ad3abef18470678b9ce2ec4))
+
+- **19-03**: Add 3 curated @tool functions (SK-06, SK-07, SK-08+SK-09)
+  ([`f624234`](https://github.com/ReyemTech/mcp-canada/commit/f6242343084b91403fc402b42f05e9507f9513a0))
+
+- **19-03**: Implement fetch_crop_yields, fetch_grain_elevators, fetch_mineral_mines
+  ([`50c1621`](https://github.com/ReyemTech/mcp-canada/commit/50c162199dc8c0550496e3fc79e6398aaaf2b2a5))
+
+- **19-04**: Implement 3 environment @tool functions + tool tests (TDD)
+  ([`10df7dc`](https://github.com/ReyemTech/mcp-canada/commit/10df7dc5fd6fa9e0bbaa7296c9e3b7cdd41097a9))
+
+- **19-04**: Implement environment client bodies + client tests (TDD)
+  ([`b877520`](https://github.com/ReyemTech/mcp-canada/commit/b877520d90edf0dcc03df84acb9470dc8dfb2025))
+
+- **19-05**: Implement fetch_wsa_stations + fetch_wsa_reservoirs client bodies
+  ([`b1bcf43`](https://github.com/ReyemTech/mcp-canada/commit/b1bcf4331cebb046d8b629f1aace5ea19b571755))
+
+- **19-05**: Implement saskatchewan_get_wsa_stations + saskatchewan_get_wsa_reservoirs tools
+  ([`6c969d6`](https://github.com/ReyemTech/mcp-canada/commit/6c969d6eb5edb17814271b342caffcb2924d3227))
+
+- **19-06**: Add 6 bilingual Saskatchewan prompts (3 guided + 3 quick)
+  ([`60cded0`](https://github.com/ReyemTech/mcp-canada/commit/60cded0ce73b342680a53aac67e99f37613d3916))
+
+- **19-06**: Add 7 zero-parameter Saskatchewan resources (3 data + 2 docs + 2 template)
+  ([`8a9f1f4`](https://github.com/ReyemTech/mcp-canada/commit/8a9f1f47a3cde05bfc9b0e1712facb491730611b))
+
+### Testing
+
+- **19**: Complete UAT - 9 passed, 0 issues (all live-verified)
+  ([`b319edb`](https://github.com/ReyemTech/mcp-canada/commit/b319edbc786bda64c176e397614fac5e719c9a99))
+
+- **19-07**: Parametrized envelope/lang + live field-presence integration tests
+  ([`f1076c6`](https://github.com/ReyemTech/mcp-canada/commit/f1076c63588a671d9c9482be6f9cc8e9c93f37d0))
+
+
 ## v0.8.0 (2026-06-15)
 
 ### Bug Fixes

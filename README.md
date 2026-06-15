@@ -87,11 +87,11 @@ Environment variable: `MCP_CANADA_MODULES=bank_of_canada,recalls`
 
 ## Examples
 
-See **[EXAMPLES.md](EXAMPLES.md)** for 23 cross-API intelligence scenarios — from tracing prairie drought to the Canadian dollar, to building pharmaceutical safety audits, to assembling MP accountability briefs, to joining data from multiple APIs in a single SQL query. Each example includes the exact prompt and tool chain you can run today.
+See **[EXAMPLES.md](EXAMPLES.md)** for 25 cross-API intelligence scenarios — from tracing prairie drought to the Canadian dollar, to building pharmaceutical safety audits, to assembling MP accountability briefs, to joining data from multiple APIs in a single SQL query. Each example includes the exact prompt and tool chain you can run today.
 
 ## How Discovery Works
 
-With 217 tools, listing all of them would consume half an agent's context window. Instead, **BM25 search** lets agents find exactly what they need:
+With 237 tools, listing all of them would consume half an agent's context window. Instead, **BM25 search** lets agents find exactly what they need:
 
 ```
 Agent: "What tools do you have for exchange rates?"

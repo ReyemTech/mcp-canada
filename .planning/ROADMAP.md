@@ -262,7 +262,7 @@ Plans:
 **Goal:** Add Nova Scotia provincial open data via data.novascotia.ca (Socrata SODA API) as a new `nova_scotia` module, establishing a reusable `shared/socrata.py` client (the 4th portal technology). Ship 5 discovery tools + 12 curated tools (17 total) across fishing/aquaculture, environment/water, lands, air quality, and health + demographics, with 6 bilingual prompts and 7 zero-parameter resources.
 **Requirements**: NS-01…NS-18
 **Depends on:** Phase 19
-**Plans:** 7/7 plans complete
+**Plans:** 7/7 plans complete + 1 gap-closure plan (20-08)
 
 Plans:
 - [ ] 20-01-PLAN.md — Wave 0: build shared/socrata.py + TestSharedSocrataContract, scaffold nova_scotia module, resolve the 3 dataset-shape spikes (NS-01)
@@ -272,6 +272,7 @@ Plans:
 - [ ] 20-05-PLAN.md — Health + demographics curated tools: health facilities (dispatch), vital statistics, chronic disease prevalence (NS-13, NS-14, NS-17)
 - [ ] 20-06-PLAN.md — 6 bilingual prompts + 7 zero-parameter resources incl. the Socrata/SoQL guide (NS-18)
 - [ ] 20-07-PLAN.md — Parametrized + LIVE field-presence integration tests, docs sync (Socrata as 4th portal tech), 95% coverage (NS-18)
+- [ ] 20-08-PLAN.md — Gap closure: per-dataset SoQL for ns_get_health_facilities (hospital + LTC live 400 fix) + real-raw-schema fixtures + de-masked LIVE integration [NS-13]
 
 ### Phase 21: New Brunswick Government Open Data
 

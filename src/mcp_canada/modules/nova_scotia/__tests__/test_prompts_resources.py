@@ -413,13 +413,13 @@ class TestNsResources:
     @pytest.mark.asyncio
     async def test_seven_resources_defined(self) -> None:
         from mcp_canada.modules.nova_scotia import resources as _m
-        import inspect
-        from fastmcp.resources import Resource
-        count = sum(
-            1 for _, obj in inspect.getmembers(_m)
-            if isinstance(obj, Resource)
-        )
-        assert count == 7, f"Expected 7 resources, found {count}"
+        # @resource returns a callable; count via __all__ which lists all 7
+        assert hasattr(_m, "__all__"), "resources.py must define __all__"
+        assert len(_m.__all__) == 7, f"Expected 7 resources in __all__, found {len(_m.__all__)}"
+        # Verify each is callable
+        for name in _m.__all__:
+            assert hasattr(_m, name), f"Resource {name} missing from module"
+            assert callable(getattr(_m, name)), f"Resource {name} must be callable"
 
     # -----------------------------------------------------------------------
     # URI scheme checks

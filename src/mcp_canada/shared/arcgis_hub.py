@@ -70,7 +70,7 @@ async def search_hub_datasets(
     url = portal_base_url.rstrip("/") + HUB_SEARCH_PATH
     params: dict[str, Any] = {"q": query, "limit": limit}
     if offset > 0:
-        params["offset"] = offset
+        params["startindex"] = offset   # OGC API Records pagination (NOT offset); startindex=0 is invalid so omit at 0
 
     if httpx_client is not None:
         response = await httpx_client.get(url, params=params)

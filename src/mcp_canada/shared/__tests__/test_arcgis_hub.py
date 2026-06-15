@@ -203,7 +203,11 @@ class TestSearchHubDatasets:
 
     @pytest.mark.asyncio
     async def test_offset_zero_omitted_from_params(self):
-        """offset=0 is not included in query params."""
+        """offset=0 omits BOTH 'offset' and 'startindex' from query params.
+
+        OGC API Records: startindex=0 is invalid (returns malformed body live).
+        Must omit entirely when offset==0.
+        """
         mock_client = _make_mock_client([HUB_SEARCH_SAMPLE])
 
         await search_hub_datasets(
@@ -216,10 +220,15 @@ class TestSearchHubDatasets:
         call_args = mock_client.get.call_args
         params = call_args[1]["params"]
         assert "offset" not in params
+        assert "startindex" not in params
 
     @pytest.mark.asyncio
-    async def test_offset_positive_included_in_params(self):
-        """offset > 0 IS included in query params."""
+    async def test_offset_positive_sends_startindex_not_offset(self):
+        """offset > 0 sends 'startindex' (OGC API Records), NOT 'offset'.
+
+        Saskatchewan GeoHub (OGC API Records) requires startindex, not offset.
+        ?offset=N returns {numberMatched: null}; ?startindex=N returns correct pagination.
+        """
         mock_client = _make_mock_client([HUB_SEARCH_SAMPLE])
 
         await search_hub_datasets(
@@ -231,7 +240,8 @@ class TestSearchHubDatasets:
 
         call_args = mock_client.get.call_args
         params = call_args[1]["params"]
-        assert params.get("offset") == 10
+        assert params.get("startindex") == 10
+        assert "offset" not in params
 
 
 # ---------------------------------------------------------------------------

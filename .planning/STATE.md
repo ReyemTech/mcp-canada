@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 19-03-PLAN.md
-last_updated: "2026-06-15T15:15:30.629Z"
+stopped_at: Completed 19-04-PLAN.md
+last_updated: "2026-06-15T15:23:47.048Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 13
   total_plans: 64
-  completed_plans: 60
+  completed_plans: 61
   percent: 0
 ---
 
@@ -108,6 +108,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 19-saskatchewan-government-open-data P01 | 10min | 3 tasks | 15 files |
 | Phase 19-saskatchewan-government-open-data P02 | 6min | 2 tasks | 4 files |
 | Phase 19-saskatchewan-government-open-data P03 | 18min | 2 tasks | 4 files |
+| Phase 19-saskatchewan-government-open-data P04 | 6min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -266,6 +267,9 @@ Recent decisions affecting current work:
 - [Phase 19-saskatchewan-government-open-data]: CACHE_TTL_ANNUAL (7d) for crop yields — annual estimates; minerals/elevators use CACHE_TTL_META (24h)
 - [Phase 19-saskatchewan-government-open-data]: Double-guard on crop region + mineral: tool pre-checks enum tuple before client call; client raises ValueError as secondary guard (mirrors Alberta ST3 pattern)
 - [Phase 19-saskatchewan-government-open-data]: Crop yields tool docstring notes PDF reports are NOT machine-readable — FeatureServer is the substitute (placed where agents see it)
+- [Phase 19-saskatchewan-government-open-data]: fetch_fire_bans validates ban_scope before calling arcgis_hub (double-guard: tool INVALID_INPUT + client ValueError) — mirrors Alberta ST3 + mineral dispatch patterns
+- [Phase 19-saskatchewan-government-open-data]: api_name='saskatchewan-spsa-firebans' for fire bans (distinguishes SPSA server from Hub in _meta envelope); historic wildfires + air quality use 'saskatchewan-geohub'
+- [Phase 19-saskatchewan-government-open-data]: Empty fire bans payload explicitly tested as valid success (count=0, _meta envelope) not error — same lesson as Manitoba flood alerts
 
 ### Roadmap Evolution
 
@@ -293,6 +297,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-15T15:15:30.625Z
-Stopped at: Completed 19-03-PLAN.md
+Last session: 2026-06-15T15:23:47.044Z
+Stopped at: Completed 19-04-PLAN.md
 Resume file: None

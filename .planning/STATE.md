@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Phase 19 context gathered
-last_updated: "2026-06-15T13:55:22.162Z"
+stopped_at: Completed 19-01-PLAN.md
+last_updated: "2026-06-15T14:57:42.441Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 13
-  total_plans: 57
-  completed_plans: 57
+  total_plans: 64
+  completed_plans: 58
   percent: 0
 ---
 
@@ -105,6 +105,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 18-manitoba-government-open-data P07 | 7min | 2 tasks | 3 files |
 | Phase 18-manitoba-government-open-data P08 | 7min | 2 tasks | 7 files |
 | Phase 18-manitoba-government-open-data P09 | 4min | 3 tasks | 3 files |
+| Phase 19-saskatchewan-government-open-data P01 | 10min | 3 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -254,6 +255,9 @@ Recent decisions affecting current work:
 - [Phase 18-manitoba-government-open-data]: data://manitoba/major-rivers includes Red River Floodway as a sixth entry — critical flood infrastructure reference
 - [Phase 18]: ALL_MANITOBA_TOOLS count=20 (5+3+4+5+3) matches tools.py __all__; 511 NOT_CONFIGURED integration test pops env var to guarantee deterministic result without needing real key
 - [Phase 18-manitoba-government-open-data]: Manitoba Hub Search uses OGC API Records params (limit/startindex) not ArcGIS-REST (num/start); blank q= omitted (not sent empty); startindex omitted when 0
+- [Phase 19-saskatchewan-government-open-data]: startindex param fix is in shared/arcgis_hub.py:search_hub_datasets (not per-module workaround); Manitoba fetch_search_datasets builds params directly so no double-application
+- [Phase 19-saskatchewan-government-open-data]: WSA_RESERVOIRS_LAYER=26 confirmed by live probe; Petroleum FS HTTP 400 was transient (HTTP 200 live); WSA Water Quality layer 19 has 24 stations (not 0); both remain per plan scope (deferred/not curated)
+- [Phase 19-saskatchewan-government-open-data]: 3 module-level limiters in client.py (_hub_limiter/_wsa_limiter/_spsa_limiter) for 3 separate rate groups (Saskatchewan has most fragmented portal architecture)
 
 ### Roadmap Evolution
 
@@ -281,6 +285,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-15T13:55:22.152Z
-Stopped at: Phase 19 context gathered
-Resume file: .planning/phases/19-saskatchewan-government-open-data/19-CONTEXT.md
+Last session: 2026-06-15T14:57:42.438Z
+Stopped at: Completed 19-01-PLAN.md
+Resume file: None

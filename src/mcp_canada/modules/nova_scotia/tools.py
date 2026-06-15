@@ -29,6 +29,10 @@ from .constants import (
     DS_LANDBASED_AQUACULTURE_LICENSES,
     DS_FISH_HATCHERY_STOCKING,
     DS_AQUACULTURE_PRODUCTION,
+    DS_SURFACE_WATER_QUALITY_CONTINUOUS,
+    DS_BOIL_WATER_ADVISORIES,
+    DS_PROTECTED_AREAS,
+    DS_AIR_QUALITY_STATIONS,
 )
 
 
@@ -315,6 +319,144 @@ async def ns_get_aquaculture_production(
             data,
             api_name="nova-scotia-socrata",
             api_url=f"{BASE_URL}/resource/{DS_AQUACULTURE_PRODUCTION}.json",
+            cached=cached,
+            lang=lang,
+        )
+    except Exception as exc:
+        return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
+
+
+# ---------------------------------------------------------------------------
+# Environment / Water / Air Quality curated tools (Plan 04)
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def ns_get_water_quality_monitoring(
+    station_number: str | None = None,
+    since: str | None = None,
+    limit: int = 5000,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Get Nova Scotia surface water quality continuous sensor readings (temperature, pH, conductance, dissolved oxygen).
+
+    Use for: querying NS water quality sensor data by station or date range; temperature, pH, dissolved oxygen, specific conductance readings; continuous water quality monitoring in Nova Scotia.
+    Keywords: nova scotia water quality monitoring sensor station temperature pH dissolved oxygen conductance readings continuous surface water NS environment
+
+    Note: Data is from the continuous monitoring network (dataset bkfi-mjgw), current through 2024-12.
+    Use since='YYYY-MM-DD' to filter by date (e.g., since='2024-01-01'). Results ordered newest-first.
+    Station locations are in a separate catalog dataset (i9ee-9hct) — use ns_query_dataset if needed.
+    """
+    try:
+        data, cached = await _client.fetch_water_quality_monitoring(
+            station_number=station_number,
+            since=since,
+            limit=limit,
+        )
+        return make_response(
+            data,
+            api_name="nova-scotia-socrata",
+            api_url=f"{BASE_URL}/resource/{DS_SURFACE_WATER_QUALITY_CONTINUOUS}.json",
+            cached=cached,
+            lang=lang,
+        )
+    except Exception as exc:
+        return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
+
+
+@tool
+async def ns_get_boil_water_advisories(
+    county: str | None = None,
+    active_only: bool = False,
+    limit: int = 5000,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Get Nova Scotia boil water advisories with site name, county, date issued, date removed, facility type, and duration.
+
+    Use for: checking NS boil water advisories; finding active drinking water advisories in Nova Scotia; water safety notices by county; historical advisory records.
+    Keywords: nova scotia boil water advisory drinking water safety county facility active removed issued duration community water supply municipal NS health
+
+    Note: Use active_only=True to get only current advisories (date_advisory_removed IS NULL).
+    An empty advisory list is a VALID success — no active advisories is the normal off-season state.
+    County names are uppercase (e.g., 'ANNAPOLIS COUNTY', 'INVERNESS COUNTY').
+    Data current to 2025.
+    """
+    try:
+        data, cached = await _client.fetch_boil_water_advisories(
+            county=county,
+            active_only=active_only,
+            limit=limit,
+        )
+        # Empty advisories list is a valid success — no active advisories is normal
+        return make_response(
+            data,
+            api_name="nova-scotia-socrata",
+            api_url=f"{BASE_URL}/resource/{DS_BOIL_WATER_ADVISORIES}.json",
+            cached=cached,
+            lang=lang,
+        )
+    except Exception as exc:
+        return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
+
+
+@tool
+async def ns_get_protected_areas(
+    status: str | None = None,
+    limit: int = 5000,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Get Nova Scotia protected areas with name, protection type, owner, authority, designation status, and area.
+
+    Use for: finding NS protected areas by designation status; national parks, wilderness areas, nature reserves in Nova Scotia; conservation lands by owner or authority; protected area inventory.
+    Keywords: nova scotia protected areas national park wilderness reserve conservation land owner authority status designation area hectares NS environment lands forestry wildlife
+
+    Note: Geometry (MultiPolygon boundaries) is excluded from this tool's response to reduce context size.
+    To retrieve polygon boundaries, use ns_query_dataset with dataset_id='ticv-5du5' and include
+    the_geom in $select explicitly. Status values: 'Designated', 'Candidate', 'Proposed'.
+    """
+    try:
+        data, cached = await _client.fetch_protected_areas(
+            status=status,
+            limit=limit,
+        )
+        # Belt-and-suspenders: strip the_geom in case client data has it
+        areas = [{k: v for k, v in row.items() if k != "the_geom"} for row in data.get("protected_areas", [])]
+        return make_response(
+            {**data, "protected_areas": areas},
+            api_name="nova-scotia-socrata",
+            api_url=f"{BASE_URL}/resource/{DS_PROTECTED_AREAS}.json",
+            cached=cached,
+            lang=lang,
+        )
+    except Exception as exc:
+        return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
+
+
+@tool
+async def ns_get_air_quality_stations(
+    city: str | None = None,
+    limit: int = 5000,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Get Nova Scotia ambient air quality monitoring station locations with measurements and monitoring period.
+
+    Use for: finding NS air quality monitoring stations by city; locating PM2.5, O3, NO2, SO2 monitoring sites; ambient air quality station inventory in Nova Scotia.
+    Keywords: nova scotia air quality stations monitoring PM2.5 O3 NO2 SO2 pollutant city latitude longitude ambient environment NS NAPS network
+
+    Note: This tool returns the STATION CATALOG only (locations, measurement types, monitoring period).
+    Individual pollutant time series (O3, PM2.5, SO2, CO by station and year) are in 20+ separate
+    per-station datasets. Use ns_query_dataset with the specific dataset ID from the station record
+    to read individual pollutant readings. See docs://ns/air-quality-guide for the full pattern.
+    """
+    try:
+        data, cached = await _client.fetch_air_quality_stations(
+            city=city,
+            limit=limit,
+        )
+        return make_response(
+            data,
+            api_name="nova-scotia-socrata",
+            api_url=f"{BASE_URL}/resource/{DS_AIR_QUALITY_STATIONS}.json",
             cached=cached,
             lang=lang,
         )

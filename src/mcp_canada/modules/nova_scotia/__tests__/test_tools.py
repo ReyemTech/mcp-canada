@@ -843,31 +843,454 @@ class TestNsGetAquacultureProductionTool:
 
 
 class TestNsGetWaterQualityMonitoringTool:
-    """ns_get_water_quality_monitoring tool tests. Plan 04 fills."""
+    """ns_get_water_quality_monitoring tool tests."""
 
-    pass
+    WATER_QUALITY_DATA = {
+        "readings": [
+            {
+                "station_number": "NS01EF0002",
+                "date": "2024-12-06T00:00:00.000",
+                "time": "12:00",
+                "temperature_c": "8.3",
+                "ph": "7.1",
+                "specific_conductance_s_cm": "142.5",
+                "dissolved_oxygen_mg_l": "11.2",
+            }
+        ],
+        "count": 1,
+        "truncated": False,
+    }
+
+    @pytest.mark.asyncio
+    async def test_happy_path_returns_envelope_with_readings(self) -> None:
+        """Returns _meta envelope with readings list."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_water_quality_monitoring",
+            new_callable=AsyncMock,
+            return_value=(self.WATER_QUALITY_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_water_quality_monitoring
+
+            result = await ns_get_water_quality_monitoring(lang="en")
+
+            assert "_meta" in result
+            assert result["_meta"]["source"]["api"] == "nova-scotia-socrata"
+            assert result["_meta"]["cached"] is False
+            assert result["_meta"]["lang"] == "en"
+            assert "data" in result
+            assert "readings" in result["data"]
+            assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_station_number_and_since_forwarded_to_client(self) -> None:
+        """station_number and since params forwarded to fetch_water_quality_monitoring."""
+        mock_fetch = AsyncMock(return_value=(self.WATER_QUALITY_DATA, False))
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_water_quality_monitoring",
+            mock_fetch,
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_water_quality_monitoring
+
+            await ns_get_water_quality_monitoring(
+                station_number="NS01EF0002", since="2024-01-01", limit=100
+            )
+
+            call_kwargs = mock_fetch.call_args[1]
+            assert call_kwargs.get("station_number") == "NS01EF0002"
+            assert call_kwargs.get("since") == "2024-01-01"
+            assert call_kwargs.get("limit") == 100
+
+    @pytest.mark.asyncio
+    async def test_error_path_returns_make_error(self) -> None:
+        """Exception from client returns make_error with UPSTREAM_ERROR."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_water_quality_monitoring",
+            new_callable=AsyncMock,
+            side_effect=Exception("upstream failure"),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_water_quality_monitoring
+
+            result = await ns_get_water_quality_monitoring()
+
+            assert "error" in result
+            assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_fr_passes_through(self) -> None:
+        """lang='fr' passes through to _meta.lang."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_water_quality_monitoring",
+            new_callable=AsyncMock,
+            return_value=(self.WATER_QUALITY_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_water_quality_monitoring
+
+            result = await ns_get_water_quality_monitoring(lang="fr")
+
+            assert result["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_api_url_contains_dataset_id(self) -> None:
+        """api_url in _meta source contains the water quality readings dataset ID."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_water_quality_monitoring",
+            new_callable=AsyncMock,
+            return_value=(self.WATER_QUALITY_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_water_quality_monitoring
+
+            result = await ns_get_water_quality_monitoring()
+
+            api_url = result["_meta"]["source"]["url"]
+            assert "bkfi-mjgw" in api_url
 
 
 class TestNsGetBoilWaterAdvisoriesTool:
-    """ns_get_boil_water_advisories tool tests. Plan 04 fills.
+    """ns_get_boil_water_advisories tool tests.
 
-    CRITICAL: must include a test that verifies empty advisory list returns
-    make_response (not make_error) — no active advisories is a valid state.
+    CRITICAL: empty advisory list must return make_response (not make_error).
     """
 
-    pass
+    ADVISORIES_DATA = {
+        "advisories": [
+            {
+                "site_name": "Murphy Road Water Distribution System",
+                "county": "ANNAPOLIS COUNTY",
+                "date_advisory_issued": "2025-03-15T00:00:00.000",
+                "date_advisory_removed": None,
+                "facility_type": "Community Water Supply",
+                "length_of_advisory": "92",
+            }
+        ],
+        "count": 1,
+        "truncated": False,
+    }
+
+    ADVISORIES_EMPTY_DATA = {
+        "advisories": [],
+        "count": 0,
+        "truncated": False,
+    }
+
+    @pytest.mark.asyncio
+    async def test_happy_path_returns_envelope_with_advisories(self) -> None:
+        """Returns _meta envelope with advisories list."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_boil_water_advisories",
+            new_callable=AsyncMock,
+            return_value=(self.ADVISORIES_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_boil_water_advisories
+
+            result = await ns_get_boil_water_advisories(lang="en")
+
+            assert "_meta" in result
+            assert result["_meta"]["source"]["api"] == "nova-scotia-socrata"
+            assert result["_meta"]["cached"] is False
+            assert "data" in result
+            assert "advisories" in result["data"]
+            assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_empty_advisories_is_valid_success_not_error(self) -> None:
+        """Empty advisory list returns make_response (not make_error) — off-season valid state."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_boil_water_advisories",
+            new_callable=AsyncMock,
+            return_value=(self.ADVISORIES_EMPTY_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_boil_water_advisories
+
+            result = await ns_get_boil_water_advisories(active_only=True)
+
+            # Must have _meta (success), NOT error key
+            assert "_meta" in result, "Empty advisory list must return make_response, not make_error"
+            assert "error" not in result
+            assert result["data"]["count"] == 0
+            assert result["data"]["advisories"] == []
+
+    @pytest.mark.asyncio
+    async def test_county_and_active_only_forwarded_to_client(self) -> None:
+        """county and active_only params forwarded to fetch_boil_water_advisories."""
+        mock_fetch = AsyncMock(return_value=(self.ADVISORIES_DATA, False))
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_boil_water_advisories",
+            mock_fetch,
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_boil_water_advisories
+
+            await ns_get_boil_water_advisories(county="INVERNESS COUNTY", active_only=True, limit=200)
+
+            call_kwargs = mock_fetch.call_args[1]
+            assert call_kwargs.get("county") == "INVERNESS COUNTY"
+            assert call_kwargs.get("active_only") is True
+            assert call_kwargs.get("limit") == 200
+
+    @pytest.mark.asyncio
+    async def test_error_path_returns_make_error(self) -> None:
+        """Exception from client returns make_error with UPSTREAM_ERROR."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_boil_water_advisories",
+            new_callable=AsyncMock,
+            side_effect=Exception("upstream failure"),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_boil_water_advisories
+
+            result = await ns_get_boil_water_advisories()
+
+            assert "error" in result
+            assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_fr_passes_through(self) -> None:
+        """lang='fr' passes through to _meta.lang."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_boil_water_advisories",
+            new_callable=AsyncMock,
+            return_value=(self.ADVISORIES_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_boil_water_advisories
+
+            result = await ns_get_boil_water_advisories(lang="fr")
+
+            assert result["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_api_url_contains_dataset_id(self) -> None:
+        """api_url in _meta source contains the boil water advisories dataset ID."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_boil_water_advisories",
+            new_callable=AsyncMock,
+            return_value=(self.ADVISORIES_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_boil_water_advisories
+
+            result = await ns_get_boil_water_advisories()
+
+            api_url = result["_meta"]["source"]["url"]
+            assert "7t68-9xmm" in api_url
 
 
 class TestNsGetProtectedAreasTool:
-    """ns_get_protected_areas tool tests. Plan 04 fills."""
+    """ns_get_protected_areas tool tests."""
 
-    pass
+    PROTECTED_AREAS_DATA = {
+        "protected_areas": [
+            {
+                "objectid": "1",
+                "pro_name": "Kejimkujik National Park",
+                "protect1": "National Park",
+                "symbol": "NP",
+                "owner": "Federal",
+                "authority": "Parks Canada",
+                "status": "Designated",
+                "web_url": "https://parks.canada.ca/kejimkujik",
+                "ha_gis": "381.28",
+            }
+        ],
+        "count": 1,
+        "truncated": False,
+    }
+
+    @pytest.mark.asyncio
+    async def test_happy_path_returns_envelope_with_protected_areas(self) -> None:
+        """Returns _meta envelope with protected_areas list."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_protected_areas",
+            new_callable=AsyncMock,
+            return_value=(self.PROTECTED_AREAS_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_protected_areas
+
+            result = await ns_get_protected_areas(lang="en")
+
+            assert "_meta" in result
+            assert result["_meta"]["source"]["api"] == "nova-scotia-socrata"
+            assert result["_meta"]["cached"] is False
+            assert "data" in result
+            assert "protected_areas" in result["data"]
+            assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_protected_areas_rows_have_no_the_geom(self) -> None:
+        """Returned protected_areas data does not contain the_geom."""
+        areas_with_geom = {
+            "protected_areas": [
+                {**self.PROTECTED_AREAS_DATA["protected_areas"][0], "the_geom": {"type": "MultiPolygon"}}
+            ],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_protected_areas",
+            new_callable=AsyncMock,
+            return_value=(areas_with_geom, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_protected_areas
+
+            result = await ns_get_protected_areas(lang="en")
+
+            for row in result["data"]["protected_areas"]:
+                assert "the_geom" not in row
+
+    @pytest.mark.asyncio
+    async def test_status_forwarded_to_client(self) -> None:
+        """status param forwarded to fetch_protected_areas."""
+        mock_fetch = AsyncMock(return_value=(self.PROTECTED_AREAS_DATA, False))
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_protected_areas",
+            mock_fetch,
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_protected_areas
+
+            await ns_get_protected_areas(status="Designated", limit=500)
+
+            call_kwargs = mock_fetch.call_args[1]
+            assert call_kwargs.get("status") == "Designated"
+            assert call_kwargs.get("limit") == 500
+
+    @pytest.mark.asyncio
+    async def test_error_path_returns_make_error(self) -> None:
+        """Exception from client returns make_error with UPSTREAM_ERROR."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_protected_areas",
+            new_callable=AsyncMock,
+            side_effect=Exception("upstream failure"),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_protected_areas
+
+            result = await ns_get_protected_areas()
+
+            assert "error" in result
+            assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_fr_passes_through(self) -> None:
+        """lang='fr' passes through to _meta.lang."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_protected_areas",
+            new_callable=AsyncMock,
+            return_value=(self.PROTECTED_AREAS_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_protected_areas
+
+            result = await ns_get_protected_areas(lang="fr")
+
+            assert result["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_api_url_contains_dataset_id(self) -> None:
+        """api_url in _meta source contains the protected areas dataset ID."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_protected_areas",
+            new_callable=AsyncMock,
+            return_value=(self.PROTECTED_AREAS_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_protected_areas
+
+            result = await ns_get_protected_areas()
+
+            api_url = result["_meta"]["source"]["url"]
+            assert "ticv-5du5" in api_url
 
 
 class TestNsGetAirQualityStationsTool:
-    """ns_get_air_quality_stations tool tests. Plan 04 fills."""
+    """ns_get_air_quality_stations tool tests."""
 
-    pass
+    AIR_QUALITY_DATA = {
+        "stations": [
+            {
+                "national_air_pollution_surveillance_network_id": "NS001",
+                "station_name": "Halifax Central",
+                "city": "Halifax",
+                "latitude": "44.6501",
+                "longitude": "-63.5751",
+                "measurements": "PM2.5, O3, NO2, SO2",
+                "monitoring_period": "2000-present",
+            }
+        ],
+        "count": 1,
+        "truncated": False,
+    }
+
+    @pytest.mark.asyncio
+    async def test_happy_path_returns_envelope_with_stations(self) -> None:
+        """Returns _meta envelope with stations list."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_air_quality_stations",
+            new_callable=AsyncMock,
+            return_value=(self.AIR_QUALITY_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_air_quality_stations
+
+            result = await ns_get_air_quality_stations(lang="en")
+
+            assert "_meta" in result
+            assert result["_meta"]["source"]["api"] == "nova-scotia-socrata"
+            assert result["_meta"]["cached"] is False
+            assert "data" in result
+            assert "stations" in result["data"]
+            assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_city_forwarded_to_client(self) -> None:
+        """city param forwarded to fetch_air_quality_stations."""
+        mock_fetch = AsyncMock(return_value=(self.AIR_QUALITY_DATA, False))
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_air_quality_stations",
+            mock_fetch,
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_air_quality_stations
+
+            await ns_get_air_quality_stations(city="Dartmouth", limit=50)
+
+            call_kwargs = mock_fetch.call_args[1]
+            assert call_kwargs.get("city") == "Dartmouth"
+            assert call_kwargs.get("limit") == 50
+
+    @pytest.mark.asyncio
+    async def test_error_path_returns_make_error(self) -> None:
+        """Exception from client returns make_error with UPSTREAM_ERROR."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_air_quality_stations",
+            new_callable=AsyncMock,
+            side_effect=Exception("upstream failure"),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_air_quality_stations
+
+            result = await ns_get_air_quality_stations()
+
+            assert "error" in result
+            assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_fr_passes_through(self) -> None:
+        """lang='fr' passes through to _meta.lang."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_air_quality_stations",
+            new_callable=AsyncMock,
+            return_value=(self.AIR_QUALITY_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_air_quality_stations
+
+            result = await ns_get_air_quality_stations(lang="fr")
+
+            assert result["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_api_url_contains_dataset_id(self) -> None:
+        """api_url in _meta source contains the air quality stations dataset ID."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_air_quality_stations",
+            new_callable=AsyncMock,
+            return_value=(self.AIR_QUALITY_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_air_quality_stations
+
+            result = await ns_get_air_quality_stations()
+
+            api_url = result["_meta"]["source"]["url"]
+            assert "3bbm-drnh" in api_url
 
 
 class TestNsGetHealthFacilitiesTool:

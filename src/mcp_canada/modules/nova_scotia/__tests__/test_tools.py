@@ -406,27 +406,440 @@ class TestNsListCategoriesTool:
 
 
 class TestNsGetMarineAquacultureLeasesTool:
-    """ns_get_marine_aquaculture_leases tool tests. Plan 03 fills."""
+    """ns_get_marine_aquaculture_leases tool tests."""
 
-    pass
+    LEASES_DATA = {
+        "leases": [
+            {
+                "license_le": "MRL-001",
+                "ownership": "Atlantic Shellfish Inc.",
+                "species": "Eastern Oyster",
+                "waterbody": "Bras d'Or Lake",
+                "county": "Inverness",
+                "sitestatus": "Active",
+                "speciestyp": "Shellfish",
+                "hectares": "3.2",
+                "lat_dms": "46°01'N",
+                "long_dms": "60°45'W",
+            }
+        ],
+        "count": 1,
+        "truncated": False,
+    }
+
+    @pytest.mark.asyncio
+    async def test_happy_path_returns_envelope_with_leases(self) -> None:
+        """Returns _meta envelope with leases list."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_marine_aquaculture_leases",
+            new_callable=AsyncMock,
+            return_value=(self.LEASES_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_marine_aquaculture_leases
+
+            result = await ns_get_marine_aquaculture_leases(lang="en")
+
+            assert "_meta" in result
+            assert result["_meta"]["source"]["api"] == "nova-scotia-socrata"
+            assert result["_meta"]["cached"] is False
+            assert result["_meta"]["lang"] == "en"
+            assert "data" in result
+            assert "leases" in result["data"]
+            assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_leases_rows_have_no_the_geom(self) -> None:
+        """Returned leases data does not contain the_geom."""
+        leases_with_geom = {
+            "leases": [{**self.LEASES_DATA["leases"][0], "the_geom": {"type": "MultiPolygon"}}],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_marine_aquaculture_leases",
+            new_callable=AsyncMock,
+            return_value=(leases_with_geom, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_marine_aquaculture_leases
+
+            result = await ns_get_marine_aquaculture_leases(lang="en")
+
+            for row in result["data"]["leases"]:
+                assert "the_geom" not in row
+
+    @pytest.mark.asyncio
+    async def test_county_and_species_type_forwarded_to_client(self) -> None:
+        """county and species_type params forwarded to fetch_marine_aquaculture_leases."""
+        mock_fetch = AsyncMock(return_value=(self.LEASES_DATA, False))
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_marine_aquaculture_leases",
+            mock_fetch,
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_marine_aquaculture_leases
+
+            await ns_get_marine_aquaculture_leases(county="Inverness", species_type="Shellfish", limit=100)
+
+            call_kwargs = mock_fetch.call_args[1]
+            assert call_kwargs.get("county") == "Inverness"
+            assert call_kwargs.get("species_type") == "Shellfish"
+            assert call_kwargs.get("limit") == 100
+
+    @pytest.mark.asyncio
+    async def test_error_path_returns_make_error(self) -> None:
+        """Exception from client returns make_error with UPSTREAM_ERROR."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_marine_aquaculture_leases",
+            new_callable=AsyncMock,
+            side_effect=Exception("upstream failure"),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_marine_aquaculture_leases
+
+            result = await ns_get_marine_aquaculture_leases()
+
+            assert "error" in result
+            assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_fr_passes_through(self) -> None:
+        """lang='fr' passes through to _meta.lang."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_marine_aquaculture_leases",
+            new_callable=AsyncMock,
+            return_value=(self.LEASES_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_marine_aquaculture_leases
+
+            result = await ns_get_marine_aquaculture_leases(lang="fr")
+
+            assert result["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_api_url_contains_dataset_id(self) -> None:
+        """api_url in _meta source contains the marine leases dataset ID."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_marine_aquaculture_leases",
+            new_callable=AsyncMock,
+            return_value=(self.LEASES_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_marine_aquaculture_leases
+
+            result = await ns_get_marine_aquaculture_leases()
+
+            api_url = result["_meta"]["source"]["url"]
+            assert "h57h-p9mm" in api_url
 
 
 class TestNsGetLandbasedAquacultureLicensesTool:
-    """ns_get_landbased_aquaculture_licenses tool tests. Plan 03 fills."""
+    """ns_get_landbased_aquaculture_licenses tool tests."""
 
-    pass
+    LICENSES_DATA = {
+        "licenses": [
+            {
+                "license_le": "LBL-001",
+                "species": "Atlantic Salmon",
+                "speciestyp": "Finfish",
+                "county": "Hants",
+                "ownership": "Hatchery Farm Ltd.",
+                "sitestatus": "Active",
+                "lat_dms": "45°05'N",
+                "long_dms": "63°44'W",
+            }
+        ],
+        "count": 1,
+        "truncated": False,
+    }
+
+    @pytest.mark.asyncio
+    async def test_happy_path_returns_envelope_with_licenses(self) -> None:
+        """Returns _meta envelope with licenses list."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_landbased_aquaculture_licenses",
+            new_callable=AsyncMock,
+            return_value=(self.LICENSES_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_landbased_aquaculture_licenses
+
+            result = await ns_get_landbased_aquaculture_licenses(lang="en")
+
+            assert "_meta" in result
+            assert result["_meta"]["source"]["api"] == "nova-scotia-socrata"
+            assert "data" in result
+            assert "licenses" in result["data"]
+            assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_county_and_species_type_forwarded_to_client(self) -> None:
+        """county and species_type params forwarded to fetch_landbased_aquaculture_licenses."""
+        mock_fetch = AsyncMock(return_value=(self.LICENSES_DATA, False))
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_landbased_aquaculture_licenses",
+            mock_fetch,
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_landbased_aquaculture_licenses
+
+            await ns_get_landbased_aquaculture_licenses(county="Hants", species_type="Finfish", limit=50)
+
+            call_kwargs = mock_fetch.call_args[1]
+            assert call_kwargs.get("county") == "Hants"
+            assert call_kwargs.get("species_type") == "Finfish"
+
+    @pytest.mark.asyncio
+    async def test_error_path_returns_make_error(self) -> None:
+        """Exception from client returns make_error."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_landbased_aquaculture_licenses",
+            new_callable=AsyncMock,
+            side_effect=Exception("upstream failure"),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_landbased_aquaculture_licenses
+
+            result = await ns_get_landbased_aquaculture_licenses()
+
+            assert "error" in result
+            assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_fr_passes_through(self) -> None:
+        """lang='fr' passes through to _meta.lang."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_landbased_aquaculture_licenses",
+            new_callable=AsyncMock,
+            return_value=(self.LICENSES_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_landbased_aquaculture_licenses
+
+            result = await ns_get_landbased_aquaculture_licenses(lang="fr")
+
+            assert result["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_api_url_contains_dataset_id(self) -> None:
+        """api_url contains the landbased licenses dataset ID."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_landbased_aquaculture_licenses",
+            new_callable=AsyncMock,
+            return_value=(self.LICENSES_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_landbased_aquaculture_licenses
+
+            result = await ns_get_landbased_aquaculture_licenses()
+
+            api_url = result["_meta"]["source"]["url"]
+            assert "yqwg-f62a" in api_url
 
 
 class TestNsGetFishHatcheryStockingTool:
-    """ns_get_fish_hatchery_stocking tool tests. Plan 03 fills."""
+    """ns_get_fish_hatchery_stocking tool tests."""
 
-    pass
+    STOCKING_DATA = {
+        "stocking_records": [
+            {
+                "county": "Antigonish",
+                "name": "Antigonish River",
+                "type": "Stream",
+                "stock": "Brook Trout",
+                "stock_strain": "NS Wild",
+                "hatchery": "Barra Glen Hatchery",
+                "fish_length_cm": "12.5",
+                "fish_weight_g": "25.0",
+                "number_released": "5000",
+                "stocking_date": "2025-11-19T00:00:00.000",
+                "mark": "None",
+                "growth_stage": "Fingerling",
+            }
+        ],
+        "count": 1,
+        "truncated": False,
+    }
+
+    @pytest.mark.asyncio
+    async def test_happy_path_returns_envelope_with_stocking_records(self) -> None:
+        """Returns _meta envelope with stocking_records list."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_fish_hatchery_stocking",
+            new_callable=AsyncMock,
+            return_value=(self.STOCKING_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_fish_hatchery_stocking
+
+            result = await ns_get_fish_hatchery_stocking(lang="en")
+
+            assert "_meta" in result
+            assert result["_meta"]["source"]["api"] == "nova-scotia-socrata"
+            assert "data" in result
+            assert "stocking_records" in result["data"]
+            assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_stock_and_county_forwarded_to_client(self) -> None:
+        """stock and county params forwarded to fetch_fish_hatchery_stocking."""
+        mock_fetch = AsyncMock(return_value=(self.STOCKING_DATA, False))
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_fish_hatchery_stocking",
+            mock_fetch,
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_fish_hatchery_stocking
+
+            await ns_get_fish_hatchery_stocking(stock="Brook Trout", county="Antigonish", limit=200)
+
+            call_kwargs = mock_fetch.call_args[1]
+            assert call_kwargs.get("stock") == "Brook Trout"
+            assert call_kwargs.get("county") == "Antigonish"
+
+    @pytest.mark.asyncio
+    async def test_error_path_returns_make_error(self) -> None:
+        """Exception from client returns make_error."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_fish_hatchery_stocking",
+            new_callable=AsyncMock,
+            side_effect=Exception("upstream failure"),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_fish_hatchery_stocking
+
+            result = await ns_get_fish_hatchery_stocking()
+
+            assert "error" in result
+            assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_fr_passes_through(self) -> None:
+        """lang='fr' passes through to _meta.lang."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_fish_hatchery_stocking",
+            new_callable=AsyncMock,
+            return_value=(self.STOCKING_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_fish_hatchery_stocking
+
+            result = await ns_get_fish_hatchery_stocking(lang="fr")
+
+            assert result["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_api_url_contains_dataset_id(self) -> None:
+        """api_url contains the hatchery stocking dataset ID."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_fish_hatchery_stocking",
+            new_callable=AsyncMock,
+            return_value=(self.STOCKING_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_fish_hatchery_stocking
+
+            result = await ns_get_fish_hatchery_stocking()
+
+            api_url = result["_meta"]["source"]["url"]
+            assert "8e4a-m6fw" in api_url
 
 
 class TestNsGetAquacultureProductionTool:
-    """ns_get_aquaculture_production tool tests. Plan 03 fills."""
+    """ns_get_aquaculture_production tool tests."""
 
-    pass
+    PRODUCTION_DATA = {
+        "production": [
+            {
+                "year": "2022",
+                "county": "Guysborough",
+                "kgs": "1250000.0",
+                "total_value": "8500000.0",
+                "full_time": "45.0",
+                "total_employ": "60.0",
+            }
+        ],
+        "count": 1,
+        "truncated": False,
+    }
+
+    @pytest.mark.asyncio
+    async def test_happy_path_returns_envelope_with_production(self) -> None:
+        """Returns _meta envelope with production list."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_aquaculture_production",
+            new_callable=AsyncMock,
+            return_value=(self.PRODUCTION_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_aquaculture_production
+
+            result = await ns_get_aquaculture_production(lang="en")
+
+            assert "_meta" in result
+            assert result["_meta"]["source"]["api"] == "nova-scotia-socrata"
+            assert "data" in result
+            assert "production" in result["data"]
+            assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_year_and_county_forwarded_to_client(self) -> None:
+        """year and county params forwarded to fetch_aquaculture_production."""
+        mock_fetch = AsyncMock(return_value=(self.PRODUCTION_DATA, False))
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_aquaculture_production",
+            mock_fetch,
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_aquaculture_production
+
+            await ns_get_aquaculture_production(year="2022", county="Guysborough", limit=500)
+
+            call_kwargs = mock_fetch.call_args[1]
+            assert call_kwargs.get("year") == "2022"
+            assert call_kwargs.get("county") == "Guysborough"
+
+    @pytest.mark.asyncio
+    async def test_error_path_returns_make_error(self) -> None:
+        """Exception from client returns make_error."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_aquaculture_production",
+            new_callable=AsyncMock,
+            side_effect=Exception("upstream failure"),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_aquaculture_production
+
+            result = await ns_get_aquaculture_production()
+
+            assert "error" in result
+            assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_fr_passes_through(self) -> None:
+        """lang='fr' passes through to _meta.lang."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_aquaculture_production",
+            new_callable=AsyncMock,
+            return_value=(self.PRODUCTION_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_aquaculture_production
+
+            result = await ns_get_aquaculture_production(lang="fr")
+
+            assert result["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_api_url_contains_dataset_id(self) -> None:
+        """api_url contains the aquaculture production dataset ID."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_aquaculture_production",
+            new_callable=AsyncMock,
+            return_value=(self.PRODUCTION_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_aquaculture_production
+
+            result = await ns_get_aquaculture_production()
+
+            api_url = result["_meta"]["source"]["url"]
+            assert "v2ex-ev63" in api_url
+
+    @pytest.mark.asyncio
+    async def test_cached_true_passes_through(self) -> None:
+        """cached=True from client passes through to _meta.cached."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_aquaculture_production",
+            new_callable=AsyncMock,
+            return_value=(self.PRODUCTION_DATA, True),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_aquaculture_production
+
+            result = await ns_get_aquaculture_production()
+
+            assert result["_meta"]["cached"] is True
 
 
 class TestNsGetWaterQualityMonitoringTool:

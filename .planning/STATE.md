@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 19-04-PLAN.md
-last_updated: "2026-06-15T15:23:47.048Z"
+stopped_at: Completed 19-05-PLAN.md
+last_updated: "2026-06-15T15:29:48.870Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 13
   total_plans: 64
-  completed_plans: 61
+  completed_plans: 62
   percent: 0
 ---
 
@@ -109,6 +109,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 19-saskatchewan-government-open-data P02 | 6min | 2 tasks | 4 files |
 | Phase 19-saskatchewan-government-open-data P03 | 18min | 2 tasks | 4 files |
 | Phase 19-saskatchewan-government-open-data P04 | 6min | 2 tasks | 4 files |
+| Phase 19-saskatchewan-government-open-data P05 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -270,6 +271,8 @@ Recent decisions affecting current work:
 - [Phase 19-saskatchewan-government-open-data]: fetch_fire_bans validates ban_scope before calling arcgis_hub (double-guard: tool INVALID_INPUT + client ValueError) — mirrors Alberta ST3 + mineral dispatch patterns
 - [Phase 19-saskatchewan-government-open-data]: api_name='saskatchewan-spsa-firebans' for fire bans (distinguishes SPSA server from Hub in _meta envelope); historic wildfires + air quality use 'saskatchewan-geohub'
 - [Phase 19-saskatchewan-government-open-data]: Empty fire bans payload explicitly tested as valid success (count=0, _meta envelope) not error — same lesson as Manitoba flood alerts
+- [Phase 19-saskatchewan-government-open-data]: api_name='saskatchewan-wsa' for WSA tools (distinguishes WSA org from Hub in _meta envelope)
+- [Phase 19-saskatchewan-government-open-data]: WSA_RESERVOIRS_LAYER=26 used as constant in client call and api_url; layer 26 pinned via call_args assertion in test
 
 ### Roadmap Evolution
 
@@ -297,6 +300,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-15T15:23:47.044Z
-Stopped at: Completed 19-04-PLAN.md
+Last session: 2026-06-15T15:29:48.866Z
+Stopped at: Completed 19-05-PLAN.md
 Resume file: None

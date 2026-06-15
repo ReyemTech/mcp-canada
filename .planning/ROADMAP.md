@@ -246,7 +246,7 @@ Plans:
 **Goal:** Add Saskatchewan's provincial open data as a new `saskatchewan` module via the geohub.saskatchewan.ca ArcGIS Hub (primary org `zcv98lgAl8xQ04cW`), the separate WSA org (`7MBdlVpjqbfBhQer`), and the SPSA wildfire REST server (`gis.saskatchewan.ca/egis`) — a lean 14 tools (5 Hub discovery + 9 curated) across agriculture (crop yields, grain elevators), energy/mining (potash/uranium/helium/coal), environment (fire bans, historic wildfires, air quality), and water (WSA hydrometric stations, reservoirs), with 6 bilingual prompts + 7 resources. ArcGIS Hub pattern (Manitoba Phase 18 / Alberta Phase 17), NOT CKAN. Wave 0 fixes the shared `arcgis_hub.py` startindex pagination bug (benefits York/Alberta/Manitoba too). Transport (511 key-gated) and Health (no public SHA FeatureServer) are deferred — no NOT_CONFIGURED stubs.
 **Requirements**: SK-01, SK-02, SK-03, SK-04, SK-05, SK-06, SK-07, SK-08, SK-09, SK-10, SK-11, SK-12, SK-13, SK-14, SK-15
 **Depends on:** Phase 18
-**Plans:** 4/7 plans executed
+**Plans:** 5/7 plans executed
 
 Plans:
 - [ ] 19-01-PLAN.md — Wave 0: shared/arcgis_hub.py startindex fix + York/Alberta/Manitoba no-regression check + module scaffold (7 files + test scaffolds, constants for 3 bases, ~14 client stubs) + spike (WSA water-quality layer 19 + Petroleum 400)

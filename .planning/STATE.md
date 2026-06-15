@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 20-nova-scotia-government-open-data 20-01-PLAN.md
-last_updated: "2026-06-15T19:05:19.624Z"
+stopped_at: Completed 20-nova-scotia-government-open-data 20-02-PLAN.md
+last_updated: "2026-06-15T19:14:36.026Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 14
   total_plans: 71
-  completed_plans: 65
+  completed_plans: 66
   percent: 0
 ---
 
@@ -113,6 +113,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 19-saskatchewan-government-open-data P06 | 8min | 2 tasks | 3 files |
 | Phase 19-saskatchewan-government-open-data P07 | 15min | 2 tasks | 7 files |
 | Phase 20-nova-scotia-government-open-data P01 | 11min | 3 tasks | 15 files |
+| Phase 20-nova-scotia-government-open-data P02 | 6min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -283,6 +284,9 @@ Recent decisions affecting current work:
 - [Phase 20-nova-scotia-government-open-data]: shared/socrata.py is the 4th portal client (CKAN/ArcGIS Hub/OGC WFS/Socrata SODA); httpx injection, parsed dicts, no cached_fetch/get_limiter inside
 - [Phase 20-nova-scotia-government-open-data]: ACTIVE_ADVISORY_FILTER = 'date_advisory_removed IS NULL' (spike-confirmed; empty-string = type-mismatch error on date column)
 - [Phase 20-nova-scotia-government-open-data]: AMI chronic disease uses health_zone (→zone) and has no sex field; hypertension uses hypertension_count+prevalence_rate (non-standard); NovaScotiaChronicDiseaseRow uses nullable fields
+- [Phase 20-nova-scotia-government-open-data]: fetch_categories uses q='' + client-side domain_category aggregation (never categories= param — confirmed broken, returns resultSetSize=0)
+- [Phase 20-nova-scotia-government-open-data]: include_geometry=False + select=None leaves select as None in fetch_query_dataset (documented: Socrata returns all fields including the_geom; agent must use $select to exclude)
+- [Phase 20-nova-scotia-government-open-data]: api_name='nova-scotia-socrata' used for all 5 discovery tools in make_response envelope
 
 ### Roadmap Evolution
 
@@ -310,6 +314,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-15T19:05:19.579Z
-Stopped at: Completed 20-nova-scotia-government-open-data 20-01-PLAN.md
+Last session: 2026-06-15T19:14:36.023Z
+Stopped at: Completed 20-nova-scotia-government-open-data 20-02-PLAN.md
 Resume file: None

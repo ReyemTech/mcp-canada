@@ -23,8 +23,11 @@ from mcp_canada.shared.envelope import make_error, make_response
 
 from . import client as _client
 from .constants import (
+    GRAIN_ELEVATORS_FS_URL,
     HUB_BASE_URL,
+    HUB_ORG_BASE,
     HUB_SEARCH_URL,
+    MINERAL_MINES_FS_URLS,
 )
 
 # Source identifier for the _meta envelope (all discovery tools)
@@ -37,6 +40,10 @@ __all__ = [
     "saskatchewan_query_dataset",
     "saskatchewan_list_organizations",
     "saskatchewan_list_categories",
+    # Agriculture + Mining (Plan 03)
+    "saskatchewan_get_crop_yields",
+    "saskatchewan_get_grain_elevators",
+    "saskatchewan_get_mineral_mines",
 ]
 
 
@@ -241,6 +248,165 @@ async def saskatchewan_list_categories(
         payload,
         api_name=_API_NAME_HUB,
         api_url=HUB_SEARCH_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Agriculture + Mining (Plan 03)
+# ---------------------------------------------------------------------------
+
+_CROP_REGIONS = ("provincial", "southeast", "southwest", "central", "northeast", "northwest")
+_MINERALS = ("potash", "uranium", "helium", "coal")
+
+
+@tool
+async def saskatchewan_get_crop_yields(
+    region: str = "provincial",
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Saskatchewan estimated crop yields (bu/acre) by region for 16 crop types.
+
+    Use for: Retrieving Saskatchewan provincial estimated crop yields by crop reporting region. Dispatches between provincial summary and 5 sub-regions: southeast, southwest, central, northeast, northwest. Returns 16 crop estimates: HRSW, Durum, Oat, Barley, Canola, Mustard, Soybean, Pea, Lentil, Chickpea, Canary_seed, Flax, Winter_wheat, Fall_rye, Other_wheat_. NOTE: yields are estimated bu/acre from the annual crop report cycle; weekly PDF crop reports are NOT machine-readable — this FeatureServer is the machine-readable substitute.
+
+    Keywords: saskatchewan crop yields agriculture canola wheat lentil chickpea barley pea durum HRSW region harvest estimate bu/acre annual
+    """
+    from .constants import CROP_YIELDS_PROVINCE_FS_URL, CROP_YIELDS_REGIONS_FS_URL
+
+    valid = list(_CROP_REGIONS)
+    if region.lower() not in _CROP_REGIONS:
+        msg = (
+            f"Région invalide: {region!r}. Valeurs valides: {valid}"
+            if lang == "fr"
+            else f"Invalid region: {region!r}. Valid: {valid}"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=valid)
+
+    # Build the FS URL for envelope source attribution
+    fs_url = (
+        CROP_YIELDS_PROVINCE_FS_URL
+        if region.lower() == "provincial"
+        else CROP_YIELDS_REGIONS_FS_URL
+    )
+
+    try:
+        payload, cached = await _client.fetch_crop_yields(region=region)
+    except ValueError as exc:
+        msg = (
+            f"Région invalide: {exc}"
+            if lang == "fr"
+            else f"Invalid region: {exc}"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=valid)
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur du géoportail Saskatchewan: {exc.response.status_code}"
+            if lang == "fr"
+            else f"Saskatchewan geoportal error: {exc.response.status_code}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur inattendue: {exc}"
+            if lang == "fr"
+            else f"Unexpected error: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        payload,
+        api_name=_API_NAME_HUB,
+        api_url=f"{fs_url}/0",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def saskatchewan_get_grain_elevators(
+    railway: Literal["CN", "CP", "SHORTLINE"] | None = None,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Saskatchewan grain elevator locations with station, railway, licensee, and capacity.
+
+    Use for: Finding grain elevator locations in Saskatchewan with railway line, licensee, elevator type, and capacity in tonnes. Default returns all SK elevators from the Western Canada Grain Elevators 2024 dataset. Optional railway filter: CN, CP, or SHORTLINE.
+
+    Keywords: saskatchewan grain elevator station railway CN CP SHORTLINE capacity tonne licensee primary process agriculture export terminal
+    """
+    try:
+        payload, cached = await _client.fetch_grain_elevators(railway=railway)
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur du géoportail Saskatchewan: {exc.response.status_code}"
+            if lang == "fr"
+            else f"Saskatchewan geoportal error: {exc.response.status_code}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur inattendue: {exc}"
+            if lang == "fr"
+            else f"Unexpected error: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        payload,
+        api_name=_API_NAME_HUB,
+        api_url=f"{GRAIN_ELEVATORS_FS_URL}/0",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+async def saskatchewan_get_mineral_mines(
+    mineral: Literal["potash", "uranium", "helium", "coal"],
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get Saskatchewan mineral mine locations for potash, uranium, helium, or coal.
+
+    Use for: Retrieving Saskatchewan mineral mine data by mineral type. Dispatches to dated FeatureServers (2024 publication): potash (13 active mines, world's largest reserve), uranium (Athabasca Basin, Cameco operations), helium (emerging sector), coal (historical and active). Returns mine name, company, status, mine type, site, regulation, and date opened.
+
+    Keywords: saskatchewan mineral mines potash uranium helium coal mining Cameco Mosaic Athabasca Basin K+S company status operating care maintenance
+    """
+    valid = list(_MINERALS)
+    if mineral.lower() not in _MINERALS:
+        msg = (
+            f"Minéral invalide: {mineral!r}. Valeurs valides: {valid}"
+            if lang == "fr"
+            else f"Invalid mineral: {mineral!r}. Valid: {valid}"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=valid)
+
+    fs_url = MINERAL_MINES_FS_URLS.get(mineral.lower(), "")
+
+    try:
+        payload, cached = await _client.fetch_mineral_mines(mineral=mineral)
+    except ValueError as exc:
+        msg = (
+            f"Minéral invalide: {exc}"
+            if lang == "fr"
+            else f"Invalid mineral: {exc}"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=valid)
+    except httpx.HTTPStatusError as exc:
+        msg = (
+            f"Erreur du géoportail Saskatchewan: {exc.response.status_code}"
+            if lang == "fr"
+            else f"Saskatchewan geoportal error: {exc.response.status_code}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    except Exception as exc:
+        msg = (
+            f"Erreur inattendue: {exc}"
+            if lang == "fr"
+            else f"Unexpected error: {exc}"
+        )
+        return make_error("UPSTREAM_ERROR", msg, lang=lang)
+    return make_response(
+        payload,
+        api_name=_API_NAME_HUB,
+        api_url=f"{fs_url}/0",
         cached=cached,
         lang=lang,
     )

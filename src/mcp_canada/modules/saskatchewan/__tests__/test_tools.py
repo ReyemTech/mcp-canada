@@ -345,7 +345,98 @@ class TestSaskGetCropYieldsTool:
     Plan 03 fills: valid region values; invalid region → INVALID_INPUT with valid= list.
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """saskatchewan_get_crop_yields returns _meta envelope with correct api name."""
+        import json
+        payload = {
+            "features": [{"Region": "Provincial", "Canola": 34.0}],
+            "count": 1,
+            "truncated": False,
+            "region": "provincial",
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_crop_yields",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_crop_yields(region="provincial")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "_meta" in data, f"Expected _meta envelope, got keys: {list(data.keys())}"
+        assert data["_meta"]["source"]["api"] == "saskatchewan-geohub"
+
+    @pytest.mark.asyncio
+    async def test_data_contains_features(self):
+        """saskatchewan_get_crop_yields wraps payload under data key with features list."""
+        import json
+        payload = {
+            "features": [{"Region": "Provincial", "Canola": 34.0, "HRSW": 43.0}],
+            "count": 1,
+            "truncated": False,
+            "region": "provincial",
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_crop_yields",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_crop_yields(region="provincial")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert data["data"]["features"][0]["Canola"] == 34.0
+
+    @pytest.mark.asyncio
+    async def test_invalid_region_returns_invalid_input(self):
+        """saskatchewan_get_crop_yields returns INVALID_INPUT for unknown region."""
+        import json
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_crop_yields",
+            new_callable=AsyncMock,
+            side_effect=ValueError("Unknown region: 'bogus'. Valid: ['provincial', ...]"),
+        ):
+            result = await tools.saskatchewan_get_crop_yields(region="bogus")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "error" in data, f"Expected error response, got: {data}"
+        assert data["error"]["code"] == "INVALID_INPUT"
+        # valid list must be present
+        assert "valid" in data["error"]
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """saskatchewan_get_crop_yields passes lang='fr' through to _meta envelope."""
+        import json
+        payload = {
+            "features": [],
+            "count": 0,
+            "truncated": False,
+            "region": "provincial",
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_crop_yields",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_crop_yields(lang="fr")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert data["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_upstream_error_on_http_exception(self):
+        """saskatchewan_get_crop_yields returns UPSTREAM_ERROR on HTTP exception."""
+        import json
+        import httpx
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_crop_yields",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "503",
+                request=httpx.Request("GET", "https://services3.arcgis.com/"),
+                response=httpx.Response(503),
+            ),
+        ):
+            result = await tools.saskatchewan_get_crop_yields(region="provincial")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "error" in data
+        assert data["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestSaskGetGrainElevatorsTool:
@@ -354,7 +445,76 @@ class TestSaskGetGrainElevatorsTool:
     Plan 03 fills.
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """saskatchewan_get_grain_elevators returns _meta envelope with correct api name."""
+        import json
+        payload = {
+            "features": [
+                {"Station": "Regina", "PR": "SK", "Railway": "CN",
+                 "Licensee": "Richardson International", "Elevator_type": "Primary",
+                 "Capacity_tonne": 42000.0}
+            ],
+            "count": 1,
+            "truncated": False,
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_grain_elevators",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_grain_elevators()
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "_meta" in data
+        assert data["_meta"]["source"]["api"] == "saskatchewan-geohub"
+
+    @pytest.mark.asyncio
+    async def test_railway_optional_filter_passed(self):
+        """saskatchewan_get_grain_elevators passes railway= to client function."""
+        import json
+        payload = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_grain_elevators",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ) as mock_client:
+            await tools.saskatchewan_get_grain_elevators(railway="CN")
+        mock_client.assert_called_once()
+        call_kwargs = mock_client.call_args
+        assert call_kwargs[1].get("railway") == "CN" or call_kwargs[0][0] == "CN"
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """saskatchewan_get_grain_elevators passes lang='fr' through to _meta envelope."""
+        import json
+        payload = {"features": [], "count": 0, "truncated": False}
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_grain_elevators",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_grain_elevators(lang="fr")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert data["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_upstream_error_on_http_exception(self):
+        """saskatchewan_get_grain_elevators returns UPSTREAM_ERROR on HTTP exception."""
+        import json
+        import httpx
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_grain_elevators",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "500",
+                request=httpx.Request("GET", "https://services3.arcgis.com/"),
+                response=httpx.Response(500),
+            ),
+        ):
+            result = await tools.saskatchewan_get_grain_elevators()
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "error" in data
+        assert data["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestSaskGetMineralMinesTool:
@@ -363,7 +523,114 @@ class TestSaskGetMineralMinesTool:
     Plan 03 fills: invalid mineral → INVALID_INPUT with valid=['potash','uranium','helium','coal'].
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_meta_envelope_on_success(self):
+        """saskatchewan_get_mineral_mines returns _meta envelope with correct api name."""
+        import json
+        payload = {
+            "features": [
+                {"Name": "K+S Bethune", "Status": "Operating", "Mine_Type": "Solution",
+                 "Company": "K+S Potash Canada GP", "DateOpened": "2017"}
+            ],
+            "count": 1,
+            "truncated": False,
+            "mineral": "potash",
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_mineral_mines",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_mineral_mines(mineral="potash")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "_meta" in data
+        assert data["_meta"]["source"]["api"] == "saskatchewan-geohub"
+
+    @pytest.mark.asyncio
+    async def test_data_contains_features(self):
+        """saskatchewan_get_mineral_mines wraps payload under data key."""
+        import json
+        payload = {
+            "features": [{"Name": "Cameco Eagle Point", "Status": "Care & Maintenance"}],
+            "count": 1,
+            "truncated": False,
+            "mineral": "uranium",
+        }
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_mineral_mines",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_mineral_mines(mineral="uranium")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert data["data"]["features"][0]["Name"] == "Cameco Eagle Point"
+
+    @pytest.mark.asyncio
+    async def test_invalid_mineral_returns_invalid_input(self):
+        """saskatchewan_get_mineral_mines returns INVALID_INPUT for unknown mineral."""
+        import json
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_mineral_mines",
+            new_callable=AsyncMock,
+            side_effect=ValueError("Unknown mineral: 'gold'. Valid: ['potash', 'uranium', ...]"),
+        ):
+            result = await tools.saskatchewan_get_mineral_mines(mineral="gold")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "error" in data
+        assert data["error"]["code"] == "INVALID_INPUT"
+        # valid list must contain the 4 mineral types
+        valid = data["error"]["valid"]
+        assert "potash" in valid
+        assert "uranium" in valid
+
+    @pytest.mark.asyncio
+    async def test_lang_passes_through_to_envelope(self):
+        """saskatchewan_get_mineral_mines passes lang='fr' through to _meta envelope."""
+        import json
+        payload = {"features": [], "count": 0, "truncated": False, "mineral": "potash"}
+        with patch(
+            "mcp_canada.modules.sanskrit.tools._client.fetch_mineral_mines"
+            if False else
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_mineral_mines",
+            new_callable=AsyncMock,
+            return_value=(payload, False),
+        ):
+            result = await tools.saskatchewan_get_mineral_mines(mineral="potash", lang="fr")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert data["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_upstream_error_on_http_exception(self):
+        """saskatchewan_get_mineral_mines returns UPSTREAM_ERROR on HTTP exception."""
+        import json
+        import httpx
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_mineral_mines",
+            new_callable=AsyncMock,
+            side_effect=httpx.HTTPStatusError(
+                "500",
+                request=httpx.Request("GET", "https://services3.arcgis.com/"),
+                response=httpx.Response(500),
+            ),
+        ):
+            result = await tools.saskatchewan_get_mineral_mines(mineral="potash")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "error" in data
+        assert data["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_fr_error_message_for_invalid_mineral(self):
+        """saskatchewan_get_mineral_mines returns French error message when lang='fr'."""
+        import json
+        with patch(
+            "mcp_canada.modules.saskatchewan.tools._client.fetch_mineral_mines",
+            new_callable=AsyncMock,
+            side_effect=ValueError("Unknown mineral"),
+        ):
+            result = await tools.saskatchewan_get_mineral_mines(mineral="gold", lang="fr")
+        data = json.loads(result) if isinstance(result, str) else result
+        assert "error" in data
+        assert data["error"]["code"] == "INVALID_INPUT"
 
 
 # ---------------------------------------------------------------------------

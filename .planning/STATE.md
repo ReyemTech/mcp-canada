@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 20-nova-scotia-government-open-data 20-06-PLAN.md
-last_updated: "2026-06-15T19:54:22.841Z"
+stopped_at: Completed 20-nova-scotia-government-open-data 20-07-PLAN.md
+last_updated: "2026-06-15T20:11:17.883Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
-  completed_phases: 14
+  completed_phases: 15
   total_plans: 71
-  completed_plans: 70
+  completed_plans: 71
   percent: 0
 ---
 
@@ -118,6 +118,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 20-nova-scotia-government-open-data P04 | 6min | 2 tasks | 4 files |
 | Phase 20-nova-scotia-government-open-data P05 | 6min | 2 tasks | 4 files |
 | Phase 20-nova-scotia-government-open-data P06 | 8min | 2 tasks | 3 files |
+| Phase 20-nova-scotia-government-open-data P07 | 12min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -301,6 +302,9 @@ Recent decisions affecting current work:
 - [Phase 20-nova-scotia-government-open-data]: vital stats field is 'counties' (not 'county') UPPERCASE matching r794-fttm dataset schema (Pitfall 4)
 - [Phase 20-nova-scotia-government-open-data]: @prompt/@resource count tests use __all__ (not isinstance check) — decorators return callables not Prompt/Resource instances in fastmcp
 - [Phase 20-nova-scotia-government-open-data]: docs://ns/socrata-guide is the canonical SODA/SoQL how-to for all agents (first Socrata portal); portal-guide documents deferred transport/511 and novagis ArcGIS Hub
+- [Phase 20-nova-scotia-government-open-data]: ALL_NS_TOOLS has 16 entries (code is authoritative over plan spec of 17; same pattern as SK 13 vs planned 14)
+- [Phase 20-nova-scotia-government-open-data]: length_of_advisory_in_days is the actual Socrata column name (not length_of_advisory); live 400 unmasked by integration test
+- [Phase 20-nova-scotia-government-open-data]: Socrata added as 4th Portal Technology in CLAUDE.md; shared/socrata.py documented for reuse by future Socrata portals (PEI, NB)
 
 ### Roadmap Evolution
 
@@ -328,6 +332,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-15T19:54:22.838Z
-Stopped at: Completed 20-nova-scotia-government-open-data 20-06-PLAN.md
+Last session: 2026-06-15T20:11:17.879Z
+Stopped at: Completed 20-nova-scotia-government-open-data 20-07-PLAN.md
 Resume file: None

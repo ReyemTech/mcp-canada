@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 20-nova-scotia-government-open-data 20-03-PLAN.md
-last_updated: "2026-06-15T19:23:14.953Z"
+stopped_at: Completed 20-nova-scotia-government-open-data 20-04-PLAN.md
+last_updated: "2026-06-15T19:32:58.605Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 14
   total_plans: 71
-  completed_plans: 67
+  completed_plans: 68
   percent: 0
 ---
 
@@ -115,6 +115,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 20-nova-scotia-government-open-data P01 | 11min | 3 tasks | 15 files |
 | Phase 20-nova-scotia-government-open-data P02 | 6min | 2 tasks | 4 files |
 | Phase 20-nova-scotia-government-open-data P03 | 5min | 2 tasks | 4 files |
+| Phase 20-nova-scotia-government-open-data P04 | 6min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -290,6 +291,9 @@ Recent decisions affecting current work:
 - [Phase 20-nova-scotia-government-open-data]: api_name='nova-scotia-socrata' used for all 5 discovery tools in make_response envelope
 - [Phase 20-nova-scotia-government-open-data]: Defensive the_geom strip applied at both client and tool layers for marine leases — belt-and-suspenders; $select is primary, row strip handles any API anomaly
 - [Phase 20-nova-scotia-government-open-data]: CACHE_TTL_ANNUAL (7d) for aquaculture production (annual dataset); leases/licenses/hatchery use CACHE_TTL_META (24h)
+- [Phase 20-nova-scotia-government-open-data]: Empty boil-water advisory list (active_only=True returning []) is make_response with count=0 — mirrors Manitoba flood-alert and Saskatchewan fire-ban patterns
+- [Phase 20-nova-scotia-government-open-data]: Protected areas (ticv-5du5) the_geom excluded via explicit $select + belt-and-suspenders row strip at both client and tool layers
+- [Phase 20-nova-scotia-government-open-data]: Air quality tool (ns_get_air_quality_stations) is station-catalog-only; 20+ per-station pollutant datasets routed to ns_query_dataset; directs to docs://ns/air-quality-guide (Plan 06)
 
 ### Roadmap Evolution
 
@@ -317,6 +321,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-15T19:23:14.949Z
-Stopped at: Completed 20-nova-scotia-government-open-data 20-03-PLAN.md
+Last session: 2026-06-15T19:32:58.601Z
+Stopped at: Completed 20-nova-scotia-government-open-data 20-04-PLAN.md
 Resume file: None

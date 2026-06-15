@@ -2,6 +2,157 @@
 
 <!-- CHANGELOG -->
 
+## v0.8.0 (2026-06-15)
+
+### Bug Fixes
+
+- **18-01**: Fix prompts.py fastmcp Message import path
+  ([`c3cc2a5`](https://github.com/ReyemTech/mcp-canada/commit/c3cc2a516dc344c70c78427e269f007445a48381))
+
+- **18-09**: Remap Manitoba Hub Search params to OGC conventions (limit/startindex)
+  ([`9a8bef5`](https://github.com/ReyemTech/mcp-canada/commit/9a8bef531716bac5e0c8b26a179c83c1366651df))
+
+### Chores
+
+- Sync uv.lock after release
+  ([`5aee2a7`](https://github.com/ReyemTech/mcp-canada/commit/5aee2a7f01b3e89165d6d0c214eca6ae6ab2bf1b))
+
+- **18-01**: Wave 0 spike — resolve Manitoba open questions
+  ([`584b8de`](https://github.com/ReyemTech/mcp-canada/commit/584b8dece5111c6a0a9d46489ff4cd200c57b54e))
+
+### Code Style
+
+- **18**: Clean ruff warnings in manitoba module (unused imports/locals)
+  ([`bc3b212`](https://github.com/ReyemTech/mcp-canada/commit/bc3b2120cc40ef4f44d15f3f289fcac0b963fbee))
+
+### Documentation
+
+- **18**: Capture phase context
+  ([`9815540`](https://github.com/ReyemTech/mcp-canada/commit/9815540da336b8288e6aad91b498637983c0e3e6))
+
+- **18**: Create Manitoba phase plan (8 plans, MB-01..MB-18)
+  ([`f1f7e6d`](https://github.com/ReyemTech/mcp-canada/commit/f1f7e6d560c63af4f0a27747243c8746b9a6beac))
+
+- **18**: Gap-closure plan 18-09 for Hub-Search 400 fix
+  ([`9450ab0`](https://github.com/ReyemTech/mcp-canada/commit/9450ab03609eeac4342989373a545d46435695f2))
+
+- **18**: Research finds ArcGIS Hub portal, sync context
+  ([`c6e37de`](https://github.com/ReyemTech/mcp-canada/commit/c6e37de3a0b69a60d1aabebb21c1a1b75fcba1e4))
+
+- **18**: Research phase — Manitoba ArcGIS Hub discovery, 9+ curated tools verified
+  ([`6c63d20`](https://github.com/ReyemTech/mcp-canada/commit/6c63d2022fd39f7bb2349a0c14c15821152e1761))
+
+- **18-01**: Complete Manitoba Wave 0 scaffold plan
+  ([`62ea617`](https://github.com/ReyemTech/mcp-canada/commit/62ea617d1edecb27b4cae32e3fefbfc07809477a))
+
+- **18-02**: Complete Manitoba discovery tools plan — 5 Hub tools + 39 tests
+  ([`4e840d8`](https://github.com/ReyemTech/mcp-canada/commit/4e840d80ca2e29875667fcbf0e6cf42c1fa74a4a))
+
+- **18-03**: Complete Manitoba flood/hydrology plan — MB-07/MB-08/MB-09
+  ([`5ace21b`](https://github.com/ReyemTech/mcp-canada/commit/5ace21b7d5f0b42b4e0f05c4b981b2d103cf4f02))
+
+- **18-04**: Complete Manitoba agriculture/drought plan — 4 tools, 33 tests, 96.67% coverage
+  ([`4fa8581`](https://github.com/ReyemTech/mcp-canada/commit/4fa85814b6f3d5098dbed4332f831a871f01becc))
+
+- **18-05**: Complete Manitoba environment/health/parks plan — parks bilingual, fisheries 350+ WBs,
+  forests, wait times, health facilities
+  ([`3419285`](https://github.com/ReyemTech/mcp-canada/commit/34192858b21b94c3794afb847cd1867ab1ea6705))
+
+- **18-06**: Complete Manitoba transport/511 plan — 3 tools, NOT_CONFIGURED fallback, 18 tests
+  ([`22f3322`](https://github.com/ReyemTech/mcp-canada/commit/22f3322cdb5b8fde5f2c9db28548dd595defb25d))
+
+- **18-07**: Complete Manitoba prompts+resources plan — 6 prompts + 7 resources, 36 tests, 97.99%
+  coverage
+  ([`345c0e2`](https://github.com/ReyemTech/mcp-canada/commit/345c0e2131f685778426cac4e30afc372e3a886d))
+
+- **18-08**: Complete Manitoba closing plan — parametrized tests, integration, docs, 96.75% coverage
+  ([`a8524fb`](https://github.com/ReyemTech/mcp-canada/commit/a8524fb1864fd4085ef9982cc9da3cd5fc8f878a))
+
+- **18-08**: Sync README/MODULES/CLAUDE/EXAMPLES for Manitoba — 20 tools, 237 total
+  ([`dc727ed`](https://github.com/ReyemTech/mcp-canada/commit/dc727edfcebdea58c9f46fda9b4c9a529f3085da))
+
+- **18-09**: Complete Manitoba Hub Search gap closure — OGC param fix, 96.76% coverage
+  ([`a7a5659`](https://github.com/ReyemTech/mcp-canada/commit/a7a56598f1da004452a394036d1b1169075d78fa))
+
+- **phase-18**: Add validation strategy
+  ([`67b4253`](https://github.com/ReyemTech/mcp-canada/commit/67b425371840663438b98d3d3bef566e50ffee8e))
+
+- **phase-18**: Complete phase execution
+  ([`27f4c2a`](https://github.com/ReyemTech/mcp-canada/commit/27f4c2a683f5aedaa2690adb16333f7ca5771d83))
+
+- **phase-18**: Resolve UAT gap + debug session after 18-09 gap closure
+  ([`ea5b76f`](https://github.com/ReyemTech/mcp-canada/commit/ea5b76fa9630cf17c7cf00a2b60c1401000f1d42))
+
+- **readme**: Sync stale counts after Manitoba (237 tools, 25 examples)
+  ([`60bed28`](https://github.com/ReyemTech/mcp-canada/commit/60bed286eae776c9331d6ed857c338c354a8d48c))
+
+- **state**: Record phase 18 context session
+  ([`47235fd`](https://github.com/ReyemTech/mcp-canada/commit/47235fdea1379a96fc763e0d51e8126a19a92c55))
+
+### Features
+
+- **18-01**: Client helpers + stubs + test scaffolds for Manitoba module
+  ([`3aa32b9`](https://github.com/ReyemTech/mcp-canada/commit/3aa32b924bdc910e9947e4d0027cbe06212a5eae))
+
+- **18-01**: Scaffold Manitoba module init, constants, schemas
+  ([`c2f4c5f`](https://github.com/ReyemTech/mcp-canada/commit/c2f4c5f2a545a0452f77d78e46a608addf7f4c46))
+
+- **18-02**: Add 5 discovery @tool functions + tool tests
+  ([`93aa3c9`](https://github.com/ReyemTech/mcp-canada/commit/93aa3c92e230d012d17629b5b0cd83a85eba7baf))
+
+- **18-02**: Implement 5 discovery client bodies + TestSharedApiGetContract
+  ([`3381dbd`](https://github.com/ReyemTech/mcp-canada/commit/3381dbd5ba507c8e32f6bc4e1b4bc4a6adc97e4e))
+
+- **18-03**: Add 3 flood/hydrology @tool functions + tool tests
+  ([`24f9832`](https://github.com/ReyemTech/mcp-canada/commit/24f9832c40ce856849e474729abe83ed49203610))
+
+- **18-03**: Implement flood/hydrology client bodies + tests
+  ([`6b9d933`](https://github.com/ReyemTech/mcp-canada/commit/6b9d9330f08fb93c92ba72734b2d9a1de208cb2e))
+
+- **18-04**: Add 4 agriculture/drought @tool functions + tool tests
+  ([`6f3363e`](https://github.com/ReyemTech/mcp-canada/commit/6f3363e82205a50519cd9d221b126ac8bcd8a6e1))
+
+- **18-04**: Implement drought/ag/livestock/crop-regions client bodies
+  ([`c5bf329`](https://github.com/ReyemTech/mcp-canada/commit/c5bf329eb0ef44725418468b5d80e5ed11eff800))
+
+- **18-05**: Add 5 environment/health @tool functions — parks, fisheries, forests, wait times,
+  health facilities
+  ([`f282a95`](https://github.com/ReyemTech/mcp-canada/commit/f282a95f163a827cafaed287b7e37cf6a99b17e4))
+
+- **18-05**: Implement 5 Plan 05 client bodies — parks, fisheries, forests, wait times, health
+  facilities
+  ([`ec6b7cb`](https://github.com/ReyemTech/mcp-canada/commit/ec6b7cbb0140224009be4a5b413830d764fda5de))
+
+- **18-06**: Add 3 transport @tool functions with NOT_CONFIGURED fallback + 10 tests
+  ([`26eb6e9`](https://github.com/ReyemTech/mcp-canada/commit/26eb6e9b7be2c987e8416d2fa4cbcbbaa9b29223))
+
+- **18-06**: Implement 511 client bodies (key-gated) + 8 tests
+  ([`e9ac72d`](https://github.com/ReyemTech/mcp-canada/commit/e9ac72d6c16c06ae63a93f74bf026611abf4fd3f))
+
+- **18-07**: Add 6 bilingual Manitoba prompts (3 guided + 3 quick lookups)
+  ([`520ee8f`](https://github.com/ReyemTech/mcp-canada/commit/520ee8fd22aaf53e6ede90b26dd9a349bf29aebe))
+
+- **18-07**: Add 7 zero-parameter Manitoba resources (data:// + docs:// + template://)
+  ([`11a7b17`](https://github.com/ReyemTech/mcp-canada/commit/11a7b1763484a5659c7351999473ed9d8656dbae))
+
+### Testing
+
+- **18**: Complete UAT - 8 passed, 1 issue (discovery tools 400)
+  ([`fdfbcce`](https://github.com/ReyemTech/mcp-canada/commit/fdfbcceb84008534d3d8e14f7b698b59e8f93551))
+
+- **18**: Diagnose discovery-tools 400 — Hub Search param bug
+  ([`0935126`](https://github.com/ReyemTech/mcp-canada/commit/0935126d6592f97ef8716701e4df272ea8919ee5))
+
+- **18-08**: Parametrized envelope/lang tests + Manitoba integration scenarios
+  ([`a772a26`](https://github.com/ReyemTech/mcp-canada/commit/a772a2665aada1bdcef2858ed3b3fd1f55017741))
+
+- **18-09**: Add failing param-regression assertions for Hub Search OGC params
+  ([`9e255cc`](https://github.com/ReyemTech/mcp-canada/commit/9e255cc33b123d1f74422801ba86ae640ef2f3b8))
+
+- **18-09**: Add live integration scenarios for 3 Manitoba Hub Search discovery tools
+  ([`5514bde`](https://github.com/ReyemTech/mcp-canada/commit/5514bde1ea1f344b4a172ee9dbf1e6d7bff00b77))
+
+
 ## v0.7.0 (2026-05-13)
 
 ### Chores

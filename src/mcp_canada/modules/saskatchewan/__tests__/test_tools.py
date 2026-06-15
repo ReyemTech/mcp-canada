@@ -470,7 +470,6 @@ class TestSaskGetGrainElevatorsTool:
     @pytest.mark.asyncio
     async def test_railway_optional_filter_passed(self):
         """saskatchewan_get_grain_elevators passes railway= to client function."""
-        import json
         payload = {"features": [], "count": 0, "truncated": False}
         with patch(
             "mcp_canada.modules.saskatchewan.tools._client.fetch_grain_elevators",
@@ -804,7 +803,6 @@ class TestSaskGetHistoricWildfiresTool:
     @pytest.mark.asyncio
     async def test_year_filter_passed_to_client(self):
         """saskatchewan_get_historic_wildfires passes year= to client function."""
-        import json
         payload = {"features": [], "count": 0, "truncated": False}
         with patch(
             "mcp_canada.modules.saskatchewan.tools._client.fetch_historic_wildfires",
@@ -821,7 +819,6 @@ class TestSaskGetHistoricWildfiresTool:
     @pytest.mark.asyncio
     async def test_cause_filter_passed_to_client(self):
         """saskatchewan_get_historic_wildfires passes cause= to client function."""
-        import json
         payload = {"features": [], "count": 0, "truncated": False}
         with patch(
             "mcp_canada.modules.saskatchewan.tools._client.fetch_historic_wildfires",
@@ -920,7 +917,6 @@ class TestSaskGetAirQualityTool:
     @pytest.mark.asyncio
     async def test_community_filter_passed_to_client(self):
         """saskatchewan_get_air_quality passes community= to client function."""
-        import json
         payload = {"features": [], "count": 0, "truncated": False}
         with patch(
             "mcp_canada.modules.saskatchewan.tools._client.fetch_air_quality",
@@ -994,7 +990,6 @@ class TestSaskGetAirQualityTool:
     @pytest.mark.asyncio
     async def test_no_community_calls_client_with_none(self):
         """saskatchewan_get_air_quality with no community passes community=None to client."""
-        import json
         payload = {"features": [], "count": 0, "truncated": False}
         with patch(
             "mcp_canada.modules.saskatchewan.tools._client.fetch_air_quality",
@@ -1084,7 +1079,6 @@ class TestSaskGetWSAStationsTool:
     @pytest.mark.asyncio
     async def test_basin_filter_passed_to_client(self):
         """saskatchewan_get_wsa_stations passes basin= to client function."""
-        import json
         payload = {"features": [], "count": 0, "truncated": False}
         with patch(
             "mcp_canada.modules.saskatchewan.tools._client.fetch_wsa_stations",
@@ -1136,7 +1130,6 @@ class TestSaskGetWSAStationsTool:
     @pytest.mark.asyncio
     async def test_no_basin_calls_client_with_none(self):
         """saskatchewan_get_wsa_stations with no basin passes basin=None to client."""
-        import json
         payload = {"features": [], "count": 0, "truncated": False}
         with patch(
             "mcp_canada.modules.saskatchewan.tools._client.fetch_wsa_stations",
@@ -1213,7 +1206,7 @@ class TestSaskGetWSAReservoirsTool:
             f"Expected Reservoir_Name in reservoir data, got: {list(first.keys())}"
         )
         assert first["Reservoir_Name"] == "ADMIRAL RESERVOIR"
-        assert "Dam_Name" in first, f"Expected Dam_Name in reservoir data"
+        assert "Dam_Name" in first, "Expected Dam_Name in reservoir data"
         assert first["Dam_Name"] == "ADMIRAL DAM"
 
     @pytest.mark.asyncio

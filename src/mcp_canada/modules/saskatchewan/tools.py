@@ -26,8 +26,6 @@ from .constants import (
     AIR_QUALITY_FS_URL,
     FIRE_BAN_LAYERS,
     GRAIN_ELEVATORS_FS_URL,
-    HUB_BASE_URL,
-    HUB_ORG_BASE,
     HUB_SEARCH_URL,
     MINERAL_MINES_FS_URLS,
     WILDFIRE_BOUNDARIES_FS_URL,
@@ -125,7 +123,7 @@ async def saskatchewan_get_dataset_details(
     """
     try:
         payload, cached = await _client.fetch_dataset_details(dataset_id=dataset_id)
-    except ValueError as exc:
+    except ValueError:
         msg = (
             f"Ensemble de données introuvable: {dataset_id}"
             if lang == "fr"

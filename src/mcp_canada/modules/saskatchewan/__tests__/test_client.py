@@ -1534,4 +1534,4 @@ class TestSaskGetWSAReservoirs:
             f"Expected Reservoir_Name in reservoir row, got: {list(first.keys())}"
         )
         assert first["Reservoir_Name"] == "ADMIRAL RESERVOIR"
-        assert "Dam_Name" in first, f"Expected Dam_Name in reservoir row"
+        assert "Dam_Name" in first, "Expected Dam_Name in reservoir row"

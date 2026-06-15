@@ -262,7 +262,7 @@ Plans:
 **Goal:** Add Nova Scotia provincial open data via data.novascotia.ca (Socrata SODA API) as a new `nova_scotia` module, establishing a reusable `shared/socrata.py` client (the 4th portal technology). Ship 5 discovery tools + 12 curated tools (17 total) across fishing/aquaculture, environment/water, lands, air quality, and health + demographics, with 6 bilingual prompts and 7 zero-parameter resources.
 **Requirements**: NS-01…NS-18
 **Depends on:** Phase 19
-**Plans:** 7 plans
+**Plans:** 1/7 plans executed
 
 Plans:
 - [ ] 20-01-PLAN.md — Wave 0: build shared/socrata.py + TestSharedSocrataContract, scaffold nova_scotia module, resolve the 3 dataset-shape spikes (NS-01)

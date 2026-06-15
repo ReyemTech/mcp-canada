@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 19-01-PLAN.md
-last_updated: "2026-06-15T14:57:42.441Z"
+stopped_at: Completed 19-02-PLAN.md
+last_updated: "2026-06-15T15:07:08.688Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 13
   total_plans: 64
-  completed_plans: 58
+  completed_plans: 59
   percent: 0
 ---
 
@@ -106,6 +106,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 18-manitoba-government-open-data P08 | 7min | 2 tasks | 7 files |
 | Phase 18-manitoba-government-open-data P09 | 4min | 3 tasks | 3 files |
 | Phase 19-saskatchewan-government-open-data P01 | 10min | 3 tasks | 15 files |
+| Phase 19-saskatchewan-government-open-data P02 | 6min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -258,6 +259,9 @@ Recent decisions affecting current work:
 - [Phase 19-saskatchewan-government-open-data]: startindex param fix is in shared/arcgis_hub.py:search_hub_datasets (not per-module workaround); Manitoba fetch_search_datasets builds params directly so no double-application
 - [Phase 19-saskatchewan-government-open-data]: WSA_RESERVOIRS_LAYER=26 confirmed by live probe; Petroleum FS HTTP 400 was transient (HTTP 200 live); WSA Water Quality layer 19 has 24 stations (not 0); both remain per plan scope (deferred/not curated)
 - [Phase 19-saskatchewan-government-open-data]: 3 module-level limiters in client.py (_hub_limiter/_wsa_limiter/_spsa_limiter) for 3 separate rate groups (Saskatchewan has most fragmented portal architecture)
+- [Phase 19-saskatchewan-government-open-data]: OGC params: limit/startindex, omit startindex when 0, omit q when blank; param-regression asserts call_args[0][1] directly
+- [Phase 19-saskatchewan-government-open-data]: auto-router: FeatureServer → query_feature_service; CSV/JSON/GeoJSON/XLSX → fetch_and_parse; else metadata-only note
+- [Phase 19-saskatchewan-government-open-data]: api_name='saskatchewan-geohub' for all 5 discovery tools; NOT_FOUND on ValueError; UPSTREAM_ERROR on HTTPStatusError
 
 ### Roadmap Evolution
 
@@ -285,6 +289,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-15T14:57:42.438Z
-Stopped at: Completed 19-01-PLAN.md
+Last session: 2026-06-15T15:07:08.684Z
+Stopped at: Completed 19-02-PLAN.md
 Resume file: None

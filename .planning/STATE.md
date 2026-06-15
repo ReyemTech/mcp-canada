@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 19-02-PLAN.md
-last_updated: "2026-06-15T15:07:08.688Z"
+stopped_at: Completed 19-03-PLAN.md
+last_updated: "2026-06-15T15:15:30.629Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 13
   total_plans: 64
-  completed_plans: 59
+  completed_plans: 60
   percent: 0
 ---
 
@@ -107,6 +107,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 18-manitoba-government-open-data P09 | 4min | 3 tasks | 3 files |
 | Phase 19-saskatchewan-government-open-data P01 | 10min | 3 tasks | 15 files |
 | Phase 19-saskatchewan-government-open-data P02 | 6min | 2 tasks | 4 files |
+| Phase 19-saskatchewan-government-open-data P03 | 18min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -262,6 +263,9 @@ Recent decisions affecting current work:
 - [Phase 19-saskatchewan-government-open-data]: OGC params: limit/startindex, omit startindex when 0, omit q when blank; param-regression asserts call_args[0][1] directly
 - [Phase 19-saskatchewan-government-open-data]: auto-router: FeatureServer → query_feature_service; CSV/JSON/GeoJSON/XLSX → fetch_and_parse; else metadata-only note
 - [Phase 19-saskatchewan-government-open-data]: api_name='saskatchewan-geohub' for all 5 discovery tools; NOT_FOUND on ValueError; UPSTREAM_ERROR on HTTPStatusError
+- [Phase 19-saskatchewan-government-open-data]: CACHE_TTL_ANNUAL (7d) for crop yields — annual estimates; minerals/elevators use CACHE_TTL_META (24h)
+- [Phase 19-saskatchewan-government-open-data]: Double-guard on crop region + mineral: tool pre-checks enum tuple before client call; client raises ValueError as secondary guard (mirrors Alberta ST3 pattern)
+- [Phase 19-saskatchewan-government-open-data]: Crop yields tool docstring notes PDF reports are NOT machine-readable — FeatureServer is the substitute (placed where agents see it)
 
 ### Roadmap Evolution
 
@@ -289,6 +293,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-15T15:07:08.684Z
-Stopped at: Completed 19-02-PLAN.md
+Last session: 2026-06-15T15:15:30.625Z
+Stopped at: Completed 19-03-PLAN.md
 Resume file: None

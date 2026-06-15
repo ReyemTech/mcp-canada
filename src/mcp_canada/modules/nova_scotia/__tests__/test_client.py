@@ -16,7 +16,6 @@ import pytest
 
 from .conftest import (
     SAMPLE_CATALOG_RESPONSE,
-    SAMPLE_VIEWS_METADATA,
 )
 
 
@@ -1778,7 +1777,7 @@ class TestNsGetChronicDiseasePrevalence:
 
             for row in data["rows"]:
                 assert "zone" in row, f"zone must be present in diabetes rows, keys: {list(row.keys())}"
-                assert "age_group" in row, f"age_group must be normalized from agegroup"
+                assert "age_group" in row, "age_group must be normalized from agegroup"
                 assert "agegroup" not in row, "agegroup must be renamed to age_group"
 
     @pytest.mark.asyncio

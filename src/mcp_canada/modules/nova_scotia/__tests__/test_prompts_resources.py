@@ -253,7 +253,6 @@ class TestNsResources:
         from mcp_canada.modules.nova_scotia.resources import ns_categories
         result = await ns_categories()
         parsed = json.loads(result)
-        cats = [c["id"] if isinstance(c, dict) else c for c in parsed["categories"]]
         # Must include key NS categories
         assert any("Fishing" in str(c) for c in parsed["categories"])
         assert any("Health" in str(c) for c in parsed["categories"])

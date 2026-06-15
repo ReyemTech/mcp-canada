@@ -11,10 +11,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from .conftest import (
-    SAMPLE_CATALOG_RESPONSE,
-    SAMPLE_VIEWS_METADATA,
-)
 
 # Sample shaped catalog results (what client returns after shape_catalog_result)
 SAMPLE_SEARCH_DATA = {

@@ -349,8 +349,34 @@ async def fetch_marine_aquaculture_leases(
     species_type: str | None = None,
     limit: int = MAX_RECORDS,
 ) -> tuple[dict[str, Any], bool]:
-    """Marine aquaculture leases (h57h-p9mm); $select excludes the_geom. Filled by Plan 03."""
-    raise NotImplementedError("Plan 03 implements")
+    """Marine aquaculture leases (h57h-p9mm).
+
+    Uses explicit $select to EXCLUDE the_geom (Pitfall 5 — geometry bloats responses).
+    Optional county and speciestyp SoQL filters; $order=county ASC.
+    """
+    where_parts: list[str] = []
+    if county:
+        where_parts.append(f"county='{county}'")
+    if species_type:
+        where_parts.append(f"speciestyp='{species_type}'")
+    where = " AND ".join(where_parts) or None
+
+    cache_key = f"{CACHE_KEY_PREFIX}marine_leases:{county or 'all'}:{species_type or 'all'}:{limit}"
+
+    async def fetcher() -> dict[str, Any]:
+        rows = await _soql(
+            DS_MARINE_AQUACULTURE_LEASES,
+            where=where,
+            select="license_le,ownership,species,waterbody,county,sitestatus,speciestyp,hectares,lat_dms,long_dms",
+            order="county ASC",
+            limit=limit,
+        )
+        # Defensive strip: the_geom excluded by $select; belt-and-suspenders to ensure
+        # geometry never reaches the agent context (Pitfall 5 — MultiPolygon can be huge).
+        rows = [{k: v for k, v in row.items() if k != "the_geom"} for row in rows]
+        return {"leases": rows, "count": len(rows), "truncated": len(rows) >= limit}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, fetcher)
 
 
 async def fetch_landbased_aquaculture_licenses(
@@ -358,8 +384,30 @@ async def fetch_landbased_aquaculture_licenses(
     species_type: str | None = None,
     limit: int = MAX_RECORDS,
 ) -> tuple[dict[str, Any], bool]:
-    """Landbased aquaculture licenses (yqwg-f62a). Filled by Plan 03."""
-    raise NotImplementedError("Plan 03 implements")
+    """Landbased aquaculture licenses (yqwg-f62a).
+
+    Optional county and speciestyp SoQL filters; explicit $select.
+    """
+    where_parts: list[str] = []
+    if county:
+        where_parts.append(f"county='{county}'")
+    if species_type:
+        where_parts.append(f"speciestyp='{species_type}'")
+    where = " AND ".join(where_parts) or None
+
+    cache_key = f"{CACHE_KEY_PREFIX}landbased_licenses:{county or 'all'}:{species_type or 'all'}:{limit}"
+
+    async def fetcher() -> dict[str, Any]:
+        rows = await _soql(
+            DS_LANDBASED_AQUACULTURE_LICENSES,
+            where=where,
+            select="license_le,species,speciestyp,county,ownership,sitestatus,lat_dms,long_dms",
+            order="county ASC",
+            limit=limit,
+        )
+        return {"licenses": rows, "count": len(rows), "truncated": len(rows) >= limit}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, fetcher)
 
 
 async def fetch_fish_hatchery_stocking(
@@ -367,8 +415,31 @@ async def fetch_fish_hatchery_stocking(
     county: str | None = None,
     limit: int = MAX_RECORDS,
 ) -> tuple[dict[str, Any], bool]:
-    """Fish hatchery stocking records (8e4a-m6fw). Filled by Plan 03."""
-    raise NotImplementedError("Plan 03 implements")
+    """Fish hatchery stocking records (8e4a-m6fw).
+
+    Optional stock species and county SoQL filters; $order=stocking_date DESC (newest first).
+    Data current to 2025-11-19.
+    """
+    where_parts: list[str] = []
+    if stock:
+        where_parts.append(f"stock='{stock}'")
+    if county:
+        where_parts.append(f"county='{county}'")
+    where = " AND ".join(where_parts) or None
+
+    cache_key = f"{CACHE_KEY_PREFIX}hatchery_stocking:{stock or 'all'}:{county or 'all'}:{limit}"
+
+    async def fetcher() -> dict[str, Any]:
+        rows = await _soql(
+            DS_FISH_HATCHERY_STOCKING,
+            where=where,
+            select="county,name,type,stock,stock_strain,hatchery,fish_length_cm,fish_weight_g,number_released,stocking_date,mark,growth_stage",
+            order="stocking_date DESC",
+            limit=limit,
+        )
+        return {"stocking_records": rows, "count": len(rows), "truncated": len(rows) >= limit}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, fetcher)
 
 
 async def fetch_aquaculture_production(
@@ -376,8 +447,33 @@ async def fetch_aquaculture_production(
     county: str | None = None,
     limit: int = MAX_RECORDS,
 ) -> tuple[dict[str, Any], bool]:
-    """Aquaculture production, value, employment (v2ex-ev63). Filled by Plan 03."""
-    raise NotImplementedError("Plan 03 implements")
+    """Aquaculture production, value, employment by county (v2ex-ev63).
+
+    Optional year and county SoQL filters.
+    IMPORTANT: year is a TEXT column — use string comparison: year='2020' NOT year=2020.
+    Annual data; 7-day cache TTL.
+    """
+    where_parts: list[str] = []
+    if year:
+        # Pitfall 3: year is stored as text, must use quoted string comparison
+        where_parts.append(f"year='{year}'")
+    if county:
+        where_parts.append(f"county='{county}'")
+    where = " AND ".join(where_parts) or None
+
+    cache_key = f"{CACHE_KEY_PREFIX}aquaculture_production:{year or 'all'}:{county or 'all'}:{limit}"
+
+    async def fetcher() -> dict[str, Any]:
+        rows = await _soql(
+            DS_AQUACULTURE_PRODUCTION,
+            where=where,
+            select="year,county,kgs,total_value,full_time,pt_employ_6_mth,pt_employ_6_mth_1,total_employ",
+            order="year DESC",
+            limit=limit,
+        )
+        return {"production": rows, "count": len(rows), "truncated": len(rows) >= limit}
+
+    return await cached_fetch(cache_key, CACHE_TTL_ANNUAL, fetcher)
 
 
 # ---------------------------------------------------------------------------

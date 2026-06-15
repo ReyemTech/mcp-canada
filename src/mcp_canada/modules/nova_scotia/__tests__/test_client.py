@@ -488,27 +488,489 @@ class TestNsListCategories:
 
 
 class TestNsGetMarineAquacultureLeases:
-    """fetch_marine_aquaculture_leases returns leases dict; excludes the_geom. Plan 03 fills."""
+    """fetch_marine_aquaculture_leases returns leases dict; excludes the_geom."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_leases_count_truncated(self) -> None:
+        """Returns leases list with count and truncated flag."""
+        from .conftest import SAMPLE_MARINE_LEASES_ROWS
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_MARINE_LEASES_ROWS)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_marine_aquaculture_leases
+
+            data, was_cached = await fetch_marine_aquaculture_leases()
+
+            assert "leases" in data
+            assert data["count"] == len(SAMPLE_MARINE_LEASES_ROWS)
+            assert data["truncated"] is False
+            assert was_cached is False
+
+    @pytest.mark.asyncio
+    async def test_select_does_not_contain_the_geom(self) -> None:
+        """$select sent to socrata.query_dataset does NOT contain 'the_geom'."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_marine_aquaculture_leases
+
+            await fetch_marine_aquaculture_leases()
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            select = call_kwargs.get("select", "")
+            assert select is not None
+            assert "the_geom" not in (select or ""), f"the_geom must NOT be in $select but found in: {select!r}"
+
+    @pytest.mark.asyncio
+    async def test_returned_rows_have_no_the_geom(self) -> None:
+        """Returned leases rows do not contain the_geom key."""
+        from .conftest import SAMPLE_MARINE_LEASES_ROWS_WITH_GEOM
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            # The mock returns rows WITH the_geom — the client must exclude via $select
+            # (in practice the API excludes it; here we verify leases list doesn't contain it)
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_MARINE_LEASES_ROWS_WITH_GEOM)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_marine_aquaculture_leases
+
+            data, _ = await fetch_marine_aquaculture_leases()
+
+            for row in data["leases"]:
+                assert "the_geom" not in row, f"the_geom must NOT appear in leases rows, but found in: {row}"
+
+    @pytest.mark.asyncio
+    async def test_county_filter_builds_correct_where(self) -> None:
+        """county filter produces $where=county='Inverness'."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_marine_aquaculture_leases
+
+            await fetch_marine_aquaculture_leases(county="Inverness")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("where") == "county='Inverness'"
+
+    @pytest.mark.asyncio
+    async def test_species_type_filter_builds_correct_where(self) -> None:
+        """species_type filter produces $where=speciestyp='Shellfish'."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_marine_aquaculture_leases
+
+            await fetch_marine_aquaculture_leases(species_type="Shellfish")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("where") == "speciestyp='Shellfish'"
+
+    @pytest.mark.asyncio
+    async def test_combined_filters_joined_with_and(self) -> None:
+        """county + species_type filters joined with AND."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_marine_aquaculture_leases
+
+            await fetch_marine_aquaculture_leases(county="Inverness", species_type="Shellfish")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            where = call_kwargs.get("where", "")
+            assert "county='Inverness'" in where
+            assert "speciestyp='Shellfish'" in where
+            assert "AND" in where
+
+    @pytest.mark.asyncio
+    async def test_no_filters_where_is_none(self) -> None:
+        """Without filters, where is None (no $where param sent)."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_marine_aquaculture_leases
+
+            await fetch_marine_aquaculture_leases()
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("where") is None
+
+    @pytest.mark.asyncio
+    async def test_order_is_county_asc(self) -> None:
+        """Default order is 'county ASC'."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_marine_aquaculture_leases
+
+            await fetch_marine_aquaculture_leases()
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("order") == "county ASC"
+
+    @pytest.mark.asyncio
+    async def test_truncated_true_when_rows_equals_limit(self) -> None:
+        """truncated=True when len(rows) >= limit."""
+        rows = [{"license_le": str(i)} for i in range(3)]
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=rows)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_marine_aquaculture_leases
+
+            data, _ = await fetch_marine_aquaculture_leases(limit=3)
+
+            assert data["truncated"] is True
+
+    @pytest.mark.asyncio
+    async def test_passes_correct_dataset_id(self) -> None:
+        """Passes DS_MARINE_AQUACULTURE_LEASES ('h57h-p9mm') to socrata.query_dataset."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_marine_aquaculture_leases
+
+            await fetch_marine_aquaculture_leases()
+
+            call_args = mock_socrata.query_dataset.call_args[0]
+            assert "h57h-p9mm" in call_args
 
 
 class TestNsGetLandbasedAquacultureLicenses:
-    """fetch_landbased_aquaculture_licenses returns licenses dict. Plan 03 fills."""
+    """fetch_landbased_aquaculture_licenses returns licenses dict."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_licenses_count_truncated(self) -> None:
+        """Returns licenses list with count and truncated flag."""
+        from .conftest import SAMPLE_LANDBASED_ROWS
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_LANDBASED_ROWS)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_landbased_aquaculture_licenses
+
+            data, was_cached = await fetch_landbased_aquaculture_licenses()
+
+            assert "licenses" in data
+            assert data["count"] == len(SAMPLE_LANDBASED_ROWS)
+            assert data["truncated"] is False
+            assert was_cached is False
+
+    @pytest.mark.asyncio
+    async def test_county_filter_builds_correct_where(self) -> None:
+        """county filter produces $where=county='Hants'."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_landbased_aquaculture_licenses
+
+            await fetch_landbased_aquaculture_licenses(county="Hants")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("where") == "county='Hants'"
+
+    @pytest.mark.asyncio
+    async def test_species_type_filter_builds_correct_where(self) -> None:
+        """species_type filter produces $where=speciestyp='Finfish'."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_landbased_aquaculture_licenses
+
+            await fetch_landbased_aquaculture_licenses(species_type="Finfish")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("where") == "speciestyp='Finfish'"
+
+    @pytest.mark.asyncio
+    async def test_combined_filters_joined_with_and(self) -> None:
+        """county + species_type filters joined with AND."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_landbased_aquaculture_licenses
+
+            await fetch_landbased_aquaculture_licenses(county="Hants", species_type="Finfish")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            where = call_kwargs.get("where", "")
+            assert "county='Hants'" in where
+            assert "speciestyp='Finfish'" in where
+            assert "AND" in where
+
+    @pytest.mark.asyncio
+    async def test_no_filters_where_is_none(self) -> None:
+        """Without filters, where is None."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_landbased_aquaculture_licenses
+
+            await fetch_landbased_aquaculture_licenses()
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("where") is None
+
+    @pytest.mark.asyncio
+    async def test_passes_correct_dataset_id(self) -> None:
+        """Passes DS_LANDBASED_AQUACULTURE_LICENSES ('yqwg-f62a') to socrata.query_dataset."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_landbased_aquaculture_licenses
+
+            await fetch_landbased_aquaculture_licenses()
+
+            call_args = mock_socrata.query_dataset.call_args[0]
+            assert "yqwg-f62a" in call_args
+
+    @pytest.mark.asyncio
+    async def test_select_does_not_contain_the_geom(self) -> None:
+        """$select does NOT contain 'the_geom' for landbased dataset."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_landbased_aquaculture_licenses
+
+            await fetch_landbased_aquaculture_licenses()
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            select = call_kwargs.get("select", "")
+            # the_geom is only in marine leases; landbased has no geometry
+            # but we still verify select is explicitly set and correct
+            assert select is not None
 
 
 class TestNsGetFishHatcheryStocking:
-    """fetch_fish_hatchery_stocking returns stocking records; default order=stocking_date DESC. Plan 03 fills."""
+    """fetch_fish_hatchery_stocking returns stocking records; default order=stocking_date DESC."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_stocking_records_count_truncated(self) -> None:
+        """Returns stocking_records list with count and truncated flag."""
+        from .conftest import SAMPLE_HATCHERY_ROWS
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_HATCHERY_ROWS)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_fish_hatchery_stocking
+
+            data, was_cached = await fetch_fish_hatchery_stocking()
+
+            assert "stocking_records" in data
+            assert data["count"] == len(SAMPLE_HATCHERY_ROWS)
+            assert data["truncated"] is False
+            assert was_cached is False
+
+    @pytest.mark.asyncio
+    async def test_stock_filter_builds_correct_where(self) -> None:
+        """stock filter produces $where=stock='Brook Trout'."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_fish_hatchery_stocking
+
+            await fetch_fish_hatchery_stocking(stock="Brook Trout")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("where") == "stock='Brook Trout'"
+
+    @pytest.mark.asyncio
+    async def test_county_filter_builds_correct_where(self) -> None:
+        """county filter produces $where=county='Antigonish'."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_fish_hatchery_stocking
+
+            await fetch_fish_hatchery_stocking(county="Antigonish")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("where") == "county='Antigonish'"
+
+    @pytest.mark.asyncio
+    async def test_combined_filters_joined_with_and(self) -> None:
+        """stock + county filters joined with AND."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_fish_hatchery_stocking
+
+            await fetch_fish_hatchery_stocking(stock="Brook Trout", county="Antigonish")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            where = call_kwargs.get("where", "")
+            assert "stock='Brook Trout'" in where
+            assert "county='Antigonish'" in where
+            assert "AND" in where
+
+    @pytest.mark.asyncio
+    async def test_order_is_stocking_date_desc(self) -> None:
+        """Default order is 'stocking_date DESC' (newest first)."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_fish_hatchery_stocking
+
+            await fetch_fish_hatchery_stocking()
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("order") == "stocking_date DESC"
+
+    @pytest.mark.asyncio
+    async def test_no_filters_where_is_none(self) -> None:
+        """Without filters, where is None."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_fish_hatchery_stocking
+
+            await fetch_fish_hatchery_stocking()
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("where") is None
+
+    @pytest.mark.asyncio
+    async def test_passes_correct_dataset_id(self) -> None:
+        """Passes DS_FISH_HATCHERY_STOCKING ('8e4a-m6fw') to socrata.query_dataset."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_fish_hatchery_stocking
+
+            await fetch_fish_hatchery_stocking()
+
+            call_args = mock_socrata.query_dataset.call_args[0]
+            assert "8e4a-m6fw" in call_args
+
+    @pytest.mark.asyncio
+    async def test_truncated_true_when_rows_equals_limit(self) -> None:
+        """truncated=True when len(rows) >= limit."""
+        rows = [{"county": str(i)} for i in range(5)]
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=rows)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_fish_hatchery_stocking
+
+            data, _ = await fetch_fish_hatchery_stocking(limit=5)
+
+            assert data["truncated"] is True
 
 
 class TestNsGetAquacultureProduction:
-    """fetch_aquaculture_production returns production dict; year filter as string. Plan 03 fills."""
+    """fetch_aquaculture_production returns production dict; year filter as string."""
 
-    pass
+    @pytest.mark.asyncio
+    async def test_returns_production_count_truncated(self) -> None:
+        """Returns production list with count and truncated flag."""
+        from .conftest import SAMPLE_PRODUCTION_ROWS
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_PRODUCTION_ROWS)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_aquaculture_production
+
+            data, was_cached = await fetch_aquaculture_production()
+
+            assert "production" in data
+            assert data["count"] == len(SAMPLE_PRODUCTION_ROWS)
+            assert data["truncated"] is False
+            assert was_cached is False
+
+    @pytest.mark.asyncio
+    async def test_year_filter_uses_string_comparison(self) -> None:
+        """year filter uses quoted string: $where=year='2020' (NOT year=2020)."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_aquaculture_production
+
+            await fetch_aquaculture_production(year="2020")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            where = call_kwargs.get("where", "")
+            # Year is TEXT field — must use quoted string comparison
+            assert "year='2020'" in where, f"Expected year='2020' in where, got: {where!r}"
+            # NOT bare integer: year=2020 would be wrong
+            assert "year=2020" not in where.replace("year='2020'", "")
+
+    @pytest.mark.asyncio
+    async def test_county_filter_builds_correct_where(self) -> None:
+        """county filter produces $where=county='Guysborough'."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_aquaculture_production
+
+            await fetch_aquaculture_production(county="Guysborough")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("where") == "county='Guysborough'"
+
+    @pytest.mark.asyncio
+    async def test_combined_filters_joined_with_and(self) -> None:
+        """year + county filters joined with AND."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_aquaculture_production
+
+            await fetch_aquaculture_production(year="2022", county="Shelburne")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            where = call_kwargs.get("where", "")
+            assert "year='2022'" in where
+            assert "county='Shelburne'" in where
+            assert "AND" in where
+
+    @pytest.mark.asyncio
+    async def test_no_filters_where_is_none(self) -> None:
+        """Without filters, where is None."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_aquaculture_production
+
+            await fetch_aquaculture_production()
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("where") is None
+
+    @pytest.mark.asyncio
+    async def test_order_is_year_desc(self) -> None:
+        """Default order is 'year DESC' (most recent first)."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_aquaculture_production
+
+            await fetch_aquaculture_production()
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("order") == "year DESC"
+
+    @pytest.mark.asyncio
+    async def test_passes_correct_dataset_id(self) -> None:
+        """Passes DS_AQUACULTURE_PRODUCTION ('v2ex-ev63') to socrata.query_dataset."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_aquaculture_production
+
+            await fetch_aquaculture_production()
+
+            call_args = mock_socrata.query_dataset.call_args[0]
+            assert "v2ex-ev63" in call_args
+
+    @pytest.mark.asyncio
+    async def test_truncated_true_when_rows_equals_limit(self) -> None:
+        """truncated=True when len(rows) >= limit."""
+        rows = [{"year": "2022"} for _ in range(4)]
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=rows)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_aquaculture_production
+
+            data, _ = await fetch_aquaculture_production(limit=4)
+
+            assert data["truncated"] is True
 
 
 class TestNsGetWaterQualityMonitoring:

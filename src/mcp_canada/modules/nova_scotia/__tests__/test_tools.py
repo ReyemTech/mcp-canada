@@ -1294,21 +1294,500 @@ class TestNsGetAirQualityStationsTool:
 
 
 class TestNsGetHealthFacilitiesTool:
-    """ns_get_health_facilities tool tests. Plan 05 fills."""
+    """ns_get_health_facilities tool tests."""
 
-    pass
+    HOSPITALS_DATA = {
+        "facilities": [
+            {
+                "facility_name": "QEII Health Sciences Centre",
+                "address": "1796 Summer Street",
+                "town": "Halifax",
+                "county": "Halifax",
+                "type": "Regional",
+                "zone": None,
+                "beds": None,
+                "x_coordinate": "-63.5901",
+                "y_coordinate": "44.6476",
+                "facility_category": "hospital",
+            }
+        ],
+        "count": 1,
+        "truncated": False,
+    }
+
+    LTC_DATA = {
+        "facilities": [
+            {
+                "facility_name": "Melville Gardens",
+                "address": "240 Willett St",
+                "town": "Truro",
+                "county": "Colchester",
+                "type": None,
+                "zone": "Zone 2 - Northern",
+                "beds": "68",
+                "x_coordinate": "-63.2702",
+                "y_coordinate": "45.3604",
+                "facility_category": "long_term_care",
+            }
+        ],
+        "count": 1,
+        "truncated": False,
+    }
+
+    @pytest.mark.asyncio
+    async def test_happy_path_hospital_returns_envelope(self) -> None:
+        """Returns _meta envelope with facilities list for hospital type."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_health_facilities",
+            new_callable=AsyncMock,
+            return_value=(self.HOSPITALS_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_health_facilities
+
+            result = await ns_get_health_facilities(facility_type="hospital", lang="en")
+
+            assert "_meta" in result
+            assert result["_meta"]["source"]["api"] == "nova-scotia-socrata"
+            assert result["_meta"]["cached"] is False
+            assert result["_meta"]["lang"] == "en"
+            assert "data" in result
+            assert "facilities" in result["data"]
+            assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_happy_path_ltc_returns_envelope(self) -> None:
+        """Returns _meta envelope with facilities list for long_term_care type."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_health_facilities",
+            new_callable=AsyncMock,
+            return_value=(self.LTC_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_health_facilities
+
+            result = await ns_get_health_facilities(facility_type="long_term_care", lang="en")
+
+            assert "_meta" in result
+            assert "facilities" in result["data"]
+            assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_invalid_facility_type_returns_invalid_input_before_network(self) -> None:
+        """Invalid facility_type returns INVALID_INPUT with valid= list (no network call)."""
+        mock_client = AsyncMock()
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_health_facilities",
+            mock_client,
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_health_facilities
+
+            result = await ns_get_health_facilities(facility_type="clinic", lang="en")
+
+            # Must be INVALID_INPUT, not UPSTREAM_ERROR
+            assert "error" in result
+            assert result["error"]["code"] == "INVALID_INPUT"
+            assert "valid" in result["error"]
+            assert isinstance(result["error"]["valid"], list)
+            # Must NOT have called the client
+            mock_client.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_invalid_facility_type_fr_message(self) -> None:
+        """Invalid facility_type with lang='fr' returns French error message."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_health_facilities",
+            new_callable=AsyncMock,
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_health_facilities
+
+            result = await ns_get_health_facilities(facility_type="clinic", lang="fr")
+
+            assert "error" in result
+            assert result["error"]["code"] == "INVALID_INPUT"
+
+    @pytest.mark.asyncio
+    async def test_api_url_contains_dispatched_dataset_id(self) -> None:
+        """api_url in _meta source contains the dispatched hospital dataset ID."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_health_facilities",
+            new_callable=AsyncMock,
+            return_value=(self.HOSPITALS_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_health_facilities
+
+            result = await ns_get_health_facilities(facility_type="hospital")
+
+            api_url = result["_meta"]["source"]["url"]
+            assert "tmfr-3h8a" in api_url
+
+    @pytest.mark.asyncio
+    async def test_ltc_api_url_contains_ltc_dataset_id(self) -> None:
+        """api_url in _meta source contains the LTC dataset ID when facility_type=long_term_care."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_health_facilities",
+            new_callable=AsyncMock,
+            return_value=(self.LTC_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_health_facilities
+
+            result = await ns_get_health_facilities(facility_type="long_term_care")
+
+            api_url = result["_meta"]["source"]["url"]
+            assert "x76a-axw2" in api_url
+
+    @pytest.mark.asyncio
+    async def test_county_and_limit_forwarded_to_client(self) -> None:
+        """county and limit params forwarded to fetch_health_facilities."""
+        mock_fetch = AsyncMock(return_value=(self.HOSPITALS_DATA, False))
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_health_facilities",
+            mock_fetch,
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_health_facilities
+
+            await ns_get_health_facilities(facility_type="hospital", county="Halifax", limit=100)
+
+            call_kwargs = mock_fetch.call_args[1]
+            assert call_kwargs.get("county") == "Halifax"
+            assert call_kwargs.get("limit") == 100
+
+    @pytest.mark.asyncio
+    async def test_upstream_error_returns_make_error(self) -> None:
+        """Exception from client returns make_error with UPSTREAM_ERROR."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_health_facilities",
+            new_callable=AsyncMock,
+            side_effect=Exception("upstream failure"),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_health_facilities
+
+            result = await ns_get_health_facilities(facility_type="hospital")
+
+            assert "error" in result
+            assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_fr_passes_through(self) -> None:
+        """lang='fr' passes through to _meta.lang."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_health_facilities",
+            new_callable=AsyncMock,
+            return_value=(self.HOSPITALS_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_health_facilities
+
+            result = await ns_get_health_facilities(facility_type="hospital", lang="fr")
+
+            assert result["_meta"]["lang"] == "fr"
 
 
 class TestNsGetVitalStatisticsTool:
-    """ns_get_vital_statistics tool tests. Plan 05 fills."""
+    """ns_get_vital_statistics tool tests."""
 
-    pass
+    VITAL_DATA = {
+        "statistics": [
+            {
+                "counties": "ANNAPOLIS",
+                "year": "2020",
+                "population": "19875.0",
+                "live_births": "142.0",
+                "birth_rate": "7.1",
+                "deaths": "281.0",
+                "death_rate": "14.1",
+                "natural_increase_rate": "-7.0",
+            }
+        ],
+        "count": 1,
+        "truncated": False,
+    }
+
+    @pytest.mark.asyncio
+    async def test_happy_path_returns_envelope_with_statistics(self) -> None:
+        """Returns _meta envelope with statistics list."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_vital_statistics",
+            new_callable=AsyncMock,
+            return_value=(self.VITAL_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_vital_statistics
+
+            result = await ns_get_vital_statistics(lang="en")
+
+            assert "_meta" in result
+            assert result["_meta"]["source"]["api"] == "nova-scotia-socrata"
+            assert result["_meta"]["cached"] is False
+            assert result["_meta"]["lang"] == "en"
+            assert "data" in result
+            assert "statistics" in result["data"]
+            assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_county_and_year_forwarded_to_client(self) -> None:
+        """county and year params forwarded to fetch_vital_statistics."""
+        mock_fetch = AsyncMock(return_value=(self.VITAL_DATA, False))
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_vital_statistics",
+            mock_fetch,
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_vital_statistics
+
+            await ns_get_vital_statistics(county="ANNAPOLIS", year="2020", limit=100)
+
+            call_kwargs = mock_fetch.call_args[1]
+            assert call_kwargs.get("county") == "ANNAPOLIS"
+            assert call_kwargs.get("year") == "2020"
+            assert call_kwargs.get("limit") == 100
+
+    @pytest.mark.asyncio
+    async def test_error_path_returns_make_error(self) -> None:
+        """Exception from client returns make_error with UPSTREAM_ERROR."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_vital_statistics",
+            new_callable=AsyncMock,
+            side_effect=Exception("upstream failure"),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_vital_statistics
+
+            result = await ns_get_vital_statistics()
+
+            assert "error" in result
+            assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_fr_passes_through(self) -> None:
+        """lang='fr' passes through to _meta.lang."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_vital_statistics",
+            new_callable=AsyncMock,
+            return_value=(self.VITAL_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_vital_statistics
+
+            result = await ns_get_vital_statistics(lang="fr")
+
+            assert result["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_api_url_contains_dataset_id(self) -> None:
+        """api_url in _meta source contains the vital statistics dataset ID."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_vital_statistics",
+            new_callable=AsyncMock,
+            return_value=(self.VITAL_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_vital_statistics
+
+            result = await ns_get_vital_statistics()
+
+            api_url = result["_meta"]["source"]["url"]
+            assert "r794-fttm" in api_url
 
 
 class TestNsGetChronicDiseasePrevalenceTool:
-    """ns_get_chronic_disease_prevalence tool tests. Plan 05 fills."""
+    """ns_get_chronic_disease_prevalence tool tests."""
 
-    pass
+    AMI_DATA = {
+        "rows": [
+            {
+                "year": "2018",
+                "zone": "Zone 1 - Western",
+                "age_group": "50 to 69",
+                "population": "42185",
+                "prevalence": "1847",
+                "crude_prevalence_rate": "4.38",
+                "disease": "ami",
+            }
+        ],
+        "count": 1,
+        "truncated": False,
+    }
+
+    DIABETES_DATA = {
+        "rows": [
+            {
+                "year": "2000-01-01T00:00:00.000",
+                "zone": "Zone 4 - Central",
+                "sex": "F",
+                "age_group": "20 to 29",
+                "population": "30198",
+                "prevalence": "223",
+                "crude_prevalence_rate": "0.74",
+                "disease": "diabetes",
+            }
+        ],
+        "count": 1,
+        "truncated": False,
+    }
+
+    @pytest.mark.asyncio
+    async def test_happy_path_returns_envelope_with_rows(self) -> None:
+        """Returns _meta envelope with rows list for valid disease."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_chronic_disease",
+            new_callable=AsyncMock,
+            return_value=(self.AMI_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_chronic_disease_prevalence
+
+            result = await ns_get_chronic_disease_prevalence(disease="ami", lang="en")
+
+            assert "_meta" in result
+            assert result["_meta"]["source"]["api"] == "nova-scotia-socrata"
+            assert result["_meta"]["cached"] is False
+            assert result["_meta"]["lang"] == "en"
+            assert "data" in result
+            assert "rows" in result["data"]
+            assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_normalized_zone_present_in_ami_rows(self) -> None:
+        """Returned AMI rows have 'zone' key (normalized from health_zone)."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_chronic_disease",
+            new_callable=AsyncMock,
+            return_value=(self.AMI_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_chronic_disease_prevalence
+
+            result = await ns_get_chronic_disease_prevalence(disease="ami")
+
+            for row in result["data"]["rows"]:
+                assert "zone" in row, f"zone key must be present in rows, got: {list(row.keys())}"
+                assert "health_zone" not in row
+
+    @pytest.mark.asyncio
+    async def test_invalid_disease_returns_invalid_input_before_network(self) -> None:
+        """Invalid disease returns INVALID_INPUT with valid= list (no network call)."""
+        mock_client = AsyncMock()
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_chronic_disease",
+            mock_client,
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_chronic_disease_prevalence
+
+            result = await ns_get_chronic_disease_prevalence(disease="flu", lang="en")
+
+            # Must be INVALID_INPUT, not UPSTREAM_ERROR
+            assert "error" in result
+            assert result["error"]["code"] == "INVALID_INPUT"
+            assert "valid" in result["error"]
+            valid = result["error"]["valid"]
+            assert isinstance(valid, list)
+            assert "ami" in valid
+            assert "diabetes" in valid
+            # Must NOT have called the client
+            mock_client.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_invalid_disease_fr_message(self) -> None:
+        """Invalid disease with lang='fr' returns French error message."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_chronic_disease",
+            new_callable=AsyncMock,
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_chronic_disease_prevalence
+
+            result = await ns_get_chronic_disease_prevalence(disease="flu", lang="fr")
+
+            assert "error" in result
+            assert result["error"]["code"] == "INVALID_INPUT"
+
+    @pytest.mark.asyncio
+    async def test_filters_forwarded_to_client(self) -> None:
+        """health_zone, sex, year, limit params forwarded to fetch_chronic_disease."""
+        mock_fetch = AsyncMock(return_value=(self.DIABETES_DATA, False))
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_chronic_disease",
+            mock_fetch,
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_chronic_disease_prevalence
+
+            await ns_get_chronic_disease_prevalence(
+                disease="diabetes",
+                health_zone="Zone 4 - Central",
+                sex="F",
+                year="2020",
+                limit=100,
+            )
+
+            call_kwargs = mock_fetch.call_args[1]
+            assert call_kwargs.get("disease") == "diabetes"
+            assert call_kwargs.get("health_zone") == "Zone 4 - Central"
+            assert call_kwargs.get("sex") == "F"
+            assert call_kwargs.get("year") == "2020"
+            assert call_kwargs.get("limit") == 100
+
+    @pytest.mark.asyncio
+    async def test_error_path_returns_make_error(self) -> None:
+        """Exception from client returns make_error with UPSTREAM_ERROR."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_chronic_disease",
+            new_callable=AsyncMock,
+            side_effect=Exception("upstream failure"),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_chronic_disease_prevalence
+
+            result = await ns_get_chronic_disease_prevalence(disease="ami")
+
+            assert "error" in result
+            assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_fr_passes_through(self) -> None:
+        """lang='fr' passes through to _meta.lang."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_chronic_disease",
+            new_callable=AsyncMock,
+            return_value=(self.AMI_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_chronic_disease_prevalence
+
+            result = await ns_get_chronic_disease_prevalence(disease="ami", lang="fr")
+
+            assert result["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_api_url_contains_dispatched_dataset_id_ami(self) -> None:
+        """api_url in _meta source contains the AMI dataset ID (24qf-ntke)."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_chronic_disease",
+            new_callable=AsyncMock,
+            return_value=(self.AMI_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_chronic_disease_prevalence
+
+            result = await ns_get_chronic_disease_prevalence(disease="ami")
+
+            api_url = result["_meta"]["source"]["url"]
+            assert "24qf-ntke" in api_url
+
+    @pytest.mark.asyncio
+    async def test_api_url_contains_dispatched_dataset_id_diabetes(self) -> None:
+        """api_url in _meta source contains the diabetes dataset ID (cumi-sw99)."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_chronic_disease",
+            new_callable=AsyncMock,
+            return_value=(self.DIABETES_DATA, False),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_chronic_disease_prevalence
+
+            result = await ns_get_chronic_disease_prevalence(disease="diabetes")
+
+            api_url = result["_meta"]["source"]["url"]
+            assert "cumi-sw99" in api_url
+
+    @pytest.mark.asyncio
+    async def test_cached_true_passes_through(self) -> None:
+        """cached=True from client passes through to _meta.cached."""
+        with patch(
+            "mcp_canada.modules.nova_scotia.tools._client.fetch_chronic_disease",
+            new_callable=AsyncMock,
+            return_value=(self.AMI_DATA, True),
+        ):
+            from mcp_canada.modules.nova_scotia.tools import ns_get_chronic_disease_prevalence
+
+            result = await ns_get_chronic_disease_prevalence(disease="ami")
+
+            assert result["_meta"]["cached"] is True
 
 
 class TestNsEnvelopes:

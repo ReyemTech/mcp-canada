@@ -25,6 +25,7 @@ from . import client as _client
 from .constants import (
     BASE_URL,
     CATALOG_URL,
+    CHRONIC_DISEASE_DATASETS,
     DS_MARINE_AQUACULTURE_LEASES,
     DS_LANDBASED_AQUACULTURE_LICENSES,
     DS_FISH_HATCHERY_STOCKING,
@@ -33,6 +34,9 @@ from .constants import (
     DS_BOIL_WATER_ADVISORIES,
     DS_PROTECTED_AREAS,
     DS_AIR_QUALITY_STATIONS,
+    DS_HOSPITALS,
+    DS_LTC_RCF_FACILITIES,
+    DS_BIRTHS_DEATHS,
 )
 
 
@@ -460,5 +464,151 @@ async def ns_get_air_quality_stations(
             cached=cached,
             lang=lang,
         )
+    except Exception as exc:
+        return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
+
+
+# ---------------------------------------------------------------------------
+# Health + Demographics curated tools (Plan 05)
+# ---------------------------------------------------------------------------
+
+
+@tool
+async def ns_get_health_facilities(
+    facility_type: str,
+    county: str | None = None,
+    limit: int = 5000,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Get Nova Scotia hospital or long-term care facility locations by type, county, health zone, and beds.
+
+    Use for: finding NS hospitals by county; locating long-term care or residential care facilities in Nova Scotia; health facility inventory by zone; beds count at LTC facilities.
+    Keywords: nova scotia hospital long-term care LTC residential care facility county health zone beds location address coordinates type regional community NS health
+
+    Dispatches by facility_type:
+      - "hospital"       → Hospitals dataset (tmfr-3h8a): facility_name, address, town, county, type
+                           (Regional/District/Community), x_coordinate, y_coordinate
+      - "long_term_care" → LTC/RCF Facilities dataset (x76a-axw2): facility_name, address, town,
+                           county, zone (Central/Eastern/Northern/Western), beds, x_coordinate, y_coordinate
+
+    Both types return a common facility shape with facility_category set to the requested type.
+    Invalid facility_type returns INVALID_INPUT with the valid options list.
+    """
+    _VALID = sorted(["hospital", "long_term_care"])
+    if facility_type not in _VALID:
+        msg = (
+            f"Type d'établissement invalide '{facility_type}'"
+            if lang == "fr"
+            else f"Invalid facility_type '{facility_type}'"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=_VALID)
+    # Dispatch dataset URL based on facility type
+    dataset_id = DS_HOSPITALS if facility_type == "hospital" else DS_LTC_RCF_FACILITIES
+    try:
+        data, cached = await _client.fetch_health_facilities(
+            facility_type=facility_type,
+            county=county,
+            limit=limit,
+        )
+        return make_response(
+            data,
+            api_name="nova-scotia-socrata",
+            api_url=f"{BASE_URL}/resource/{dataset_id}.json",
+            cached=cached,
+            lang=lang,
+        )
+    except ValueError as exc:
+        # Secondary guard: client also raises ValueError on invalid facility_type
+        return make_error("INVALID_INPUT", str(exc), lang=lang, valid=_VALID)
+    except Exception as exc:
+        return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
+
+
+@tool
+async def ns_get_vital_statistics(
+    county: str | None = None,
+    year: str | None = None,
+    limit: int = 5000,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Get Nova Scotia vital statistics (births, deaths, rates, natural increase) by county and year.
+
+    Use for: analyzing NS birth and death rates by county; population growth and natural increase in Nova Scotia; demographic trends; vital statistics comparison across counties and years.
+    Keywords: nova scotia vital statistics births deaths birth rate death rate population natural increase county year demographics NS census demography
+
+    IMPORTANT: county names are UPPERCASE in this dataset (e.g., 'ANNAPOLIS', 'HALIFAX', 'LUNENBURG').
+    IMPORTANT: year is a TEXT column — use string year values (e.g., year='2020'), not integers.
+    Returns fields: counties, year, population, live_births, birth_rate, deaths, death_rate,
+    excess_of_births_over_deaths, natural_increase_rate.
+    """
+    try:
+        data, cached = await _client.fetch_vital_statistics(
+            county=county,
+            year=year,
+            limit=limit,
+        )
+        return make_response(
+            data,
+            api_name="nova-scotia-socrata",
+            api_url=f"{BASE_URL}/resource/{DS_BIRTHS_DEATHS}.json",
+            cached=cached,
+            lang=lang,
+        )
+    except Exception as exc:
+        return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
+
+
+@tool
+async def ns_get_chronic_disease_prevalence(
+    disease: str,
+    health_zone: str | None = None,
+    sex: str | None = None,
+    year: str | None = None,
+    limit: int = 5000,
+    lang: Literal["en", "fr"] = "en",
+) -> dict:
+    """Get Nova Scotia chronic disease crude prevalence by health zone, sex, age group, and year.
+
+    Use for: querying NS chronic disease rates by health zone; comparing disease burden across zones; diabetes prevalence in Nova Scotia; AMI heart disease statistics; COPD asthma hypertension trends by age sex zone year.
+    Keywords: nova scotia chronic disease prevalence diabetes heart disease AMI COPD hypertension asthma health zone sex age year crude prevalence rate NS Health statistics
+
+    Dispatches by disease:
+      - "ami"          → Acute Myocardial Infarction (24qf-ntke) — no sex field in this dataset
+      - "diabetes"     → Diabetes (cumi-sw99)
+      - "copd"         → Chronic Obstructive Pulmonary Disease (ua9e-4pss)
+      - "hypertension" → Hypertension (sztc-sewr) — fields: hypertension_count, prevalence_rate
+      - "asthma"       → Asthma (2bih-5dgk)
+
+    Zone is normalized: AMI uses 'health_zone' in the source dataset, renamed to 'zone' in output.
+    All 5 disease datasets surface a consistent 'zone' key in returned rows.
+    Invalid disease returns INVALID_INPUT with the valid disease list.
+    """
+    _VALID = sorted(CHRONIC_DISEASE_DATASETS.keys())
+    if disease not in CHRONIC_DISEASE_DATASETS:
+        msg = (
+            f"Maladie inconnue '{disease}'"
+            if lang == "fr"
+            else f"Unknown disease '{disease}'"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=_VALID)
+    dataset_id = CHRONIC_DISEASE_DATASETS[disease]
+    try:
+        data, cached = await _client.fetch_chronic_disease(
+            disease=disease,
+            health_zone=health_zone,
+            sex=sex,
+            year=year,
+            limit=limit,
+        )
+        return make_response(
+            data,
+            api_name="nova-scotia-socrata",
+            api_url=f"{BASE_URL}/resource/{dataset_id}.json",
+            cached=cached,
+            lang=lang,
+        )
+    except ValueError as exc:
+        # Secondary guard: client also validates disease
+        return make_error("INVALID_INPUT", str(exc), lang=lang, valid=_VALID)
     except Exception as exc:
         return make_error("UPSTREAM_ERROR", str(exc), lang=lang)

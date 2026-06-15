@@ -1297,7 +1297,136 @@ class TestSaskGetWSAStations:
     Plan 05 fills.
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_default_where_clause_is_province_sk(self):
+        """fetch_wsa_stations defaults to where=\"Province='SK'\"."""
+        from mcp_canada.modules.saskatchewan.client import fetch_wsa_stations
+        from .conftest import SAMPLE_ARCGIS_WSA_STATIONS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WSA_STATIONS,
+        ) as mock_qfs:
+            data, cached = await fetch_wsa_stations()
+        mock_qfs.assert_called_once()
+        where = mock_qfs.call_args[1].get("where")
+        assert where == "Province='SK'", (
+            f"Expected where=\"Province='SK'\", got: {where}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_basin_filter_appends_to_where(self):
+        """fetch_wsa_stations with basin='Assiniboine' appends Major_Basin LIKE clause."""
+        from mcp_canada.modules.saskatchewan.client import fetch_wsa_stations
+        from .conftest import SAMPLE_ARCGIS_WSA_STATIONS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WSA_STATIONS,
+        ) as mock_qfs:
+            await fetch_wsa_stations(basin="Assiniboine")
+        where = mock_qfs.call_args[1].get("where")
+        assert "Province='SK'" in where, f"Expected Province='SK' in where, got: {where}"
+        assert "AND Major_Basin LIKE '%Assiniboine%'" in where, (
+            f"Expected basin LIKE clause in where, got: {where}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_uses_wsa_stations_fs_url_not_hub_org(self):
+        """fetch_wsa_stations calls WSA_STATIONS_FS_URL (services1 / 7MBdlVpjqbfBhQer), NOT Hub org."""
+        from mcp_canada.modules.saskatchewan.client import fetch_wsa_stations
+        from mcp_canada.modules.saskatchewan.constants import WSA_STATIONS_FS_URL
+        from .conftest import SAMPLE_ARCGIS_WSA_STATIONS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WSA_STATIONS,
+        ) as mock_qfs:
+            await fetch_wsa_stations()
+        url = mock_qfs.call_args[0][0]
+        assert url == WSA_STATIONS_FS_URL, (
+            f"Expected WSA_STATIONS_FS_URL, got: {url}"
+        )
+        assert "services1.arcgis.com/7MBdlVpjqbfBhQer" in url, (
+            f"Expected WSA org (7MBdlVpjqbfBhQer) in URL, got: {url}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_uses_layer_0(self):
+        """fetch_wsa_stations calls query_feature_service with layer_id=0."""
+        from mcp_canada.modules.saskatchewan.client import fetch_wsa_stations
+        from .conftest import SAMPLE_ARCGIS_WSA_STATIONS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WSA_STATIONS,
+        ) as mock_qfs:
+            await fetch_wsa_stations()
+        layer_id = mock_qfs.call_args[0][1]
+        assert layer_id == 0, f"Expected layer_id=0, got: {layer_id}"
+
+    @pytest.mark.asyncio
+    async def test_out_fields_includes_hyperlink_graph(self):
+        """fetch_wsa_stations sends out_fields including HyperLink_Graph."""
+        from mcp_canada.modules.saskatchewan.client import fetch_wsa_stations
+        from .conftest import SAMPLE_ARCGIS_WSA_STATIONS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WSA_STATIONS,
+        ) as mock_qfs:
+            await fetch_wsa_stations()
+        out_fields = mock_qfs.call_args[1].get("out_fields", "")
+        for field in ("Station_Number", "Major_Basin", "Station_Class", "Operated_By", "HyperLink_Graph"):
+            assert field in out_fields, f"Expected {field} in out_fields, got: {out_fields}"
+
+    @pytest.mark.asyncio
+    async def test_returns_features_count_truncated(self):
+        """fetch_wsa_stations returns dict with features, count, truncated."""
+        from mcp_canada.modules.saskatchewan.client import fetch_wsa_stations
+        from .conftest import SAMPLE_ARCGIS_WSA_STATIONS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WSA_STATIONS,
+        ):
+            data, cached = await fetch_wsa_stations()
+        assert "features" in data
+        assert "count" in data
+        assert "truncated" in data
+        assert data["count"] == 2
+        # HyperLink_Graph present in returned rows
+        first = data["features"][0]
+        assert "HyperLink_Graph" in first, (
+            f"Expected HyperLink_Graph in station row, got keys: {list(first.keys())}"
+        )
+        assert "wsask.ca" in first["HyperLink_Graph"], (
+            f"Expected wsask.ca in HyperLink_Graph URL, got: {first['HyperLink_Graph']}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_no_basin_returns_all_sk_stations(self):
+        """fetch_wsa_stations with no basin returns all SK stations."""
+        from mcp_canada.modules.saskatchewan.client import fetch_wsa_stations
+        from .conftest import SAMPLE_ARCGIS_WSA_STATIONS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WSA_STATIONS,
+        ) as mock_qfs:
+            data, _ = await fetch_wsa_stations(basin=None)
+        where = mock_qfs.call_args[1].get("where")
+        assert where == "Province='SK'", (
+            f"Expected only Province='SK' when no basin, got: {where}"
+        )
+        assert "AND" not in where, f"Expected no AND clause when basin=None, got: {where}"
 
 
 class TestSaskGetWSAReservoirs:
@@ -1306,4 +1435,103 @@ class TestSaskGetWSAReservoirs:
     Plan 05 fills: assert layer_id=WSA_RESERVOIRS_LAYER (26) passed to query_feature_service.
     """
 
-    pass
+    @pytest.mark.asyncio
+    async def test_uses_wsa_reservoirs_fs_url_not_hub_org(self):
+        """fetch_wsa_reservoirs calls WSA_RESERVOIRS_FS_URL (services1 / 7MBdlVpjqbfBhQer), NOT Hub org."""
+        from mcp_canada.modules.saskatchewan.client import fetch_wsa_reservoirs
+        from mcp_canada.modules.saskatchewan.constants import WSA_RESERVOIRS_FS_URL
+        from .conftest import SAMPLE_ARCGIS_WSA_RESERVOIRS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WSA_RESERVOIRS,
+        ) as mock_qfs:
+            data, cached = await fetch_wsa_reservoirs()
+        url = mock_qfs.call_args[0][0]
+        assert url == WSA_RESERVOIRS_FS_URL, (
+            f"Expected WSA_RESERVOIRS_FS_URL, got: {url}"
+        )
+        assert "services1.arcgis.com/7MBdlVpjqbfBhQer" in url, (
+            f"Expected WSA org (7MBdlVpjqbfBhQer) in URL, got: {url}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_CRITICAL_uses_layer_26_not_layer_0(self):
+        """CRITICAL: fetch_wsa_reservoirs calls query_feature_service with layer_id=26 (NOT 0).
+
+        Layer 0 is empty — all reservoir data is at layer 26 (spike-confirmed 2026-06-15).
+        WSA_RESERVOIRS_LAYER constant must be used; never hardcode 0.
+        """
+        from mcp_canada.modules.saskatchewan.client import fetch_wsa_reservoirs
+        from mcp_canada.modules.saskatchewan.constants import WSA_RESERVOIRS_LAYER
+        from .conftest import SAMPLE_ARCGIS_WSA_RESERVOIRS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WSA_RESERVOIRS,
+        ) as mock_qfs:
+            await fetch_wsa_reservoirs()
+        layer_id = mock_qfs.call_args[0][1]
+        assert layer_id == WSA_RESERVOIRS_LAYER, (
+            f"CRITICAL: Expected layer_id={WSA_RESERVOIRS_LAYER} (WSA_RESERVOIRS_LAYER), "
+            f"got: {layer_id}. Layer 0 is EMPTY — all reservoir data is at layer 26."
+        )
+        assert layer_id == 26, (
+            f"CRITICAL: layer_id must be 26, got: {layer_id}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_where_clause_is_1_equals_1(self):
+        """fetch_wsa_reservoirs uses where='1=1' (fetch all reservoirs)."""
+        from mcp_canada.modules.saskatchewan.client import fetch_wsa_reservoirs
+        from .conftest import SAMPLE_ARCGIS_WSA_RESERVOIRS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WSA_RESERVOIRS,
+        ) as mock_qfs:
+            await fetch_wsa_reservoirs()
+        where = mock_qfs.call_args[1].get("where")
+        assert where == "1=1", f"Expected where='1=1', got: {where}"
+
+    @pytest.mark.asyncio
+    async def test_out_fields_includes_reservoir_and_dam_name(self):
+        """fetch_wsa_reservoirs sends out_fields including Reservoir_Name, Dam_Name, Water_Level_MASL."""
+        from mcp_canada.modules.saskatchewan.client import fetch_wsa_reservoirs
+        from .conftest import SAMPLE_ARCGIS_WSA_RESERVOIRS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WSA_RESERVOIRS,
+        ) as mock_qfs:
+            await fetch_wsa_reservoirs()
+        out_fields = mock_qfs.call_args[1].get("out_fields", "")
+        for field in ("Reservoir_Name", "Dam_Name", "Water_Level_MASL"):
+            assert field in out_fields, f"Expected {field} in out_fields, got: {out_fields}"
+
+    @pytest.mark.asyncio
+    async def test_returns_features_count_truncated(self):
+        """fetch_wsa_reservoirs returns dict with features, count, truncated."""
+        from mcp_canada.modules.saskatchewan.client import fetch_wsa_reservoirs
+        from .conftest import SAMPLE_ARCGIS_WSA_RESERVOIRS
+
+        with patch(
+            "mcp_canada.modules.saskatchewan.client.arcgis_hub.query_feature_service",
+            new_callable=AsyncMock,
+            return_value=SAMPLE_ARCGIS_WSA_RESERVOIRS,
+        ):
+            data, cached = await fetch_wsa_reservoirs()
+        assert "features" in data
+        assert "count" in data
+        assert "truncated" in data
+        assert data["count"] == 2
+        first = data["features"][0]
+        assert "Reservoir_Name" in first, (
+            f"Expected Reservoir_Name in reservoir row, got: {list(first.keys())}"
+        )
+        assert first["Reservoir_Name"] == "ADMIRAL RESERVOIR"
+        assert "Dam_Name" in first, f"Expected Dam_Name in reservoir row"

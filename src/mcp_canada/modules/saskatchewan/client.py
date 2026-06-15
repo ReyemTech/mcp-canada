@@ -695,12 +695,36 @@ async def fetch_wsa_stations(
     """Fetch WSA hydrometric gauging stations from Hydrometric_Gauging_Stations_V2 FeatureServer.
 
     Uses WSA org (7MBdlVpjqbfBhQer / services1.arcgis.com) — NOT the primary Hub org.
-    Default where=Province='SK'; optional basin= filter on Major_Basin field.
+    Default where=Province='SK'; optional basin= filter on Major_Basin field (LIKE).
     Fields: Station_Number, Station_Name, Province, Latitude, Longitude,
     Major_Basin, Station_Type, Station_Class, Operated_By, HyperLink_Graph.
-    Filled by Plan 05.
+    HyperLink_Graph links to live hourly hydrographs at wsask.ca.
     """
-    raise NotImplementedError("Plan 05 implements")
+    where = "Province='SK'"
+    if basin:
+        where += f" AND Major_Basin LIKE '%{basin}%'"
+    cache_key = f"{CACHE_KEY_PREFIX}wsa:stations:{basin or 'all'}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _wsa_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            WSA_STATIONS_FS_URL,
+            WSA_STATIONS_LAYER,
+            where=where,
+            out_fields=(
+                "Station_Number,Station_Name,Province,Latitude,Longitude,"
+                "Major_Basin,Station_Type,Station_Class,Operated_By,HyperLink_Graph"
+            ),
+            include_geometry=False,
+            max_records=max_records,
+        )
+        return {
+            "features": features,
+            "count": len(features),
+            "truncated": truncated,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 async def fetch_wsa_reservoirs(
@@ -710,7 +734,25 @@ async def fetch_wsa_reservoirs(
 
     Uses WSA org (7MBdlVpjqbfBhQer / services1.arcgis.com) — NOT the primary Hub org.
     CRITICAL: Layer 26 (NOT layer 0) — spike-confirmed 2026-06-15; layer 0 returns empty.
+    WSA_RESERVOIRS_LAYER constant (=26) must be used; never hardcode layer 0 for reservoirs.
     Fields: Reservoir_Name, Dam_Name, Imagery_Date, Water_Level_MASL.
-    Filled by Plan 05.
     """
-    raise NotImplementedError("Plan 05 implements")
+    cache_key = f"{CACHE_KEY_PREFIX}wsa:reservoirs:all"
+
+    async def _fetch() -> dict[str, Any]:
+        await _wsa_limiter.acquire()
+        features, truncated = await arcgis_hub.query_feature_service(
+            WSA_RESERVOIRS_FS_URL,
+            WSA_RESERVOIRS_LAYER,  # 26 — NOT 0 (layer 0 is empty, spike-confirmed)
+            where="1=1",
+            out_fields="Reservoir_Name,Dam_Name,Imagery_Date,Water_Level_MASL",
+            include_geometry=False,
+            max_records=max_records,
+        )
+        return {
+            "features": features,
+            "count": len(features),
+            "truncated": truncated,
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)

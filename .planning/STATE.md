@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 status: planning
-stopped_at: Completed 20-nova-scotia-government-open-data 20-02-PLAN.md
-last_updated: "2026-06-15T19:14:36.026Z"
+stopped_at: Completed 20-nova-scotia-government-open-data 20-03-PLAN.md
+last_updated: "2026-06-15T19:23:14.953Z"
 last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
 progress:
   total_phases: 34
   completed_phases: 14
   total_plans: 71
-  completed_plans: 66
+  completed_plans: 67
   percent: 0
 ---
 
@@ -114,6 +114,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 19-saskatchewan-government-open-data P07 | 15min | 2 tasks | 7 files |
 | Phase 20-nova-scotia-government-open-data P01 | 11min | 3 tasks | 15 files |
 | Phase 20-nova-scotia-government-open-data P02 | 6min | 2 tasks | 4 files |
+| Phase 20-nova-scotia-government-open-data P03 | 5min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -287,6 +288,8 @@ Recent decisions affecting current work:
 - [Phase 20-nova-scotia-government-open-data]: fetch_categories uses q='' + client-side domain_category aggregation (never categories= param — confirmed broken, returns resultSetSize=0)
 - [Phase 20-nova-scotia-government-open-data]: include_geometry=False + select=None leaves select as None in fetch_query_dataset (documented: Socrata returns all fields including the_geom; agent must use $select to exclude)
 - [Phase 20-nova-scotia-government-open-data]: api_name='nova-scotia-socrata' used for all 5 discovery tools in make_response envelope
+- [Phase 20-nova-scotia-government-open-data]: Defensive the_geom strip applied at both client and tool layers for marine leases — belt-and-suspenders; $select is primary, row strip handles any API anomaly
+- [Phase 20-nova-scotia-government-open-data]: CACHE_TTL_ANNUAL (7d) for aquaculture production (annual dataset); leases/licenses/hatchery use CACHE_TTL_META (24h)
 
 ### Roadmap Evolution
 
@@ -314,6 +317,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-15T19:14:36.023Z
-Stopped at: Completed 20-nova-scotia-government-open-data 20-02-PLAN.md
+Last session: 2026-06-15T19:23:14.949Z
+Stopped at: Completed 20-nova-scotia-government-open-data 20-03-PLAN.md
 Resume file: None

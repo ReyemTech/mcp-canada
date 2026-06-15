@@ -212,6 +212,29 @@ Primary portal is **geohub.saskatchewan.ca** ArcGIS Hub (ArcGIS Online org `zcv9
 - **SK-14**: Agent can get WSA reservoir locations with reservoir names and dam names from the `WSA_Reservoirs` FeatureServer (WSA org, layer 26 — NOT layer 0)
 - **SK-15**: All Saskatchewan tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, saskatchewan_ prefix), are discoverable via discover_tools, and 6 prompts + 7 resources are auto-discovered by FileSystemProvider
 
+### Nova Scotia Government Open Data
+
+Primary portal is **data.novascotia.ca** — a **Socrata** (Tyler Technologies) open-data platform exposing the keyless **SODA API** (`/api/catalog/v1` discovery, `/resource/{id}.json` SoQL reads). Socrata is a NEW (4th) portal technology for this codebase (after CKAN, ArcGIS Hub, OGC WFS), served by the new reusable `shared/socrata.py` client. Module prefix `ns_`. Transport / 511 is DEFERRED (HTML-only, no clean feed; no NOT_CONFIGURED stubs). NS ArcGIS Hub (novagis) is DEFERRED (no public no-auth FeatureServers confirmed). Geospatial datasets come through Socrata; geometry (`the_geom`) excluded via explicit `$select` in curated tools.
+
+- **NS-01**: `shared/socrata.py` provides a reusable SODA client — `search_catalog(domain, q, limit, offset, only)`, `get_dataset_metadata(domain, dataset_id)`, `query_dataset(domain, dataset_id, where, select, order, limit, offset, q, group)`, and `shape_catalog_result(result)` — returning parsed dicts (consistent with the `api_get` parsed-dict contract), with an optional `X-App-Token` slot (keyless default), `httpx_client` injection, and no caching/rate-limiting inside the shared client. Adds Socrata as the 4th Portal Technologies row in CLAUDE.md.
+- **NS-02**: Agent can search Nova Scotia's data.novascotia.ca Socrata catalogue by keyword with pagination (`/api/catalog/v1?domains=data.novascotia.ca&q=...&limit=...&offset=...&only=datasets`)
+- **NS-03**: Agent can get full metadata (schema columns, attribution, license) for a specific Nova Scotia dataset by ID via `/api/views/{id}.json`
+- **NS-04**: Agent can run a SoQL query against any Nova Scotia dataset via `/resource/{id}.json` with `$where`, `$select`, `$order`, `$limit`, `$offset`, `$q`, `$group` (geometry inclusion controlled via `$select`)
+- **NS-05**: Agent can list Nova Scotia government organizations (publishers/attributions) that publish on data.novascotia.ca (derived from catalog `owner`/`attribution`/`domain_metadata`)
+- **NS-06**: Agent can list Nova Scotia data categories — the catalog `categories=` param is BROKEN (returns 0 live); `ns_list_categories` MUST use `q=` + client-side `classification.domain_category` aggregation, returning 20+ categories incl. "Fishing and Aquaculture"
+- **NS-07**: Agent can get Nova Scotia marine aquaculture lease locations (`h57h-p9mm`) with license_le, ownership, species, waterbody, county, sitestatus, speciestyp, hectares, lat_dms, long_dms — geometry (`the_geom`) excluded via `$select`
+- **NS-08**: Agent can get Nova Scotia landbased aquaculture licenses (`yqwg-f62a`) with license_le, species, speciestyp, county, ownership, sitestatus, lat_dms, long_dms
+- **NS-09**: Agent can get Nova Scotia fish hatchery stocking records (`8e4a-m6fw`) with county, stock, stock_strain, hatchery, fish_length_cm, fish_weight_g, number_released, stocking_date, mark (current to 2025)
+- **NS-10**: Agent can get Nova Scotia aquaculture production, value, and employment data by county and year (`v2ex-ev63`) with year, county, kgs, total_value, full_time, total_employ
+- **NS-11**: Agent can get Nova Scotia surface water quality continuous monitoring readings (`bkfi-mjgw`) with station_number, date, time, temperature_c, ph, specific_conductance_s_cm, dissolved_oxygen_mg_l
+- **NS-12**: Agent can get Nova Scotia boil water advisories (`7t68-9xmm`) with site_name, county, date_advisory_issued, date_advisory_removed, facility_type, length_of_advisory; active-advisory filter resolved by Wave 0 spike (NULL vs empty string for date_advisory_removed)
+- **NS-13**: Agent can get Nova Scotia hospital and long-term care facility locations dispatched by facility_type: Literal["hospital","long_term_care"] (Hospitals `tmfr-3h8a` + LTC/RCF `x76a-axw2`) with facility name, address, town, county, type, zone, beds, coordinates
+- **NS-14**: Agent can get Nova Scotia vital statistics (`r794-fttm`) — births, deaths, rates, natural increase — by county and year (counties UPPERCASE; year is text)
+- **NS-15**: Agent can get Nova Scotia protected areas (`ticv-5du5`) with pro_name, protect1, symbol, owner, authority, status, web_url, ha_gis — geometry excluded via `$select`
+- **NS-16**: Agent can get Nova Scotia ambient air quality monitoring station locations (`3bbm-drnh`) with station_name, city, latitude, longitude, measurements, monitoring_period (reference catalog; individual pollutant time series are discovery-only via ns_query_dataset)
+- **NS-17**: Agent can get Nova Scotia chronic disease prevalence dispatched by disease: Literal["ami","diabetes","copd","hypertension","asthma"] (`24qf-ntke`, `cumi-sw99`, `ua9e-4pss`, `sztc-sewr`, `2bih-5dgk`) with year, zone (normalized from health_zone/zone), sex, agegroup, population, crude_prevalence_rate; invalid disease returns INVALID_INPUT
+- **NS-18**: All Nova Scotia tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, ns_ prefix), are discoverable via discover_tools, and 6 prompts + 7 resources are auto-discovered by FileSystemProvider
+
 ## v2 Requirements
 
 ### Extended Datastore
@@ -407,6 +430,24 @@ Primary portal is **geohub.saskatchewan.ca** ArcGIS Hub (ArcGIS Online org `zcv9
 | SK-13 | Phase 19 | Planned |
 | SK-14 | Phase 19 | Planned |
 | SK-15 | Phase 19 | Planned |
+| NS-01 | Phase 20 | Planned |
+| NS-02 | Phase 20 | Planned |
+| NS-03 | Phase 20 | Planned |
+| NS-04 | Phase 20 | Planned |
+| NS-05 | Phase 20 | Planned |
+| NS-06 | Phase 20 | Planned |
+| NS-07 | Phase 20 | Planned |
+| NS-08 | Phase 20 | Planned |
+| NS-09 | Phase 20 | Planned |
+| NS-10 | Phase 20 | Planned |
+| NS-11 | Phase 20 | Planned |
+| NS-12 | Phase 20 | Planned |
+| NS-13 | Phase 20 | Planned |
+| NS-14 | Phase 20 | Planned |
+| NS-15 | Phase 20 | Planned |
+| NS-16 | Phase 20 | Planned |
+| NS-17 | Phase 20 | Planned |
+| NS-18 | Phase 20 | Planned |
 
 **Coverage:**
 - v1 requirements: 73 total (added 27 Alberta requirements in Phase 17)
@@ -419,8 +460,9 @@ Primary portal is **geohub.saskatchewan.ca** ArcGIS Hub (ArcGIS Online org `zcv9
 - Alberta requirements: 27 total (Phase 17)
 - Manitoba requirements: 18 total (Phase 18)
 - Saskatchewan requirements: 15 total (Phase 19)
+- Nova Scotia requirements: 18 total (Phase 20)
 - Prompts & Resources requirements: 20 total (Phase 40)
 
 ---
 *Requirements defined: 2026-04-07*
-*Last updated: 2026-06-15 after Phase 19 planning (added SK-01…SK-15)*
+*Last updated: 2026-06-15 after Phase 20 planning (added NS-01…NS-18)*

@@ -162,7 +162,7 @@ def _normalize_zone_field(row: dict[str, Any], disease: str) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Discovery client functions (Plan 02 fills bodies)
+# Discovery client functions (Plan 02)
 # ---------------------------------------------------------------------------
 
 
@@ -171,15 +171,49 @@ async def fetch_search_datasets(
     limit: int = 10,
     offset: int = 0,
 ) -> tuple[dict[str, Any], bool]:
-    """Search the NS Socrata catalog. Filled by Plan 02."""
-    raise NotImplementedError("Plan 02 implements")
+    """Search the Nova Scotia Socrata catalog by keyword with pagination.
+
+    Returns shaped results: {"results": [...], "total": int}.
+    Limit is clamped to [1, 1000] before forwarding to the SODA API.
+    """
+    clamped_limit = max(1, min(limit, 1000))
+    cache_key = f"{CACHE_KEY_PREFIX}catalog:search:{query}:{clamped_limit}:{offset}"
+
+    async def fetcher() -> dict[str, Any]:
+        await _limiter.acquire()
+        raw = await socrata.search_catalog(
+            BASE_DOMAIN,
+            q=query,
+            limit=clamped_limit,
+            offset=offset,
+            only="datasets",
+            app_token=APP_TOKEN,
+        )
+        results = [socrata.shape_catalog_result(r) for r in raw.get("results", [])]
+        return {"results": results, "total": raw.get("resultSetSize", 0)}
+
+    return await cached_fetch(cache_key, CACHE_TTL_SEARCH, fetcher)
 
 
 async def fetch_dataset_details(
     dataset_id: str,
 ) -> tuple[dict[str, Any], bool]:
-    """Fetch /api/views/{id}.json metadata for a dataset. Filled by Plan 02."""
-    raise NotImplementedError("Plan 02 implements")
+    """Fetch /api/views/{id}.json metadata for a dataset.
+
+    Returns {"details": flat_metadata_dict}.
+    """
+    cache_key = f"{CACHE_KEY_PREFIX}metadata:{dataset_id}"
+
+    async def fetcher() -> dict[str, Any]:
+        await _limiter.acquire()
+        flat = await socrata.get_dataset_metadata(
+            BASE_DOMAIN,
+            dataset_id,
+            app_token=APP_TOKEN,
+        )
+        return {"details": flat}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, fetcher)
 
 
 async def fetch_query_dataset(
@@ -193,21 +227,116 @@ async def fetch_query_dataset(
     group: str | None = None,
     include_geometry: bool = False,
 ) -> tuple[dict[str, Any], bool]:
-    """Pass-through SoQL query for any NS dataset. Filled by Plan 02.
+    """Pass-through SoQL query for any NS dataset.
 
-    When include_geometry=False (default), the_geom is stripped from $select.
+    When include_geometry=False (default) AND select is None, select is left as None —
+    Socrata returns all fields including the_geom. Agents should pass explicit $select
+    to exclude geometry. When include_geometry=False AND select is provided, select
+    passes through unchanged.
     """
-    raise NotImplementedError("Plan 02 implements")
+    cache_key = (
+        f"{CACHE_KEY_PREFIX}query:{dataset_id}:{where}:{select}:"
+        f"{order}:{limit}:{offset}:{q}:{group}:{include_geometry}"
+    )
+
+    async def fetcher() -> dict[str, Any]:
+        await _limiter.acquire()
+        rows = await socrata.query_dataset(
+            BASE_DOMAIN,
+            dataset_id,
+            where=where,
+            select=select,
+            order=order,
+            limit=limit,
+            offset=offset,
+            q=q,
+            group=group,
+            app_token=APP_TOKEN,
+        )
+        return {"rows": rows, "count": len(rows), "truncated": len(rows) >= limit}
+
+    return await cached_fetch(cache_key, CACHE_TTL_SEARCH, fetcher)
 
 
 async def fetch_organizations() -> tuple[dict[str, Any], bool]:
-    """List unique organization attributions from NS catalog. Filled by Plan 02."""
-    raise NotImplementedError("Plan 02 implements")
+    """List unique organization attributions from the NS Socrata catalog.
+
+    Fetches a wide catalog page and aggregates unique owner.display_name /
+    attribution values with dataset counts. Never uses a dedicated organizations
+    endpoint — derives from catalog results (same approach as Saskatchewan Hub).
+    """
+    cache_key = f"{CACHE_KEY_PREFIX}organizations"
+
+    async def fetcher() -> dict[str, Any]:
+        await _limiter.acquire()
+        # Fetch a wide page to capture many organizations
+        raw = await socrata.search_catalog(
+            BASE_DOMAIN,
+            q="",
+            limit=1000,
+            offset=0,
+            only="datasets",
+            app_token=APP_TOKEN,
+        )
+        # Aggregate unique owner.display_name values with counts
+        org_counts: dict[str, int] = {}
+        for result in raw.get("results", []):
+            owner = result.get("owner") or {}
+            name = owner.get("display_name")
+            # Also try attribution from classification.domain_metadata
+            if not name:
+                for meta in (result.get("classification") or {}).get("domain_metadata") or []:
+                    if isinstance(meta, dict) and str(meta.get("key", "")).endswith("Department"):
+                        name = meta.get("value")
+                        break
+            if name:
+                org_counts[name] = org_counts.get(name, 0) + 1
+
+        organizations = sorted(
+            [{"name": k, "dataset_count": v} for k, v in org_counts.items()],
+            key=lambda x: (-x["dataset_count"], x["name"]),
+        )
+        return {"organizations": organizations}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, fetcher)
 
 
 async def fetch_categories() -> tuple[dict[str, Any], bool]:
-    """List domain categories from NS catalog. Filled by Plan 02."""
-    raise NotImplementedError("Plan 02 implements")
+    """List domain categories from the NS Socrata catalog.
+
+    IMPORTANT: The catalog categories= param is BROKEN (returns resultSetSize=0 always).
+    This function uses q= (or empty q) + client-side aggregation of
+    classification.domain_category to enumerate all categories.
+    The categories= param is NEVER sent.
+    """
+    cache_key = f"{CACHE_KEY_PREFIX}categories"
+
+    async def fetcher() -> dict[str, Any]:
+        await _limiter.acquire()
+        # Fetch a wide page to capture many categories (no categories= param — it's broken)
+        raw = await socrata.search_catalog(
+            BASE_DOMAIN,
+            q="",
+            limit=1000,
+            offset=0,
+            only="datasets",
+            app_token=APP_TOKEN,
+        )
+        # Aggregate classification.domain_category values client-side
+        cat_counts: dict[str, int] = {}
+        for result in raw.get("results", []):
+            classification = result.get("classification") or {}
+            cat = classification.get("domain_category")
+            if cat:
+                cat_counts[cat] = cat_counts.get(cat, 0) + 1
+
+        categories = sorted(
+            [{"name": k, "count": v} for k, v in cat_counts.items()],
+            key=lambda x: (-x["count"], x["name"]),
+        )
+        return {"categories": categories}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, fetcher)
 
 
 # ---------------------------------------------------------------------------

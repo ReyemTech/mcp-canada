@@ -882,6 +882,61 @@ Step 6: ds_query(sql="
 
 ---
 
+### 27. Nova Scotia Aquaculture Production vs. StatCan Fisheries GDP
+
+> "How much of Nova Scotia's marine economy comes from aquaculture? Compare NS production (kg + $) with StatCan's fisheries and aquaculture GDP series."
+
+**APIs:** Nova Scotia Government Open Data (Socrata) + Statistics Canada WDS + Local Datastore
+
+```
+Step 1: ns_get_aquaculture_production(limit=500)
+        → NS annual aquaculture production by county: year, county, kgs, total_value,
+          full_time employment, total employment. Ordered most recent year first.
+
+Step 2: ds_create_table(
+          table_name="ns_aquaculture",
+          columns=[
+            {name: "year",         type: "TEXT"},
+            {name: "county",       type: "TEXT"},
+            {name: "kgs",          type: "REAL"},
+            {name: "total_value",  type: "REAL"},
+            {name: "full_time",    type: "REAL"},
+            {name: "total_employ", type: "REAL"}
+          ])
+
+Step 3: ds_insert_data(table_name="ns_aquaculture", rows=[...from step 1...])
+
+Step 4: sc_get_series_observations(vectorIds="v41707477", latestN=10)
+        → StatCan WDS: GDP at basic prices — fisheries and aquaculture (NAICS 1141+1142),
+          annual, chained 2017 dollars (vector v41707477 or equivalent via cube 36-10-0434-01)
+
+Step 5: ds_create_table(
+          table_name="statcan_fisheries_gdp",
+          columns=[
+            {name: "year",  type: "TEXT"},
+            {name: "gdp_m", type: "REAL"}
+          ])
+
+Step 6: ds_insert_data(table_name="statcan_fisheries_gdp", rows=[...from step 4...])
+
+Step 7: ds_query(sql="
+          SELECT
+            ns.year,
+            SUM(ns.kgs)         AS total_kgs,
+            SUM(ns.total_value) AS total_value_cad,
+            SUM(ns.full_time)   AS full_time_jobs,
+            sg.gdp_m            AS ns_fisheries_gdp_m
+          FROM ns_aquaculture ns
+          LEFT JOIN statcan_fisheries_gdp sg ON ns.year = sg.year
+          GROUP BY ns.year, sg.gdp_m
+          ORDER BY ns.year DESC")
+        → Per-year: total NS aquaculture kg, dollar value, employment, and StatCan fisheries GDP
+```
+
+**The insight:** Nova Scotia produces most of Atlantic Canada's farmed shellfish (oysters, mussels) and finfish (Atlantic Salmon). `ns_get_aquaculture_production` gives the granular county-level breakdown from data.novascotia.ca's Socrata portal; the StatCan WDS GDP series gives the national fisheries GDP context. The JOIN makes the NS aquaculture sector's share of national fisheries GDP visible row-by-row. For deeper analysis, use `ns_get_marine_aquaculture_leases` to map active lease sites by county and `ns_get_fish_hatchery_stocking` to trace hatchery output that underpins wild fishery restoration. See `data://ns/fishing-areas` for species type breakdowns and `docs://ns/socrata-guide` for SoQL query syntax on the data.novascotia.ca SODA API.
+
+---
+
 ## Key Patterns
 
 Three structural patterns make these examples work:
@@ -903,7 +958,7 @@ uvx mcp-canada
 # Or load specific modules
 uvx mcp-canada --modules bank_of_canada,open_parliament,recalls
 
-# 250 tools. 16 APIs + 1 local datastore. Zero auth tokens. One command.
+# 266 tools. 17 APIs + 1 local datastore. Zero auth tokens. One command.
 ```
 
 Add to Claude Desktop, Claude Code, or any MCP-compatible agent — then try any prompt above.

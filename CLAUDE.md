@@ -63,18 +63,22 @@ Every module in `src/mcp_canada/modules/{name}/`:
 - `i18n.py` — `t(key, lang)` bilingual error messages
 - `arcgis_hub.py` — ArcGIS Hub FeatureServer client (Phase 14: York Region and other ArcGIS Hub portals)
 - `ogc.py` — OGC WFS 2.0 client (Phase 15: BC Geographic Warehouse; reuse for Quebec and other provinces with WFS portals)
+- `socrata.py` — Socrata SODA client (Phase 20: Nova Scotia data.novascotia.ca; reuse for future Socrata portals PEI/NB)
 
-### Portal Technologies (3)
+### Portal Technologies (4)
 
 | Technology | Client | First used | Pattern |
 |-----------|--------|------------|---------|
 | **CKAN** | `shared/http.py` + per-module `_api_get` | Federal CKAN, Ontario, Toronto, BC CKAN, Quebec (Données Québec), Alberta (open.alberta.ca) | `BASE_URL + /api/3/action/` |
 | **ArcGIS Hub** | `shared/arcgis_hub.py` | Phase 14: York Region; Phase 17: Alberta (WMBappServices wildfire, AHSGIS health, GeoDiscover environment/parks); Phase 18: Manitoba (geoportal.gov.mb.ca, org mMUesHYPkXjaFGfS); Phase 19: Saskatchewan (geohub.saskatchewan.ca, primary org zcv98lgAl8xQ04cW + WSA org 7MBdlVpjqbfBhQer + SPSA gis.saskatchewan.ca/egis) | FeatureServer `query` endpoint |
 | **OGC WFS 2.0** | `shared/ogc.py` | Phase 15: British Columbia | `GetFeature` with CQL_FILTER; two-step CKAN→WFS workflow |
+| **Socrata** | `shared/socrata.py` | Phase 20: Nova Scotia (data.novascotia.ca) | SODA API: `/api/catalog/v1` discovery + `/resource/{id}.json` SoQL (`$where/$select/$order/$limit`); keyless, optional `X-App-Token` |
 
 **Alberta static reports (AER ST1/ST3/ST39):** Alberta Energy Regulator publishes well/production/pipeline statistics as static XLSX/TXT files at `static.aer.ca/prd/`. These are **not** a portal technology — they're downloaded and parsed via `shared/parsers.py` (`fetch_and_parse`) and routed through per-tool URL templates. See `docs://alberta/aer-data-guide` for the product slug casing and rotation rules. **511 Alberta v2 JSON API** is an undocumented-but-stable raw-JSON feed (not CKAN envelope) used for road events / winter conditions / cameras.
 
 **BC two-step CKAN→WFS workflow:** Discover datasets via `bc_search_datasets` (CKAN) → get `object_name` + `queryable_via_wfs` via `bc_get_dataset_details` → query geospatial features via `bc_query_features` (WFS). See `docs://bc/wfs-query-guide` resource for full CQL syntax and examples.
+
+**Socrata categories= workaround:** The `/api/catalog/v1?categories=X` parameter is **broken** (returns `resultSetSize=0` for any category on data.novascotia.ca). Use `q=` keyword search + client-side aggregation of `classification.domain_category` instead. Geometry columns (`the_geom`) must be excluded via explicit `$select`; belt-and-suspenders row-level strip handles any API anomaly. NS transport/511 (HTML-only) and NS ArcGIS Hub (novagis, no public no-auth FeatureServers) are deferred.
 
 **Manitoba ArcGIS Hub (geoportal.gov.mb.ca, org mMUesHYPkXjaFGfS):** Hub Search API at `/api/search/v1/collections/all/items` (NOT `/api/v2/datasets` which 404s). `data.manitoba.ca` is unreachable; `mli.gov.mb.ca` (Manitoba Land Initiative) was retired 2022-02-09 — never reference either. **Manitoba 511 v3 key GATED:** account signup + explicit key request at https://www.manitoba511.ca/my511/register; tools return `NOT_CONFIGURED` via `Five11NotConfigured` exception when `MANITOBA_511_KEY` env var absent. River Conditions are live CSV (no FeatureServer backing the web app). See `docs://manitoba/portal-guide` for the full pitfall list.
 

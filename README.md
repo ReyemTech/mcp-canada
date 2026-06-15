@@ -18,7 +18,7 @@
 
 ---
 
-**250 tools, ~99 prompts, and ~131 resources** across **9 federal APIs + 7 provincial APIs + 2 municipal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, York Region ArcGIS Hub data, British Columbia CKAN + WFS geospatial data, Quebec Données Québec CKAN + ArcGIS IQA data, Alberta open data + AER energy + WMBappServices wildfire + AHSGIS health + 511 Alberta transport, Manitoba geoportal (ArcGIS Hub) + 511 Manitoba transport, Saskatchewan geoportal (ArcGIS Hub) + WSA water infrastructure + SPSA fire bans, and persistent local storage. All bilingual (English/French).
+**266 tools, ~105 prompts, and ~138 resources** across **9 federal APIs + 8 provincial APIs + 2 municipal APIs + 1 local SQLite datastore** — exchange rates, parliamentary data, product recalls, drug information, 80K+ open datasets, food nutrition data, real-time weather, immigration statistics, Ontario provincial data, Toronto municipal data, York Region ArcGIS Hub data, British Columbia CKAN + WFS geospatial data, Quebec Données Québec CKAN + ArcGIS IQA data, Alberta open data + AER energy + WMBappServices wildfire + AHSGIS health + 511 Alberta transport, Manitoba geoportal (ArcGIS Hub) + 511 Manitoba transport, Saskatchewan geoportal (ArcGIS Hub) + WSA water infrastructure + SPSA fire bans, Nova Scotia Socrata SODA portal (data.novascotia.ca), and persistent local storage. All bilingual (English/French).
 
 > **First ArcGIS Hub module** — shared infrastructure in `shared/arcgis_hub.py` is reusable for future Canadian municipal modules (BC, Calgary, Edmonton, and other cities publishing via ArcGIS Hub).
 > **First OGC WFS module** — BC introduces WFS 2.0 (OGC) support via `shared/ogc.py`, making WFS the third portal technology alongside CKAN and ArcGIS Hub. See `docs://bc/wfs-query-guide` for the CKAN→WFS two-step workflow.
@@ -135,12 +135,13 @@ All tools accept `lang: "en" | "fr"` for bilingual support. Responses include a 
 | [British Columbia](docs/modules/british-columbia.md) | Provincial | 20 | 6 | 7 | CKAN + WFS geospatial — [BC Data Catalogue](https://catalogue.data.gov.bc.ca) |
 | [Manitoba](docs/modules/manitoba.md) | Provincial | 20 | 6 | 7 | ArcGIS Hub + 511 Manitoba — [geoportal.gov.mb.ca](https://geoportal.gov.mb.ca) |
 | [Saskatchewan](docs/modules/saskatchewan.md) | Provincial | 13 | 6 | 7 | ArcGIS Hub + WSA water + SPSA fire bans — [geohub.saskatchewan.ca](https://geohub.saskatchewan.ca) |
+| [Nova Scotia](docs/modules/nova-scotia.md) | Provincial | 16 | 6 | 7 | Socrata SODA portal (aquaculture, environment, health) — [data.novascotia.ca](https://data.novascotia.ca) |
 | [Ontario](docs/modules/ontario.md) | Provincial | 6 | 4 | 6 | 3,000+ provincial datasets — [Ontario Open Data](https://data.ontario.ca) |
 | [Quebec](docs/modules/quebec.md) | Provincial | 18 | 6 | 7 | Federated CKAN (139 orgs) — [Données Québec](https://www.donneesquebec.ca) |
 | [Toronto](docs/modules/toronto.md) | Municipal | 12 | 6 | 8 | TTC, neighbourhoods, 311, RentSafe — [Toronto Open Data](https://open.toronto.ca) |
 | [York Region](docs/modules/york-region.md) | Municipal | 27 | 5 | 8 | 4 ArcGIS Hub portals (York Region, Markham, Newmarket, Aurora) |
 | [Local Datastore](docs/modules/datastore.md) | Local | 6 | 4 | 6 | SQLite persistence for cross-API SQL JOINs — `~/.mcp-canada/datastore.db` |
-| **Total** | | **250** | **~99** | **~131** | |
+| **Total** | | **266** | **~105** | **~138** | |
 
 ---
 
@@ -202,6 +203,7 @@ src/mcp_canada/
     ├── saskatchewan/      # 13 tools — geohub.saskatchewan.ca ArcGIS Hub + WSA water + SPSA fire bans
     ├── quebec/            # 18 tools — Données Québec CKAN
     ├── alberta/           # 24 tools — open.alberta.ca CKAN + AER + WMB + AHSGIS + 511
+    ├── nova_scotia/       # 16 tools — data.novascotia.ca Socrata SODA
     ├── statcan/           # 15 tools — Statistics Canada WDS + SDMX
     └── weather/           # 34 tools — MSC GeoMet OGC API
         ├── current/       # 5 tools — realtime conditions, forecast, alerts
@@ -277,6 +279,12 @@ Found a vulnerability? Please **do not** open a public issue. Email [contact@rey
 ## License
 
 [MIT](LICENSE) — [Reyem Tech](https://reyem.tech)
+
+### Data Attributions
+
+Data from the following government sources is accessed by this library subject to their respective licences:
+
+- **Nova Scotia Open Data** — Licensed under the [Open Government Licence – Nova Scotia v1.1](https://novascotia.ca/opendata/licence.asp). Contains public sector information provided by the Province of Nova Scotia.
 
 ## Star History
 

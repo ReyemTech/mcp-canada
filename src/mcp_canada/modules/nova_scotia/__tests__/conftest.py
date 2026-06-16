@@ -11,6 +11,16 @@ Includes:
   - Empty boil-water advisory list (valid off-season edge case — NOT an error)
   - Both health_zone (AMI) and zone (other diseases) row fixtures for normalization tests
 
+Health fixtures (Plan 08 gap closure — updated 2026-06-16):
+  - SAMPLE_HOSPITALS_ROWS: RAW (pre-normalization) hospital schema from Socrata tmfr-3h8a.
+    Keys: facility, address, town, county, type, the_geom.
+    NO facility_name / x_coordinate / y_coordinate (they are derived in client normalization).
+  - SAMPLE_LTC_ROWS: RAW (pre-normalization) LTC schema from Socrata x76a-axw2.
+    Keys: facility_name, address, town, postal_code, facility_type, zone,
+          nursing_homes_nh_no_of_beds, residential_care_facilities_rcf_no_of_beds,
+          single_entry_access_sea_participating, x_coordinate, y_coordinate.
+    NO county / type columns (they do not exist in the raw LTC dataset).
+
 Spike note (20-SPIKE.md): Dataset IDs verified 2026-06-15.
 """
 
@@ -327,49 +337,60 @@ SAMPLE_AIR_QUALITY_ROWS: list[dict[str, Any]] = [
 # Health + Demographics row fixtures
 # ---------------------------------------------------------------------------
 
+# RAW hospital rows — exact Socrata tmfr-3h8a schema (live-confirmed 2026-06-15).
+# Keys: facility, address, town, county, type, the_geom.
+# NO facility_name, NO x_coordinate, NO y_coordinate — those are derived during normalization.
 SAMPLE_HOSPITALS_ROWS: list[dict[str, Any]] = [
     {
-        "facility_name": "QEII Health Sciences Centre",
+        "facility": "QEII Health Sciences Centre",
         "address": "1796 Summer Street",
         "town": "Halifax",
         "county": "Halifax",
         "type": "Regional",
-        "x_coordinate": "-63.5901",
-        "y_coordinate": "44.6476",
+        "the_geom": {"type": "Point", "coordinates": [-63.5901, 44.6476]},
     },
     {
-        "facility_name": "Hants Community Hospital",
+        "facility": "Hants Community Hospital",
         "address": "89 Payzant Drive",
         "town": "Windsor",
         "county": "Hants",
         "type": "Community",
-        "x_coordinate": "-64.1333",
-        "y_coordinate": "45.0000",
+        "the_geom": {"type": "Point", "coordinates": [-64.1333, 45.0000]},
     },
 ]
 
+# RAW LTC rows — exact Socrata x76a-axw2 schema (live-confirmed 2026-06-15).
+# Keys: facility_name, address, town, postal_code, facility_type, zone,
+#       nursing_homes_nh_no_of_beds, residential_care_facilities_rcf_no_of_beds,
+#       single_entry_access_sea_participating, x_coordinate, y_coordinate.
+# NO county, NO type columns — those do not exist in the raw LTC dataset.
+# Beds arrive as number strings (e.g. "190.0") — coerced to int during normalization.
 SAMPLE_LTC_ROWS: list[dict[str, Any]] = [
     {
         "facility_name": "Melville Gardens",
         "address": "240 Willett St",
         "town": "Truro",
-        "county": "Colchester",
-        "zone": "Zone 2 - Northern",
-        "beds": "68",
+        "postal_code": "B2N 5G6",
+        "facility_type": "Nursing Home",
+        "zone": "Northern",
+        "nursing_homes_nh_no_of_beds": "190.0",
+        "residential_care_facilities_rcf_no_of_beds": "0",
+        "single_entry_access_sea_participating": "Yes",
         "x_coordinate": "-63.2702",
         "y_coordinate": "45.3604",
-        "facility_category": "Long-term Care",
     },
     {
         "facility_name": "Harbourstone Enhanced Care",
         "address": "277 Lacewood Drive",
         "town": "Halifax",
-        "county": "Halifax",
-        "zone": "Zone 4 - Central",
-        "beds": "120",
+        "postal_code": "B3S 0G4",
+        "facility_type": "Residential Care Facility",
+        "zone": "Central",
+        "nursing_homes_nh_no_of_beds": "120.0",
+        "residential_care_facilities_rcf_no_of_beds": "40",
+        "single_entry_access_sea_participating": "Yes",
         "x_coordinate": "-63.6478",
         "y_coordinate": "44.6805",
-        "facility_category": "Long-term Care",
     },
 ]
 

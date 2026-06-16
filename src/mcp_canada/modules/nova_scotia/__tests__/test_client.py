@@ -1462,11 +1462,126 @@ class TestNsGetAirQualityStations:
 
 
 class TestNsGetHealthFacilities:
-    """fetch_health_facilities dispatches to DS_HOSPITALS or DS_LTC_RCF_FACILITIES."""
+    """fetch_health_facilities — per-dataset SoQL + raw->normalized mapping tests.
+
+    Plan 08 gap closure (2026-06-16): fixtures now use RAW Socrata schemas.
+    Constants (HOSPITAL_SELECT / LTC_SELECT / HOSPITAL_ORDER / LTC_ORDER) added in Task 2.
+    Import inside test methods so RED ImportError is scoped to this class only.
+    """
+
+    # -----------------------------------------------------------------------
+    # Per-dataset SoQL assertions
+    # -----------------------------------------------------------------------
 
     @pytest.mark.asyncio
-    async def test_hospital_queries_ds_hospitals(self) -> None:
-        """facility_type='hospital' passes DS_HOSPITALS ('tmfr-3h8a') to socrata.query_dataset."""
+    async def test_hospital_select_uses_raw_columns_not_normalized(self) -> None:
+        """Hospital $select uses raw column 'facility' + 'the_geom', NOT 'facility_name'/'x_coordinate'."""
+        from mcp_canada.modules.nova_scotia.constants import HOSPITAL_SELECT
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            await fetch_health_facilities(facility_type="hospital")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            select = call_kwargs.get("select", "") or ""
+            assert select == HOSPITAL_SELECT, f"Expected HOSPITAL_SELECT={HOSPITAL_SELECT!r}, got {select!r}"
+            assert "facility," in select or select.startswith("facility,") or select == "facility" or "facility" in select.split(",")
+            assert "the_geom" in select
+            assert "facility_name" not in select, "facility_name must NOT be in hospital $select (does not exist in raw)"
+            assert "x_coordinate" not in select, "x_coordinate must NOT be in hospital $select (derived from the_geom)"
+            assert "y_coordinate" not in select, "y_coordinate must NOT be in hospital $select (derived from the_geom)"
+
+    @pytest.mark.asyncio
+    async def test_hospital_order_is_county_asc(self) -> None:
+        """Hospital $order = 'county ASC' (hospital has county column)."""
+        from mcp_canada.modules.nova_scotia.constants import HOSPITAL_ORDER
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            await fetch_health_facilities(facility_type="hospital")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            assert call_kwargs.get("order") == HOSPITAL_ORDER == "county ASC"
+
+    @pytest.mark.asyncio
+    async def test_ltc_select_uses_raw_columns_not_county(self) -> None:
+        """LTC $select uses 'facility_name' + 'nursing_homes_nh_no_of_beds', NOT 'county'."""
+        from mcp_canada.modules.nova_scotia.constants import LTC_SELECT
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            await fetch_health_facilities(facility_type="long_term_care")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            select = call_kwargs.get("select", "") or ""
+            assert select == LTC_SELECT, f"Expected LTC_SELECT={LTC_SELECT!r}, got {select!r}"
+            assert "facility_name" in select
+            assert "nursing_homes_nh_no_of_beds" in select
+            assert "county" not in select, "county must NOT be in LTC $select (column does not exist in raw LTC dataset)"
+
+    @pytest.mark.asyncio
+    async def test_ltc_order_is_town_asc_not_county(self) -> None:
+        """LTC $order = 'town ASC' (LTC has NO county column; ordering by county would 400)."""
+        from mcp_canada.modules.nova_scotia.constants import LTC_ORDER
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            await fetch_health_facilities(facility_type="long_term_care")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            order = call_kwargs.get("order", "") or ""
+            assert order == LTC_ORDER == "town ASC", f"Expected 'town ASC', got {order!r}"
+            assert "county" not in order, "county must NOT appear in LTC $order (would 400)"
+
+    @pytest.mark.asyncio
+    async def test_hospital_county_filter_builds_where_clause(self) -> None:
+        """hospital + county='Halifax' -> $where contains county='Halifax'."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            await fetch_health_facilities(facility_type="hospital", county="Halifax")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            where = call_kwargs.get("where", "") or ""
+            assert "county='Halifax'" in where, f"Expected county='Halifax' in where, got {where!r}"
+
+    @pytest.mark.asyncio
+    async def test_ltc_county_filter_is_skipped_no_county_column(self) -> None:
+        """PRIMARY REGRESSION GUARD: LTC + county='Halifax' -> $where is None (no county column in LTC)."""
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=[])
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            await fetch_health_facilities(facility_type="long_term_care", county="Halifax")
+
+            call_kwargs = mock_socrata.query_dataset.call_args[1]
+            where = call_kwargs.get("where")
+            assert where is None or "county" not in (where or ""), (
+                f"county filter must NOT be sent to LTC (no county column → 400). Got where={where!r}"
+            )
+
+    # -----------------------------------------------------------------------
+    # Raw -> normalized mapping assertions
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_hospital_raw_facility_becomes_facility_name(self) -> None:
+        """Hospital normalization: raw 'facility' key -> 'facility_name' in output."""
         from .conftest import SAMPLE_HOSPITALS_ROWS
 
         with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
@@ -1476,41 +1591,38 @@ class TestNsGetHealthFacilities:
 
             data, was_cached = await fetch_health_facilities(facility_type="hospital")
 
-            call_args = mock_socrata.query_dataset.call_args[0]
-            assert "tmfr-3h8a" in call_args
             assert "facilities" in data
             assert data["count"] == len(SAMPLE_HOSPITALS_ROWS)
             assert was_cached is False
+            first = data["facilities"][0]
+            assert first.get("facility_name") == "QEII Health Sciences Centre", (
+                f"facility_name must be derived from raw 'facility' key. Got: {first}"
+            )
 
     @pytest.mark.asyncio
-    async def test_ltc_queries_ds_ltc_rcf_facilities(self) -> None:
-        """facility_type='long_term_care' passes DS_LTC_RCF_FACILITIES ('x76a-axw2') to socrata.query_dataset."""
-        from .conftest import SAMPLE_LTC_ROWS
+    async def test_hospital_x_y_derived_from_the_geom_coordinates(self) -> None:
+        """Hospital x_coordinate/y_coordinate derived from the_geom.coordinates[0]/[1]."""
+        from .conftest import SAMPLE_HOSPITALS_ROWS
 
         with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
-            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_LTC_ROWS)
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_HOSPITALS_ROWS)
 
             from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
 
-            data, was_cached = await fetch_health_facilities(facility_type="long_term_care")
+            data, _ = await fetch_health_facilities(facility_type="hospital")
 
-            call_args = mock_socrata.query_dataset.call_args[0]
-            assert "x76a-axw2" in call_args
-            assert "facilities" in data
-            assert data["count"] == len(SAMPLE_LTC_ROWS)
-            assert was_cached is False
-
-    @pytest.mark.asyncio
-    async def test_invalid_facility_type_raises_value_error(self) -> None:
-        """Invalid facility_type raises ValueError (secondary guard; tool double-guards)."""
-        from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
-
-        with pytest.raises(ValueError):
-            await fetch_health_facilities(facility_type="clinic")
+            first = data["facilities"][0]
+            # the_geom.coordinates = [-63.5901, 44.6476] (GeoJSON: [lon, lat])
+            assert first.get("x_coordinate") == -63.5901, (
+                f"x_coordinate must be the_geom.coordinates[0] (longitude). Got: {first.get('x_coordinate')}"
+            )
+            assert first.get("y_coordinate") == 44.6476, (
+                f"y_coordinate must be the_geom.coordinates[1] (latitude). Got: {first.get('y_coordinate')}"
+            )
 
     @pytest.mark.asyncio
-    async def test_hospital_rows_have_common_keys(self) -> None:
-        """Hospital rows include facility_name, county, facility_category."""
+    async def test_hospital_the_geom_stripped_from_output(self) -> None:
+        """Hospital rows must NOT contain 'the_geom' in normalized output."""
         from .conftest import SAMPLE_HOSPITALS_ROWS
 
         with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
@@ -1521,14 +1633,48 @@ class TestNsGetHealthFacilities:
             data, _ = await fetch_health_facilities(facility_type="hospital")
 
             for row in data["facilities"]:
-                assert "facility_name" in row, f"facility_name missing from hospital row: {row}"
-                assert "county" in row, f"county missing from hospital row: {row}"
-                assert "facility_category" in row, f"facility_category missing from hospital row: {row}"
-                assert row["facility_category"] == "hospital"
+                assert "the_geom" not in row, f"the_geom must be stripped from normalized hospital row: {row}"
 
     @pytest.mark.asyncio
-    async def test_ltc_rows_have_common_keys(self) -> None:
-        """LTC rows include facility_name, county, facility_category."""
+    async def test_hospital_zone_and_beds_are_none(self) -> None:
+        """Hospital normalization: zone=None and beds=None (hospital has neither)."""
+        from .conftest import SAMPLE_HOSPITALS_ROWS
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_HOSPITALS_ROWS)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            data, _ = await fetch_health_facilities(facility_type="hospital")
+
+            for row in data["facilities"]:
+                assert row.get("zone") is None, f"zone must be None for hospital. Got: {row.get('zone')}"
+                assert row.get("beds") is None, f"beds must be None for hospital. Got: {row.get('beds')}"
+                assert row.get("facility_category") == "hospital"
+
+    @pytest.mark.asyncio
+    async def test_ltc_raw_facility_type_becomes_type(self) -> None:
+        """LTC normalization: raw 'facility_type' key -> 'type' in output."""
+        from .conftest import SAMPLE_LTC_ROWS
+
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_LTC_ROWS)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            data, was_cached = await fetch_health_facilities(facility_type="long_term_care")
+
+            assert "facilities" in data
+            assert data["count"] == len(SAMPLE_LTC_ROWS)
+            assert was_cached is False
+            first = data["facilities"][0]
+            assert first.get("type") == "Nursing Home", (
+                f"type must be derived from raw 'facility_type'. Got: {first.get('type')}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_ltc_county_is_none_in_normalized_output(self) -> None:
+        """LTC normalization: county=None (LTC has no county; zone carries the region)."""
         from .conftest import SAMPLE_LTC_ROWS
 
         with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
@@ -1539,42 +1685,154 @@ class TestNsGetHealthFacilities:
             data, _ = await fetch_health_facilities(facility_type="long_term_care")
 
             for row in data["facilities"]:
-                assert "facility_name" in row
-                assert "county" in row
-                assert "facility_category" in row
-                assert row["facility_category"] == "long_term_care"
+                assert row.get("county") is None, (
+                    f"county must be None for LTC (no county column in raw). Got: {row.get('county')}"
+                )
+                assert row.get("facility_category") == "long_term_care"
 
     @pytest.mark.asyncio
-    async def test_county_filter_builds_where_clause(self) -> None:
-        """county filter builds $where with county='...'."""
+    async def test_ltc_beds_coerced_to_int_from_float_string(self) -> None:
+        """LTC normalization: beds=int(float('190.0'))=190 (raw arrives as number string)."""
+        from .conftest import SAMPLE_LTC_ROWS
+
         with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
-            mock_socrata.query_dataset = AsyncMock(return_value=[])
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_LTC_ROWS)
 
             from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
 
-            await fetch_health_facilities(facility_type="hospital", county="Halifax")
+            data, _ = await fetch_health_facilities(facility_type="long_term_care")
 
-            call_kwargs = mock_socrata.query_dataset.call_args[1]
-            where = call_kwargs.get("where", "") or ""
-            assert "Halifax" in where
+            first = data["facilities"][0]
+            assert first.get("beds") == 190, (
+                f"beds must be coerced from '190.0' to int 190. Got: {first.get('beds')!r}"
+            )
+            assert isinstance(first.get("beds"), int), (
+                f"beds must be int, not str or float. Got type: {type(first.get('beds'))}"
+            )
 
     @pytest.mark.asyncio
-    async def test_no_county_filter_where_is_none(self) -> None:
-        """Without county filter, where is None."""
+    async def test_ltc_x_y_are_floats(self) -> None:
+        """LTC normalization: x_coordinate/y_coordinate coerced to float."""
+        from .conftest import SAMPLE_LTC_ROWS
+
         with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
-            mock_socrata.query_dataset = AsyncMock(return_value=[])
+            mock_socrata.query_dataset = AsyncMock(return_value=SAMPLE_LTC_ROWS)
 
             from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
 
-            await fetch_health_facilities(facility_type="hospital")
+            data, _ = await fetch_health_facilities(facility_type="long_term_care")
 
-            call_kwargs = mock_socrata.query_dataset.call_args[1]
-            assert call_kwargs.get("where") is None
+            first = data["facilities"][0]
+            assert isinstance(first.get("x_coordinate"), float), (
+                f"x_coordinate must be float. Got: {first.get('x_coordinate')!r}"
+            )
+            assert isinstance(first.get("y_coordinate"), float), (
+                f"y_coordinate must be float. Got: {first.get('y_coordinate')!r}"
+            )
+
+    # -----------------------------------------------------------------------
+    # Edge-case helpers (coverage guards — REQUIRED)
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_hospital_missing_the_geom_yields_none_coordinates(self) -> None:
+        """Hospital row with no the_geom key -> x_coordinate is None + y_coordinate is None (no exception)."""
+        row_without_geom = [
+            {
+                "facility": "Mystery Hospital",
+                "address": "1 Unknown Ave",
+                "town": "Nowhere",
+                "county": "Halifax",
+                "type": "Community",
+                # NO the_geom key
+            }
+        ]
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=row_without_geom)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            data, _ = await fetch_health_facilities(facility_type="hospital")
+
+            first = data["facilities"][0]
+            assert first.get("x_coordinate") is None, "x_coordinate must be None when the_geom is absent"
+            assert first.get("y_coordinate") is None, "y_coordinate must be None when the_geom is absent"
+
+    @pytest.mark.asyncio
+    async def test_hospital_short_the_geom_coordinates_yields_none(self) -> None:
+        """Hospital row with malformed the_geom.coordinates (len<2) -> x_coordinate/y_coordinate are None."""
+        row_malformed_geom = [
+            {
+                "facility": "Malformed Hospital",
+                "address": "2 Bad Coords",
+                "town": "Somewhere",
+                "county": "Pictou",
+                "type": "Regional",
+                "the_geom": {"type": "Point", "coordinates": []},  # empty list
+            }
+        ]
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=row_malformed_geom)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            data, _ = await fetch_health_facilities(facility_type="hospital")
+
+            first = data["facilities"][0]
+            assert first.get("x_coordinate") is None, "x_coordinate must be None for malformed the_geom"
+            assert first.get("y_coordinate") is None, "y_coordinate must be None for malformed the_geom"
+
+    @pytest.mark.asyncio
+    async def test_ltc_empty_beds_string_yields_none(self) -> None:
+        """LTC row with nursing_homes_nh_no_of_beds=='' -> beds is None (coercion never raises)."""
+        row_empty_beds = [
+            {
+                "facility_name": "Empty Beds Home",
+                "address": "3 Empty St",
+                "town": "Truro",
+                "postal_code": "B2N 5G6",
+                "facility_type": "Nursing Home",
+                "zone": "Northern",
+                "nursing_homes_nh_no_of_beds": "",  # empty string
+                "residential_care_facilities_rcf_no_of_beds": "0",
+                "single_entry_access_sea_participating": "No",
+                "x_coordinate": "-63.2702",
+                "y_coordinate": "45.3604",
+            }
+        ]
+        with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
+            mock_socrata.query_dataset = AsyncMock(return_value=row_empty_beds)
+
+            from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+            data, _ = await fetch_health_facilities(facility_type="long_term_care")
+
+            first = data["facilities"][0]
+            assert first.get("beds") is None, (
+                f"beds must be None when raw value is ''. Got: {first.get('beds')!r}"
+            )
+
+    # -----------------------------------------------------------------------
+    # Preserved tests (adapted to RAW hospital shape)
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_invalid_facility_type_raises_value_error(self) -> None:
+        """Invalid facility_type raises ValueError (secondary guard; tool double-guards)."""
+        from mcp_canada.modules.nova_scotia.client import fetch_health_facilities
+
+        with pytest.raises(ValueError):
+            await fetch_health_facilities(facility_type="clinic")
 
     @pytest.mark.asyncio
     async def test_truncated_true_when_rows_equals_limit(self) -> None:
         """truncated=True when len(facilities) >= limit."""
-        rows = [{"facility_name": f"Hosp {i}", "county": "Halifax", "type": "Community"} for i in range(3)]
+        # RAW hospital shape (facility, county, type, the_geom)
+        rows = [
+            {"facility": f"Hosp {i}", "address": "", "town": "", "county": "Halifax",
+             "type": "Community", "the_geom": {"type": "Point", "coordinates": [-63.5, 44.6]}}
+            for i in range(3)
+        ]
         with patch("mcp_canada.modules.nova_scotia.client.socrata") as mock_socrata:
             mock_socrata.query_dataset = AsyncMock(return_value=rows)
 

@@ -1,5 +1,5 @@
 ---
-status: diagnosed
+status: resolved
 trigger: "ns_get_health_facilities returns HTTP 400 (UPSTREAM_ERROR) live for both facility_type values (hospital, long_term_care)"
 created: 2026-06-15T00:00:00Z
 updated: 2026-06-15T00:00:00Z

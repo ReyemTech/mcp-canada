@@ -1,5 +1,5 @@
 ---
-status: diagnosed
+status: resolved
 phase: 20-nova-scotia-government-open-data
 source: [20-01-SUMMARY.md, 20-02-SUMMARY.md, 20-03-SUMMARY.md, 20-04-SUMMARY.md, 20-05-SUMMARY.md, 20-06-SUMMARY.md, 20-07-SUMMARY.md]
 started: 2026-06-15T00:00:00Z
@@ -74,7 +74,8 @@ skipped: 0
 ## Gaps
 
 - truth: "ns_get_health_facilities returns hospital and long-term-care facilities with facility name, county/type, and location for both valid facility_type values"
-  status: failed
+  status: resolved
+  resolution: "Fixed in 20-08 (commit a1467a2): per-dataset SoQL (HOSPITAL_SELECT/LTC_SELECT + orders, LTC county filter skipped) with post-fetch normalization to the common shape. Live re-verified 2026-06-16: hospital→'Soldiers Memorial Hospital' (county=Annapolis, type=Community); long_term_care→'Bayview Memorial Health Centre' (county=None correct, type=Nursing Home, beds=10); the_geom absent for both. The UPSTREAM_ERROR integration escape-hatch was removed (commit 092b6da) so a live 400 now fails the suite. 297 NS unit tests + 2 de-masked live health integration tests green; 97.07% coverage."
   reason: "User reported: ns_get_health_facilities returns HTTP 400 for BOTH valid facility types live. The shared $select uses normalized field names but the hospital dataset (tmfr-3h8a) uses raw column 'facility' + the_geom (no x/y), and the LTC dataset (x76a-axw2) has no county/type columns. The single shared $select references non-existent columns on each dataset → 400. Mocked unit tests + integration tests passed because the mock/fixture used the normalized shape, not the real raw Socrata schema."
   severity: major
   test: 7

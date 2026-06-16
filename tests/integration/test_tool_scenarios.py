@@ -2684,49 +2684,55 @@ class TestNovaScotiaToolScenarios:
     @pytest.mark.integration
     @pytest.mark.timeout(30)
     async def test_health_facilities_hospital_field_presence(self, mcp_server):
-        """'NS hospitals' — facility_name/county/type non-null."""
+        """'NS hospitals' — facility_name/county/type non-null (live 200 required)."""
         data = await call_tool(mcp_server, "ns_get_health_facilities", {
             "facility_type": "hospital",
             "limit": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR"
-            return
+        assert "_meta" in data, f"Expected live success, got: {data}"
         assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
         facilities = data["data"]["facilities"]
         assert isinstance(facilities, list)
         assert len(facilities) >= 1, "Hospital facilities must return at least 1 hospital"
         first = facilities[0]
-        # FIELD PRESENCE
+        # FIELD PRESENCE — all three must be non-null from the normalized output
         assert first.get("facility_name") is not None, (
             f"FIELD PRESENCE FAILED: 'facility_name' must be non-null. Keys: {list(first.keys())}"
         )
         assert first.get("county") is not None, (
             f"FIELD PRESENCE FAILED: 'county' must be non-null. Got: {first}"
         )
+        assert first.get("type") is not None, (
+            f"FIELD PRESENCE FAILED: 'type' must be non-null. Got: {first}"
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.integration
     @pytest.mark.timeout(30)
     async def test_health_facilities_ltc_beds_and_zone(self, mcp_server):
-        """'NS long-term care facilities' — beds/zone present in at least 1 LTC row."""
+        """'NS long-term care facilities' — beds/zone/facility_name present (live 200 required)."""
         data = await call_tool(mcp_server, "ns_get_health_facilities", {
             "facility_type": "long_term_care",
             "limit": 10,
         })
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR"
-            return
+        assert "_meta" in data, f"Expected live success, got: {data}"
         assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
         facilities = data["data"]["facilities"]
         assert isinstance(facilities, list)
         assert len(facilities) >= 1, "LTC facilities must return at least 1 facility"
+        first = facilities[0]
+        assert first.get("facility_name") is not None, (
+            f"FIELD PRESENCE FAILED: 'facility_name' must be non-null. Got: {first}"
+        )
         # FIELD PRESENCE: beds and zone should be present in LTC data
         rows_with_beds = [f for f in facilities if f.get("beds") is not None]
         assert len(rows_with_beds) >= 1, (
             f"FIELD PRESENCE FAILED: 'beds' must be non-null in >=1 LTC row. "
+            f"Keys in first row: {list(facilities[0].keys())}"
+        )
+        rows_with_zone = [f for f in facilities if f.get("zone") is not None]
+        assert len(rows_with_zone) >= 1, (
+            f"FIELD PRESENCE FAILED: 'zone' must be non-null in >=1 LTC row. "
             f"Keys in first row: {list(facilities[0].keys())}"
         )
 

@@ -74,6 +74,33 @@ DS_LTC_WAITLIST: Final[str] = "c39g-gsdd"       # Long-term Care Waitlist
 DS_BIRTHS_DEATHS: Final[str] = "r794-fttm"      # Births and Deaths with Rates
 
 # ---------------------------------------------------------------------------
+# Per-dataset SoQL constants for health facilities (live-confirmed 2026-06-15)
+#
+# Root cause: the two datasets have INCOMPATIBLE raw Socrata schemas.
+# A single shared $select/$order using normalized names errors with HTTP 400
+# ("query.soql.no-such-column") on BOTH datasets. See debug/ns-health-facilities-400.md.
+#
+# Hospital (tmfr-3h8a) raw cols: facility, address, town, county, type, the_geom.
+#   - NO facility_name, NO x_coordinate, NO y_coordinate.
+#   - the_geom = {"type":"Point","coordinates":[lon, lat]} (GeoJSON [longitude, latitude]).
+#   - Live-200 SoQL: $select=facility,address,town,county,type,the_geom  $order=county ASC
+#
+# LTC (x76a-axw2) raw cols: facility_name, address, town, postal_code, facility_type,
+#   zone, nursing_homes_nh_no_of_beds, residential_care_facilities_rcf_no_of_beds,
+#   single_entry_access_sea_participating, x_coordinate, y_coordinate, [the_geom optional].
+#   - NO county, NO type columns.
+#   - Live-200 SoQL: $select=facility_name,... $order=town ASC (county column absent → 400)
+# ---------------------------------------------------------------------------
+HOSPITAL_SELECT: Final[str] = "facility,address,town,county,type,the_geom"
+HOSPITAL_ORDER: Final[str] = "county ASC"
+LTC_SELECT: Final[str] = (
+    "facility_name,address,town,postal_code,facility_type,zone,"
+    "nursing_homes_nh_no_of_beds,residential_care_facilities_rcf_no_of_beds,"
+    "single_entry_access_sea_participating,x_coordinate,y_coordinate"
+)
+LTC_ORDER: Final[str] = "town ASC"  # LTC has NO county column — cannot order by county
+
+# ---------------------------------------------------------------------------
 # Chronic disease datasets — dispatch dict (all live-verified 2026-06-15)
 #
 # IMPORTANT schema differences (from 20-SPIKE.md):

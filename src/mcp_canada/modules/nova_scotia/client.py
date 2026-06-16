@@ -55,15 +55,19 @@ from .constants import (
     DS_BIRTHS_DEATHS,  # noqa: F401
     DS_BOIL_WATER_ADVISORIES,  # noqa: F401
     DS_FISH_HATCHERY_STOCKING,  # noqa: F401
-    DS_HOSPITALS,  # noqa: F401
+    DS_HOSPITALS,
     DS_LANDBASED_AQUACULTURE_LICENSES,  # noqa: F401
-    DS_LTC_RCF_FACILITIES,  # noqa: F401
+    DS_LTC_RCF_FACILITIES,
     DS_LTC_WAITLIST,  # noqa: F401
     DS_MARINE_AQUACULTURE_LEASES,  # noqa: F401
     DS_PROTECTED_AREAS,  # noqa: F401
     DS_ROCKWEED_LEASES,  # noqa: F401
     DS_SURFACE_WATER_QUALITY_CONTINUOUS,  # noqa: F401
     DS_SURFACE_WATER_QUALITY_STATIONS,  # noqa: F401
+    HOSPITAL_ORDER,
+    HOSPITAL_SELECT,
+    LTC_ORDER,
+    LTC_SELECT,
     MAX_RECORDS,
     NS_APP_TOKEN_ENV,
     RATE_GROUP,
@@ -612,8 +616,94 @@ async def fetch_air_quality_stations(
 
 
 # ---------------------------------------------------------------------------
-# Health + Demographics client functions (Plan 05 fills bodies)
+# Health + Demographics client functions (Plan 05 implemented; Plan 08 fixed)
 # ---------------------------------------------------------------------------
+
+
+def _coerce_int(value: Any) -> int | None:
+    """Coerce a value to int, returning None on failure.
+
+    Handles None, empty string, and float-strings like "190.0" → 190.
+    Never raises.
+    """
+    if value is None or value == "":
+        return None
+    try:
+        return int(float(value))
+    except (ValueError, TypeError):
+        return None
+
+
+def _coerce_float(value: Any) -> float | None:
+    """Coerce a value to float, returning None on failure.
+
+    Handles None, empty string, and numeric strings like "-63.2702".
+    Never raises.
+    """
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def _normalize_hospital_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Normalize a raw hospital row (tmfr-3h8a) to the common facility shape.
+
+    Raw cols: facility, address, town, county, type, the_geom.
+    Derived: facility_name from facility; x/y from the_geom.coordinates[0]/[1].
+    the_geom is stripped from output (Pitfall 5).
+    """
+    coords = row.get("the_geom", {})
+    if isinstance(coords, dict):
+        coord_list = coords.get("coordinates", [])
+    else:
+        coord_list = []
+
+    if isinstance(coord_list, list) and len(coord_list) >= 2:
+        x_coord: float | None = _coerce_float(coord_list[0])
+        y_coord: float | None = _coerce_float(coord_list[1])
+    else:
+        x_coord = None
+        y_coord = None
+
+    return {
+        "facility_name": row.get("facility"),
+        "address": row.get("address"),
+        "town": row.get("town"),
+        "county": row.get("county"),
+        "type": row.get("type"),
+        "zone": None,        # hospital has no zone
+        "beds": None,        # hospital has no beds
+        "x_coordinate": x_coord,
+        "y_coordinate": y_coord,
+        "facility_category": "hospital",
+    }
+
+
+def _normalize_ltc_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Normalize a raw LTC row (x76a-axw2) to the common facility shape.
+
+    Raw cols: facility_name, address, town, postal_code, facility_type, zone,
+              nursing_homes_nh_no_of_beds, residential_care_facilities_rcf_no_of_beds,
+              single_entry_access_sea_participating, x_coordinate, y_coordinate.
+    NO county column in raw (county=None in output; zone carries the region).
+    beds coerced from "190.0" → int 190; x/y coerced to float.
+    the_geom stripped if unexpectedly present.
+    """
+    return {
+        "facility_name": row.get("facility_name"),
+        "address": row.get("address"),
+        "town": row.get("town"),
+        "county": None,      # LTC has no county; zone carries the region
+        "type": row.get("facility_type"),
+        "zone": row.get("zone"),
+        "beds": _coerce_int(row.get("nursing_homes_nh_no_of_beds")),
+        "x_coordinate": _coerce_float(row.get("x_coordinate")),
+        "y_coordinate": _coerce_float(row.get("y_coordinate")),
+        "facility_category": "long_term_care",
+    }
 
 
 async def fetch_health_facilities(
@@ -626,12 +716,21 @@ async def fetch_health_facilities(
     facility_type: "hospital"       → DS_HOSPITALS (tmfr-3h8a)
                    "long_term_care" → DS_LTC_RCF_FACILITIES (x76a-axw2)
 
-    Both datasets are normalized to a common flat facility shape:
-    facility_name, address, town, county, type, zone, beds,
-    x_coordinate, y_coordinate, facility_category.
+    The two datasets have INCOMPATIBLE raw Socrata schemas (live-confirmed 2026-06-15).
+    Each uses its own per-dataset $select/$order built from live-confirmed raw column names.
+    Normalization to the common flat shape happens AFTER fetch (not before).
 
-    facility_category is set to the requested facility_type so callers
-    can distinguish hospital vs LTC rows in mixed results.
+    Common output shape:
+      facility_name, address, town, county, type, zone, beds,
+      x_coordinate, y_coordinate, facility_category
+
+    Hospital: facility derived from raw 'facility'; x/y derived from the_geom.coordinates;
+              county and type pass through; zone=None, beds=None; the_geom stripped from output.
+    LTC: type from raw 'facility_type'; county=None (no county column in LTC, zone carries region);
+         beds coerced from "190.0"→int; x/y coerced to float.
+
+    county filtering is HOSPITAL-ONLY — LTC has no county column; sending county= to LTC 400s.
+    For LTC facilities by region, use the zone field.
 
     Raises:
         ValueError: If facility_type is not "hospital" or "long_term_care".
@@ -644,16 +743,17 @@ async def fetch_health_facilities(
 
     if facility_type == "hospital":
         dataset_id = DS_HOSPITALS
-        # Hospitals: facility_name, address, town, county, type, x_coordinate, y_coordinate
-        # (zone and beds not available in hospital dataset)
-        select = "facility_name,address,town,county,type,x_coordinate,y_coordinate"
+        select = HOSPITAL_SELECT   # "facility,address,town,county,type,the_geom"
+        order = HOSPITAL_ORDER     # "county ASC"
+        # Hospital HAS county column — apply county filter if requested
+        where: str | None = f"county='{county}'" if county else None
     else:
         dataset_id = DS_LTC_RCF_FACILITIES
-        # LTC: facility_name, address, town, county, zone, nursing_homes_nh_no_of_beds→beds,
-        #       x_coordinate, y_coordinate
-        select = "facility_name,address,town,county,zone,nursing_homes_nh_no_of_beds,x_coordinate,y_coordinate"
+        select = LTC_SELECT        # facility_name, ..., x_coordinate, y_coordinate
+        order = LTC_ORDER          # "town ASC" — LTC has NO county column (county would 400)
+        # LTC has NO county column — NEVER send a county= filter (it 400s)
+        where = None
 
-    where = f"county='{county}'" if county else None
     cache_key = f"{CACHE_KEY_PREFIX}health_facilities:{facility_type}:{county or 'all'}:{limit}"
 
     async def fetcher() -> dict[str, Any]:
@@ -661,25 +761,14 @@ async def fetch_health_facilities(
             dataset_id,
             where=where,
             select=select,
-            order="county ASC",
+            order=order,
             limit=limit,
         )
-        # Normalize rows to the common facility shape
-        normalized: list[dict[str, Any]] = []
-        for row in rows:
-            facility: dict[str, Any] = {
-                "facility_name": row.get("facility_name"),
-                "address": row.get("address"),
-                "town": row.get("town"),
-                "county": row.get("county"),
-                "type": row.get("type"),
-                "zone": row.get("zone"),  # None for hospitals
-                "beds": row.get("nursing_homes_nh_no_of_beds"),  # None for hospitals
-                "x_coordinate": row.get("x_coordinate"),
-                "y_coordinate": row.get("y_coordinate"),
-                "facility_category": facility_type,
-            }
-            normalized.append(facility)
+        # Normalize each raw row to the common shape AFTER fetch
+        if facility_type == "hospital":
+            normalized = [_normalize_hospital_row(row) for row in rows]
+        else:
+            normalized = [_normalize_ltc_row(row) for row in rows]
         return {"facilities": normalized, "count": len(normalized), "truncated": len(normalized) >= limit}
 
     return await cached_fetch(cache_key, CACHE_TTL_ANNUAL, fetcher)

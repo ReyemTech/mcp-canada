@@ -2163,12 +2163,7 @@ class TestSaskatchewanToolScenarios:
         data = await call_tool(mcp_server, "saskatchewan_get_crop_yields", {
             "region": "provincial",
         })
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR", (
-                f"Crop yields error must be UPSTREAM_ERROR: {data['error']}"
-            )
-            return
+        assert "_meta" in data, f"Expected live success from saskatchewan_get_crop_yields, got: {data}"
         assert data["_meta"]["source"]["api"] == "saskatchewan-geohub"
         features = data["data"]["features"]
         assert isinstance(features, list), "Crop yields must return a features list"
@@ -2189,10 +2184,7 @@ class TestSaskatchewanToolScenarios:
     async def test_grain_elevators_capacity_and_province(self, mcp_server):
         """'Saskatchewan grain elevators' — at least one row with Capacity_tonne and PR=='SK'."""
         data = await call_tool(mcp_server, "saskatchewan_get_grain_elevators", {})
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR"
-            return
+        assert "_meta" in data, f"Expected live success from saskatchewan_get_grain_elevators, got: {data}"
         assert data["_meta"]["source"]["api"] == "saskatchewan-geohub"
         features = data["data"]["features"]
         assert isinstance(features, list)
@@ -2212,10 +2204,7 @@ class TestSaskatchewanToolScenarios:
         data = await call_tool(mcp_server, "saskatchewan_get_mineral_mines", {
             "mineral": "potash",
         })
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR"
-            return
+        assert "_meta" in data, f"Expected live success from saskatchewan_get_mineral_mines, got: {data}"
         assert data["_meta"]["source"]["api"] == "saskatchewan-geohub"
         features = data["data"]["features"]
         assert isinstance(features, list)
@@ -2235,10 +2224,7 @@ class TestSaskatchewanToolScenarios:
     async def test_air_quality_aqhi_field_present(self, mcp_server):
         """'Saskatchewan air quality in Regina' — AQHI field present and at least one pollutant."""
         data = await call_tool(mcp_server, "saskatchewan_get_air_quality", {})
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR"
-            return
+        assert "_meta" in data, f"Expected live success from saskatchewan_get_air_quality, got: {data}"
         assert data["_meta"]["source"]["api"] == "saskatchewan-geohub"
         features = data["data"]["features"]
         assert isinstance(features, list)
@@ -2302,10 +2288,7 @@ class TestSaskatchewanToolScenarios:
         a layer-ID bug or wrong-org bug. If the wrong layer or org is used, this field is absent.
         """
         data = await call_tool(mcp_server, "saskatchewan_get_wsa_stations", {})
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR"
-            return
+        assert "_meta" in data, f"Expected live success from saskatchewan_get_wsa_stations, got: {data}"
         assert data["_meta"]["source"]["api"] == "saskatchewan-wsa", (
             f"WSA stations must use 'saskatchewan-wsa' api_name. "
             f"Got: {data['_meta']['source']['api']}"
@@ -2336,10 +2319,7 @@ class TestSaskatchewanToolScenarios:
         Only layer 26 returns Reservoir_Name. This test PROVES the implementation uses layer 26.
         """
         data = await call_tool(mcp_server, "saskatchewan_get_wsa_reservoirs", {})
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR"
-            return
+        assert "_meta" in data, f"Expected live success from saskatchewan_get_wsa_reservoirs, got: {data}"
         assert data["_meta"]["source"]["api"] == "saskatchewan-wsa", (
             f"WSA reservoirs must use 'saskatchewan-wsa' api_name. "
             f"Got: {data['_meta']['source']['api']}"
@@ -2383,10 +2363,7 @@ class TestSaskatchewanToolScenarios:
         After the fix, startindex works and numberMatched>0 for any real query.
         """
         data = await call_tool(mcp_server, "saskatchewan_search_datasets", {"query": "crops"})
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR"
-            return
+        assert "_meta" in data, f"Expected live success from saskatchewan_search_datasets, got: {data}"
         assert data["_meta"]["source"]["api"] == "saskatchewan-geohub"
         payload = data["data"]
         assert "total" in payload, f"response must include 'total' key: {payload}"
@@ -2474,12 +2451,7 @@ class TestNovaScotiaToolScenarios:
             "species_type": "Shellfish",
             "limit": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR", (
-                f"Marine leases error must be UPSTREAM_ERROR: {data['error']}"
-            )
-            return
+        assert "_meta" in data, f"Expected live success from ns_get_marine_aquaculture_leases, got: {data}"
         assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
         leases = data["data"]["leases"]
         assert isinstance(leases, list)
@@ -2506,10 +2478,7 @@ class TestNovaScotiaToolScenarios:
             "stock": "Brook Trout",
             "limit": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR"
-            return
+        assert "_meta" in data, f"Expected live success from ns_get_fish_hatchery_stocking, got: {data}"
         assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
         records = data["data"]["stocking_records"]
         assert isinstance(records, list)
@@ -2534,10 +2503,7 @@ class TestNovaScotiaToolScenarios:
         data = await call_tool(mcp_server, "ns_get_aquaculture_production", {
             "limit": 10,
         })
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR"
-            return
+        assert "_meta" in data, f"Expected live success from ns_get_aquaculture_production, got: {data}"
         assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
         production = data["data"]["production"]
         assert isinstance(production, list)
@@ -2562,10 +2528,7 @@ class TestNovaScotiaToolScenarios:
         data = await call_tool(mcp_server, "ns_get_water_quality_monitoring", {
             "limit": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR"
-            return
+        assert "_meta" in data, f"Expected live success from ns_get_water_quality_monitoring, got: {data}"
         assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
         readings = data["data"]["readings"]
         assert isinstance(readings, list)
@@ -2629,10 +2592,7 @@ class TestNovaScotiaToolScenarios:
             "status": "Designated",
             "limit": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR"
-            return
+        assert "_meta" in data, f"Expected live success from ns_get_protected_areas, got: {data}"
         assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
         areas = data["data"]["protected_areas"]
         assert isinstance(areas, list)
@@ -2660,10 +2620,7 @@ class TestNovaScotiaToolScenarios:
         data = await call_tool(mcp_server, "ns_get_air_quality_stations", {
             "limit": 10,
         })
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR"
-            return
+        assert "_meta" in data, f"Expected live success from ns_get_air_quality_stations, got: {data}"
         assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
         stations = data["data"]["stations"]
         assert isinstance(stations, list)
@@ -2744,10 +2701,7 @@ class TestNovaScotiaToolScenarios:
         data = await call_tool(mcp_server, "ns_get_vital_statistics", {
             "limit": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR"
-            return
+        assert "_meta" in data, f"Expected live success from ns_get_vital_statistics, got: {data}"
         assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
         # Key is "statistics" (set by fetch_vital_statistics client function)
         payload = data["data"]
@@ -2798,9 +2752,7 @@ class TestNovaScotiaToolScenarios:
                 "disease": "ami",
                 "limit": 5,
             })
-            if "error" in data2:
-                assert data2["error"]["code"] == "UPSTREAM_ERROR"
-                return
+            assert "_meta" in data2, f"Expected live success from ns_get_chronic_disease_prevalence (bare ami query), got: {data2}"
             rows = data2["data"]["rows"]
         if rows:
             first = rows[0]
@@ -2830,10 +2782,7 @@ class TestNovaScotiaToolScenarios:
         the workaround is broken.
         """
         data = await call_tool(mcp_server, "ns_list_categories", {})
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR"
-            return
+        assert "_meta" in data, f"Expected live success from ns_list_categories, got: {data}"
         assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
         categories = data["data"]["categories"]
         assert isinstance(categories, list)
@@ -2873,10 +2822,7 @@ class TestNovaScotiaToolScenarios:
             "query": "aquaculture",
             "limit": 20,
         })
-        assert "_meta" in data or "error" in data
-        if "error" in data:
-            assert data["error"]["code"] == "UPSTREAM_ERROR"
-            return
+        assert "_meta" in data, f"Expected live success from ns_search_datasets, got: {data}"
         assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
         results = data["data"]["results"]
         total = data["data"]["total"]

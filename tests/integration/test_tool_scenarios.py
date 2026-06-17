@@ -1584,11 +1584,10 @@ class TestQuebecToolScenarios:
             "q": "santé",
             "rows": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "donnees-quebec"
-            assert isinstance(data["data"], list)
-            assert len(data["data"]) >= 1
+        assert "_meta" in data, f"Expected live success from quebec_search_datasets, got: {data}"
+        assert data["_meta"]["source"]["api"] == "donnees-quebec"
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) >= 1
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -1596,14 +1595,13 @@ class TestQuebecToolScenarios:
     async def test_list_organizations_live(self, mcp_server):
         """'List all organizations on Données Québec.'"""
         data = await call_tool(mcp_server, "quebec_list_organizations", {})
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert isinstance(data["data"], list)
-            # Must have at least 100 orgs (139 confirmed)
-            assert len(data["data"]) >= 100
-            slugs = [o["name"] for o in data["data"]]
-            assert "msss" in slugs
-            assert "mtq" in slugs
+        assert "_meta" in data, f"Expected live success from quebec_list_organizations, got: {data}"
+        assert isinstance(data["data"], list)
+        # Must have at least 100 orgs (139 confirmed)
+        assert len(data["data"]) >= 100
+        slugs = [o["name"] for o in data["data"]]
+        assert "msss" in slugs
+        assert "mtq" in slugs
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -1611,15 +1609,14 @@ class TestQuebecToolScenarios:
     async def test_list_categories_groups_not_tags(self, mcp_server):
         """'What thematic categories exist on Données Québec?' — must use groups not tags."""
         data = await call_tool(mcp_server, "quebec_list_categories", {})
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert isinstance(data["data"], list)
-            # DQ has 10 thematic groups
-            assert len(data["data"]) >= 5
-            names = [c["name"] for c in data["data"]]
-            assert any("sante" in n or "environnement" in n for n in names), (
-                f"No health/environment group found: {names}"
-            )
+        assert "_meta" in data, f"Expected live success from quebec_list_categories, got: {data}"
+        assert isinstance(data["data"], list)
+        # DQ has 10 thematic groups
+        assert len(data["data"]) >= 5
+        names = [c["name"] for c in data["data"]]
+        assert any("sante" in n or "environnement" in n for n in names), (
+            f"No health/environment group found: {names}"
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -1627,14 +1624,13 @@ class TestQuebecToolScenarios:
     async def test_get_er_wait_times_live(self, mcp_server):
         """'What are the current ER wait times in Quebec hospitals?'"""
         data = await call_tool(mcp_server, "quebec_get_er_wait_times", {})
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "donnees-quebec"
-            assert isinstance(data["data"], list)
-            # 116 EDs in the MSSS datastore
-            assert len(data["data"]) >= 50
-            row = data["data"][0]
-            assert "installation" in row or "establishment" in row
+        assert "_meta" in data, f"Expected live success from quebec_get_er_wait_times, got: {data}"
+        assert data["_meta"]["source"]["api"] == "donnees-quebec"
+        assert isinstance(data["data"], list)
+        # 116 EDs in the MSSS datastore
+        assert len(data["data"]) >= 50
+        row = data["data"][0]
+        assert "installation" in row or "establishment" in row
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -1645,12 +1641,11 @@ class TestQuebecToolScenarios:
             "instal_type": "CLSC",
             "limit": 10,
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert isinstance(data["data"], list)
-            assert len(data["data"]) >= 1
-            for row in data["data"]:
-                assert row["is_clsc"] is True
+        assert "_meta" in data, f"Expected live success from quebec_get_health_installations, got: {data}"
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) >= 1
+        for row in data["data"]:
+            assert row["is_clsc"] is True
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -1658,14 +1653,13 @@ class TestQuebecToolScenarios:
     async def test_get_road_works_wfs_csv(self, mcp_server):
         """'What road construction zones are currently active?'"""
         data = await call_tool(mcp_server, "quebec_get_road_works", {})
-        # Road works may be empty if no active construction; accept both
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert isinstance(data["data"], list)
-            # If data present, verify shape
-            if data["data"]:
-                row = data["data"][0]
-                assert "route" in row or "identifier" in row
+        # Road works may be empty if no active construction; empty list is valid (not an error)
+        assert "_meta" in data, f"Expected live success from quebec_get_road_works, got: {data}"
+        assert isinstance(data["data"], list)
+        # If data present, verify shape (empty list in off-season is acceptable)
+        if data["data"]:
+            row = data["data"][0]
+            assert "route" in row or "identifier" in row
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -1895,6 +1889,10 @@ class TestAlbertaToolScenarios:
             assert data["_meta"]["source"]["api"] == "alberta-511"
             assert "events" in data["data"]
             assert isinstance(data["data"]["events"], list)
+        else:
+            assert data["error"]["code"] in {"UPSTREAM_ERROR", "RATE_LIMITED"}, (
+                f"Road events error must be UPSTREAM_ERROR/RATE_LIMITED, got: {data.get('error')}"
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -1992,13 +1990,12 @@ class TestManitobaToolScenarios:
     async def test_provincial_parks(self, mcp_server):
         """'What are Manitoba provincial parks?' — live ArcGIS FeatureServer (93 parks)."""
         data = await call_tool(mcp_server, "manitoba_get_provincial_parks", {})
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "manitoba-provincial-parks"
-            payload = data["data"]
-            assert "features" in payload
-            assert isinstance(payload["features"], list)
-            # ~93 parks expected; don't assert exact count (data drift)
+        assert "_meta" in data, f"Expected live success from manitoba_get_provincial_parks, got: {data}"
+        assert data["_meta"]["source"]["api"] == "manitoba-provincial-parks"
+        payload = data["data"]
+        assert "features" in payload
+        assert isinstance(payload["features"], list)
+        # ~93 parks expected; don't assert exact count (data drift)
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -2008,12 +2005,11 @@ class TestManitobaToolScenarios:
         data = await call_tool(mcp_server, "manitoba_get_surgical_wait_times", {
             "procedure": "Cardiac",
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "manitoba-surgical-wait-times"
-            payload = data["data"]
-            assert "features" in payload
-            assert isinstance(payload["features"], list)
+        assert "_meta" in data, f"Expected live success from manitoba_get_surgical_wait_times, got: {data}"
+        assert data["_meta"]["source"]["api"] == "manitoba-surgical-wait-times"
+        payload = data["data"]
+        assert "features" in payload
+        assert isinstance(payload["features"], list)
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -2021,12 +2017,11 @@ class TestManitobaToolScenarios:
     async def test_drought_status(self, mcp_server):
         """'Manitoba drought status' — live continental Drought Monitor FeatureServer."""
         data = await call_tool(mcp_server, "manitoba_get_drought_status", {})
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert "drought" in data["_meta"]["source"]["api"]
-            payload = data["data"]
-            assert "features" in payload
-            assert isinstance(payload["features"], list)
+        assert "_meta" in data, f"Expected live success from manitoba_get_drought_status, got: {data}"
+        assert "drought" in data["_meta"]["source"]["api"]
+        payload = data["data"]
+        assert "features" in payload
+        assert isinstance(payload["features"], list)
 
     @pytest.mark.asyncio
     @pytest.mark.integration

@@ -5,7 +5,7 @@ milestone_name: Statistics Canada + Datastore
 status: planning
 stopped_at: Completed 20-nova-scotia-government-open-data 20-08-PLAN.md
 last_updated: "2026-06-16T20:39:07.542Z"
-last_activity: 2026-04-07 — Roadmap created for v1.1 milestone
+last_activity: 2026-06-17 — Completed quick task 1: de-mask UPSTREAM_ERROR escape-hatch in provincial integration tests
 progress:
   total_phases: 34
   completed_phases: 15
@@ -321,6 +321,7 @@ Recent decisions affecting current work:
 - Phases 27-34 added: Major municipalities (Montreal, Vancouver, Calgary, Edmonton, Ottawa, Winnipeg, Halifax, Mississauga)
 - Phases 35-39 added: Regional municipalities (Peel, Durham, Halton, Waterloo, Metro Vancouver)
 - Phase 40 added: MCP Prompts and Resources — workflow prompts for guided data exploration, static resources for reference data across all modules
+- Phase 20.1 inserted after Phase 20: Remove UPSTREAM_ERROR escape-hatch pattern from all provincial integration tests (MB/SK/AB/QC/NS) and re-run live integration to surface masked upstream failures before pushing Phase 20 (URGENT)
 
 ### Pending Todos
 
@@ -331,6 +332,13 @@ Recent decisions affecting current work:
 - [Phase 7]: SSL resolution outcome is empirical — truststore may fail in CI; decision protocol defined in STACK.md but outcome unknown until live endpoint test
 - [Phase 8]: WDS 25 req/s limit + asyncio.gather burst could trigger rate limits even at 20 req/s TokenBucket — monitor during integration testing
 - [Phase 9]: StatCan SDMX structure+json Accept header support unverified; may need stdlib XML parsing for structure queries
+- [Quick-1 finding]: Live integration suite surfaced 17 PRE-EXISTING failures in out-of-scope modules (NOT MB/SK/AB/QC/NS) — BOC exchange rates (4, data["data"] shape→dict-by-series), Toronto TTC GTFS (2, UPSTREAM_ERROR) + cross-module (1, ReadTimeout), StatCan coord (2, null-field Pydantic) + bulk_vector (1, dict-vs-list drift), SDMX data_last_n (1, JSON parse), IRCC invalid_breakdown (1) + cross-module (1), York Region shape (3, dict-vs-list drift). Deferred to separate investigation.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 1 | Remove UPSTREAM_ERROR escape-hatch pattern from provincial integration tests and re-run live integration | 2026-06-17 | 2bdf450 | [1-remove-upstream-error-escape-hatch-patte](./quick/1-remove-upstream-error-escape-hatch-patte/) |
 
 ## Session Continuity
 

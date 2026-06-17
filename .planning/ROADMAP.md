@@ -274,6 +274,16 @@ Plans:
 - [ ] 20-07-PLAN.md — Parametrized + LIVE field-presence integration tests, docs sync (Socrata as 4th portal tech), 95% coverage (NS-18)
 - [ ] 20-08-PLAN.md — Gap closure: per-dataset SoQL for ns_get_health_facilities (hospital + LTC live 400 fix) + real-raw-schema fixtures + de-masked LIVE integration [NS-13]
 
+### Phase 20.1: Remove UPSTREAM_ERROR escape-hatch pattern from all provincial integration tests (MB/SK/AB/QC/NS) and re-run live integration to surface masked upstream failures before pushing Phase 20 (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 20
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 20.1 to break down)
+
 ### Phase 21: New Brunswick Government Open Data
 
 **Goal:** [To be planned]

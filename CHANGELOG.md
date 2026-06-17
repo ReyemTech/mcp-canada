@@ -2,6 +2,155 @@
 
 <!-- CHANGELOG -->
 
+## v0.10.0 (2026-06-17)
+
+### Bug Fixes
+
+- **20**: Revise 20-08 gap plan per checker feedback
+  ([`864b3c9`](https://github.com/ReyemTech/mcp-canada/commit/864b3c982f13f7cb370a5156a988db6df04d4936))
+
+- **20-08**: Remove UPSTREAM_ERROR escape-hatch from NS health integration scenarios
+  ([`19d6c3b`](https://github.com/ReyemTech/mcp-canada/commit/19d6c3bbe4a093862daaefa6825082ba4c843c79))
+
+### Chores
+
+- Sync uv.lock after release
+  ([`ff76bbe`](https://github.com/ReyemTech/mcp-canada/commit/ff76bbe19377e0d95751d59a7d6b26c6068c0584))
+
+### Code Style
+
+- **20**: Clean ruff warnings in nova_scotia module (unused imports/locals/f-strings)
+  ([`1adbd9d`](https://github.com/ReyemTech/mcp-canada/commit/1adbd9d42f4f608f197bb04da151f46682df59e9))
+
+### Documentation
+
+- **20**: Align plan 07 to wave 6 (contiguous waves)
+  ([`01e5431`](https://github.com/ReyemTech/mcp-canada/commit/01e5431cd1752b5df6c53bf52a4455d6a7bf14e9))
+
+- **20**: Capture phase context
+  ([`8347833`](https://github.com/ReyemTech/mcp-canada/commit/8347833b4d5ee4de0f6c8d50118e5a19a34fac99))
+
+- **20**: Create Nova Scotia phase plan (7 plans, NS-01…NS-18)
+  ([`c69ea10`](https://github.com/ReyemTech/mcp-canada/commit/c69ea108084b7bb6f776b3b87bf56a015d5ab0b0))
+
+- **20**: Gap-closure plan 20-08 — fix ns_get_health_facilities live 400 (NS-13)
+  ([`dfafc15`](https://github.com/ReyemTech/mcp-canada/commit/dfafc15546ce9c51d3a76590f12ce599b31fb35f))
+
+- **20**: Research confirms Socrata SHIP + add validation strategy
+  ([`df314e7`](https://github.com/ReyemTech/mcp-canada/commit/df314e73f2a3ac3f1fa6cf0dd576831194f3c77d))
+
+- **20**: Research Phase 20 Nova Scotia — Socrata SODA API live-verified, 17 tools planned
+  ([`8c2c4bc`](https://github.com/ReyemTech/mcp-canada/commit/8c2c4bc578f507ed8229a89fd7a0d448fc3419b9))
+
+- **20-01**: Complete nova-scotia wave 0 — shared/socrata.py + module scaffold
+  ([`ba67760`](https://github.com/ReyemTech/mcp-canada/commit/ba67760a47029abc7f3afda1d9ed05458e9b585a))
+
+- **20-01**: Wave 0 spike — resolve 3 uncertain NS dataset shapes
+  ([`44dfb77`](https://github.com/ReyemTech/mcp-canada/commit/44dfb770a2199eb6d63eb133deec6385a61c0af7))
+
+- **20-02**: Complete Nova Scotia discovery tools — 5 tools, categories workaround, 42 tests green
+  ([`8e75221`](https://github.com/ReyemTech/mcp-canada/commit/8e75221c07f7677870f78d20161c7b4640161367))
+
+- **20-03**: Complete Nova Scotia aquaculture tools plan — 4 tools, geometry-exclusion, 97 tests
+  ([`936ab53`](https://github.com/ReyemTech/mcp-canada/commit/936ab53c430d857355a563891f11f11136b30d10))
+
+- **20-04**: Complete Nova Scotia environment/water/air plan — 4 tools, empty-advisory-valid,
+  geometry-exclusion, 97% coverage
+  ([`9c35d9e`](https://github.com/ReyemTech/mcp-canada/commit/9c35d9ef5b6d745329551d93fe3d2ca7d8f539d2))
+
+- **20-05**: Complete Nova Scotia health/demographics plan — 17 ns_ tools, 97% coverage
+  ([`79fa897`](https://github.com/ReyemTech/mcp-canada/commit/79fa897435ee841a7a2d01d1a892bfb374aace65))
+
+- **20-06**: Complete Nova Scotia prompts and resources plan
+  ([`6dd97ef`](https://github.com/ReyemTech/mcp-canada/commit/6dd97ef9bfcfe9eb62d790ab101cf0c0144f835c))
+
+- **20-07**: Complete Nova Scotia final wave — 32 parametrized + 24 live integration + docs sync
+  ([`8eaedc3`](https://github.com/ReyemTech/mcp-canada/commit/8eaedc3601bc27b805b1623d9082185664c60cd5))
+
+- **20-07**: Sync README/MODULES/CLAUDE/EXAMPLES — Socrata as 4th portal tech
+  ([`274649e`](https://github.com/ReyemTech/mcp-canada/commit/274649eeef2ed5a09b5c0b8cc6cf1e490accb3b1))
+
+- **20-08**: Complete NS health facilities gap closure — NS-13 restored
+  ([`fd0b90b`](https://github.com/ReyemTech/mcp-canada/commit/fd0b90b18dbc665f82eb9e27e0ee0f0caf788130))
+
+- **phase-20**: Complete phase execution
+  ([`9e009b7`](https://github.com/ReyemTech/mcp-canada/commit/9e009b7c69e67185a5a2f825016845dac2f2d286))
+
+- **phase-20**: Resolve UAT gap + debug session after 20-08 gap closure
+  ([`d6b8adc`](https://github.com/ReyemTech/mcp-canada/commit/d6b8adc38a8b73348fe022030d1d7fa08605c025))
+
+- **quick-1**: Complete escape-hatch de-masking summary
+  ([`aef4c9d`](https://github.com/ReyemTech/mcp-canada/commit/aef4c9de7e2473b52aca3641d061766961d05cb7))
+
+- **quick-1**: Record quick task 1 + 17-failure finding in STATE.md
+  ([`9981081`](https://github.com/ReyemTech/mcp-canada/commit/9981081ae1f87a8442d675d505a1b13b1637ca89))
+
+- **state**: Record phase 20 context session
+  ([`863c9bf`](https://github.com/ReyemTech/mcp-canada/commit/863c9bff07b856c609702f20521e489229ddba2e))
+
+### Features
+
+- **20-01**: Build shared/socrata.py — 4th portal client (SODA API)
+  ([`16dca1b`](https://github.com/ReyemTech/mcp-canada/commit/16dca1ba8626c39e7c29bbe6b2e6ad2adc19865f))
+
+- **20-01**: Scaffold nova_scotia module — 7-file pattern + test scaffolds
+  ([`31d0cb4`](https://github.com/ReyemTech/mcp-canada/commit/31d0cb44e20b367f4b2d913ca22d14d38802fd6a))
+
+- **20-02**: Add 5 discovery @tool functions + tool tests
+  ([`0a556fe`](https://github.com/ReyemTech/mcp-canada/commit/0a556fe6040bbee57055565890e37795e3a5fc6d))
+
+- **20-02**: Implement 5 discovery client bodies + TestSharedApiGetContract
+  ([`8fbcd1c`](https://github.com/ReyemTech/mcp-canada/commit/8fbcd1caf2180e4f2711085145fe5829b5240a5d))
+
+- **20-03**: Add 4 curated aquaculture @tool functions + tool tests
+  ([`f0fb343`](https://github.com/ReyemTech/mcp-canada/commit/f0fb343c8423bd5a2a559432bae665bcdcc1e117))
+
+- **20-03**: Implement 4 fishing/aquaculture client bodies with geometry exclusion
+  ([`a1b21e8`](https://github.com/ReyemTech/mcp-canada/commit/a1b21e865104dbf2cb4efe31c5f6f568cadfb2b5))
+
+- **20-04**: Add 4 environment/water/air @tool functions (NS-11/12/15/16)
+  ([`f296afc`](https://github.com/ReyemTech/mcp-canada/commit/f296afcb754a372e75d8a9b130458cb2e5b687b8))
+
+- **20-04**: Implement 4 environment/water/air client bodies (NS-11/12/15/16)
+  ([`102ab51`](https://github.com/ReyemTech/mcp-canada/commit/102ab51860f53460df7b2e5845ee92937308cb8c))
+
+- **20-05**: Add 3 curated @tool functions for NS health/demographics (double-guard dispatch)
+  ([`c46fec9`](https://github.com/ReyemTech/mcp-canada/commit/c46fec9fb829ec8a807d9701251463cde4cd6aa2))
+
+- **20-05**: Implement 3 health/demographics client bodies + _normalize_zone_field tests
+  ([`ebbb257`](https://github.com/ReyemTech/mcp-canada/commit/ebbb257c7604cf222e85ece68f77ab2073b2c5b3))
+
+- **20-06**: Add 6 bilingual NS prompts (3 guided + 3 quick lookups)
+  ([`85eb176`](https://github.com/ReyemTech/mcp-canada/commit/85eb1762cfec28ffc563459fc42a7c9ab6842980))
+
+- **20-06**: Add 7 zero-parameter NS resources (4 data + 2 docs + 1 template)
+  ([`708c264`](https://github.com/ReyemTech/mcp-canada/commit/708c2647a49dd158deb010588a6b6b7bc5c68e12))
+
+- **20-08**: GREEN — per-dataset SoQL constants + branched fetch_health_facilities with
+  normalization
+  ([`4e85b9f`](https://github.com/ReyemTech/mcp-canada/commit/4e85b9f981edabca4f0cc37dd6b7c561af38b474))
+
+### Testing
+
+- **20**: Complete UAT - 9 passed, 1 issue (health facilities 400 live)
+  ([`2407ce9`](https://github.com/ReyemTech/mcp-canada/commit/2407ce9e16c0c6bdda672597deef82ac64679f04))
+
+- **20**: Diagnose health-facilities 400 — per-dataset $select bug + test escape-hatch
+  ([`11d47ee`](https://github.com/ReyemTech/mcp-canada/commit/11d47ee2130e2b30298aa7f849894bb03ad7f6ce))
+
+- **20-07**: Parametrized envelope/lang + live field-presence integration tests
+  ([`42100d1`](https://github.com/ReyemTech/mcp-canada/commit/42100d1e91d62aa64541af27b5022c707e5a515f))
+
+- **20-08**: RED — real raw Socrata schema fixtures + per-dataset SoQL assertion tests
+  ([`b0757c0`](https://github.com/ReyemTech/mcp-canada/commit/b0757c0b87b7572d45cebfb3de4879ad679629bc))
+
+- **quick-1**: De-mask idiom-A SK+NS integration tests (Task 1)
+  ([`3419a29`](https://github.com/ReyemTech/mcp-canada/commit/3419a298bf5e94414d8465a6aab4057f890a7aef))
+
+- **quick-1**: De-mask idiom-B QC+MB tests; harden AB road events (Task 2)
+  ([`8e5d98f`](https://github.com/ReyemTech/mcp-canada/commit/8e5d98f8f8efb1a2d2778cfe9dca2cc2eb860b62))
+
+
 ## v0.9.0 (2026-06-15)
 
 ### Bug Fixes

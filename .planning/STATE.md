@@ -50,16 +50,26 @@ Suite at reconciliation: 3032 passed, 2 skipped, 97.05% coverage.
 
 ## Open Items
 
-1. ~~StatCan `FREQUENCY_CODES` is wrong~~ — **FIXED 2026-07-25.** Both the frequency
-   and scalar-factor maps were shifted; rebuilt from StatCan's published code set,
-   catalogs updated, tautological assertions replaced with literals, live-drift
-   integration guard added. See 08-UAT.md Gap 1.
-2. **`sc_get_series_info_by_vector` returns no UOM label** (minor, OPEN) — 08-UAT Gap 2,
-   tracked in `.planning/todos/pending/2026-07-25-statcan-series-info-uom-label.md`.
-3. **Phases 15 (BC) and 16 (Quebec) have no REQUIREMENTS.md entries at all** — both
-   shipped (5 and 7 plans, 20 and 18 tools) but no BC-/QC- prefixed requirements were
-   ever written, so they are invisible to the traceability table.
-4. 3 active debug sessions in `.planning/debug/`.
+All items from the 2026-07-25 reconciliation are closed:
+
+1. ~~StatCan `FREQUENCY_CODES` is wrong~~ — **FIXED.** Frequency *and* scalar-factor
+   maps were both shifted; rebuilt from StatCan's published code set, catalogs
+   updated, tautological assertions replaced with literals, live-drift guard added.
+2. ~~`sc_get_series_info_by_vector` returns no UOM label~~ — **FIXED.** Decoded `uom`
+   added, sourced from live getCodeSets. Turned up a third fabricated catalog
+   (`data://statcan/uom-codes`, all 15 entries wrong) — replaced with a verified subset.
+3. ~~Phases 15 (BC) and 16 (Quebec) have no REQUIREMENTS.md entries~~ — **BACKFILLED.**
+   BC-01..22 and QC-01..19 derived from shipped code and verified against the modules;
+   ROADMAP `Requirements: TBD` lines replaced. Every executed phase now has traceability.
+4. ~~3 active debug sessions~~ — **CLOSED.** All three were fixed long ago:
+   `ircc-header-parsing` moved to resolved/ (plan 11-04 shipped its recommendation
+   verbatim); the two BC sessions were stale duplicates of newer files already in
+   resolved/.
+
+Remaining backlog (not defects):
+- `.planning/todos/pending/2026-04-12-research-cross-canada-er-wait-times-datasets.md`
+  — research item; premises refreshed 2026-07-25 against what phases 17-20 learned.
+- ROADMAP phases 20.1 and 21-39 carry `Requirements: TBD` — correct, they are unplanned.
 
 ## Performance Metrics
 

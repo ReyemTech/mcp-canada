@@ -39,6 +39,15 @@ This is genuinely exceptional open data. Cross-Canada ER wait time comparison wo
 | Alberta | — | None (AHS ahs.ca/waittimes is a web dashboard, not open data) |
 | Manitoba, Saskatchewan, Maritimes, territories | — | None known |
 
+**Updated 2026-07-25** — phases 17-20 shipped after this todo was filed and settled
+several of the rows above:
+
+| Province | Finding from the shipped phase |
+|---|---|
+| **Alberta** (Phase 17) | AHS has FeatureServers for hospitals/zones/EMS-PCN clinics, but **no** wait-time or occupancy layer. AB-16 explicitly records ER wait times as subsumed/deferred (Pitfall 9). |
+| **Saskatchewan** (Phase 19) | Health **deferred** — SHA publishes no public ArcGIS FeatureServer at all. |
+| **Nova Scotia** (Phase 20) | Socrata portal shipped with `ns_get_health_facilities`; no wait-time dataset surfaced during that phase. |
+
 BC Phase 15 explicitly surfaced locations but not wait times — the BCGW layer `WHSE_IMAGERY_AND_BASE_MAPS.GSR_EMERGENCY_ROOMS_SV` doesn't include occupancy.
 
 ## Solution
@@ -49,10 +58,16 @@ Research whether each of these provinces exposes an ER wait time / hospital occu
 
 - Ontario — check data.ontario.ca CKAN for MOH/HQO/Ontario Health datasets; check Ontario Health Atlas API
 - British Columbia — check catalogue.data.gov.bc.ca for Ministry of Health CKAN datasets beyond the WFS geographic layer
-- Alberta — check open.alberta.ca CKAN for AHS wait time data; ahs.ca/waittimes likely has a backing API
-- Manitoba — check data.manitoba.ca CKAN for Manitoba Health
-- Saskatchewan — check open.saskatchewan.ca CKAN for Saskatchewan Health Authority
-- Nova Scotia — check data.novascotia.ca CKAN for NSHA
+- Alberta — Phase 17 already swept open.alberta.ca and the AHSGIS FeatureServers
+  without finding occupancy data; the remaining lead is a backing API behind
+  ahs.ca/waittimes
+- Manitoba — **NOT** data.manitoba.ca (unreachable, confirmed Phase 18). Use the
+  geoportal.gov.mb.ca ArcGIS Hub (org `mMUesHYPkXjaFGfS`) instead
+- Saskatchewan — **NOT** data.saskatchewan.ca (does not exist, confirmed Phase 19).
+  Try geohub.saskatchewan.ca, though Phase 19 already found SHA has no public
+  FeatureServer — likely a dead end
+- Nova Scotia — data.novascotia.ca is **Socrata**, not CKAN (confirmed Phase 20);
+  query via `/api/catalog/v1`, and note the `categories=` parameter is broken
 - New Brunswick — check nbopendata.ca for Horizon/Vitalité
 - Newfoundland and Labrador — check opendata.gov.nl.ca
 - Prince Edward Island — check peiopendata.ca

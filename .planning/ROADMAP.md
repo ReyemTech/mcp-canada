@@ -37,9 +37,9 @@ Phases 1-6 delivered 7 federal API modules (Bank of Canada, Open Parliament, Rec
 **Plans:** 3/3 plans complete
 
 Plans:
-- [ ] 07-01-PLAN.md — Datastore module infrastructure: constants, schemas, async SQLite client, identifier validation, --ephemeral flag
-- [ ] 07-02-PLAN.md — Datastore tools (6 @tool functions) + unit tests + integration tests
-- [ ] 07-03-PLAN.md — StatCan SSL probe + statcan module stub with _make_statcan_client factory
+- [x] 07-01-PLAN.md — Datastore module infrastructure: constants, schemas, async SQLite client, identifier validation, --ephemeral flag
+- [x] 07-02-PLAN.md — Datastore tools (6 @tool functions) + unit tests + integration tests
+- [x] 07-03-PLAN.md — StatCan SSL probe + statcan module stub with _make_statcan_client factory
 
 ### Phase 8: StatCan WDS
 **Goal**: Agents can discover, explore, and retrieve Statistics Canada time series data through all WDS REST endpoints with proper caching, rate limiting, and bilingual support
@@ -54,9 +54,9 @@ Plans:
 **Plans:** 3/3 plans complete
 
 Plans:
-- [ ] 08-01-PLAN.md — Constants, schemas, BM25 search, getCubeMetadata, getCodeSets client functions + tests
-- [ ] 08-02-PLAN.md — Series info, data retrieval, and change monitoring client functions + tests
-- [ ] 08-03-PLAN.md — All 11 sc_ tool functions + integration tests through MCP Client
+- [x] 08-01-PLAN.md — Constants, schemas, BM25 search, getCubeMetadata, getCodeSets client functions + tests
+- [x] 08-02-PLAN.md — Series info, data retrieval, and change monitoring client functions + tests
+- [x] 08-03-PLAN.md — All 11 sc_ tool functions + integration tests through MCP Client
 
 ### Phase 9: SDMX + Composite
 **Goal**: Agents can apply server-side dimension filters via SDMX for large tables and store multi-series fetches directly to the shared datastore in a single tool call
@@ -69,8 +69,8 @@ Plans:
 **Plans:** 1/2 plans executed
 
 Plans:
-- [ ] 09-01-PLAN.md — SDMX client layer: constants, schemas, 3 async client functions (structure/data/vector), unit tests
-- [ ] 09-02-PLAN.md — SDMX + composite tools (4 @tool functions), unit tests, integration tests through MCP Client
+- [x] 09-01-PLAN.md — SDMX client layer: constants, schemas, 3 async client functions (structure/data/vector), unit tests
+- [x] 09-02-PLAN.md — SDMX + composite tools (4 @tool functions), unit tests, integration tests through MCP Client
 
 ### Phase 10: Tests + Docs
 **Goal**: All new tools are covered by integration tests through the MCP Client layer and the README accurately reflects the expanded tool catalog
@@ -84,8 +84,8 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 10-01-PLAN.md — Integration test audit + coverage verification (INF-06, INF-07)
-- [ ] 10-02-PLAN.md — README updates + EXAMPLES.md cross-module SQL examples (INF-08, INF-09)
+- [x] 10-01-PLAN.md — Integration test audit + coverage verification (INF-06, INF-07)
+- [x] 10-02-PLAN.md — README updates + EXAMPLES.md cross-module SQL examples (INF-08, INF-09)
 
 ## Progress
 
@@ -116,7 +116,7 @@ Plans:
 - [x] 11-01-PLAN.md — Shared file parser library (parsers.py) + openpyxl dependency + unit tests
 - [x] 11-02-PLAN.md — IRCC module skeleton: dataset registry, client functions, unit tests
 - [x] 11-03-PLAN.md — IRCC tool functions, integration tests, README update
-- [ ] 11-04-PLAN.md — Gap closure: IRCC multi-row merged header parsing (UAT blocker)
+- [x] 11-04-PLAN.md — Gap closure: IRCC multi-row merged header parsing (UAT blocker)
 
 ### Phase 12: Ontario Government Open Data
 **Goal**: Agents can search Ontario's 2,946 open datasets (data.ontario.ca), browse ministry organizations, get dataset/resource details, and fetch curated population projections data — reusing the proven CKAN client pattern and shared XLSX parser
@@ -132,8 +132,8 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 12-01-PLAN.md — Ontario module skeleton: constants, schemas, CKAN client layer, population projections parser, unit tests
-- [ ] 12-02-PLAN.md — Ontario tool functions, unit tests, integration tests, README update
+- [x] 12-01-PLAN.md — Ontario module skeleton: constants, schemas, CKAN client layer, population projections parser, unit tests
+- [x] 12-02-PLAN.md — Ontario tool functions, unit tests, integration tests, README update
 
 ### Phase 13: Toronto Municipal Government Open Data
 **Goal**: Agents can search Toronto's open data catalogue (open.toronto.ca), browse city divisions, get dataset/resource details, and use curated tools for TTC transit (GTFS), neighbourhood profiles, 311 service requests, RentSafeTO evaluations, and short-term rentals — with new shared GeoJSON/JSON parsers
@@ -151,8 +151,8 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 13-01-PLAN.md — Shared GeoJSON/JSON parsers + Toronto module skeleton: constants, schemas, client layer, unit tests
-- [ ] 13-02-PLAN.md — Toronto tool functions, unit tests, integration tests, README update
+- [x] 13-01-PLAN.md — Shared GeoJSON/JSON parsers + Toronto module skeleton: constants, schemas, client layer, unit tests
+- [x] 13-02-PLAN.md — Toronto tool functions, unit tests, integration tests, README update
 
 ### Phase 14: York Region Municipal Government Open Data
 
@@ -171,9 +171,9 @@ Plans:
 **Plans:** 3/3 plans complete
 
 Plans:
-- [ ] 14-01-PLAN.md — Shared ArcGIS Hub client + York Region module skeleton (constants, schemas, client, unit tests)
-- [ ] 14-02-PLAN.md — York Region tool functions (20 discovery × 4 portals + 7 curated) + unit tests
-- [ ] 14-03-PLAN.md — Prompts, resources, integration tests, README, and REQUIREMENTS.md finalization
+- [x] 14-01-PLAN.md — Shared ArcGIS Hub client + York Region module skeleton (constants, schemas, client, unit tests)
+- [x] 14-02-PLAN.md — York Region tool functions (20 discovery × 4 portals + 7 curated) + unit tests
+- [x] 14-03-PLAN.md — Prompts, resources, integration tests, README, and REQUIREMENTS.md finalization
 
 ### Phase 15: British Columbia Government Open Data
 
@@ -183,10 +183,10 @@ Plans:
 **Plans:** 5/5 plans complete
 
 Plans:
-- [ ] 15-01-PLAN.md — shared/ogc.py WFS 2.0 client + british_columbia module skeleton + Wave 0 test stubs
-- [ ] 15-02-PLAN.md — CKAN client functions + 5 discovery tools (bc_search_datasets, bc_get_dataset_details, bc_query_features, bc_list_organizations, bc_list_categories)
-- [ ] 15-03-PLAN.md — _wfs_fetch caching layer + 15 curated WFS tools (wildfire, forestry, environment, mining, health, transportation, climate)
-- [ ] 15-04-PLAN.md — 6 prompts + 7 resources + integration tests + README + CLAUDE.md updates
+- [x] 15-01-PLAN.md — shared/ogc.py WFS 2.0 client + british_columbia module skeleton + Wave 0 test stubs
+- [x] 15-02-PLAN.md — CKAN client functions + 5 discovery tools (bc_search_datasets, bc_get_dataset_details, bc_query_features, bc_list_organizations, bc_list_categories)
+- [x] 15-03-PLAN.md — _wfs_fetch caching layer + 15 curated WFS tools (wildfire, forestry, environment, mining, health, transportation, climate)
+- [x] 15-04-PLAN.md — 6 prompts + 7 resources + integration tests + README + CLAUDE.md updates
 
 ### Phase 16: Quebec Government Open Data
 
@@ -203,7 +203,7 @@ Plans:
 - [x] 16-05-PLAN.md — Gap closure cycle 1 (post-UAT)
 - [x] 16-06-PLAN.md — Gap closure cycle 2 (WFS paging, snake_case mapper, Hydro-Québec SECLEVEL=1 SSL)
 - [x] 16-07-PLAN.md — Gap closure cycle 3 (bridges int->str coercion, electricity XLSX legend row filter)
-- [ ] 16-08-PLAN.md — Gap closure cycle 4 (route filter substring match bug)
+- [x] 16-08-PLAN.md — Gap closure cycle 4 (route filter substring match bug)
 
 ### Phase 17: Alberta Government Open Data
 
@@ -213,15 +213,15 @@ Plans:
 **Plans:** 9/9 plans complete
 
 Plans:
-- [ ] 17-01-PLAN.md — Module scaffolding: 7-file pattern + Wave 0 test stubs + _api_get/_511_get helpers + 24 client function stubs
-- [ ] 17-02-PLAN.md — 5 CKAN discovery tools + TestSharedApiGetContract regression guard
-- [ ] 17-03-PLAN.md — 4 AER tools (ST1 daily, ST1 archive, ST39 pipelines, ST3 production)
-- [ ] 17-04-PLAN.md — 4 wildfire tools (active fires, perimeters, fire bans, fire control orders)
-- [ ] 17-05-PLAN.md — 3 AHS health tools (hospitals, zones, EMS/PCN clinics)
-- [ ] 17-06-PLAN.md — 3 transport tools (511 road events, winter conditions, cameras)
-- [ ] 17-07-PLAN.md — 5 environment/agriculture/demographics/parks tools
-- [ ] 17-08-PLAN.md — 6 prompts + 7 resources (Phase 40 pattern)
-- [ ] 17-09-PLAN.md — Parametrized envelope/lang tests + integration tests + README/docs/EXAMPLES updates + 95% coverage gate
+- [x] 17-01-PLAN.md — Module scaffolding: 7-file pattern + Wave 0 test stubs + _api_get/_511_get helpers + 24 client function stubs
+- [x] 17-02-PLAN.md — 5 CKAN discovery tools + TestSharedApiGetContract regression guard
+- [x] 17-03-PLAN.md — 4 AER tools (ST1 daily, ST1 archive, ST39 pipelines, ST3 production)
+- [x] 17-04-PLAN.md — 4 wildfire tools (active fires, perimeters, fire bans, fire control orders)
+- [x] 17-05-PLAN.md — 3 AHS health tools (hospitals, zones, EMS/PCN clinics)
+- [x] 17-06-PLAN.md — 3 transport tools (511 road events, winter conditions, cameras)
+- [x] 17-07-PLAN.md — 5 environment/agriculture/demographics/parks tools
+- [x] 17-08-PLAN.md — 6 prompts + 7 resources (Phase 40 pattern)
+- [x] 17-09-PLAN.md — Parametrized envelope/lang tests + integration tests + README/docs/EXAMPLES updates + 95% coverage gate
 
 ### Phase 18: Manitoba Government Open Data
 
@@ -231,15 +231,15 @@ Plans:
 **Plans:** 9/9 plans complete
 
 Plans:
-- [ ] 18-01-PLAN.md — Module scaffold (7 files + test scaffolds, stubs, fixtures) + Wave 0 spike (511 key + resolve 3 FeatureServer URLs)
-- [ ] 18-02-PLAN.md — 5 ArcGIS Hub discovery tools (search, details, query auto-router, organizations, categories)
-- [ ] 18-03-PLAN.md — 3 flood/hydrology tools (flood alerts, river stations, provincial waterways)
-- [ ] 18-04-PLAN.md — 4 agriculture/drought tools (drought monitor, ag weather stations, livestock prices, crop regions)
-- [ ] 18-05-PLAN.md — 5 environment/health/parks tools (parks, surgical wait times, fisheries, forests, health facilities)
-- [ ] 18-06-PLAN.md — 3 transport tools (511 road events, winter conditions, cameras — conditional, NOT_CONFIGURED fallback)
-- [ ] 18-07-PLAN.md — 6 bilingual prompts + 7 resources (Phase 40 pattern)
-- [ ] 18-08-PLAN.md — Parametrized envelope/lang tests + integration tests + README/MODULES/CLAUDE/EXAMPLES sync + 95% coverage gate
-- [ ] 18-09-PLAN.md — Gap closure: fix 3 ArcGIS-Hub discovery tools (OGC limit/startindex params, omit blank q) + param-regression tests + live integration check [MB-01, MB-04, MB-05]
+- [x] 18-01-PLAN.md — Module scaffold (7 files + test scaffolds, stubs, fixtures) + Wave 0 spike (511 key + resolve 3 FeatureServer URLs)
+- [x] 18-02-PLAN.md — 5 ArcGIS Hub discovery tools (search, details, query auto-router, organizations, categories)
+- [x] 18-03-PLAN.md — 3 flood/hydrology tools (flood alerts, river stations, provincial waterways)
+- [x] 18-04-PLAN.md — 4 agriculture/drought tools (drought monitor, ag weather stations, livestock prices, crop regions)
+- [x] 18-05-PLAN.md — 5 environment/health/parks tools (parks, surgical wait times, fisheries, forests, health facilities)
+- [x] 18-06-PLAN.md — 3 transport tools (511 road events, winter conditions, cameras — conditional, NOT_CONFIGURED fallback)
+- [x] 18-07-PLAN.md — 6 bilingual prompts + 7 resources (Phase 40 pattern)
+- [x] 18-08-PLAN.md — Parametrized envelope/lang tests + integration tests + README/MODULES/CLAUDE/EXAMPLES sync + 95% coverage gate
+- [x] 18-09-PLAN.md — Gap closure: fix 3 ArcGIS-Hub discovery tools (OGC limit/startindex params, omit blank q) + param-regression tests + live integration check [MB-01, MB-04, MB-05]
 
 ### Phase 19: Saskatchewan Government Open Data
 
@@ -249,13 +249,13 @@ Plans:
 **Plans:** 7/7 plans complete
 
 Plans:
-- [ ] 19-01-PLAN.md — Wave 0: shared/arcgis_hub.py startindex fix + York/Alberta/Manitoba no-regression check + module scaffold (7 files + test scaffolds, constants for 3 bases, ~14 client stubs) + spike (WSA water-quality layer 19 + Petroleum 400)
-- [ ] 19-02-PLAN.md — 5 ArcGIS Hub discovery tools (search/details/query auto-router/orgs/categories) with OGC params (limit/startindex, omit blank q) + TestSharedApiGetContract
-- [ ] 19-03-PLAN.md — Agriculture (crop yields, grain elevators) + Energy/mining (mineral mines dispatch: potash/uranium/helium/coal) — 3 curated tools
-- [ ] 19-04-PLAN.md — Environment (fire bans via SPSA, historic wildfires, air quality) — 3 curated tools
-- [ ] 19-05-PLAN.md — Water/WSA (hydrometric stations, reservoirs layer 26) — 2 curated tools
-- [ ] 19-06-PLAN.md — 6 bilingual prompts + 7 resources (Phase 40 pattern), portal-guide documents multi-org architecture + deferred domains
-- [ ] 19-07-PLAN.md — Parametrized envelope/lang tests + LIVE field-presence integration (Manitoba lesson) + README/MODULES/CLAUDE/EXAMPLES sync + 95% coverage gate
+- [x] 19-01-PLAN.md — Wave 0: shared/arcgis_hub.py startindex fix + York/Alberta/Manitoba no-regression check + module scaffold (7 files + test scaffolds, constants for 3 bases, ~14 client stubs) + spike (WSA water-quality layer 19 + Petroleum 400)
+- [x] 19-02-PLAN.md — 5 ArcGIS Hub discovery tools (search/details/query auto-router/orgs/categories) with OGC params (limit/startindex, omit blank q) + TestSharedApiGetContract
+- [x] 19-03-PLAN.md — Agriculture (crop yields, grain elevators) + Energy/mining (mineral mines dispatch: potash/uranium/helium/coal) — 3 curated tools
+- [x] 19-04-PLAN.md — Environment (fire bans via SPSA, historic wildfires, air quality) — 3 curated tools
+- [x] 19-05-PLAN.md — Water/WSA (hydrometric stations, reservoirs layer 26) — 2 curated tools
+- [x] 19-06-PLAN.md — 6 bilingual prompts + 7 resources (Phase 40 pattern), portal-guide documents multi-org architecture + deferred domains
+- [x] 19-07-PLAN.md — Parametrized envelope/lang tests + LIVE field-presence integration (Manitoba lesson) + README/MODULES/CLAUDE/EXAMPLES sync + 95% coverage gate
 
 ### Phase 20: Nova Scotia Government Open Data
 
@@ -265,14 +265,14 @@ Plans:
 **Plans:** 8/8 plans complete
 
 Plans:
-- [ ] 20-01-PLAN.md — Wave 0: build shared/socrata.py + TestSharedSocrataContract, scaffold nova_scotia module, resolve the 3 dataset-shape spikes (NS-01)
-- [ ] 20-02-PLAN.md — 5 Socrata catalog discovery tools incl. the categories=-broken workaround (NS-02…NS-06)
-- [ ] 20-03-PLAN.md — Fishing/aquaculture curated tools: marine + landbased leases, hatchery stocking, production (NS-07…NS-10)
-- [ ] 20-04-PLAN.md — Environment/water/air curated tools: water quality, boil-water advisories, protected areas, air-quality stations (NS-11, NS-12, NS-15, NS-16)
-- [ ] 20-05-PLAN.md — Health + demographics curated tools: health facilities (dispatch), vital statistics, chronic disease prevalence (NS-13, NS-14, NS-17)
-- [ ] 20-06-PLAN.md — 6 bilingual prompts + 7 zero-parameter resources incl. the Socrata/SoQL guide (NS-18)
-- [ ] 20-07-PLAN.md — Parametrized + LIVE field-presence integration tests, docs sync (Socrata as 4th portal tech), 95% coverage (NS-18)
-- [ ] 20-08-PLAN.md — Gap closure: per-dataset SoQL for ns_get_health_facilities (hospital + LTC live 400 fix) + real-raw-schema fixtures + de-masked LIVE integration [NS-13]
+- [x] 20-01-PLAN.md — Wave 0: build shared/socrata.py + TestSharedSocrataContract, scaffold nova_scotia module, resolve the 3 dataset-shape spikes (NS-01)
+- [x] 20-02-PLAN.md — 5 Socrata catalog discovery tools incl. the categories=-broken workaround (NS-02…NS-06)
+- [x] 20-03-PLAN.md — Fishing/aquaculture curated tools: marine + landbased leases, hatchery stocking, production (NS-07…NS-10)
+- [x] 20-04-PLAN.md — Environment/water/air curated tools: water quality, boil-water advisories, protected areas, air-quality stations (NS-11, NS-12, NS-15, NS-16)
+- [x] 20-05-PLAN.md — Health + demographics curated tools: health facilities (dispatch), vital statistics, chronic disease prevalence (NS-13, NS-14, NS-17)
+- [x] 20-06-PLAN.md — 6 bilingual prompts + 7 zero-parameter resources incl. the Socrata/SoQL guide (NS-18)
+- [x] 20-07-PLAN.md — Parametrized + LIVE field-presence integration tests, docs sync (Socrata as 4th portal tech), 95% coverage (NS-18)
+- [x] 20-08-PLAN.md — Gap closure: per-dataset SoQL for ns_get_health_facilities (hospital + LTC live 400 fix) + real-raw-schema fixtures + de-masked LIVE integration [NS-13]
 
 ### Phase 20.1: Remove UPSTREAM_ERROR escape-hatch pattern from all provincial integration tests (MB/SK/AB/QC/NS) and re-run live integration to surface masked upstream failures before pushing Phase 20 (INSERTED)
 
@@ -488,8 +488,8 @@ Plans:
 **Plans:** 5/5 plans complete
 
 Plans:
-- [ ] 40-01-PLAN.md — Reference implementation: BoC prompts + resources + _example update + unit tests
-- [ ] 40-02-PLAN.md — StatCan + Datastore + CKAN prompts/resources + unit tests
-- [ ] 40-03-PLAN.md — Open Parliament + Recalls + Drug Database + Nutrient File prompts/resources + unit tests
-- [ ] 40-04-PLAN.md — Weather + IRCC + Ontario + Toronto prompts/resources + unit tests
-- [ ] 40-05-PLAN.md — Integration tests + README + CLAUDE.md documentation updates
+- [x] 40-01-PLAN.md — Reference implementation: BoC prompts + resources + _example update + unit tests
+- [x] 40-02-PLAN.md — StatCan + Datastore + CKAN prompts/resources + unit tests
+- [x] 40-03-PLAN.md — Open Parliament + Recalls + Drug Database + Nutrient File prompts/resources + unit tests
+- [x] 40-04-PLAN.md — Weather + IRCC + Ontario + Toronto prompts/resources + unit tests
+- [x] 40-05-PLAN.md — Integration tests + README + CLAUDE.md documentation updates

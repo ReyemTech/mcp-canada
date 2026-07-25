@@ -175,8 +175,8 @@ def test_every_exemption_states_a_reason():
     assert not bad, (
         f"{len(bad)} exemption(s) without a usable reason:\n\n"
         + "\n".join(f"  - {b}" for b in bad)
-        + f"\n\nState why the test cannot assert in every branch, e.g. "
-        f'reason="empty result is the documented off-season state".'
+        + "\n\nState why the test cannot assert in every branch, e.g. "
+        'reason="empty result is the documented off-season state".'
     )
 
 

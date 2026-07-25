@@ -7,12 +7,16 @@ Run: uv run pytest tests/integration/test_weather_climate_scenarios.py -v -m int
 """
 
 import pytest
-from tests.integration.conftest import call_tool, discover
+from tests.integration.conftest import assert_rows, call_tool, discover
 
 pytestmark = pytest.mark.integration
 
-# Well-known stable station: Ottawa CDA (station 6158731)
+# Well-known stable station: Ottawa CDA.
+# 6158731 has climate-daily coverage; the climate-normals collection indexes
+# Ottawa CDA under 6105976 (966 normals records). They are different stations,
+# so normals must not be requested with the daily id.
 OTTAWA_STATION = "6158731"
+OTTAWA_NORMALS_STATION = "6105976"
 
 
 class TestClimateScenarios:
@@ -25,41 +29,41 @@ class TestClimateScenarios:
             "start_date": "2024-01-01",
             "end_date": "2024-01-31",
         })
-        assert "_meta" in data
+        assert "_meta" in data, f"expected live envelope, got: {data}"
         assert data["_meta"]["source"]["api"] == "msc-geomet"
-        assert "data" in data
-        # Shape check — not value check (data changes)
-        if data["data"]:
-            record = data["data"][0]
-            assert "station_id" in record
-            assert "date" in record
+        # January 2024 at Ottawa CDA is closed historical data — an empty result
+        # is a defect, not a live-data condition, so no allow_empty_reason.
+        record = assert_rows(data, "wx_get_climate_daily")[0]
+        assert "station_id" in record, f"record missing station_id: {record}"
+        assert "date" in record, f"record missing date: {record}"
 
     @pytest.mark.asyncio
     async def test_climate_normals(self, mcp_server):
         """'What are the climate normals for Ottawa?'"""
         data = await call_tool(mcp_server, "wx_get_climate_normals", {
-            "station_id": OTTAWA_STATION,
+            "station_id": OTTAWA_NORMALS_STATION,
         })
-        assert "_meta" in data
-        assert "data" in data
-        # Shape check
-        if data["data"]:
-            record = data["data"][0]
-            assert "station_id" in record
-            assert "variable" in record or "period_begin" in record
+        assert "_meta" in data, f"expected live envelope, got: {data}"
+        # Ottawa CDA is a long-running station — normals must exist.
+        record = assert_rows(data, "wx_get_climate_normals")[0]
+        assert "station_id" in record, f"record missing station_id: {record}"
+        assert "variable" in record or "period_begin" in record, (
+            f"record missing both variable and period_begin: {record}"
+        )
 
     @pytest.mark.asyncio
     async def test_climate_trends(self, mcp_server):
-        """'What are the long-term climate trends for temperature in Canada?'"""
+        """'What are the long-term precipitation trends in Canada?'"""
+        # ahccd-trends carries precipitation only — "temperature" matches nothing.
         data = await call_tool(mcp_server, "wx_get_climate_trends", {
-            "measurement_type": "temperature",
+            "measurement_type": "total_precip",
         })
-        assert "_meta" in data
-        assert "data" in data
-        # Shape check
-        if data["data"]:
-            record = data["data"][0]
-            assert "measurement_type" in record or "trend" in record
+        assert "_meta" in data, f"expected live envelope, got: {data}"
+        # National temperature trends are a published static series.
+        record = assert_rows(data, "wx_get_climate_trends")[0]
+        assert "measurement_type" in record or "trend" in record, (
+            f"record missing both measurement_type and trend: {record}"
+        )
 
     @pytest.mark.asyncio
     async def test_climate_projections_metadata(self, mcp_server):

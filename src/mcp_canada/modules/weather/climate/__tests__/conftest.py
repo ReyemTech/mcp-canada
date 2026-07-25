@@ -65,17 +65,33 @@ def sample_normal_feature():
 
 @pytest.fixture
 def sample_trend_feature():
-    """Sample ahccd-trends OGC feature."""
+    """Sample ahccd-trends OGC feature — REAL property names, captured 2026-07-25.
+
+    This fixture previously used SCREAMING_CASE keys (CLIMATE_IDENTIFIER,
+    MEASUREMENT_TYPE, TREND) that ahccd-trends does not publish. Because the
+    client read the same wrong keys, the tests agreed with the code and the
+    defect shipped: every filtered call matched zero records. ahccd-trends uses
+    bilingual double-underscore names, unlike the SCREAMING_CASE of
+    climate-daily and climate-normals.
+
+    Note the collection carries precipitation measures only — "rain", "snow",
+    "total_precip". There is no temperature series despite the AHCCD name.
+    """
     return {
         "type": "Feature",
         "id": "ahccd-trends.1",
-        "geometry": {"type": "Point", "coordinates": [-75.717, 45.367]},
+        "geometry": {"type": "Point", "coordinates": [-121.76, 49.24]},
         "properties": {
-            "CLIMATE_IDENTIFIER": "6158731",
-            "MEASUREMENT_TYPE": "temperature",
-            "TREND": "0.018",
-            "YEAR_BEGIN": "1940",
-            "YEAR_END": "2020",
+            "identifier__identifiant": "1100120.Jan.total_precip",
+            "station_id__id_station": "1100120",
+            "station_name__nom_station": "AGASSIZ_CDA",
+            "joined__rejoint": 0,
+            "elevation__elevation": 15,
+            "period__periode": "Jan",
+            "province__province": "BC",
+            "year_range__annees": "1890-2017",
+            "measurement_type__type_mesure": "total_precip",
+            "trend_value__valeur_tendance": 74.81,
         },
     }
 

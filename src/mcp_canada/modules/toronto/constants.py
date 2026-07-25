@@ -22,13 +22,15 @@ MAX_RESOURCES = 10
 # ---------------------------------------------------------------------------
 
 # TTC GTFS — static schedule feed
-GTFS_DATASET_ID = "7795b45e-e65a-4465-81fc-c5b0dc4b531e"
-GTFS_RESOURCE_ID = "f17e0649-8a28-4ed6-b6b4-d89e5b8bee5d"
-GTFS_ZIP_URL = (
-    "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/"
-    "7795b45e-e65a-4465-81fc-c5b0dc4b531e/resource/"
-    "f17e0649-8a28-4ed6-b6b4-d89e5b8bee5d/download/ttc-routes-and-schedules.zip"
-)
+# Use the CKAN SLUG, not a uuid. Toronto republishes the GTFS feed under fresh
+# dataset AND resource uuids; the slug is what stays put. The previous uuid
+# (7795b45e-...-c5b0dc4b531e) now 404s on package_show.
+GTFS_DATASET_ID = "ttc-routes-and-schedules"
+# NOTE: do NOT pin the download URL here. A previous GTFS_ZIP_URL constant
+# embedded a resource id and filename that Toronto later changed, which 404'd
+# and killed both TTC tools behind an UPSTREAM_ERROR. The ZIP resource is
+# resolved at call time from CKAN package_show — see
+# toronto/client.py:_resolve_gtfs_zip_url.
 
 # Neighbourhood Profiles — 2016 Census, indicator-per-row model
 # Resource ID for the datastore-active version (140 neighbourhoods, 2,383 characteristics)

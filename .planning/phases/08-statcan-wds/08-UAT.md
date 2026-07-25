@@ -1,6 +1,7 @@
 ---
 status: complete
 gap_1_resolved: 2026-07-25
+gap_2_resolved: 2026-07-25
 phase: 08-statcan-wds
 source: 08-01-SUMMARY.md, 08-02-SUMMARY.md, 08-03-SUMMARY.md
 started: 2026-04-07T06:30:00Z
@@ -46,10 +47,12 @@ note: |
 
 ### 5. Get series info by vector
 expected: `sc_get_series_info_by_vector(vector_id=41690973)` returns series metadata including table reference, coordinate, frequency label, and unit of measure label. Numeric codes are decoded alongside labels.
-result: fail
-tested: 2026-07-25 (live, through MCP call_tool)
+result: pass
+tested: 2026-07-25 (live, through MCP call_tool) — initially FAILED, fixed same day
 note: |
-  Two parts of the expectation are unmet:
+  Initially failed on two counts, both fixed 2026-07-25 (see Gaps 1 and 2);
+  re-run live afterwards returns frequency "Monthly" and uom "2002=100".
+  Original findings:
    1. frequency label is WRONG — frequencyCode 6 returned as "Bi-monthly"
       (CPI 18100004 is monthly). See Gap 1.
    2. NO unit-of-measure label — the response carries `uom_code: 17` with no
@@ -116,8 +119,8 @@ result: pass
 ## Summary
 
 total: 14
-passed: 12
-failed: 1
+passed: 13
+failed: 0
 issues: 3
 pending: 0
 skipped: 0
@@ -161,7 +164,7 @@ assertions were replaced with literal expected labels
 corrected to real upstream values, and `TestStatCanCodeSetDrift` (integration)
 now fails if the local maps ever diverge from live `getCodeSets` again.
 
-### Gap 2 — sc_get_series_info_by_vector returns no UOM label (minor) — OPEN
+### Gap 2 — sc_get_series_info_by_vector returns no UOM label (minor) — RESOLVED 2026-07-25
 
 `SeriesInfo` (`schemas.py:63-77`) exposes `uom_code: int` but no decoded `uom`
 string, so the test-5 expectation "unit of measure label" is not met. Either add a

@@ -2960,3 +2960,41 @@ class TestStatCanCodeSetDrift:
             "data://statcan/frequency-codes disagrees with the live code set: "
             f"{ {k: (catalog.get(k), live.get(k)) for k in set(catalog) | set(live) if catalog.get(k) != live.get(k)} }"
         )
+
+    @pytest.mark.asyncio
+    async def test_series_info_decodes_uom_label(self, mcp_server):
+        """'What unit is this CPI series in?' — 08-UAT Gap 2.
+
+        Vector 41690973 is memberUomCode 17, which upstream means "2002=100"
+        (the CPI index base). Before the fix the response carried the bare code
+        with no label, and the data://statcan/uom-codes catalog claimed 17 meant
+        "Canadian dollars".
+        """
+        data = await call_tool(
+            mcp_server, "sc_get_series_info_by_vector", {"vector_id": 41690973}
+        )
+        assert "_meta" in data, f"expected envelope, got: {data}"
+        info = data["data"]
+        assert info["uom_code"] == 17
+        assert info.get("uom") == "2002=100", (
+            f"uom_code must be decoded alongside frequency/scalar, got {info.get('uom')!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_uom_catalog_subset_matches_live(self, mcp_server):
+        """Every embedded UOM entry must be a real upstream value."""
+        import json as _json
+        from mcp_canada.modules.statcan.resources import statcan_uom_codes
+
+        data = await call_tool(mcp_server, "sc_get_code_sets", {})
+        live = {e["code"]: e["desc_en"] for e in data["data"]["uom"]}
+        catalog = {
+            int(k): v["en"]
+            for k, v in _json.loads(statcan_uom_codes()).items()
+            if not k.startswith("_")
+        }
+
+        wrong = {k: (v, live.get(k)) for k, v in catalog.items() if live.get(k) != v}
+        assert not wrong, (
+            f"data://statcan/uom-codes has entries that do not exist upstream: {wrong}"
+        )

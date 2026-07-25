@@ -345,9 +345,13 @@ class TestStatCanResources:
         )
         content = await r.read()
         data = json.loads(content)
-        first_val = next(iter(data.values()))
-        assert "en" in first_val
-        assert "fr" in first_val
+        # `_note` documents that this is a 31-of-464 subset; every other key is
+        # a numeric UOM code mapping to a bilingual pair.
+        codes = {k: v for k, v in data.items() if not k.startswith("_")}
+        assert codes, "catalog must contain at least one code entry"
+        for code, val in codes.items():
+            assert code.isdigit(), f"unexpected non-code key: {code}"
+            assert "en" in val and "fr" in val, f"code {code} missing a language"
 
     # ------------------------------------------------------------------
     # docs://statcan/wds-guide

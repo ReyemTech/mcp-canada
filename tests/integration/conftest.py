@@ -96,7 +96,13 @@ async def call_direct_tool(mcp_server: Any, tool_name: str, arguments: dict | No
 # ---------------------------------------------------------------------------
 
 #: Error codes that a live upstream outage may legitimately produce.
-TRANSIENT_CODES = frozenset({"UPSTREAM_ERROR", "RATE_LIMITED"})
+#:
+#: UPSTREAM_UNAVAILABLE covers scheduled downtime the tool detects and reports
+#: deliberately — StatCan WDS has a documented nightly maintenance window
+#: (00:00-08:30 EST) and returns this rather than failing opaquely. Treating it
+#: as transient is what lets the suite run overnight; it is still distinct from
+#: NOT_FOUND or INVALID_INPUT, which remain hard failures.
+TRANSIENT_CODES = frozenset({"UPSTREAM_ERROR", "RATE_LIMITED", "UPSTREAM_UNAVAILABLE"})
 
 
 def assert_live_or_transient(data: dict, tool: str, api: str | None = None) -> bool:

@@ -1,5 +1,6 @@
 ---
-status: diagnosed
+status: complete
+gap_1_resolved: 2026-07-25
 phase: 08-statcan-wds
 source: 08-01-SUMMARY.md, 08-02-SUMMARY.md, 08-03-SUMMARY.md
 started: 2026-04-07T06:30:00Z
@@ -123,7 +124,7 @@ skipped: 0
 
 ## Gaps
 
-### Gap 1 — FREQUENCY_CODES map is shifted and truncated (major, agent-visible wrong data)
+### Gap 1 — FREQUENCY_CODES map is shifted and truncated (major) — RESOLVED 2026-07-25
 
 `src/mcp_canada/modules/statcan/constants.py:28-41` hardcodes a frequency map that
 does not match StatCan's own code set (confirmed live via `sc_get_code_sets`, test 4):
@@ -151,11 +152,16 @@ Why the unit tests miss it: `__tests__/test_client.py` builds its expected value
 `FREQUENCY_CODES.get(raw["frequencyCode"])` — asserting the map against itself. The
 assertions are tautological and pass for any map, correct or not.
 
-Fix: replace the hardcoded map with StatCan's published code set (or derive it from
-`getCodeSets` at runtime with a long TTL), update the `data://` resource catalog to
-match, and replace the self-referential assertions with literal expected labels.
+**Resolved 2026-07-25.** Both maps were rebuilt from StatCan's published code set;
+`SCALAR_FACTOR_CODES` turned out to carry the same defect (1="thousands" where
+upstream means "tens" — a 100x magnitude misread) and was corrected in the same
+pass. Both `data://` catalogs updated, including French labels. The tautological
+assertions were replaced with literal expected labels
+(`__tests__/test_code_maps.py`, 39 tests), the fabricated fixture codes were
+corrected to real upstream values, and `TestStatCanCodeSetDrift` (integration)
+now fails if the local maps ever diverge from live `getCodeSets` again.
 
-### Gap 2 — sc_get_series_info_by_vector returns no UOM label (minor)
+### Gap 2 — sc_get_series_info_by_vector returns no UOM label (minor) — OPEN
 
 `SeriesInfo` (`schemas.py:63-77`) exposes `uom_code: int` but no decoded `uom`
 string, so the test-5 expectation "unit of measure label" is not met. Either add a

@@ -16,7 +16,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 class TestCubeLiteSchema:
     def test_cube_lite_validates_from_fixture(self, cube_list_lite_response):
         from mcp_canada.modules.statcan.schemas import CubeLite
-        from mcp_canada.modules.statcan.constants import FREQUENCY_CODES
 
         raw = cube_list_lite_response[0]
         cube = CubeLite(
@@ -29,13 +28,13 @@ class TestCubeLiteSchema:
             release_time=raw["releaseTime"],
             archived=raw["archived"],
             frequency_code=raw["frequencyCode"],
-            frequency=FREQUENCY_CODES.get(raw["frequencyCode"], "Unknown"),
+            frequency="Monthly",  # literal: fixture is frequencyCode 6
             subject_codes=raw["subjectCode"],
             survey_codes=raw["surveyCode"],
         )
         assert cube.product_id == 18100004
         assert cube.title_en == "Consumer Price Index, monthly"
-        assert cube.frequency_code == 5
+        assert cube.frequency_code == 6
         assert cube.frequency == "Monthly"
         assert cube.subject_codes == ["18"]
 
@@ -63,8 +62,6 @@ class TestCubeLiteSchema:
 class TestCubeMetadataSchema:
     def test_cube_metadata_validates_with_dimensions(self, cube_metadata_response):
         from mcp_canada.modules.statcan.schemas import CubeMetadata, Dimension, DimensionMember
-        from mcp_canada.modules.statcan.constants import FREQUENCY_CODES
-
         obj = cube_metadata_response["object"]
         dimensions = []
         for dim in obj["dimension"]:
@@ -95,7 +92,7 @@ class TestCubeMetadataSchema:
             start_date=obj["cubeStartDate"],
             end_date=obj["cubeEndDate"],
             frequency_code=obj["frequencyCode"],
-            frequency=FREQUENCY_CODES.get(obj["frequencyCode"], "Unknown"),
+            frequency="Monthly",  # literal: fixture is frequencyCode 6
             nb_series=obj["nbSeries"],
             nb_datapoints=obj["nbDatapoints"],
             dimensions=dimensions,
@@ -154,17 +151,15 @@ class TestCodeSetsSchema:
 class TestSeriesInfoSchema:
     def test_series_info_validates_from_fixture(self, series_info_response):
         from mcp_canada.modules.statcan.schemas import SeriesInfo
-        from mcp_canada.modules.statcan.constants import FREQUENCY_CODES, SCALAR_FACTOR_CODES
-
         obj = series_info_response[0]["object"]
         info = SeriesInfo(
             product_id=obj["productId"],
             coordinate=obj["coordinate"],
             vector_id=obj["vectorId"],
             frequency_code=obj["frequencyCode"],
-            frequency=FREQUENCY_CODES.get(obj["frequencyCode"], "Unknown"),
+            frequency="Monthly",  # literal: fixture is frequencyCode 6
             scalar_factor_code=obj["scalarFactorCode"],
-            scalar_factor=SCALAR_FACTOR_CODES.get(obj["scalarFactorCode"], "Unknown"),
+            scalar_factor="units",  # literal: fixture is scalarFactorCode 0
             decimals=obj["decimals"],
             terminated=bool(obj["terminated"]),
             title_en=obj["SeriesTitleEn"],
@@ -180,8 +175,6 @@ class TestSeriesInfoSchema:
 class TestObservationRowSchema:
     def test_observation_row_validates_with_float_value(self, observation_response):
         from mcp_canada.modules.statcan.schemas import ObservationRow
-        from mcp_canada.modules.statcan.constants import FREQUENCY_CODES, SCALAR_FACTOR_CODES
-
         dp = observation_response[0]["object"]["vectorDataPoint"][0]
         row = ObservationRow(
             ref_per=dp["refPer"],
@@ -189,9 +182,9 @@ class TestObservationRowSchema:
             value=dp["value"],
             decimals=dp["decimals"],
             scalar_factor_code=dp["scalarFactorCode"],
-            scalar_factor=SCALAR_FACTOR_CODES.get(dp["scalarFactorCode"], "Unknown"),
+            scalar_factor="units",  # literal: fixture is scalarFactorCode 0
             frequency_code=dp["frequencyCode"],
-            frequency=FREQUENCY_CODES.get(dp["frequencyCode"], "Unknown"),
+            frequency="Monthly",  # literal: fixture is frequencyCode 6
             status_code=dp["statusCode"],
             symbol_code=dp["symbolCode"],
             release_time=dp["releaseTime"],
@@ -203,8 +196,6 @@ class TestObservationRowSchema:
 
     def test_observation_row_allows_none_value(self, observation_response):
         from mcp_canada.modules.statcan.schemas import ObservationRow
-        from mcp_canada.modules.statcan.constants import FREQUENCY_CODES, SCALAR_FACTOR_CODES
-
         dp = observation_response[0]["object"]["vectorDataPoint"][2]
         row = ObservationRow(
             ref_per=dp["refPer"],
@@ -212,9 +203,9 @@ class TestObservationRowSchema:
             value=dp["value"],
             decimals=dp["decimals"],
             scalar_factor_code=dp["scalarFactorCode"],
-            scalar_factor=SCALAR_FACTOR_CODES.get(dp["scalarFactorCode"], "Unknown"),
+            scalar_factor="units",  # literal: fixture is scalarFactorCode 0
             frequency_code=dp["frequencyCode"],
-            frequency=FREQUENCY_CODES.get(dp["frequencyCode"], "Unknown"),
+            frequency="Monthly",  # literal: fixture is frequencyCode 6
             status_code=dp["statusCode"],
             symbol_code=dp["symbolCode"],
             release_time=dp["releaseTime"],

@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 Phase: 20 of 35 (20.1 — Remove UPSTREAM_ERROR escape-hatch)
 Plan: 0 of TBD — phase not yet planned
 Status: Ready to plan
-Last activity: 2026-07-25 — full state reconciliation
+Last activity: 2026-07-25 — state reconciliation + StatCan code-map fix
 
 Progress: [████░░░░░░] 43%
 
@@ -50,12 +50,12 @@ Suite at reconciliation: 3032 passed, 2 skipped, 97.05% coverage.
 
 ## Open Items
 
-1. **StatCan `FREQUENCY_CODES` is wrong** (major, agent-visible) — the hardcoded map
-   in `statcan/constants.py:28` is shifted from code 6 onward; monthly CPI is reported
-   as "Bi-monthly". Found by running 08-UAT tests 3-6, which had been left `[pending]`.
-   See `.planning/todos/pending/2026-07-25-fix-statcan-frequency-codes-map.md` and
-   `08-UAT.md` Gap 1. 08-UAT is now `status: diagnosed`.
-2. **`sc_get_series_info_by_vector` returns no UOM label** (minor) — 08-UAT Gap 2.
+1. ~~StatCan `FREQUENCY_CODES` is wrong~~ — **FIXED 2026-07-25.** Both the frequency
+   and scalar-factor maps were shifted; rebuilt from StatCan's published code set,
+   catalogs updated, tautological assertions replaced with literals, live-drift
+   integration guard added. See 08-UAT.md Gap 1.
+2. **`sc_get_series_info_by_vector` returns no UOM label** (minor, OPEN) — 08-UAT Gap 2,
+   tracked in `.planning/todos/pending/2026-07-25-statcan-series-info-uom-label.md`.
 3. **Phases 15 (BC) and 16 (Quebec) have no REQUIREMENTS.md entries at all** — both
    shipped (5 and 7 plans, 20 and 18 tools) but no BC-/QC- prefixed requirements were
    ever written, so they are invisible to the traceability table.

@@ -1,8 +1,10 @@
 ---
-status: diagnosed
+status: resolved
 trigger: "Investigate IRCC XLSX multi-row header parsing blocker"
 created: 2026-04-08T00:00:00Z
-updated: 2026-04-08T00:00:00Z
+updated: 2026-07-25T00:00:00Z
+resolved: 2026-07-25T00:00:00Z
+resolved_by: "11-04-PLAN.md (phase 11 gap closure) — closed out during the 2026-07-25 reconciliation"
 ---
 
 ## Current Focus
@@ -149,5 +151,25 @@ fix: |
   - Builds flat column names
   - Returns standard list[dict] output
 
-verification:
-files_changed: []
+verification: |
+  Recommendation Option 4 shipped as written. Confirmed 2026-07-25:
+    - `_parse_ircc_xlsx()` exists in shared/parsers.py (lines 222-300): openpyxl,
+      forward-fill of merged cells, composite flat column names.
+    - `DATASET_PARSE_CONFIG` in ircc/constants.py covers 12 dataset keys and
+      matches the skip_rows/header_rows/label_cols table proposed above
+      key-for-key (ops 6/2/1, asylum 2/2/2, adhoc_pr 2/1/1, ...), plus a
+      `citizenship` key added later.
+    - Threaded through client.py:43 as `ircc_parse_config=`; the config is
+      hashed into the cache key (parsers.py:510) so one URL parsed under two
+      configs cannot collide.
+    - 11-UAT.md: 10/10 pass, explicitly noting "Column names are clean (no col_
+      prefix, no unnamed_*)" — the original symptom (190 unnamed_* columns).
+    - Covered by TestParseIrccXlsx (test_parsers.py:866) and per-dataset
+      assertions across ircc/__tests__/test_client.py.
+
+files_changed:
+  - src/mcp_canada/shared/parsers.py
+  - src/mcp_canada/shared/__tests__/test_parsers.py
+  - src/mcp_canada/modules/ircc/constants.py
+  - src/mcp_canada/modules/ircc/client.py
+  - src/mcp_canada/modules/ircc/__tests__/test_client.py

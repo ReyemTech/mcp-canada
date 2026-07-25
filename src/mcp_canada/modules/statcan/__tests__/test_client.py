@@ -8,6 +8,22 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
+def _cached_fetch_call(mock_cf, key_fragment: str):
+    """Find the cached_fetch call whose cache key contains key_fragment.
+
+    get_series_info_by_* makes two cached_fetch calls — the series lookup and
+    the shared 7-day getCodeSets fetch used to decode the UOM label — so the
+    bare `.call_args` (last call) is ambiguous.
+    """
+    for call in mock_cf.call_args_list:
+        if key_fragment in call[0][0]:
+            return call
+    raise AssertionError(
+        f"no cached_fetch call with {key_fragment!r} in its key; "
+        f"saw: {[c[0][0] for c in mock_cf.call_args_list]}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Task 1: Schema validation tests
 # ---------------------------------------------------------------------------
@@ -603,7 +619,7 @@ class TestGetSeriesInfoByVector:
             with patch.object(statcan_client, "_limiter_acquire", new=AsyncMock()):
                 with patch("mcp_canada.modules.statcan.client.cached_fetch", wraps=statcan_client.cached_fetch) as mock_cf:
                     await statcan_client.get_series_info_by_vector(32164132)
-                    call_args = mock_cf.call_args
+                    call_args = _cached_fetch_call(mock_cf, "getSeriesInfoFromVector")
                     assert call_args[0][0] == "statcan_wds:getSeriesInfoFromVector:32164132"
 
     @pytest.mark.asyncio
@@ -625,7 +641,7 @@ class TestGetSeriesInfoByVector:
             with patch.object(statcan_client, "_limiter_acquire", new=AsyncMock()):
                 with patch("mcp_canada.modules.statcan.client.cached_fetch", wraps=statcan_client.cached_fetch) as mock_cf:
                     await statcan_client.get_series_info_by_vector(41690973)
-                    call_args = mock_cf.call_args
+                    call_args = _cached_fetch_call(mock_cf, "getSeriesInfoFromVector")
                     assert call_args[0][1] == CACHE_TTL_META
 
     @pytest.mark.asyncio
@@ -647,7 +663,14 @@ class TestGetSeriesInfoByVector:
             with patch.object(statcan_client, "_limiter_acquire", new=acquire_mock):
                 await statcan_client.get_series_info_by_vector(41690973)
 
-        acquire_mock.assert_called_once()
+        # Two acquisitions on a cold cache: the series lookup plus the shared
+        # 7-day getCodeSets fetch behind the UOM label (08-UAT Gap 2). The code
+        # set is cached for a week, so this is not two requests per call in
+        # practice — but both must pass through the limiter.
+        assert acquire_mock.await_count == 2, (
+            f"expected series lookup + getCodeSets to each acquire the limiter, "
+            f"got {acquire_mock.await_count}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -722,7 +745,7 @@ class TestGetSeriesInfoByCoord:
             with patch.object(statcan_client, "_limiter_acquire", new=AsyncMock()):
                 with patch("mcp_canada.modules.statcan.client.cached_fetch", wraps=statcan_client.cached_fetch) as mock_cf:
                     await statcan_client.get_series_info_by_coord(35100003, "1.12")
-                    call_args = mock_cf.call_args
+                    call_args = _cached_fetch_call(mock_cf, "getSeriesInfoFromCubePidCoord")
                     assert "35100003" in call_args[0][0]
                     assert "1.12.0.0.0.0.0.0.0.0" in call_args[0][0]
 
@@ -745,7 +768,14 @@ class TestGetSeriesInfoByCoord:
             with patch.object(statcan_client, "_limiter_acquire", new=acquire_mock):
                 await statcan_client.get_series_info_by_coord(35100003, "1.12")
 
-        acquire_mock.assert_called_once()
+        # Two acquisitions on a cold cache: the series lookup plus the shared
+        # 7-day getCodeSets fetch behind the UOM label (08-UAT Gap 2). The code
+        # set is cached for a week, so this is not two requests per call in
+        # practice — but both must pass through the limiter.
+        assert acquire_mock.await_count == 2, (
+            f"expected series lookup + getCodeSets to each acquire the limiter, "
+            f"got {acquire_mock.await_count}"
+        )
 
 
 # ---------------------------------------------------------------------------

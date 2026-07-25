@@ -138,27 +138,53 @@ def statcan_status_codes() -> str:
 def statcan_uom_codes() -> str:
     """Common units of measure (UOM) codes used in Statistics Canada WDS series.
 
-    Maps WDS uomCode integers to bilingual unit descriptions.
-    Use this catalog to interpret the uomCode field in sc_get_series_info_by_vector.
+    Maps WDS memberUomCode integers to bilingual unit descriptions.
     Format: {"code": {"en": "English unit", "fr": "Unité en français"}}
+
+    This is a COMMON SUBSET (31 of 464 upstream codes), transcribed verbatim
+    from getCodeSets. sc_get_series_info_by_vector now decodes `uom` inline, so
+    this catalog is a quick reference rather than the lookup path; use
+    sc_get_code_sets for the full set.
+
+    Note codes are not semantic: 17 is the index base "2002=100", not a
+    currency. An earlier hand-written version of this catalog guessed the
+    labels and had all 15 of its entries wrong (08-UAT.md Gap 2) — do not add
+    entries here without checking them against getCodeSets.
     """
     return json.dumps(
         {
-            "0": {"en": "Not applicable", "fr": "Sans objet"},
-            "1": {"en": "Number", "fr": "Nombre"},
-            "11": {"en": "Persons", "fr": "Personnes"},
-            "15": {"en": "Dollars", "fr": "Dollars"},
-            "17": {"en": "Canadian dollars", "fr": "Dollars canadiens"},
-            "20": {"en": "Percentage", "fr": "Pourcentage"},
-            "21": {"en": "Percent change", "fr": "Variation en pourcentage"},
-            "22": {"en": "Rate per 1,000", "fr": "Taux pour 1 000"},
-            "23": {"en": "Rate per 100,000", "fr": "Taux pour 100 000"},
-            "39": {"en": "Index (2012=100)", "fr": "Indice (2012=100)"},
-            "40": {"en": "Index (2002=100)", "fr": "Indice (2002=100)"},
-            "50": {"en": "Hours", "fr": "Heures"},
-            "60": {"en": "Kilograms", "fr": "Kilogrammes"},
-            "81": {"en": "Tonnes", "fr": "Tonnes métriques"},
-            "301": {"en": "Tonnes (thousands)", "fr": "Tonnes (milliers)"},
+            "_note": (
+                "Common subset of 31 codes; StatCan publishes 464. "
+                "Call sc_get_code_sets for the complete uom set, or read the "
+                "decoded `uom` field on sc_get_series_info_by_vector."
+            ),
+            "17": {"en": "2002=100", "fr": "2002=100"},
+            "20": {"en": "2007=100", "fr": "2007=100"},
+            "21": {"en": "2010=100", "fr": "2010=100"},
+            "34": {"en": "Barrels", "fr": "Barils"},
+            "72": {"en": "Cubic metres", "fr": "Mètres cubes"},
+            "81": {"en": "Dollars", "fr": "Dollars"},
+            "133": {"en": "Employees", "fr": "Employés"},
+            "148": {"en": "Head", "fr": "Tête"},
+            "149": {"en": "Hectares", "fr": "Hectares"},
+            "152": {"en": "Hours", "fr": "Heures"},
+            "154": {"en": "Households", "fr": "Ménages"},
+            "160": {"en": "Index", "fr": "Indice"},
+            "192": {"en": "Kilograms", "fr": "Kilogrammes"},
+            "196": {"en": "Kilometres", "fr": "Kilomètres"},
+            "203": {"en": "Litres", "fr": "Litres"},
+            "210": {"en": "Megawatt hours", "fr": "Mégawatt heures"},
+            "223": {"en": "Number", "fr": "Nombre"},
+            "239": {"en": "Percent", "fr": "Pourcent"},
+            "249": {"en": "Persons", "fr": "Personnes"},
+            "257": {"en": "Rate", "fr": "Taux"},
+            "271": {"en": "Ratio", "fr": "Ratio"},
+            "281": {"en": "Square metres", "fr": "Mètres carrés"},
+            "287": {"en": "Tonnes", "fr": "Tonnes"},
+            "300": {"en": "Units", "fr": "Unités"},
+            "301": {"en": "Vehicle-kilometres", "fr": "Véhicule-kilomètres"},
+            "308": {"en": "Years", "fr": "Années"},
+            "383": {"en": "2012=100", "fr": "2012=100"},
         },
         ensure_ascii=False,
         indent=2,

@@ -412,6 +412,16 @@ async def get_code_sets() -> tuple[CodeSets, bool]:
     Raises:
         httpx.HTTPStatusError: On HTTP 4xx/5xx responses.
     """
+    obj, was_cached = await _raw_code_sets_cached()
+    return _flatten_code_sets(obj), was_cached
+
+
+async def _raw_code_sets_cached() -> tuple[dict, bool]:
+    """Fetch the raw getCodeSets object, cached for 7 days.
+
+    Shared by get_code_sets() and the UOM label lookup so both hit one cache
+    entry rather than two.
+    """
     cache_key = "statcan_wds:getCodeSets"
 
     async def _fetcher() -> dict:
@@ -422,12 +432,54 @@ async def get_code_sets() -> tuple[CodeSets, bool]:
             return resp.json()
 
     raw, was_cached = await cached_fetch(cache_key, CACHE_TTL_CODESETS, _fetcher)
-    obj = _unwrap(raw)
-    return _flatten_code_sets(obj), was_cached
+    return _unwrap(raw), was_cached
+
+
+async def _raw_code_sets() -> dict:
+    """Raw getCodeSets object. Seam for tests; see _raw_code_sets_cached."""
+    obj, _ = await _raw_code_sets_cached()
+    return obj
+
+
+async def _uom_label(uom_code: int) -> str | None:
+    """Decode a WDS memberUomCode to its English label.
+
+    Sourced from the live code set rather than a hardcoded map: upstream
+    publishes 464 UOM codes and many are index bases (17 = "2002=100") that
+    cannot be guessed. The previous hand-written catalog had every entry wrong
+    (08-UAT.md Gap 2).
+
+    Returns None for an unknown code, a null upstream label, or any failure —
+    a getCodeSets outage must not take down series-info lookups.
+    """
+    try:
+        obj = await _raw_code_sets()
+        for entry in obj.get("uom") or []:
+            if entry.get("memberUomCode") == uom_code:
+                label = entry.get("memberUomEn")
+                return label or None
+    except Exception:  # noqa: BLE001 — decode is best-effort by design
+        return None
+    return None
+
+
+async def _flatten_series_info_async(obj: dict) -> SeriesInfo:
+    """Flatten a raw series info object and decode its UOM label.
+
+    Separate from the sync _flatten_series_info because the UOM label comes
+    from the cached code set rather than a local map (08-UAT.md Gap 2).
+    """
+    info = _flatten_series_info(obj)
+    info.uom = await _uom_label(info.uom_code)
+    return info
 
 
 def _flatten_series_info(obj: dict) -> SeriesInfo:
-    """Flatten a raw series info object to a SeriesInfo schema instance."""
+    """Flatten a raw series info object to a SeriesInfo schema instance.
+
+    Does NOT populate `uom` — that needs an await against the code set. Callers
+    that want the decoded label should use _flatten_series_info_async.
+    """
     freq_code: int = obj.get("frequencyCode", 0)
     scalar_code: int = obj.get("scalarFactorCode", 0)
     return SeriesInfo(
@@ -535,7 +587,7 @@ async def get_series_info_by_vector(vector_id: int) -> tuple[SeriesInfo, bool]:
 
     raw, was_cached = await cached_fetch(cache_key, CACHE_TTL_META, _fetcher)
     obj = _unwrap(raw)
-    return _flatten_series_info(obj), was_cached
+    return await _flatten_series_info_async(obj), was_cached
 
 
 async def get_series_info_by_coord(
@@ -572,7 +624,7 @@ async def get_series_info_by_coord(
 
     raw, was_cached = await cached_fetch(cache_key, CACHE_TTL_META, _fetcher)
     obj = _unwrap(raw)
-    return _flatten_series_info(obj), was_cached
+    return await _flatten_series_info_async(obj), was_cached
 
 
 async def get_latest_n_by_vector(

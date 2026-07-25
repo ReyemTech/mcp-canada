@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 current_phase: 20
-current_phase_name: Remove UPSTREAM_ERROR escape-hatch from provincial integration tests
-status: planning
+current_phase_name: Finish integration de-masking and fix the failures it exposed
+status: executing
 stopped_at: Phase 20.1 context gathered
 last_updated: "2026-07-25T04:28:21.535Z"
 last_activity: 2026-07-25
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** An agent can combine data from any Canadian government source in a single SQL query — turning isolated APIs into one queryable data platform.
-**Current focus:** Phase 20.1 — remove UPSTREAM_ERROR escape-hatch from provincial integration tests (not yet planned)
+**Current focus:** Phase 20.1 complete — next is Phase 21 (New Brunswick)
 
 ## Current Position
 
-Phase: 20 of 35 (20.1 — Remove UPSTREAM_ERROR escape-hatch)
-Plan: 0 of TBD — phase not yet planned
-Status: Ready to plan
-Last activity: 2026-07-25 — state reconciliation + StatCan code-map fix
+Phase: 20 of 35 (20.1 — integration de-masking: COMPLETE)
+Plan: 6 of 6 complete
+Status: Phase 20.1 complete; ready to plan Phase 21
+Last activity: 2026-07-25 — Phase 20.1 executed end to end
 
 Progress: [████░░░░░░] 43%
 

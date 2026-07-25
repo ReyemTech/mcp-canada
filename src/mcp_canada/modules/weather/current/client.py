@@ -21,6 +21,61 @@ from mcp_canada.modules.weather.constants import (
 from mcp_canada.shared.geo import build_bbox, extract_centroid, ogc_fetch
 
 
+def _name_filter(location: str | None, lat: float | None, province: str | None,
+                 lang: str) -> dict[str, str] | None:
+    """Server-side property filter for a city-name lookup, or None.
+
+    The citypage collection holds 844 cities. Filtering must happen upstream —
+    pulling one `limit`-sized page and filtering it locally only finds cities
+    that happen to fall in that arbitrary page, which is why every major-city
+    lookup used to return NOT_FOUND while lat/lon worked (Phase 20.1).
+
+    The upstream filter is a case-insensitive token match, so `name.en=Toronto`
+    matches both "Toronto" and "Toronto Island" — see _pick_city for the
+    exact-match preference that resolves it.
+    """
+    if location is None or lat is not None or province is not None:
+        return None
+    field = "name.fr" if lang == "fr" else "name.en"
+    return {field: location}
+
+
+def _pick_city(features: list[dict], location: str | None, lang: str) -> dict | None:
+    """Choose the best feature for a name lookup, preferring an exact match.
+
+    `name.en=Toronto` returns ["Toronto Island", "Toronto"] in that order, so
+    taking features[0] answers "weather in Toronto" with Toronto Island.
+    """
+    if not features:
+        return None
+    if location is None:
+        return features[0]
+
+    wanted = location.strip().lower()
+
+    def _names(feature: dict) -> tuple[str, str]:
+        names = feature.get("properties", {}).get("name", {})
+        return (
+            str(names.get(lang, "")).strip().lower(),
+            str(names.get("en", "")).strip().lower(),
+        )
+
+    # Exact match wins: "Toronto" should not resolve to "Toronto Island".
+    for feature in features:
+        if wanted in _names(feature):
+            return feature
+
+    # Otherwise accept a containing match — "Ottawa" legitimately resolves to
+    # "Ottawa (Kanata - Orleans)". This also re-checks the upstream filter
+    # client-side: if the server ever ignores the name parameter and returns an
+    # unrelated city, we return None rather than answering with the wrong place.
+    for feature in features:
+        if any(wanted in name for name in _names(feature)):
+            return feature
+
+    return None
+
+
 async def fetch_current_conditions(
     location: str | None = None,
     province: str | None = None,
@@ -50,23 +105,21 @@ async def fetch_current_conditions(
     elif province is not None:
         bbox = PROVINCE_BBOX.get(province.upper())
 
+    name_filter = _name_filter(location, lat, province, lang)
+
     features, _, was_cached = await ogc_fetch(
-        COLL_CITYPAGE, bbox=bbox, limit=50, ttl=CACHE_TTL_REALTIME
+        COLL_CITYPAGE,
+        bbox=bbox,
+        properties=name_filter,
+        limit=50,
+        ttl=CACHE_TTL_REALTIME,
     )
 
-    # Filter by name when only location string given (no coordinates)
-    if location is not None and lat is None and province is None:
-        loc_lower = location.lower()
-        features = [
-            f for f in features
-            if loc_lower in f["properties"].get("name", {}).get(lang, "").lower()
-            or loc_lower in f["properties"].get("name", {}).get("en", "").lower()
-        ]
-
-    if not features:
+    feature = _pick_city(features, location if name_filter else None, lang)
+    if feature is None:
         return None, was_cached
 
-    props = features[0]["properties"]
+    props = feature["properties"]
     cc = props.get("currentConditions", {})
 
     def _val(nested: dict, *keys: str) -> object:
@@ -131,22 +184,21 @@ async def fetch_forecast(
     elif province is not None:
         bbox = PROVINCE_BBOX.get(province.upper())
 
+    name_filter = _name_filter(location, lat, province, lang)
+
     features, _, was_cached = await ogc_fetch(
-        COLL_CITYPAGE, bbox=bbox, limit=50, ttl=CACHE_TTL_FORECAST
+        COLL_CITYPAGE,
+        bbox=bbox,
+        properties=name_filter,
+        limit=50,
+        ttl=CACHE_TTL_FORECAST,
     )
 
-    if location is not None and lat is None and province is None:
-        loc_lower = location.lower()
-        features = [
-            f for f in features
-            if loc_lower in f["properties"].get("name", {}).get(lang, "").lower()
-            or loc_lower in f["properties"].get("name", {}).get("en", "").lower()
-        ]
-
-    if not features:
+    feature = _pick_city(features, location if name_filter else None, lang)
+    if feature is None:
         return [], was_cached
 
-    props = features[0]["properties"]
+    props = feature["properties"]
     forecast_group = props.get("forecastGroup", {})
     raw_forecasts = forecast_group.get("forecasts", [])
 

@@ -63,6 +63,7 @@ testpaths = ["tests", "src"]
 python_files = ["test_*.py"]
 markers = [
     "integration: live API tests (skip with -m 'not integration', run with --run-integration)",
+    "tolerates_upstream_error(reason): integration test exempt from the masking-idiom guard in tests/test_integration_test_quality.py. A reason is mandatory — state why the test genuinely cannot assert in every branch (documented off-season empty result, key-gated tool, known upstream flakiness).",
 ]
 addopts = "-m 'not integration'"
 

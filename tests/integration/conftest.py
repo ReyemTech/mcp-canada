@@ -75,3 +75,82 @@ async def call_direct_tool(mcp_server: Any, tool_name: str, arguments: dict | No
     async with Client(mcp_server) as client:
         result = await client.call_tool(tool_name, arguments or {})
         return json.loads(_extract_text(result))  # type: ignore[no-any-return]
+
+
+# ---------------------------------------------------------------------------
+# Live-assertion helpers (Phase 20.1)
+#
+# Government APIs genuinely go down, so integration tests need a way to tolerate
+# an outage without tolerating a bug. The rule: a test may accept an error
+# response, but it must assert WHICH error — an unreachable upstream is
+# UPSTREAM_ERROR or RATE_LIMITED, while NOT_FOUND or INVALID_INPUT on a call that
+# should succeed is a real defect and must fail loudly.
+#
+# The pattern these replace silently passed on any error:
+#
+#     assert "_meta" in data or "error" in data   # ← true for both outcomes
+#     if "_meta" in data:                          # ← skipped entirely on error
+#         assert ...
+#
+# See tests/test_integration_test_quality.py for the guard that enforces this.
+# ---------------------------------------------------------------------------
+
+#: Error codes that a live upstream outage may legitimately produce.
+TRANSIENT_CODES = frozenset({"UPSTREAM_ERROR", "RATE_LIMITED"})
+
+
+def assert_live_or_transient(data: dict, tool: str, api: str | None = None) -> bool:
+    """Assert the response is either live data or a *tolerated transient* error.
+
+    Returns True when live data is present, so the caller can go on to assert on
+    the payload. Returns False when a transient upstream error was tolerated —
+    but only after asserting the error code is genuinely transient.
+
+    Assign the result to a plain local (``live = assert_live_or_transient(...)``)
+    rather than branching on the call directly; the masking guard keys off
+    conditionals over response-shaped names.
+
+    Args:
+        data: parsed tool response.
+        tool: tool name, for the failure message.
+        api: when given, assert ``_meta.source.api`` equals it.
+    """
+    if "error" in data:
+        code = data.get("error", {}).get("code")
+        assert code in TRANSIENT_CODES, (
+            f"{tool} returned a NON-transient error. Only {sorted(TRANSIENT_CODES)} "
+            f"are tolerated here — anything else is a real defect, not an outage. "
+            f"Got: {data['error']}"
+        )
+        return False
+
+    assert "_meta" in data, (
+        f"{tool} returned neither a _meta envelope nor an error. Every tool must "
+        f"return one or the other. Got: {data}"
+    )
+    if api is not None:
+        assert data["_meta"]["source"]["api"] == api, (
+            f"{tool} _meta.source.api should be {api!r}, got "
+            f"{data['_meta']['source'].get('api')!r}"
+        )
+    return True
+
+
+def assert_rows(data: dict, tool: str, *, allow_empty_reason: str | None = None) -> list:
+    """Return ``data["data"]`` as a list, asserting its type.
+
+    ``allow_empty_reason`` documents why an empty result is a legitimate live
+    state (off-season, no active alerts). Without it, empty fails — an empty
+    payload is the most common way a broken tool looks healthy.
+    """
+    rows = data.get("data")
+    assert isinstance(rows, list), (
+        f"{tool} data should be a list of rows, got {type(rows).__name__}: {rows!r}"
+    )
+    if not rows:
+        assert allow_empty_reason, (
+            f"{tool} returned zero rows and empty is not documented as valid here. "
+            f"An empty payload is how a broken tool looks healthy — if empty IS "
+            f"valid, pass allow_empty_reason= saying why."
+        )
+    return rows

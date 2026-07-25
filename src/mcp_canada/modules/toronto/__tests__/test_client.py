@@ -278,10 +278,18 @@ class TestFetchGTFSFile:
         mock_bytes_response = make_mock_bytes_response(GTFS_STOPS_ZIP_BYTES)
         mock_limiter = _make_mock_limiter()
 
+        # The fetcher resolves the ZIP url from CKAN package_show before
+        # downloading, so that call is mocked alongside the download itself.
+        fake_package = (
+            {"resources": [{"format": "ZIP", "url": "https://example/ttc.zip"}]},
+            False,
+        )
         with (
             patch("mcp_canada.modules.toronto.client.cached_fetch",
                   side_effect=_make_fake_cached_fetch(None)),
             patch("mcp_canada.modules.toronto.client.get_limiter", return_value=mock_limiter),
+            patch("mcp_canada.modules.toronto.client._api_get",
+                  new=AsyncMock(return_value=fake_package)),
             patch("httpx.AsyncClient") as mock_cls,
         ):
             mock_client = AsyncMock()
@@ -306,10 +314,18 @@ class TestFetchGTFSFile:
         mock_bytes_response = make_mock_bytes_response(GTFS_ROUTES_ZIP_BYTES)
         mock_limiter = _make_mock_limiter()
 
+        # The fetcher resolves the ZIP url from CKAN package_show before
+        # downloading, so that call is mocked alongside the download itself.
+        fake_package = (
+            {"resources": [{"format": "ZIP", "url": "https://example/ttc.zip"}]},
+            False,
+        )
         with (
             patch("mcp_canada.modules.toronto.client.cached_fetch",
                   side_effect=_make_fake_cached_fetch(None)),
             patch("mcp_canada.modules.toronto.client.get_limiter", return_value=mock_limiter),
+            patch("mcp_canada.modules.toronto.client._api_get",
+                  new=AsyncMock(return_value=fake_package)),
             patch("httpx.AsyncClient") as mock_cls,
         ):
             mock_client = AsyncMock()
@@ -658,3 +674,59 @@ class TestFetchShortTermRentals:
 
         assert len(results) == 1
         assert results[0]["status"] == "Active"
+
+
+class TestGtfsUrlIsResolvedFromCkan:
+    """The GTFS zip URL must be discovered, not hardcoded.
+
+    Regression cover for the Phase 20.1 defect. constants.GTFS_ZIP_URL pinned a
+    dataset id, resource id and filename:
+
+        .../7795b45e-...-c5b0dc4b531e/resource/f17e0649-.../download/
+            ttc-routes-and-schedules.zip
+
+    Toronto Open Data has since republished the feed under a different resource
+    id and filename (opendata_ttc_schedules.zip), so the pinned URL returns 404
+    and both toronto_get_ttc_stops and toronto_get_ttc_routes have been dead —
+    reported as "UPSTREAM_ERROR: Failed to fetch TTC GTFS stop data", which read
+    like a transient outage.
+
+    Verified live 2026-07-25: the pinned URL 404s; the CKAN package_show
+    resource URL returns a 35 MB zip. Resolving through CKAN means the next
+    republish does not break the tools.
+    """
+
+    @pytest.mark.asyncio
+    async def test_resolves_zip_url_from_package_show(self):
+        from mcp_canada.modules.toronto import client as tc
+
+        package = {
+            "resources": [
+                {"format": "ZIP", "name": "TTC Routes and Schedules Data",
+                 "url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/"
+                        "7795b45e-e65a-4465-81fc-c36b9dfff169/resource/"
+                        "cfb6b2b8-6191-41e3-bda1-b175c51148cb/download/"
+                        "opendata_ttc_schedules.zip"},
+            ]
+        }
+        resolved = await tc._resolve_gtfs_zip_url(package)
+        assert resolved.endswith("opendata_ttc_schedules.zip"), (
+            f"must take the ZIP resource URL from CKAN, got {resolved}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_raises_when_no_zip_resource(self):
+        from mcp_canada.modules.toronto import client as tc
+
+        with pytest.raises(ValueError) as exc:
+            await tc._resolve_gtfs_zip_url({"resources": [{"format": "CSV", "url": "x"}]})
+        assert "zip" in str(exc.value).lower()
+
+    def test_constants_no_longer_pin_a_download_url(self):
+        """A hardcoded download URL is what rotted — it must not come back."""
+        from mcp_canada.modules.toronto import constants
+
+        assert not hasattr(constants, "GTFS_ZIP_URL"), (
+            "GTFS_ZIP_URL pinned a resource id that Toronto has since changed. "
+            "Resolve the URL from CKAN package_show instead."
+        )

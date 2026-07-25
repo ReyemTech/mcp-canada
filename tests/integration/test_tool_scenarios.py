@@ -1253,14 +1253,33 @@ class TestIrccScenarios:
 
     @pytest.mark.asyncio
     async def test_ircc_invalid_breakdown(self, mcp_server):
-        """'What happens with a bad breakdown?'"""
-        result = await call_tool(
-            mcp_server,
-            "ircc_get_permanent_residents",
-            {"breakdown": "nonexistent"},
-        )
-        assert "error" in result
-        assert result["error"]["code"] == "INVALID_INPUT"
+        """'What happens with a bad breakdown?'
+
+        `breakdown` is Literal-typed, so Pydantic rejects an unknown value at
+        the MCP boundary BEFORE the tool body runs. The tool's own INVALID_INPUT
+        branch is therefore unreachable for this parameter — the type system is
+        the earlier and better gate, and the resulting ToolError names every
+        valid option, which a bare INVALID_INPUT string would not.
+
+        This test previously expected a dict and failed with an unhandled
+        ToolError; it now asserts the behaviour that actually protects the agent.
+        """
+        from fastmcp.exceptions import ToolError
+
+        with pytest.raises(ToolError) as exc:
+            await call_tool(
+                mcp_server,
+                "ircc_get_permanent_residents",
+                {"breakdown": "nonexistent"},
+            )
+
+        message = str(exc.value)
+        assert "breakdown" in message, f"error must name the offending parameter: {message}"
+        for valid in ("country", "province", "gender"):
+            assert valid in message, (
+                f"the rejection must list valid options so the agent can retry; "
+                f"{valid!r} missing from: {message}"
+            )
 
     @pytest.mark.asyncio
     async def test_ircc_list_datasets(self, mcp_server):

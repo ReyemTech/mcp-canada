@@ -6,6 +6,8 @@ was_cached is always False — SQLite is local I/O, not a cached remote API.
 
 from __future__ import annotations
 
+import json
+
 import aiosqlite
 
 from mcp_canada.modules.datastore.constants import (
@@ -118,6 +120,27 @@ async def create_table(
     return (None, False)
 
 
+def _bind(value: Any) -> Any:
+    """Prepare a Python value for SQLite parameter binding.
+
+    dict and list values are serialised to JSON text. Several modules return
+    nested payloads by design — IRCC reshapes observations into
+    {"years": {"2023": {"q1": {...}}}} — and sqlite3 refuses to bind them,
+    producing "Error binding parameter 2: type 'dict' is not supported". Since
+    the datastore exists so an agent can combine any module's output in one SQL
+    query, rejecting a whole class of module output defeats its purpose.
+
+    Stored as JSON text, the data stays queryable via SQLite's JSON1 functions:
+
+        SELECT json_extract(years, '$."2023".total') FROM ircc_pr;
+
+    Scalars pass through untouched — ints stay ints (Phase 20.1).
+    """
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False)
+    return value
+
+
 async def insert_rows(
     table: str, rows: list[dict]
 ) -> tuple[int, bool]:
@@ -152,7 +175,7 @@ async def insert_rows(
     placeholders = ", ".join("?" for _ in columns)
     sql = f"INSERT INTO {table} ({col_list}) VALUES ({placeholders})"
 
-    values = [[row[col] for col in columns] for row in rows]
+    values = [[_bind(row[col]) for col in columns] for row in rows]
 
     conn = await get_db()
     await conn.executemany(sql, values)

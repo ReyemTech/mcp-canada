@@ -23,7 +23,7 @@ from mcp_canada.modules.toronto.constants import (
     CACHE_TTL_GTFS,
     CACHE_TTL_META,
     CACHE_TTL_SEARCH,
-    GTFS_ZIP_URL,
+    GTFS_DATASET_ID,
     MAX_DESCRIPTION_CHARS,
     MAX_RESOURCES,
     NEIGHBOURHOOD_PROFILES_RESOURCE_ID,
@@ -246,6 +246,23 @@ async def fetch_dataset_count() -> tuple[int, bool]:
 # ---------------------------------------------------------------------------
 
 
+async def _resolve_gtfs_zip_url(package: dict[str, Any]) -> str:
+    """Pick the GTFS ZIP resource URL out of a CKAN package_show result.
+
+    The URL is resolved rather than pinned: the previous hardcoded constant
+    embedded a resource id and filename that Toronto later changed, leaving both
+    TTC tools returning 404 behind an UPSTREAM_ERROR (Phase 20.1).
+    """
+    for resource in package.get("resources") or []:
+        if str(resource.get("format", "")).upper() == "ZIP" and resource.get("url"):
+            return str(resource["url"])
+    raise ValueError(
+        "TTC GTFS package exposes no ZIP resource — Toronto Open Data may have "
+        f"restructured the dataset. Resources: "
+        f"{[r.get('format') for r in package.get('resources') or []]}"
+    )
+
+
 async def fetch_gtfs_file(
     filename: str,
     ttl: int = CACHE_TTL_GTFS,
@@ -266,9 +283,14 @@ async def fetch_gtfs_file(
     limiter = get_limiter(RATE_GROUP, rate=RATE_LIMIT)
 
     async def fetcher() -> list[dict[str, Any]]:
+        package, _ = await _api_get(
+            "action/package_show", {"id": GTFS_DATASET_ID}, CACHE_TTL_GTFS
+        )
+        zip_url = await _resolve_gtfs_zip_url(package)
+
         await limiter.acquire()
         async with httpx.AsyncClient(timeout=120.0) as http:
-            response = await http.get(GTFS_ZIP_URL)
+            response = await http.get(zip_url, follow_redirects=True)
             response.raise_for_status()
             zip_bytes = response.content
 

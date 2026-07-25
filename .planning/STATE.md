@@ -2,12 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
-current_phase: 20.1
+current_phase: 20
 current_phase_name: Remove UPSTREAM_ERROR escape-hatch from provincial integration tests
 status: planning
-stopped_at: All 15 executed phases verified passed (2026-07-25 reconciliation); Phase 20.1 not yet planned
-last_updated: "2026-07-25T03:10:49.531Z"
+stopped_at: Phase 20.1 context gathered
+last_updated: "2026-07-25T04:28:21.535Z"
 last_activity: 2026-07-25
+last_activity_desc: state reconciliation + StatCan code-map fix
 progress:
   total_phases: 35
   completed_phases: 15
@@ -38,14 +39,18 @@ Progress: [████░░░░░░] 43%
 Suite at reconciliation: 3032 passed, 2 skipped, 97.05% coverage.
 
 **Reconciliation of 2026-07-25** (see git history for the commit):
+
 - Phase 17 (Alberta): was `human_needed`. Both live-agent UAT items re-run and
   confirmed (BM25 discovery ranks `alberta_` tools top-5 on all 5 probe queries;
   French error strings + `_meta.lang='fr'` verified live). All 3 doc-tracking gaps closed.
+
 - Phase 11 (IRCC): was mechanically `stale` — the report predated plan 11-04, a
   gap-closure plan. Re-verified with 3 added truths covering 11-04; 11-UAT was
   already 10/10 against the post-11-04 build.
+
 - REQUIREMENTS.md: 100 checklist boxes and 117 traceability rows were still
   "Planned" for shipped work. Flipped to Complete against on-disk evidence.
+
 - ROADMAP.md: 61 plan checkboxes flipped to `[x]`.
 
 ## Open Items
@@ -55,20 +60,25 @@ All items from the 2026-07-25 reconciliation are closed:
 1. ~~StatCan `FREQUENCY_CODES` is wrong~~ — **FIXED.** Frequency *and* scalar-factor
    maps were both shifted; rebuilt from StatCan's published code set, catalogs
    updated, tautological assertions replaced with literals, live-drift guard added.
+
 2. ~~`sc_get_series_info_by_vector` returns no UOM label~~ — **FIXED.** Decoded `uom`
    added, sourced from live getCodeSets. Turned up a third fabricated catalog
    (`data://statcan/uom-codes`, all 15 entries wrong) — replaced with a verified subset.
+
 3. ~~Phases 15 (BC) and 16 (Quebec) have no REQUIREMENTS.md entries~~ — **BACKFILLED.**
    BC-01..22 and QC-01..19 derived from shipped code and verified against the modules;
    ROADMAP `Requirements: TBD` lines replaced. Every executed phase now has traceability.
+
 4. ~~3 active debug sessions~~ — **CLOSED.** All three were fixed long ago:
    `ircc-header-parsing` moved to resolved/ (plan 11-04 shipped its recommendation
    verbatim); the two BC sessions were stale duplicates of newer files already in
    resolved/.
 
 Remaining backlog (not defects):
+
 - `.planning/todos/pending/2026-04-12-research-cross-canada-er-wait-times-datasets.md`
   — research item; premises refreshed 2026-07-25 against what phases 17-20 learned.
+
 - ROADMAP phases 20.1 and 21-39 carry `Requirements: TBD` — correct, they are unplanned.
 
 ## Performance Metrics
@@ -383,6 +393,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-16T20:39:07.538Z
-Stopped at: Completed 20-nova-scotia-government-open-data 20-08-PLAN.md
-Resume file: None
+Last session: 2026-07-25T04:28:21.490Z
+Stopped at: Phase 20.1 context gathered
+Resume file: .planning/phases/20.1-remove-upstream-error-escape-hatch-pattern-from-all-provincial-integration-tests-mb-sk-ab-qc-ns-and-re-run-live-integration-to-surface-masked-upstream-failures-before-pushing-phase-20/20.1-CONTEXT.md

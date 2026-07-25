@@ -327,7 +327,10 @@ class TestCuratedYorkRegion:
         kwargs = call_kwargs[1]
         where_clause = args[2] if len(args) > 2 else kwargs.get("where", "")
         assert "STOP_NAME" in where_clause
-        assert "Finch" in where_clause
+        # Uppercased on both sides — the attribute data is stored uppercase, so
+        # a raw LIKE drops mixed-case queries entirely (Phase 20.1).
+        assert "UPPER(STOP_NAME)" in where_clause
+        assert "FINCH" in where_clause
         assert "LIKE" in where_clause
 
     @pytest.mark.asyncio
@@ -454,7 +457,10 @@ class TestCuratedMarkham:
         kwargs = call_kwargs[1]
         where_clause = args[2] if len(args) > 2 else kwargs.get("where", "")
         assert "STREET" in where_clause
-        assert "Main" in where_clause
+        # Uppercased on both sides — the attribute data is stored uppercase, so
+        # a raw LIKE drops mixed-case queries entirely (Phase 20.1).
+        assert "UPPER(STREET)" in where_clause
+        assert "MAIN" in where_clause
         assert "LIKE" in where_clause
 
     @pytest.mark.asyncio
@@ -478,7 +484,10 @@ class TestCuratedMarkham:
         kwargs = call_kwargs[1]
         where_clause = args[2] if len(args) > 2 else kwargs.get("where", "")
         assert "NAME" in where_clause
-        assert "Warden" in where_clause
+        # Uppercased on both sides — the attribute data is stored uppercase, so
+        # a raw LIKE drops mixed-case queries entirely (Phase 20.1).
+        assert "UPPER(NAME)" in where_clause
+        assert "WARDEN" in where_clause
         assert "LIKE" in where_clause
 
 
@@ -502,3 +511,77 @@ class TestEscapeWhere:
     def test_empty_string_unchanged(self):
         result = _escape_where_value("")
         assert result == ""
+
+
+class TestLikeFiltersAreCaseInsensitive:
+    """Text filters must match regardless of the caller's casing.
+
+    Regression cover for the Phase 20.1 defect: the ArcGIS attribute data is
+    stored uppercase ("WATERBRIDGE", "MAIN") but the WHERE clauses compared
+    against the caller's raw string, so a natural query lost everything:
+
+        STREET LIKE '%Main%'          -> 0 rows
+        UPPER(STREET) LIKE '%MAIN%'   -> 420 rows
+
+    An agent asking for "Main Street in Markham" got an empty result that looked
+    like a legitimate no-match. The integration test's `if "data" in data:`
+    guard skipped its assertions, so nothing flagged it.
+
+    Verified against live layers 2026-07-25: markham addresses 0 vs 420,
+    markham roads 40 vs 42 (mixed-case data, so the raw form silently dropped
+    records rather than all of them).
+    """
+
+    @pytest.mark.asyncio
+    async def test_markham_addresses_street_filter_is_case_insensitive(self):
+        from mcp_canada.modules.york_region import client as yc
+
+        spy = AsyncMock(return_value=({"features": [], "count": 0, "truncated": False}, False))
+        with patch.object(yc, "_fetch_features", spy):
+            await yc.fetch_markham_addresses(street="Main")
+
+        where = spy.await_args.kwargs.get("where") or spy.await_args.args[2]
+        assert "UPPER(" in where.upper(), (
+            f"STREET data is stored uppercase; a raw LIKE drops every row for a "
+            f"mixed-case query. WHERE was: {where}"
+        )
+        assert "MAIN" in where.upper()
+
+    @pytest.mark.asyncio
+    async def test_markham_roads_name_filter_is_case_insensitive(self):
+        from mcp_canada.modules.york_region import client as yc
+
+        spy = AsyncMock(return_value=({"features": [], "count": 0, "truncated": False}, False))
+        with patch.object(yc, "_fetch_features", spy):
+            await yc.fetch_markham_roads(name="Main")
+
+        where = spy.await_args.kwargs.get("where") or spy.await_args.args[2]
+        assert "UPPER(" in where.upper(), f"WHERE was: {where}"
+
+    @pytest.mark.asyncio
+    async def test_transit_stop_filter_is_case_insensitive(self):
+        from mcp_canada.modules.york_region import client as yc
+
+        spy = AsyncMock(return_value=({"features": [], "count": 0, "truncated": False}, False))
+        with patch.object(yc, "_fetch_features", spy):
+            await yc.fetch_regional_roads(name="Finch") if False else None
+            await yc.fetch_search_datasets("x") if False else None
+        # Exercised via the transit stops fetcher
+        with patch.object(yc, "_fetch_features", spy):
+            fn = getattr(yc, "fetch_transit_stops", None)
+            if fn is None:
+                pytest.skip("no fetch_transit_stops in this module revision")
+            await fn(query="Finch")
+        where = spy.await_args.kwargs.get("where") or spy.await_args.args[2]
+        assert "UPPER(" in where.upper(), f"WHERE was: {where}"
+
+    @pytest.mark.asyncio
+    async def test_no_filter_still_selects_everything(self):
+        from mcp_canada.modules.york_region import client as yc
+
+        spy = AsyncMock(return_value=({"features": [], "count": 0, "truncated": False}, False))
+        with patch.object(yc, "_fetch_features", spy):
+            await yc.fetch_markham_addresses()
+
+        where = spy.await_args.kwargs.get("where") or spy.await_args.args[2]
+        assert where == "1=1", f"an unfiltered call must select all rows, got: {where}"

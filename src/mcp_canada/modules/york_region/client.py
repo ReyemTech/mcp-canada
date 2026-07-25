@@ -329,7 +329,12 @@ async def fetch_transit_stops(
     Returns:
         ({"features": [...], "count": int, "truncated": bool}, was_cached)
     """
-    where = f"STOP_NAME LIKE '%{_escape_where_value(query)}%'" if query else "1=1"
+    # UPPER() on both sides: the ArcGIS attribute data is stored uppercase, so a
+    # raw LIKE silently drops rows for any mixed-case query (Phase 20.1).
+    where = (
+        f"UPPER(STOP_NAME) LIKE '%{_escape_where_value(query).upper()}%'"
+        if query else "1=1"
+    )
     return await _fetch_features(YR_TRANSIT_FS, YR_BUS_STOPS_LAYER, where=where, include_geometry=include_geometry)
 
 
@@ -483,7 +488,10 @@ async def fetch_markham_addresses(
     Returns:
         ({"features": [...], "count": int, "truncated": bool}, was_cached)
     """
-    where = f"STREET LIKE '%{_escape_where_value(street)}%'" if street else "1=1"
+    where = (
+        f"UPPER(STREET) LIKE '%{_escape_where_value(street).upper()}%'"
+        if street else "1=1"
+    )
     return await _fetch_features(MARKHAM_ADDRESSES_FS, MARKHAM_ADDRESSES_LAYER, where=where, include_geometry=include_geometry)
 
 
@@ -500,5 +508,8 @@ async def fetch_markham_roads(
     Returns:
         ({"features": [...], "count": int, "truncated": bool}, was_cached)
     """
-    where = f"NAME LIKE '%{_escape_where_value(name)}%'" if name else "1=1"
+    where = (
+        f"UPPER(NAME) LIKE '%{_escape_where_value(name).upper()}%'"
+        if name else "1=1"
+    )
     return await _fetch_features(MARKHAM_ROADS_FS, MARKHAM_ROADS_LAYER, where=where, include_geometry=include_geometry)

@@ -154,3 +154,25 @@ def assert_rows(data: dict, tool: str, *, allow_empty_reason: str | None = None)
             f"valid, pass allow_empty_reason= saying why."
         )
     return rows
+
+
+def assert_feature_payload(data: dict, tool: str) -> dict:
+    """Assert the geospatial feature-collection payload shape and return it.
+
+    Feature-query tools (BC WFS, York Region / Alberta / Manitoba / Saskatchewan
+    ArcGIS) deliberately return a dict — ``{"features": [...], "count": N,
+    "truncated": bool}`` — rather than a bare list, because the truncation flag
+    and match count are meaningful to an agent. Tests that assert
+    ``isinstance(data["data"], list)`` against these tools are asserting the
+    wrong contract.
+    """
+    payload = data.get("data")
+    assert isinstance(payload, dict), (
+        f"{tool} returns a feature-collection dict, not a bare "
+        f"{type(payload).__name__}. Expected keys: features, count, truncated."
+    )
+    assert "features" in payload, f"{tool} payload missing features: {list(payload)}"
+    assert isinstance(payload["features"], list), (
+        f"{tool} features must be a list, got {type(payload['features']).__name__}"
+    )
+    return payload

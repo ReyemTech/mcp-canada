@@ -68,7 +68,9 @@ async def search_hub_datasets(
         raise ValueError("portal has no public ArcGIS Hub open data portal")
 
     url = portal_base_url.rstrip("/") + HUB_SEARCH_PATH
-    params: dict[str, Any] = {"q": query, "limit": limit}
+    params: dict[str, Any] = {"limit": limit}
+    if query and query.strip():
+        params["q"] = query   # empty q is rejected with HTTP 400 by every Hub portal, so omit it
     if offset > 0:
         params["startindex"] = offset   # OGC API Records pagination (NOT offset); startindex=0 is invalid so omit at 0
 

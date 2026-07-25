@@ -9,6 +9,7 @@ Run: uv run pytest tests/integration/test_tool_scenarios.py -v -m integration --
 import aiosqlite
 import pytest
 from tests.integration.conftest import (
+    assert_feature_payload,
     assert_live_or_transient,
     assert_rows,
     call_direct_tool,
@@ -1334,11 +1335,9 @@ class TestYorkRegionToolScenarios:
         data = await call_tool(mcp_server, "york_region_get_transit_stops", {
             "query": "Finch",
         })
-        assert "_meta" in data
-        # Response has features list (may be empty on API error but structure must be present)
-        assert "data" in data or "error" in data
-        if "data" in data:
-            assert isinstance(data["data"], list)
+        live = assert_live_or_transient(data, "york_region_get_transit_stops", "arcgis-hub")
+        if live:
+            assert_feature_payload(data, "york_region_get_transit_stops")
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(90)
@@ -1347,9 +1346,13 @@ class TestYorkRegionToolScenarios:
         data = await call_tool(mcp_server, "york_region_get_public_health", {
             "location_type": "hospital",
         })
-        assert "_meta" in data or "error" in data
-        if "data" in data:
-            assert isinstance(data["data"], list)
+        live = assert_live_or_transient(data, "york_region_get_public_health", "arcgis-hub")
+        if live:
+            payload = assert_feature_payload(data, "york_region_get_public_health")
+            assert payload["features"], (
+                f"York Region has hospitals — an empty feature list means the "
+                f"location_type filter is broken: {payload}"
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(90)
@@ -1358,17 +1361,24 @@ class TestYorkRegionToolScenarios:
         data = await call_tool(mcp_server, "markham_get_addresses", {
             "street": "Main",
         })
-        assert "_meta" in data or "error" in data
-        if "data" in data:
-            assert isinstance(data["data"], list)
+        live = assert_live_or_transient(data, "markham_get_addresses", "arcgis-hub")
+        if live:
+            payload = assert_feature_payload(data, "markham_get_addresses")
+            assert payload["features"], (
+                f"Markham has Main Street addresses — empty means the street "
+                f"filter is broken: {payload}"
+            )
 
     @pytest.mark.asyncio
     async def test_aurora_list_categories_live(self, mcp_server):
         """'What dataset categories exist in Aurora open data?'"""
         data = await call_tool(mcp_server, "aurora_list_categories")
-        assert "_meta" in data or "error" in data
-        if "data" in data:
-            assert isinstance(data["data"], list)
+        live = assert_live_or_transient(data, "aurora_list_categories", "arcgis-hub")
+        if live:
+            # Regression cover: this returned UPSTREAM_ERROR until 2026-07-25
+            # because the shared Hub client sent `q=` on a no-query listing and
+            # every Hub portal 400s on an empty q.
+            assert_rows(data, "aurora_list_categories")
 
     @pytest.mark.asyncio
     async def test_newmarket_search_datasets_live(self, mcp_server):
@@ -1377,9 +1387,11 @@ class TestYorkRegionToolScenarios:
             "query": "",
             "limit": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "data" in data:
-            assert isinstance(data["data"], list)
+        live = assert_live_or_transient(data, "newmarket_search_datasets", "arcgis-hub")
+        if live:
+            # Same empty-q regression as aurora_list_categories — an empty query
+            # is the whole point of this test, so it exercises the fixed path.
+            assert_rows(data, "newmarket_search_datasets")
 
     @pytest.mark.asyncio
     async def test_no_vaughan_tools_in_catalog(self, mcp_server):
@@ -1860,12 +1872,15 @@ class TestAlbertaToolScenarios:
             "format": "CSV",
             "rows": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "alberta-open-data"
-            # Results shape: {"count": int, "results": [...]}
-            assert "results" in data["data"]
-            assert data["data"].get("count", 0) >= 0
+        live = assert_live_or_transient(data, "alberta_search_datasets", "alberta-open-data")
+        if live:
+            payload = data["data"]
+            assert "results" in payload, f"payload missing results: {list(payload)}"
+            # open.alberta.ca has thousands of wildfire CSVs — zero means the
+            # search or the format filter is broken, not that Alberta is quiet.
+            assert payload["results"], (
+                f"wildfire+CSV search returned nothing: {payload}"
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -1873,12 +1888,11 @@ class TestAlbertaToolScenarios:
     async def test_active_fires_now(self, mcp_server):
         """'How many active wildfires in Alberta right now?' — live WMBappServices FeatureServer."""
         data = await call_tool(mcp_server, "alberta_get_active_fires", {})
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "alberta-wmb-arcgis"
-            assert "features" in data["data"]
-            assert isinstance(data["data"]["features"], list)
-            # Don't assert exact count — varies seasonally (May-October peak)
+        live = assert_live_or_transient(data, "alberta_get_active_fires", "alberta-wmb-arcgis")
+        if live:
+            # Feature count is NOT asserted — active fires vary seasonally and
+            # zero is a legitimate winter reading. The shape must still hold.
+            assert_feature_payload(data, "alberta_get_active_fires")
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -1886,15 +1900,18 @@ class TestAlbertaToolScenarios:
     async def test_alberta_hospitals(self, mcp_server):
         """'List Alberta hospitals' — live AHSGIS FeatureServer (~101 hospitals)."""
         data = await call_tool(mcp_server, "alberta_get_hospitals", {})
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "alberta-ahs-arcgis"
-            assert "features" in data["data"]
-            # ~101 hospitals expected; allow generous ±50 window for live drift
-            if isinstance(data["data"].get("count"), int):
-                assert 50 <= data["data"]["count"] <= 250, (
-                    f"Alberta hospital count unexpectedly far from ~101: {data['data']['count']}"
-                )
+        live = assert_live_or_transient(data, "alberta_get_hospitals", "alberta-ahs-arcgis")
+        if live:
+            payload = assert_feature_payload(data, "alberta_get_hospitals")
+            count = payload.get("count")
+            assert isinstance(count, int), (
+                f"the AHS hospital layer must report a count, got {count!r} — "
+                f"a missing count previously skipped this assertion entirely"
+            )
+            # ~101 hospitals expected; generous window for live drift.
+            assert 50 <= count <= 250, (
+                f"Alberta hospital count unexpectedly far from ~101: {count}"
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.integration

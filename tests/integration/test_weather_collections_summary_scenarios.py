@@ -7,9 +7,16 @@ Run: uv run pytest tests/integration/test_weather_collections_summary_scenarios.
 """
 
 import pytest
-from tests.integration.conftest import call_tool, discover
+from tests.integration.conftest import (
+    assert_live_or_transient,
+    assert_rows,
+    call_tool,
+    discover,
+)
 
 pytestmark = pytest.mark.integration
+
+API = "msc-geomet"
 
 
 # ─── Collections scenarios ────────────────────────────────────────────────────
@@ -22,19 +29,16 @@ class TestCollectionsScenarios:
     async def test_list_all_collections(self, mcp_server):
         """'What weather data collections are available from MSC GeoMet?'"""
         data = await call_tool(mcp_server, "wx_list_collections", {})
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "msc-geomet"
-            assert isinstance(data["data"], list)
-            # MSC GeoMet has 100+ collections
-            assert len(data["data"]) >= 10, (
-                f"Expected many collections, got {len(data['data'])}"
+        live = assert_live_or_transient(data, "wx_list_collections", API)
+        if live:
+            collections = assert_rows(data, "wx_list_collections")
+            # MSC GeoMet publishes 100+ collections
+            assert len(collections) >= 10, (
+                f"Expected many collections, got {len(collections)}"
             )
-            # Each collection should have id, title
-            if data["data"]:
-                coll = data["data"][0]
-                assert "id" in coll
-                assert "title" in coll
+            coll = collections[0]
+            assert "id" in coll, f"collection missing id: {coll}"
+            assert "title" in coll, f"collection missing title: {coll}"
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
@@ -44,15 +48,18 @@ class TestCollectionsScenarios:
             "collection_id": "climate-stations",
             "limit": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert isinstance(data["data"]["items"], list)
-            if data["data"]["items"]:
-                item = data["data"]["items"][0]
-                # Should have properties from the OGC feature
-                assert "properties" in item
-                # And centroid lat/lon extracted
-                assert "lat" in item or item.get("lat") is None
+        live = assert_live_or_transient(data, "wx_get_collection_items", API)
+        if live:
+            items = data["data"]["items"]
+            assert isinstance(items, list), (
+                f"items must be a list, got {type(items).__name__}"
+            )
+            # climate-stations is a static reference collection — asking for 5 and
+            # getting none means the query is broken, not that the data is quiet.
+            assert items, f"climate-stations returned no items: {data['data']}"
+            item = items[0]
+            assert "properties" in item, f"item missing OGC properties: {item}"
+            assert "lat" in item, f"item missing extracted centroid lat: {item}"
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
@@ -62,10 +69,15 @@ class TestCollectionsScenarios:
             "collection_id": "this-collection-does-not-exist",
             "limit": 5,
         })
-        # Should return either NOT_FOUND error or UPSTREAM_ERROR (400/404 from API)
-        assert "_meta" in data or "error" in data
+        # Error-PATH test: the collection genuinely does not exist, so NOT_FOUND
+        # is the correct answer and is not treated as an outage.
         if "error" in data:
-            assert data["error"]["code"] in ("NOT_FOUND", "UPSTREAM_ERROR")
+            assert data["error"]["code"] in ("NOT_FOUND", "UPSTREAM_ERROR"), (
+                f"unknown collection must yield NOT_FOUND (or UPSTREAM_ERROR if "
+                f"the API 400s), got: {data['error']}"
+            )
+        else:
+            assert "_meta" in data, f"expected an error or an envelope, got: {data}"
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
@@ -89,15 +101,13 @@ class TestSummaryScenarios:
             "location": "Toronto",
             "province": "ON",
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "msc-geomet"
+        live = assert_live_or_transient(data, "wx_get_weather_summary", API)
+        if live:
             result = data["data"]
-            # Should have all 4 sections
-            assert "conditions" in result
-            assert "forecast" in result
-            assert "alerts" in result
-            assert "aqhi" in result
+            for section in ("conditions", "forecast", "alerts", "aqhi"):
+                assert section in result, (
+                    f"composite summary missing {section!r} section: {list(result)}"
+                )
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
@@ -114,12 +124,13 @@ class TestSummaryScenarios:
         data = await call_tool(mcp_server, "wx_get_historical_extremes", {
             "station_id": "6105976",
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
+        live = assert_live_or_transient(data, "wx_get_historical_extremes", API)
+        if live:
             result = data["data"]
-            assert "temperature_records" in result
-            assert "precipitation_records" in result
-            assert "snowfall_records" in result
+            for section in ("temperature_records", "precipitation_records", "snowfall_records"):
+                assert section in result, (
+                    f"extremes missing {section!r} section: {list(result)}"
+                )
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)

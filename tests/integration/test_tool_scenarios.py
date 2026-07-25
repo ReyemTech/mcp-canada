@@ -12,6 +12,7 @@ from tests.integration.conftest import (
     assert_feature_payload,
     assert_live_or_transient,
     assert_rows,
+    assert_series_payload,
     call_direct_tool,
     call_tool,
     discover,
@@ -38,10 +39,11 @@ class TestBocScenarios:
         data = await call_tool(mcp_server, "boc_get_exchange_rates", {"currency": "USD", "recent": 1})
         assert "_meta" in data
         assert data["_meta"]["source"]["api"] == "bank-of-canada-valet"
-        assert len(data["data"]) >= 1
-        row = data["data"][0]
-        assert row["series_name"] == "FXUSDCAD"
-        assert 0.5 < row["value"] < 3.0
+        payload = assert_series_payload(data, "boc_get_exchange_rates", "FXUSDCAD")
+        rates = list(payload["FXUSDCAD"]["observations"].values())
+        assert all(0.5 < v < 3.0 for v in rates), (
+            f"USD/CAD outside a plausible range: {rates}"
+        )
 
     @pytest.mark.asyncio
     async def test_exchange_rate_date_range(self, mcp_server):
@@ -49,8 +51,16 @@ class TestBocScenarios:
         data = await call_tool(mcp_server, "boc_get_exchange_rates", {
             "currency": "EUR", "start_date": "2026-03-01", "end_date": "2026-03-31"
         })
-        assert len(data["data"]) >= 15
-        assert all(r["series_name"] == "FXEURCAD" for r in data["data"])
+        payload = assert_series_payload(data, "boc_get_exchange_rates", "FXEURCAD")
+        observations = payload["FXEURCAD"]["observations"]
+        # ~21 banking days in March; allow for holidays but require a full month.
+        assert len(observations) >= 15, (
+            f"expected a month of EUR/CAD observations, got {len(observations)}: "
+            f"{sorted(observations)[:5]}"
+        )
+        assert list(payload) == ["FXEURCAD"], (
+            f"a single-currency query must return exactly one series: {list(payload)}"
+        )
 
     @pytest.mark.asyncio
     async def test_compare_usd_eur_gbp(self, mcp_server):
@@ -58,30 +68,34 @@ class TestBocScenarios:
         data = await call_tool(mcp_server, "boc_get_observations", {
             "series_names": "FXUSDCAD,FXEURCAD,FXGBPCAD", "recent": 3
         })
-        series = {r["series_name"] for r in data["data"]}
-        assert "FXUSDCAD" in series
-        assert "FXEURCAD" in series
-        assert "FXGBPCAD" in series
+        assert_series_payload(
+            data, "boc_get_observations", "FXUSDCAD", "FXEURCAD", "FXGBPCAD"
+        )
 
     @pytest.mark.asyncio
     async def test_current_policy_rate(self, mcp_server):
         """'What is the Bank of Canada policy rate?'"""
         data = await call_tool(mcp_server, "boc_get_interest_rates", {"rate_type": "policy", "recent": 1})
-        assert len(data["data"]) >= 1
-        assert 0 < data["data"][0]["value"] < 20
+        payload = assert_series_payload(data, "boc_get_interest_rates")
+        assert payload, f"policy rate query returned no series: {payload}"
+        rates = [v for s in payload.values() for v in s["observations"].values()]
+        assert rates, f"policy rate series carried no observations: {payload}"
+        assert all(0 < v < 20 for v in rates), (
+            f"policy rate outside a plausible range: {rates}"
+        )
 
     @pytest.mark.asyncio
     async def test_inflation_cpi(self, mcp_server):
         """'What's the latest Canadian CPI?'"""
         data = await call_tool(mcp_server, "boc_get_inflation_data", {"recent": 3})
         assert "_meta" in data
-        assert len(data["data"]) >= 1
+        assert assert_series_payload(data, "boc_get_inflation_data")
 
     @pytest.mark.asyncio
     async def test_commodity_energy(self, mcp_server):
         """'Show me energy commodity prices.'"""
         data = await call_tool(mcp_server, "boc_get_commodity_prices", {"commodity_type": "energy", "recent": 3})
-        assert len(data["data"]) >= 1
+        assert assert_series_payload(data, "boc_get_commodity_prices")
 
     @pytest.mark.asyncio
     async def test_series_search(self, mcp_server):
@@ -490,7 +504,10 @@ class TestCrossModuleScenarios:
     async def test_exchange_rate_plus_trade(self, mcp_server):
         """'Get USD/CAD and find trade datasets.'"""
         fx = await call_tool(mcp_server, "boc_get_exchange_rates", {"currency": "USD", "recent": 1})
-        assert fx["data"][0]["value"] is not None
+        fx_payload = assert_series_payload(fx, "boc_get_exchange_rates", "FXUSDCAD")
+        assert all(
+            v is not None for v in fx_payload["FXUSDCAD"]["observations"].values()
+        ), f"USD/CAD observations must carry values: {fx_payload}"
 
         trade = await call_tool(mcp_server, "ckan_search_datasets", {"query": "trade", "rows": 3})
         assert "_meta" in trade

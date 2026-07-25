@@ -35,11 +35,17 @@ Response:
     "lang": "en",
     "timestamp": "2026-04-04T22:16:54.133649+00:00"
   },
-  "data": [
-    {"date": "2026-04-02", "series_name": "FXUSDCAD", "value": 1.3918, "label": "USD/CAD", "description": "US dollar to Canadian dollar daily exchange rate"},
-    {"date": "2026-04-01", "series_name": "FXUSDCAD", "value": 1.3888, "label": "USD/CAD", "description": "..."},
-    {"date": "2026-03-31", "series_name": "FXUSDCAD", "value": 1.3939, "label": "USD/CAD", "description": "..."}
-  ]
+  "data": {
+    "FXUSDCAD": {
+      "label": "USD/CAD",
+      "description": "US dollar to Canadian dollar daily exchange rate",
+      "observations": {
+        "2026-04-02": 1.3918,
+        "2026-04-01": 1.3888,
+        "2026-03-31": 1.3939
+      }
+    }
+  }
 }
 ```
 

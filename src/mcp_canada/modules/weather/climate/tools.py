@@ -283,11 +283,15 @@ async def wx_get_climate_trends(
     """Get long-term climate trends from the AHCCD dataset.
 
     Returns Adjusted and Homogenized Canadian Climate Data (AHCCD) trend records
-    showing long-term climate trends at stations across Canada. Can filter by
-    station or measurement type (temperature, precipitation, etc.).
+    showing long-term precipitation trends at stations across Canada.
 
-    Use for: long-term climate trends, AHCCD data, climate change evidence,
-    temperature trend, precipitation trend, homogenized climate data, climate signal.
+    Note: this collection publishes PRECIPITATION measures only — valid
+    measurement_type values are "rain", "snow", and "total_precip". There is no
+    temperature series here despite the AHCCD name; a temperature filter returns
+    zero records.
+
+    Use for: long-term precipitation trends, AHCCD data, climate change evidence,
+    rain/snow trend, homogenized climate data, climate signal.
 
     Keywords: climate trends, AHCCD, long-term trend, temperature trend,
     precipitation trend, homogenized data, adjusted climate, climate signal,
@@ -295,8 +299,8 @@ async def wx_get_climate_trends(
     long-term climate change
 
     Args:
-        station_id: Optional station identifier to filter trends.
-        measurement_type: Optional measurement type (e.g. "temperature", "precipitation").
+        station_id: Optional AHCCD station id to filter trends (e.g. "1100120").
+        measurement_type: Optional measurement type — "rain", "snow", or "total_precip".
         lang: Response language — "en" (default) or "fr".
     """
     try:

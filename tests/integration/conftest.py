@@ -176,3 +176,36 @@ def assert_feature_payload(data: dict, tool: str) -> dict:
         f"{tool} features must be a list, got {type(payload['features']).__name__}"
     )
     return payload
+
+
+def assert_series_payload(data: dict, tool: str, *series_names: str) -> dict:
+    """Assert the series-keyed observation payload shape and return it.
+
+    BOC observation tools return a dict keyed by series name — deliberately, as
+    of the 2026-04-09 shared/reshape.py refactor — rather than a flat list that
+    repeats the label and description on every row::
+
+        {"FXUSDCAD": {"label": "USD/CAD",
+                      "description": "...",
+                      "observations": {"2026-07-23": 1.39}}}
+
+    Each named series must be present and carry a non-empty observations map.
+    """
+    payload = data.get("data")
+    assert isinstance(payload, dict), (
+        f"{tool} returns a series-keyed dict, not a bare "
+        f"{type(payload).__name__}. See shared/reshape.py:reshape_observations."
+    )
+    for name in series_names:
+        assert name in payload, (
+            f"{tool} payload missing series {name!r}; got {list(payload)}"
+        )
+        series = payload[name]
+        assert "observations" in series, (
+            f"{tool} series {name!r} missing observations: {list(series)}"
+        )
+        assert series["observations"], (
+            f"{tool} series {name!r} has an empty observations map — a published "
+            f"BOC series should always have values: {series}"
+        )
+    return payload

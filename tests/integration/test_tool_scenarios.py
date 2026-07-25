@@ -1886,7 +1886,7 @@ class TestQuebecToolScenarios:
                 f"route_num should be zero-padded form '00020', got {row['route_num']}"
             )
             assert row["route_num"] != "00204", (
-                f"Route 204 row leaked through A-20 filter — substring match bug"
+                "Route 204 row leaked through A-20 filter — substring match bug"
             )
             # route_name is nullable upstream; when present it must not be a
             # Route 204 leak. `or ""` keeps the assertion on every row.

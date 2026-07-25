@@ -1,6 +1,7 @@
+"""Tests for shared/envelope.py — response envelope and error builders."""
+
 import pytest
 
-"""Tests for shared/envelope.py — response envelope and error builders."""
 
 from datetime import datetime
 

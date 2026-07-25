@@ -178,7 +178,7 @@ Plans:
 ### Phase 15: British Columbia Government Open Data
 
 **Goal:** Agents can search the BC Data Catalogue (CKAN + bcgov custom extensions) and query BC Geographic Warehouse geospatial layers via WFS 2.0, with 20 curated bc_ tools (5 discovery + 15 WFS-backed) covering wildfire, forestry, environment, natural resources, health, transportation, and climate. Introduces a reusable `shared/ogc.py` WFS client (third portal tech alongside CKAN and ArcGIS Hub) plus 6 prompts and 7 resources.
-**Requirements**: TBD (no explicit REQ IDs yet — delivers on milestone provincial coverage goal)
+**Requirements**: BC-01, BC-02, BC-03, BC-04, BC-05, BC-06, BC-07, BC-08, BC-09, BC-10, BC-11, BC-12, BC-13, BC-14, BC-15, BC-16, BC-17, BC-18, BC-19, BC-20, BC-21, BC-22 (backfilled 2026-07-25 from shipped code)
 **Depends on:** Phase 14
 **Plans:** 5/5 plans complete
 
@@ -191,7 +191,7 @@ Plans:
 ### Phase 16: Quebec Government Open Data
 
 **Goal:** Agents can search the Données Québec CKAN catalogue (1,593 datasets, 139 orgs, 10 thematic groups) and access curated MSSS health, MTQ transport, environment, demographics, and energy data via 18 `quebec_` tools (5 discovery + 13 curated), reusing the post-15-05 `_api_get` parsed-dict pattern and Phase 15 `TestSharedApiGetContract` test class from day 1.
-**Requirements**: TBD (no explicit REQ IDs yet — delivers on milestone provincial coverage goal)
+**Requirements**: QC-01, QC-02, QC-03, QC-04, QC-05, QC-06, QC-07, QC-08, QC-09, QC-10, QC-11, QC-12, QC-13, QC-14, QC-15, QC-16, QC-17, QC-18, QC-19 (backfilled 2026-07-25 from shipped code)
 **Depends on:** Phase 15
 **Plans:** 8/8 plans complete + 1 gap-closure plan (18-09)
 

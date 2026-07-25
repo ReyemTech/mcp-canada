@@ -116,6 +116,61 @@
 - [x] **YR-13**: York Region module has resources.py with 6-10 zero-parameter @resource functions using data://, docs://, template:// URI schemes, including a portal catalog and municipality list
 - [x] **YR-14**: All York Region tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, municipality prefix), are discoverable via discover_tools, and README reflects the new tool catalog
 
+### British Columbia Government Open Data
+
+Backfilled 2026-07-25 from shipped code — Phase 15 was planned with `Requirements: TBD` and never had REQ IDs assigned, leaving it invisible to the traceability table below. Every item was verified against `src/mcp_canada/modules/british_columbia/` at backfill time.
+
+Two portals, two steps: the **BC Data Catalogue** (CKAN + bcgov extensions) for discovery, and the **BC Geographic Warehouse** (OGC WFS 2.0) for geospatial queries. Discovery yields an `object_name` + `queryable_via_wfs` flag that the WFS tools consume. Introduces `shared/ogc.py`, the third portal technology alongside CKAN and ArcGIS Hub. Module prefix `bc_`.
+
+- [x] **BC-01**: Agent can search the BC Data Catalogue by keyword with optional `organization` and `tag` filters and `rows`/`start` pagination
+- [x] **BC-02**: Agent can get full BC dataset details by package id, including the WFS routing metadata (`object_name`, `queryable_via_wfs`) that `bc_query_features` needs
+- [x] **BC-03**: Agent can query features from a BC dataset via WFS or file download, with CQL filters, `max_records`, and opt-in geometry
+- [x] **BC-04**: Agent can list BC government ministries and agencies that publish open data
+- [x] **BC-05**: Agent can list BC Data Catalogue tag-based categories for dataset discovery
+- [x] **BC-06**: Agent can query currently active BC wildfires with `status`, `centre`, and `min_size_hectares` filters from the BCGW WFS
+- [x] **BC-07**: Agent can query historical BC wildfire perimeters with `year`, `cause`, and `min_size_hectares` filters
+- [x] **BC-08**: Agent can query BC forest tenure licences by `status`, `tenure_type`, `client_name`, and `district`
+- [x] **BC-09**: Agent can query BC forest cut block polygons (`FTEN_CUT_BLOCK_POLY_SVW`) by `status`, `district`, and `client_name`
+- [x] **BC-10**: Agent can query BC protected lands (`WHSE_TANTALIS.TA_PARK_ECORES_PA_SVW`) by `designation`, `min_area_ha`, and `name`
+- [x] **BC-11**: Agent can query BC groundwater wells (`GW_WATER_WELLS_WRBC_SVW`) by `city`, `well_class`, `aquifer_id`, and `intended_use`
+- [x] **BC-12**: Agent can query BC wildfire weather monitoring stations by `name` and `min_elevation`
+- [x] **BC-13**: Agent can query BC local and regional parks (`GBA_LOCAL_REG_GREENSPACES_SP`) by `municipality`, `regional_district`, and `park_type`
+- [x] **BC-14**: Agent can query BC mining tenure claims (`MTA_ACQUIRED_TENURE_SVW`) by `tenure_type`, `owner_name`, and `min_area_ha`
+- [x] **BC-15**: Agent can query BC fish habitat holding areas (`CRIMS_HOLDING_AREAS`) by `feature_code`
+- [x] **BC-16**: Agent can query BC hospital emergency rooms (`GSR_EMERGENCY_ROOMS_SV`) by `locality` and `wheelchair_accessible`
+- [x] **BC-17**: Agent can query BC walk-in medical clinics (`GSR_MED_WALK_IN_CLINICS_SV`) by `locality`
+- [x] **BC-18**: Agent can query BC highway profile segments (`MOT_HIGHWAY_PROFILES_SP`) by `highway_number`, `admin_unit`, and `min_lanes`
+- [x] **BC-19**: Agent can query BC road structures (`MOT_ROAD_STRUCTURE_SP`) by `structure_type`
+- [x] **BC-20**: Agent can query BC climate observation stations by `name` and `min_elevation`
+- [x] **BC-21**: A reusable OGC WFS 2.0 client lives in `shared/ogc.py` (`GetFeature` + CQL_FILTER, paging via `wfs_page_all`) and is not BC-specific — available to Quebec and any other province with a WFS portal
+- [x] **BC-22**: All BC tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, `bc_` prefix), are discoverable via discover_tools, and 6 prompts + 7 resources are auto-discovered by FileSystemProvider
+
+### Quebec Government Open Data
+
+Backfilled 2026-07-25 from shipped code — Phase 16 was planned with `Requirements: TBD` and never had REQ IDs assigned. Every item was verified against `src/mcp_canada/modules/quebec/` at backfill time.
+
+Primary portal is **Données Québec** (CKAN — 1,593 datasets, 139 orgs, 10 thematic groups). Curated tools draw on MSSS (health), MTQ (transport, live WFS CSV), MELCCFP (environment), MAMH (municipal), and Hydro-Québec. Reuses the post-15-05 `_api_get` parsed-dict pattern and the Phase 15 `TestSharedApiGetContract` guard from day 1. Module prefix `quebec_`.
+
+- [x] **QC-01**: Agent can search the Données Québec catalogue by keyword with optional `organization` and `group` filters and `rows`/`start` pagination
+- [x] **QC-02**: Agent can get full details for a Données Québec dataset including the resources list and `datastore_active` flags
+- [x] **QC-03**: Agent can query records from a dataset's best resource, preferring CSV > GeoJSON > JSON > XLSX
+- [x] **QC-04**: Agent can list all 139 organizations in the federated catalog with package counts
+- [x] **QC-05**: Agent can list the 10 thematic groups (Santé, Environnement, etc.) used to categorize datasets
+- [x] **QC-06**: Agent can get Quebec health installations (hospitals, CLSCs, CHSLDs, psychiatric) from the MSSS datastore, filterable by `instal_type` and `rss_name`
+- [x] **QC-07**: Agent can get current Quebec emergency room wait times and stretcher occupancy (hourly refresh from MSSS), filterable by `installation`
+- [x] **QC-08**: Agent can get Quebec municipality population, area, and administrative region from the MAMH municipal registry, filterable by `region`
+- [x] **QC-09**: Agent can get current Quebec winter road conditions (pavement state, visibility) from the MTQ WFS
+- [x] **QC-10**: Agent can get current Quebec road construction zones and work sites from the MTQ live WFS CSV
+- [x] **QC-11**: Agent can get current Quebec road events (accidents, incidents, warnings) from the MTQ live WFS CSV
+- [x] **QC-12**: Agent can get the Quebec bridge, culvert, tunnel, and retaining wall inventory from the MTQ structure registry, filterable by `route`, `municipality`, and `region`
+- [x] **QC-13**: Agent can get MFFP/MRN historical forest fire archive metadata and download URLs (discovery-only — the archive is a bulk download, not a queryable endpoint)
+- [x] **QC-14**: Agent can get the RSQAQ air quality monitoring station network (MELCCFP), filterable by `active_only`
+- [x] **QC-15**: Agent can get current Quebec air quality index (IQA) readings from the MELCCFP ArcGIS FeatureServer
+- [x] **QC-16**: Agent can get MELCCFP physicochemical water quality monitoring metadata and download URLs (discovery-only)
+- [x] **QC-17**: Agent can get historical Quebec electricity production and consumption data from Hydro-Québec via Données Québec CSV
+- [x] **QC-18**: Agent can get the MELCCFP protected areas registry (Registre des aires protégées) metadata and download URLs (discovery-only)
+- [x] **QC-19**: All Quebec tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, `quebec_` prefix), are discoverable via discover_tools, and 6 prompts + 7 resources are auto-discovered by FileSystemProvider
+
 ### MCP Prompts and Resources
 
 - [x] **PR-01**: Every module has a prompts.py with 4-6 @prompt functions auto-discovered by FileSystemProvider
@@ -350,6 +405,47 @@ Primary portal is **data.novascotia.ca** — a **Socrata** (Tyler Technologies) 
 | YR-12 | Phase 14 | Complete |
 | YR-13 | Phase 14 | Complete |
 | YR-14 | Phase 14 | Complete |
+| BC-01 | Phase 15 | Complete |
+| BC-02 | Phase 15 | Complete |
+| BC-03 | Phase 15 | Complete |
+| BC-04 | Phase 15 | Complete |
+| BC-05 | Phase 15 | Complete |
+| BC-06 | Phase 15 | Complete |
+| BC-07 | Phase 15 | Complete |
+| BC-08 | Phase 15 | Complete |
+| BC-09 | Phase 15 | Complete |
+| BC-10 | Phase 15 | Complete |
+| BC-11 | Phase 15 | Complete |
+| BC-12 | Phase 15 | Complete |
+| BC-13 | Phase 15 | Complete |
+| BC-14 | Phase 15 | Complete |
+| BC-15 | Phase 15 | Complete |
+| BC-16 | Phase 15 | Complete |
+| BC-17 | Phase 15 | Complete |
+| BC-18 | Phase 15 | Complete |
+| BC-19 | Phase 15 | Complete |
+| BC-20 | Phase 15 | Complete |
+| BC-21 | Phase 15 | Complete |
+| BC-22 | Phase 15 | Complete |
+| QC-01 | Phase 16 | Complete |
+| QC-02 | Phase 16 | Complete |
+| QC-03 | Phase 16 | Complete |
+| QC-04 | Phase 16 | Complete |
+| QC-05 | Phase 16 | Complete |
+| QC-06 | Phase 16 | Complete |
+| QC-07 | Phase 16 | Complete |
+| QC-08 | Phase 16 | Complete |
+| QC-09 | Phase 16 | Complete |
+| QC-10 | Phase 16 | Complete |
+| QC-11 | Phase 16 | Complete |
+| QC-12 | Phase 16 | Complete |
+| QC-13 | Phase 16 | Complete |
+| QC-14 | Phase 16 | Complete |
+| QC-15 | Phase 16 | Complete |
+| QC-16 | Phase 16 | Complete |
+| QC-17 | Phase 16 | Complete |
+| QC-18 | Phase 16 | Complete |
+| QC-19 | Phase 16 | Complete |
 | PR-01 | Phase 40 | Complete |
 | PR-02 | Phase 40 | Complete |
 | PR-03 | Phase 40 | Complete |

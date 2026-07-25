@@ -1,9 +1,17 @@
 ---
 phase: 11-ircc-immigration
 verified: 2026-04-08T00:00:00Z
+re_verified: 2026-07-25T00:00:00Z
 status: passed
-score: 16/16 must-haves verified
-re_verification: false
+score: 16/16 must-haves verified (plans 11-01..11-03); +3 truths for 11-04 verified 2026-07-25
+re_verification: true
+re_verification_reason: |
+  The original report was written at 15:14 on 2026-04-08, before plan 11-04
+  (multi-row merged-header parser, a gap-closure plan) committed its summary at
+  15:57. That ordering left the report mechanically stale — it covered three of
+  four plans. 11-UAT.md, run afterwards at 22:00 the same day, passed 10/10
+  against the post-11-04 behaviour, so the gap was in the paperwork, not the code.
+  Re-verified 2026-07-25; see "Re-verification — Plan 11-04 Coverage" below.
 ---
 
 # Phase 11: IRCC Immigration Verification Report
@@ -136,3 +144,24 @@ No gaps. All must-haves are verified. The phase goal is achieved:
 
 _Verified: 2026-04-08_
 _Verifier: Claude (gsd-verifier)_
+
+---
+
+## Re-verification — Plan 11-04 Coverage (2026-07-25)
+
+Plan 11-04 (IRCC multi-row merged header parser) landed after the original
+verification was written. These three truths close that gap.
+
+| #  | Truth | Status | Evidence |
+|----|-------|--------|---------|
+| 17 | `_parse_ircc_xlsx()` parses multi-row merged headers via openpyxl forward-fill into flat composite column names | VERIFIED | `src/mcp_canada/shared/parsers.py` lines 222-300 (`header_rows`, `header_block_raw`, forward-fill of merged cells); `TestParseIrccXlsx` in `shared/__tests__/test_parsers.py` line 866 |
+| 18 | Every IRCC dataset key has a parse config, and the client threads it through `fetch_and_parse` | VERIFIED | `DATASET_PARSE_CONFIG` in `ircc/constants.py` line 53 covers 12 dataset keys; `client.py` line 43 looks it up and passes `ircc_parse_config=` to the parser; asserted per-dataset across `ircc/__tests__/test_client.py` |
+| 19 | The parse config is hashed into the cache key so one URL parsed with two configs cannot collide | VERIFIED | `parsers.py` line 510: `config_hash = str(sorted(ircc_parse_config.items())) if ircc_parse_config else ""` folded into the `cached_fetch` key |
+
+**Human UAT:** `11-UAT.md` — 10/10 pass, 0 issues, run 2026-04-08T22:00Z against the
+post-11-04 build (tests 1-8 exercise the nested `years` output that 11-04 produced).
+
+**Suite at re-verification:** `uv run pytest --cov=src/mcp_canada --cov-fail-under=95`
+→ 3032 passed, 2 skipped, 97.05% coverage (2026-07-25).
+
+**Verdict:** PASSED — all 19 truths verified; verification now covers all four plans.

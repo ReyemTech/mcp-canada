@@ -2,16 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
+current_phase: 20.1
+current_phase_name: Remove UPSTREAM_ERROR escape-hatch from provincial integration tests
 status: planning
-stopped_at: Completed 20-nova-scotia-government-open-data 20-08-PLAN.md
-last_updated: "2026-06-16T20:39:07.542Z"
-last_activity: 2026-06-17 — Completed quick task 1: de-mask UPSTREAM_ERROR escape-hatch in provincial integration tests
+stopped_at: All 15 executed phases verified passed (2026-07-25 reconciliation); Phase 20.1 not yet planned
+last_updated: "2026-07-25T03:10:49.531Z"
+last_activity: 2026-07-25
 progress:
-  total_phases: 34
+  total_phases: 35
   completed_phases: 15
-  total_plans: 72
-  completed_plans: 72
-  percent: 0
+  total_plans: 71
+  completed_plans: 71
+  percent: 43
 ---
 
 # Project State
@@ -21,20 +23,48 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** An agent can combine data from any Canadian government source in a single SQL query — turning isolated APIs into one queryable data platform.
-**Current focus:** Phase 7 — Datastore + SSL
+**Current focus:** Phase 20.1 — remove UPSTREAM_ERROR escape-hatch from provincial integration tests (not yet planned)
 
 ## Current Position
 
-Phase: 7 of 10 (Datastore + SSL)
-Plan: 0 of TBD in current phase
+Phase: 20 of 35 (20.1 — Remove UPSTREAM_ERROR escape-hatch)
+Plan: 0 of TBD — phase not yet planned
 Status: Ready to plan
-Last activity: 2026-04-07 — Roadmap created for v1.1 milestone
+Last activity: 2026-07-25 — full state reconciliation
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [████░░░░░░] 43%
+
+**Executed and verified:** phases 07-20 and 40 (15 phases, 71 plans, all verification `passed`).
+Suite at reconciliation: 3032 passed, 2 skipped, 97.05% coverage.
+
+**Reconciliation of 2026-07-25** (see git history for the commit):
+- Phase 17 (Alberta): was `human_needed`. Both live-agent UAT items re-run and
+  confirmed (BM25 discovery ranks `alberta_` tools top-5 on all 5 probe queries;
+  French error strings + `_meta.lang='fr'` verified live). All 3 doc-tracking gaps closed.
+- Phase 11 (IRCC): was mechanically `stale` — the report predated plan 11-04, a
+  gap-closure plan. Re-verified with 3 added truths covering 11-04; 11-UAT was
+  already 10/10 against the post-11-04 build.
+- REQUIREMENTS.md: 100 checklist boxes and 117 traceability rows were still
+  "Planned" for shipped work. Flipped to Complete against on-disk evidence.
+- ROADMAP.md: 61 plan checkboxes flipped to `[x]`.
+
+## Open Items
+
+1. **StatCan `FREQUENCY_CODES` is wrong** (major, agent-visible) — the hardcoded map
+   in `statcan/constants.py:28` is shifted from code 6 onward; monthly CPI is reported
+   as "Bi-monthly". Found by running 08-UAT tests 3-6, which had been left `[pending]`.
+   See `.planning/todos/pending/2026-07-25-fix-statcan-frequency-codes-map.md` and
+   `08-UAT.md` Gap 1. 08-UAT is now `status: diagnosed`.
+2. **`sc_get_series_info_by_vector` returns no UOM label** (minor) — 08-UAT Gap 2.
+3. **Phases 15 (BC) and 16 (Quebec) have no REQUIREMENTS.md entries at all** — both
+   shipped (5 and 7 plans, 20 and 18 tools) but no BC-/QC- prefixed requirements were
+   ever written, so they are invisible to the traceability table.
+4. 3 active debug sessions in `.planning/debug/`.
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0
 - Average duration: -
 - Total execution time: -
@@ -46,6 +76,7 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 **Recent Trend:**
+
 - Last 5 plans: -
 - Trend: -
 

@@ -1,20 +1,50 @@
 ---
 phase: 17-alberta-government-open-data
 verified: 2026-04-16T00:00:00Z
-status: human_needed
-score: 27/27 must-haves verified (automated); 3 doc-tracking gaps + 2 live-agent UAT items pending
+re_verified: 2026-07-25T00:00:00Z
+status: passed
+score: 27/27 must-haves verified (automated); 2 live-agent UAT items confirmed 2026-07-25; 3 doc-tracking gaps closed 2026-07-25
 requirements_covered: 27/27
 automated_gate: passed
 human_verification:
   - test: "BM25 discovery surfaces alberta_ tools for natural-language queries"
     expected: "Queries like 'oil wells alberta' and 'alberta wildfires right now' rank alberta_ tools in top 5 results"
     why_human: "BM25 relevance ranking across 217 tools is sensitive to surrounding module docstrings; live agent feel is the final check even though the unit-level discovery test passes"
+    result: pass
+    verified_on: 2026-07-25
+    evidence: |
+      Ran discover_tools through the MCP Client + BM25SearchTransform (max_results=5).
+      alberta_ tools in top 5 for every query; correct tool ranked #1 in 4 of 5:
+        'oil wells alberta'          -> 4/5 alberta_ (#1 alberta_get_well_licences_today)
+        'alberta wildfires right now'-> 3/5 alberta_ (#1 wx_get_current_conditions, #2 alberta_get_active_fires)
+        'alberta road closures'      -> 3/5 alberta_ (#1 alberta_get_road_events)
+        'alberta hospitals'          -> 5/5 alberta_ (#1 alberta_get_hospitals)
+        'alberta fire ban camping'   -> 4/5 alberta_ (#1 alberta_get_fire_bans)
+      The one non-alberta #1 (weather for "right now") is acceptable cross-module
+      competition, not a discovery failure — the expected criterion was top-5 ranking.
   - test: "French-language (lang='fr') agent session returns bilingual error messages and _meta.lang='fr' end-to-end"
     expected: "A francophone agent asking Alberta questions gets French error strings + _meta.lang='fr' on every tool response"
     why_human: "Inline ternary `lang == 'fr'` pattern covers error messages but nuances (formatting, terminology) are subjective; only a conversational pass can confirm quality"
+    result: pass
+    verified_on: 2026-07-25
+    evidence: |
+      Error path (live, through MCP call_tool):
+        alberta_get_dataset_details(package_id="definitely-not-real-xyz", lang="fr")
+        -> {"error":{"code":"NOT_FOUND","message":"Jeu de données introuvable: definitely-not-real-xyz","lang":"fr"}}
+      Success path (live, open.alberta.ca):
+        alberta_list_categories(lang="fr") -> _meta.lang='fr', _meta.source.api='alberta-open-data'
+      Note: Literal-typed params (e.g. category, ban_type) are rejected by Pydantic
+      before the tool body runs, so their French INVALID_INPUT branches are
+      unreachable through MCP. Not a defect — the type system is the earlier gate —
+      but it means those specific French strings are dead code.
+gaps_closed:
+  - "REQUIREMENTS.md AB-18/AB-19/AB-20 flipped to Complete + [x] (2026-07-25)"
+  - "ROADMAP.md Phase 17 plan checkboxes 17-01..17-09 flipped to [x] (2026-07-25)"
+  - "STATE.md rolled forward off the stale 'Phase 7 of 10' position (2026-07-25)"
 gaps:
   - truth: "REQUIREMENTS.md traceability table marks AB-01..26 + AB-27 as Complete"
-    status: partial
+    status: resolved
+    resolved_on: 2026-07-25
     reason: "AB-18, AB-19, AB-20 rows still show 'Planned' in REQUIREMENTS.md traceability table even though 511 Alberta transport tools ship and are covered by live integration tests"
     artifacts:
       - path: ".planning/REQUIREMENTS.md"
@@ -23,7 +53,8 @@ gaps:
       - "Update REQUIREMENTS.md traceability table AB-18/AB-19/AB-20 rows to 'Complete' (lines 321-323)"
       - "Add `[x]` to the requirement checklist lines for AB-18/AB-19/AB-20 (lines 161-163)"
   - truth: "ROADMAP.md Phase 17 plan checklist shows 9/9 plans complete"
-    status: partial
+    status: resolved
+    resolved_on: 2026-07-25
     reason: "Phase 17 header claims 'Plans: 9/9 plans complete' but all 9 individual plan checkbox rows are still rendered as `- [ ]` (unchecked)"
     artifacts:
       - path: ".planning/ROADMAP.md"
@@ -31,7 +62,8 @@ gaps:
     missing:
       - "Flip each Phase 17 plan checkbox at ROADMAP.md lines 216-224 to `- [x]` so the header claim matches the individual entries"
   - truth: "STATE.md reflects Phase 17 as complete (completed_phases/total_phases/status)"
-    status: partial
+    status: resolved
+    resolved_on: 2026-07-25
     reason: "STATE.md frontmatter shows `completed_phases: 12` and `status: planning` with `current_focus: Phase 7 — Datastore + SSL`; 17-09-SUMMARY ships a closing note but STATE.md has not been rolled forward to reflect Phase 17 completion"
     artifacts:
       - path: ".planning/STATE.md"
@@ -46,8 +78,8 @@ gaps:
 **Phase Goal:** Add Alberta's provincial open data surface to mcp-canada via 24 `alberta_` tools (5 discovery + 19 curated). Primary CKAN at open.alberta.ca, ArcGIS Hub portals (GeoDiscover Alberta + WMBappServices + AHSGIS), AER static reports, 511 Alberta REST API. Bilingual, BM25-discoverable, integration-tested through MCP Client, ≥95% coverage.
 
 **Verified:** 2026-04-16
-**Status:** human_needed (all automated must-haves passed; three planning-doc tracking gaps and two live-agent UAT items remain)
-**Re-verification:** No — initial verification.
+**Status:** PASSED (27/27 automated must-haves; both live-agent UAT items confirmed 2026-07-25; all three planning-doc tracking gaps closed 2026-07-25)
+**Re-verification:** Yes — 2026-07-25 reconciliation pass. See `human_verification[].evidence` in the frontmatter for the BM25-discovery and French-language transcripts.
 
 ---
 

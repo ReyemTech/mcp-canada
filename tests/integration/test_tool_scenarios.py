@@ -8,7 +8,13 @@ Run: uv run pytest tests/integration/test_tool_scenarios.py -v -m integration --
 
 import aiosqlite
 import pytest
-from tests.integration.conftest import call_tool, call_direct_tool, discover
+from tests.integration.conftest import (
+    assert_live_or_transient,
+    assert_rows,
+    call_direct_tool,
+    call_tool,
+    discover,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -1406,7 +1412,21 @@ class TestYorkRegionToolScenarios:
 
 @pytest.mark.asyncio
 class TestBcToolScenarios:
-    """BC open data tool integration scenarios — live BCDC CKAN + BCGW WFS endpoints."""
+    """BC open data tool integration scenarios — live BCDC CKAN + BCGW WFS endpoints.
+
+    Pinned package ids (D-11): the WFS-routing tests used to discover a dataset
+    by searching, then pytest.skip() when the search came back empty. A skip
+    reports neither pass nor fail, so "BCDC search returned no results" silently
+    meant the routing path under test was never exercised. These two datasets are
+    canonical, long-lived BCDC entries; if either ever disappears the test fails
+    loudly, which is the point.
+    """
+
+    #: BC Wildfire Fire Perimeters - Historical (queryable_via_wfs=True,
+    #: WHSE_LAND_AND_NATURAL_RESOURCE.PROT_HISTORICAL_FIRE_POLYS_SP)
+    WFS_PACKAGE_ID = "22c7cb44-1463-48f7-8e47-88857f207702"
+    #: BC Greenhouse Gas Emissions (queryable_via_wfs=False, 11 file resources)
+    NON_WFS_PACKAGE_ID = "7ec1a555-122e-4173-9536-1731dfd63b5c"
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(60)
@@ -1416,11 +1436,10 @@ class TestBcToolScenarios:
             "q": "wildfire",
             "rows": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "data" in data:
-            assert isinstance(data["data"], list)
-            assert len(data["data"]) >= 1
-            titles = [d.get("title", "").lower() for d in data["data"]]
+        live = assert_live_or_transient(data, "bc_search_datasets")
+        if live:
+            results = assert_rows(data, "bc_search_datasets")
+            titles = [d.get("title", "").lower() for d in results]
             assert any("wildfire" in t or "fire" in t for t in titles), (
                 f"No wildfire-related dataset found: {titles}"
             )
@@ -1432,15 +1451,15 @@ class TestBcToolScenarios:
         data = await call_tool(mcp_server, "bc_get_active_fires", {
             "max_records": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "bc-wfs"
-            assert "data" in data
-            # data is {"features": [...], "truncated": bool}
-            assert isinstance(data["data"], dict)
-            assert "features" in data["data"]
-            assert isinstance(data["data"]["features"], list)
-            assert "truncated" in data["data"]
+        live = assert_live_or_transient(data, "bc_get_active_fires", "bc-wfs")
+        if live:
+            payload = data["data"]
+            assert isinstance(payload, dict), (
+                f"WFS tools return a dict, got {type(payload).__name__}"
+            )
+            assert "features" in payload, f"payload missing features: {payload}"
+            assert isinstance(payload["features"], list)
+            assert "truncated" in payload, f"payload missing truncated: {payload}"
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(90)
@@ -1450,14 +1469,17 @@ class TestBcToolScenarios:
             "year": 2023,
             "max_records": 10,
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "bc-wfs"
-            # data is {"features": [...], "truncated": bool}
-            assert isinstance(data["data"], dict)
-            assert "features" in data["data"]
-            features = data["data"]["features"]
-            assert len(features) >= 1 or data["data"].get("truncated") is True
+        live = assert_live_or_transient(data, "bc_get_fire_perimeters", "bc-wfs")
+        if live:
+            payload = data["data"]
+            assert isinstance(payload, dict), (
+                f"WFS tools return a dict, got {type(payload).__name__}"
+            )
+            assert "features" in payload, f"payload missing features: {payload}"
+            # 2023 was a record BC fire season — an empty result is a defect.
+            assert payload["features"] or payload.get("truncated") is True, (
+                f"2023 fire perimeters must return features: {payload}"
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(60)
@@ -1467,19 +1489,18 @@ class TestBcToolScenarios:
             "designation": "PROVINCIAL PARK",
             "max_records": 10,
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "bc-wfs"
-            # data is {"features": [...], "truncated": bool}
-            assert isinstance(data["data"], dict)
-            assert "features" in data["data"]
-            features = data["data"]["features"]
-            if features:
-                # Verify known field names are present
-                sample = features[0]
-                assert any(
-                    k in sample for k in ("PROTECTED_LANDS_NAME", "PROTECTED_LANDS_DESIGNATION", "PROT_LANDS_NAME")
-                ), f"Expected park field names not found: {list(sample.keys())[:10]}"
+        live = assert_live_or_transient(data, "bc_get_protected_areas", "bc-wfs")
+        if live:
+            payload = data["data"]
+            assert "features" in payload, f"payload missing features: {payload}"
+            # BC has hundreds of provincial parks — empty means broken.
+            features = payload["features"]
+            assert features, f"PROVINCIAL PARK designation returned nothing: {payload}"
+            sample = features[0]
+            assert any(
+                k in sample
+                for k in ("PROTECTED_LANDS_NAME", "PROTECTED_LANDS_DESIGNATION", "PROT_LANDS_NAME")
+            ), f"Expected park field names not found: {list(sample.keys())[:10]}"
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(60)
@@ -1489,12 +1510,14 @@ class TestBcToolScenarios:
             "tenure_type": "mineral",
             "max_records": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "bc-wfs"
-            # data is {"features": [...], "truncated": bool}
-            assert isinstance(data["data"], dict)
-            assert "features" in data["data"]
+        live = assert_live_or_transient(data, "bc_get_mining_tenure", "bc-wfs")
+        if live:
+            payload = data["data"]
+            assert "features" in payload, f"payload missing features: {payload}"
+            assert payload["features"], (
+                f"BC has thousands of active mineral claims — empty means the "
+                f"tenure_type filter is broken: {payload}"
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(60)
@@ -1508,64 +1531,59 @@ class TestBcToolScenarios:
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(90)
+    async def test_dataset_details_exposes_wfs_routing_metadata(self, mcp_server):
+        """The two-step workflow depends on details carrying the WFS routing flags."""
+        details = await call_tool(mcp_server, "bc_get_dataset_details", {
+            "package_id": self.WFS_PACKAGE_ID,
+        })
+        live = assert_live_or_transient(details, "bc_get_dataset_details")
+        if live:
+            dd = details["data"]
+            assert dd.get("queryable_via_wfs") is True, (
+                f"{self.WFS_PACKAGE_ID} (BC Wildfire Fire Perimeters - Historical) "
+                f"must be WFS-queryable — bc_query_features routing depends on this "
+                f"flag. Got: {dd.get('queryable_via_wfs')!r}"
+            )
+            assert dd.get("object_name"), (
+                f"a WFS-queryable dataset must expose object_name: {dd}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(90)
     async def test_query_features_routes_to_wfs(self, mcp_server):
         """bc_query_features routes to WFS when dataset has queryable_via_wfs=True."""
-        # Step 1: search for a known WFS dataset
-        search_data = await call_tool(mcp_server, "bc_search_datasets", {
-            "q": "fire perimeters",
-            "rows": 5,
-        })
-        if "error" in search_data or not search_data.get("data"):
-            pytest.skip("BCDC search returned no results")
-        # Step 2: find a dataset with queryable_via_wfs
-        wfs_dataset = None
-        for ds in search_data["data"]:
-            details = await call_tool(mcp_server, "bc_get_dataset_details", {
-                "package_id": ds["id"],
-            })
-            if details.get("data", {}).get("queryable_via_wfs"):
-                wfs_dataset = details["data"]
-                break
-        if wfs_dataset is None:
-            pytest.skip("No WFS-queryable dataset found in search results")
-        # Step 3: query via bc_query_features (requires package_id, not object_name)
-        pkg_id = wfs_dataset.get("id")
-        if not pkg_id:
-            pytest.skip("Dataset has no id")
         result = await call_tool(mcp_server, "bc_query_features", {
-            "package_id": pkg_id,
+            "package_id": self.WFS_PACKAGE_ID,
             "max_records": 3,
         })
-        assert "_meta" in result or "error" in result
-        if "_meta" in result:
-            assert result["_meta"]["source"]["api"] == "bc-wfs"
+        live = assert_live_or_transient(result, "bc_query_features", "bc-wfs")
+        if live:
+            payload = result["data"]
+            assert isinstance(payload, dict), (
+                f"the WFS route returns a dict, got {type(payload).__name__} — "
+                f"a list would mean it fell through to the file parser"
+            )
+            assert "features" in payload, f"WFS payload missing features: {payload}"
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(90)
     async def test_query_features_routes_to_file_parser(self, mcp_server):
-        """bc_query_features routes to file parser when dataset has queryable_via_wfs=False."""
-        # Search for likely non-WFS datasets (e.g. XLSX/CSV-only)
-        search_data = await call_tool(mcp_server, "bc_search_datasets", {
-            "q": "statistics report",
-            "rows": 10,
+        """bc_query_features routes to the file parser when queryable_via_wfs=False."""
+        details = await call_tool(mcp_server, "bc_get_dataset_details", {
+            "package_id": self.NON_WFS_PACKAGE_ID,
         })
-        if "error" in search_data or not search_data.get("data"):
-            pytest.skip("BCDC search returned no results")
-        csv_dataset = None
-        for ds in search_data["data"]:
-            details = await call_tool(mcp_server, "bc_get_dataset_details", {
-                "package_id": ds["id"],
-            })
-            details_data = details.get("data", {})
-            if not details_data.get("queryable_via_wfs") and details_data.get("resources"):
-                # Must have at least one downloadable resource
-                csv_dataset = details_data
-                break
-        if csv_dataset is None:
-            pytest.skip("No non-WFS dataset with resources found in search results")
-        # Verify structure — the tool should return _meta or error, not raise an exception
-        assert csv_dataset.get("queryable_via_wfs") is False
-        assert isinstance(csv_dataset.get("resources", []), list)
+        live = assert_live_or_transient(details, "bc_get_dataset_details")
+        if live:
+            dd = details["data"]
+            assert dd.get("queryable_via_wfs") is False, (
+                f"{self.NON_WFS_PACKAGE_ID} (BC Greenhouse Gas Emissions) is a "
+                f"file-resource dataset and must NOT be WFS-queryable — this test "
+                f"exercises the non-WFS branch. Got: {dd.get('queryable_via_wfs')!r}"
+            )
+            resources = dd.get("resources") or []
+            assert isinstance(resources, list) and resources, (
+                f"the file-parser route needs downloadable resources: {dd}"
+            )
 
 
 # ─── Quebec Government Open Data scenarios ───────────────────────────────────

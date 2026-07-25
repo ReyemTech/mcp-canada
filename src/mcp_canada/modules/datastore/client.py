@@ -7,6 +7,7 @@ was_cached is always False — SQLite is local I/O, not a cached remote API.
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import aiosqlite
 

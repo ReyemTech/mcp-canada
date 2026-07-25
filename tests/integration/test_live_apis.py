@@ -137,14 +137,17 @@ class TestOpenParliamentLive:
         )
         assert r.status_code == 200
         data = r.json()
-        # If the API ever fixes keyword search, this test will need updating
-        # For now: verify we get results but they're NOT cannabis-related
-        if data["objects"]:
-            first_bill_name = data["objects"][0].get("name", {}).get("en", "")
-            # The first result should NOT be about cannabis (known limitation)
-            assert "cannabis" not in first_bill_name.lower(), (
-                "Bill keyword search now works! Update parl_search_bills docstring."
-            )
+        # Documents a known upstream limitation: the bills endpoint ignores `q`
+        # and returns unfiltered results. Session 42-1 always has bills, so an
+        # empty list means the request shape broke, not that the limitation ended.
+        assert data["objects"], (
+            f"session 42-1 must return bills — an empty list means the query "
+            f"itself failed: {data}"
+        )
+        first_bill_name = data["objects"][0].get("name", {}).get("en", "")
+        assert "cannabis" not in first_bill_name.lower(), (
+            "Bill keyword search now works! Update parl_search_bills docstring."
+        )
 
     @pytest.mark.asyncio
     async def test_requires_accept_json_header(self, http):

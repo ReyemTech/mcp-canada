@@ -7,9 +7,24 @@ Run: uv run pytest tests/integration/test_weather_aqhi_hydro_scenarios.py -v -m 
 """
 
 import pytest
-from tests.integration.conftest import call_tool, discover
+from tests.integration.conftest import (
+    assert_live_or_transient,
+    assert_rows,
+    call_tool,
+    discover,
+)
 
 pytestmark = pytest.mark.integration
+
+API = "msc-geomet"
+
+# AQHI location_ids are opaque 5-letter MSC codes, NOT province-prefixed strings.
+# Earlier revisions of this file used invented ids ("ON106", "ON-01") that match
+# nothing, and the masked assertions hid the resulting NOT_FOUND.
+# Resolved from the live collections 2026-07-25 by filtering location_name_en.
+# Note the id differs per collection for the same city: Toronto observations are
+# FDQBU while Toronto forecasts are FCWYG. Ottawa is FEVNT in both.
+OTTAWA_AQHI = "FEVNT"
 
 
 # ─── AQHI scenarios ──────────────────────────────────────────────────────────
@@ -24,28 +39,24 @@ class TestAqhiScenarios:
         data = await call_tool(mcp_server, "wx_get_aqhi", {
             "lat": 45.4, "lon": -75.7
         })
-        # Should return data or NOT_FOUND — never an exception
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "msc-geomet"
-            assert isinstance(data["data"], list)
-            if data["data"]:
-                reading = data["data"][0]
-                assert "aqhi_value" in reading
-                assert "location_id" in reading
+        live = assert_live_or_transient(data, "wx_get_aqhi", API)
+        if live:
+            # Ottawa is inside an AQHI forecast region and readings are hourly.
+            reading = assert_rows(data, "wx_get_aqhi")[0]
+            assert "aqhi_value" in reading, f"reading missing aqhi_value: {reading}"
+            assert "location_id" in reading, f"reading missing location_id: {reading}"
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
     async def test_aqhi_forecast_by_location_id(self, mcp_server):
-        """'What is the AQHI forecast for Ottawa (ON106)?'"""
+        """'What is the AQHI forecast for Ottawa?'"""
         data = await call_tool(mcp_server, "wx_get_aqhi_forecast", {
-            "location_id": "ON106"
+            "location_id": OTTAWA_AQHI
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert isinstance(data["data"], list)
-            if data["data"]:
-                assert "aqhi_value" in data["data"][0]
+        live = assert_live_or_transient(data, "wx_get_aqhi_forecast", API)
+        if live:
+            rows = assert_rows(data, "wx_get_aqhi_forecast")
+            assert "aqhi_value" in rows[0], f"forecast row missing aqhi_value: {rows[0]}"
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
@@ -78,14 +89,11 @@ class TestHydroScenarios:
         data = await call_tool(mcp_server, "wx_get_water_levels", {
             "station_number": "02LA004"
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "msc-geomet"
-            assert isinstance(data["data"], list)
-            if data["data"]:
-                reading = data["data"][0]
-                assert "station_number" in reading
-                assert "level_m" in reading
+        live = assert_live_or_transient(data, "wx_get_water_levels", API)
+        if live:
+            reading = assert_rows(data, "wx_get_water_levels")[0]
+            assert "station_number" in reading, f"reading missing station_number: {reading}"
+            assert "level_m" in reading, f"reading missing level_m: {reading}"
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
@@ -94,23 +102,22 @@ class TestHydroScenarios:
         data = await call_tool(mcp_server, "wx_search_hydro_stations", {
             "province": "ON"
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert isinstance(data["data"], list)
-            if data["data"]:
-                station = data["data"][0]
-                assert "station_number" in station
-                assert "station_name" in station
+        live = assert_live_or_transient(data, "wx_search_hydro_stations", API)
+        if live:
+            # Ontario always has hydrometric stations.
+            station = assert_rows(data, "wx_search_hydro_stations")[0]
+            assert "station_number" in station, f"station missing station_number: {station}"
+            assert "station_name" in station, f"station missing station_name: {station}"
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
     async def test_aqhi_history(self, mcp_server):
         """'Get historical air quality observations.'"""
         data = await call_tool(mcp_server, "wx_get_aqhi_history", {
-            "location_id": "ON-01",  # Toronto area
+            "location_id": OTTAWA_AQHI,
             "limit": 5,
         })
-        assert "_meta" in data or "error" in data
+        assert_live_or_transient(data, "wx_get_aqhi_history")
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
@@ -119,7 +126,7 @@ class TestHydroScenarios:
         data = await call_tool(mcp_server, "wx_get_water_flow", {
             "station_number": "02LA004",
         })
-        assert "_meta" in data or "error" in data
+        assert_live_or_transient(data, "wx_get_water_flow")
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
@@ -128,7 +135,7 @@ class TestHydroScenarios:
         data = await call_tool(mcp_server, "wx_get_daily_mean_water", {
             "station_number": "02LA004",
         })
-        assert "_meta" in data or "error" in data
+        assert_live_or_transient(data, "wx_get_daily_mean_water")
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
@@ -146,7 +153,12 @@ class TestHydroScenarios:
         data = await call_tool(mcp_server, "wx_get_flood_risk", {
             "station_number": "ZZZZZZZZ"
         })
-        assert "_meta" in data or "error" in data
-        # Valid responses: either NOT_FOUND error or successful response (if station somehow exists)
+        # This is an error-PATH test: station ZZZZZZZZ does not exist, so
+        # NOT_FOUND is the correct answer and must not be treated as an outage.
         if "error" in data:
-            assert data["error"]["code"] in ("NOT_FOUND", "UPSTREAM_ERROR")
+            assert data["error"]["code"] in ("NOT_FOUND", "UPSTREAM_ERROR"), (
+                f"unknown station must yield NOT_FOUND (or a transient "
+                f"UPSTREAM_ERROR), got: {data['error']}"
+            )
+        else:
+            assert "_meta" in data, f"expected an error or an envelope, got: {data}"

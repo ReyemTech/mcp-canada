@@ -34,21 +34,29 @@ def statcan_frequency_codes() -> str:
     Maps WDS frequencyCode integers to bilingual labels.
     Use this catalog to interpret the frequencyCode field in sc_get_cube_metadata.
     Format: {"code": {"en": "English label", "fr": "Libellé en français"}}
+
+    Codes are transcribed from StatCan's published set (getCodeSets) and are NOT
+    contiguous — there is no 3, 5, 8, or 10.
     """
     return json.dumps(
         {
-            "1": {"en": "Daily", "fr": "Quotidien"},
-            "2": {"en": "Weekly (Sunday)", "fr": "Hebdomadaire (dimanche)"},
-            "4": {"en": "Bi-weekly", "fr": "Bihebdomadaire"},
-            "5": {"en": "Monthly", "fr": "Mensuel"},
-            "6": {"en": "Bi-monthly", "fr": "Bimestriel"},
-            "7": {"en": "Quarterly", "fr": "Trimestriel"},
-            "8": {"en": "Semi-annual", "fr": "Semestriel"},
-            "9": {"en": "Annual", "fr": "Annuel"},
-            "10": {"en": "Every 2 years", "fr": "Tous les 2 ans"},
-            "11": {"en": "Every 3 years", "fr": "Tous les 3 ans"},
-            "12": {"en": "Irregular", "fr": "Irrégulier"},
-            "13": {"en": "Every 5 years", "fr": "Tous les 5 ans"},
+            "1": {"en": "Daily", "fr": "Quotidienne"},
+            "2": {"en": "Weekly", "fr": "Hebdomadaire"},
+            "4": {"en": "Biweekly", "fr": "Aux 2 semaines"},
+            "6": {"en": "Monthly", "fr": "Mensuelle"},
+            "7": {"en": "Bimonthly", "fr": "Aux 2 mois"},
+            "9": {"en": "Quarterly", "fr": "Trimestrielle"},
+            "11": {"en": "Semi-annual", "fr": "Semestrielle"},
+            "12": {"en": "Annual", "fr": "Annuelle"},
+            "13": {"en": "Every 2 years", "fr": "Aux 2 ans"},
+            "14": {"en": "Every 3 years", "fr": "Aux 3 ans"},
+            "15": {"en": "Every 4 years", "fr": "Aux 4 ans"},
+            "16": {"en": "Every 5 years", "fr": "Aux 5 ans"},
+            "17": {"en": "Every 10 years", "fr": "Aux 10 ans"},
+            "18": {"en": "Occasional", "fr": "Occasionnelle"},
+            "19": {"en": "Occasional Quarterly", "fr": "Occasionnelle trimestrielle"},
+            "20": {"en": "Occasional Monthly", "fr": "Occasionnelle mensuelle"},
+            "21": {"en": "Occasional Daily", "fr": "Occasionnelle quotidienne"},
         },
         ensure_ascii=False,
         indent=2,
@@ -67,19 +75,21 @@ def statcan_scalar_factor_codes() -> str:
     Maps WDS scalarFactorCode integers to bilingual labels indicating the
     unit multiplier applied to observation values.
     Format: {"code": {"en": "English label", "fr": "Libellé en français"}}
+
+    Code N means 10^N. The published set is exactly 0-9; there is no 888.
     """
     return json.dumps(
         {
-            "0": {"en": "Units (no multiplier)", "fr": "Unités (aucun multiplicateur)"},
-            "1": {"en": "Thousands", "fr": "Milliers"},
-            "2": {"en": "Millions", "fr": "Millions"},
-            "3": {"en": "Billions", "fr": "Milliards"},
-            "4": {"en": "Trillions", "fr": "Billions"},
-            "5": {"en": "Tens", "fr": "Dizaines"},
-            "6": {"en": "Hundreds", "fr": "Centaines"},
-            "7": {"en": "Tens of thousands", "fr": "Dizaines de milliers"},
-            "8": {"en": "Hundreds of thousands", "fr": "Centaines de milliers"},
-            "888": {"en": "Not applicable", "fr": "Sans objet"},
+            "0": {"en": "units", "fr": "unités"},
+            "1": {"en": "tens", "fr": "dizaines"},
+            "2": {"en": "hundreds", "fr": "centaines"},
+            "3": {"en": "thousands", "fr": "milliers"},
+            "4": {"en": "tens of thousands", "fr": "dizaines de milliers"},
+            "5": {"en": "hundreds of thousands", "fr": "centaines de milliers"},
+            "6": {"en": "millions", "fr": "millions"},
+            "7": {"en": "tens of millions", "fr": "dizaines de millions"},
+            "8": {"en": "hundreds of millions", "fr": "centaines de millions"},
+            "9": {"en": "billions", "fr": "milliards"},
         },
         ensure_ascii=False,
         indent=2,

@@ -2873,3 +2873,90 @@ class TestNovaScotiaToolScenarios:
         assert "hospital" in data["error"]["valid"], (
             f"valid= list must include 'hospital'. Got: {data['error']['valid']}"
         )
+
+
+@pytest.mark.integration
+class TestStatCanCodeSetDrift:
+    """Guard the hardcoded WDS decode maps against StatCan's live code set.
+
+    Regression cover for 08-UAT.md Gap 1: `FREQUENCY_CODES` was shifted from code
+    6 onward (monthly CPI reported as "Bi-monthly") and `SCALAR_FACTOR_CODES` was
+    shifted from code 1 onward (a 100x magnitude misread). Unit tests could not
+    catch it — they asserted the maps against themselves — and the server
+    contradicted itself, because `sc_get_code_sets` proxies the live endpoint
+    while every other sc_ tool decoded against the stale local copy.
+
+    These tests fail if the local maps and upstream ever diverge again.
+    """
+
+    @pytest.mark.asyncio
+    async def test_frequency_map_matches_live_code_set(self, mcp_server):
+        """'Do our frequency labels still match what StatCan publishes?'"""
+        from mcp_canada.modules.statcan.constants import FREQUENCY_CODES
+
+        data = await call_tool(mcp_server, "sc_get_code_sets", {})
+        assert "_meta" in data, f"expected envelope, got: {data}"
+        live = {e["code"]: e["desc_en"] for e in data["data"]["frequency"]}
+
+        assert live, "live frequency code set came back empty"
+        assert FREQUENCY_CODES == live, (
+            "FREQUENCY_CODES has drifted from StatCan's published set.\n"
+            f"  only local: {set(FREQUENCY_CODES) - set(live)}\n"
+            f"  only live:  {set(live) - set(FREQUENCY_CODES)}\n"
+            f"  mismatched: "
+            f"{ {k: (FREQUENCY_CODES[k], live[k]) for k in set(FREQUENCY_CODES) & set(live) if FREQUENCY_CODES[k] != live[k]} }"
+        )
+
+    @pytest.mark.asyncio
+    async def test_scalar_map_matches_live_code_set(self, mcp_server):
+        """'Do our scalar multiplier labels still match StatCan?'"""
+        from mcp_canada.modules.statcan.constants import SCALAR_FACTOR_CODES
+
+        data = await call_tool(mcp_server, "sc_get_code_sets", {})
+        live = {e["code"]: e["desc_en"] for e in data["data"]["scalar"]}
+
+        assert live, "live scalar code set came back empty"
+        assert SCALAR_FACTOR_CODES == live, (
+            "SCALAR_FACTOR_CODES has drifted from StatCan's published set.\n"
+            f"  only local: {set(SCALAR_FACTOR_CODES) - set(live)}\n"
+            f"  only live:  {set(live) - set(SCALAR_FACTOR_CODES)}\n"
+            f"  mismatched: "
+            f"{ {k: (SCALAR_FACTOR_CODES[k], live[k]) for k in set(SCALAR_FACTOR_CODES) & set(live) if SCALAR_FACTOR_CODES[k] != live[k]} }"
+        )
+
+    @pytest.mark.asyncio
+    async def test_monthly_cpi_is_labelled_monthly(self, mcp_server):
+        """'Is monthly CPI actually reported as monthly?' — the original defect.
+
+        Vector 41690973 is CPI all-items Canada, frequencyCode 6. Before the fix
+        every observation came back labelled "Bi-monthly" despite reference
+        periods exactly one month apart.
+        """
+        data = await call_tool(
+            mcp_server, "sc_get_data_by_vector", {"vector_id": 41690973, "n": 3}
+        )
+        assert "_meta" in data, f"expected envelope, got: {data}"
+        rows = data["data"]
+        assert rows, "no observations returned"
+        for row in rows:
+            assert row["frequency_code"] == 6, (
+                f"CPI should be frequencyCode 6, got {row['frequency_code']}"
+            )
+            assert row["frequency"] == "Monthly", (
+                f"frequencyCode 6 must decode to 'Monthly', got {row['frequency']!r}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_resource_catalog_agrees_with_live_code_set(self, mcp_server):
+        """The data:// catalog agents read must not contradict the live API."""
+        import json as _json
+        from mcp_canada.modules.statcan.resources import statcan_frequency_codes
+
+        data = await call_tool(mcp_server, "sc_get_code_sets", {})
+        live = {e["code"]: e["desc_en"] for e in data["data"]["frequency"]}
+        catalog = {int(k): v["en"] for k, v in _json.loads(statcan_frequency_codes()).items()}
+
+        assert catalog == live, (
+            "data://statcan/frequency-codes disagrees with the live code set: "
+            f"{ {k: (catalog.get(k), live.get(k)) for k in set(catalog) | set(live) if catalog.get(k) != live.get(k)} }"
+        )

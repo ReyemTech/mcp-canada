@@ -1,4 +1,12 @@
-"""WDS API response fixtures for StatCan client tests."""
+"""WDS API response fixtures for StatCan client tests.
+
+Product IDs and titles are synthetic, but every WDS *code* below is a real
+value from StatCan's published code set (getCodeSets). The fixtures
+previously used frequencyCode 5 and 7 for monthly/quarterly series — neither
+means that upstream (5 is not a StatCan code at all; 7 is Bimonthly). Those
+invented codes were what made the shipped FREQUENCY_CODES map look correct.
+Keep these aligned with constants.FREQUENCY_CODES / SCALAR_FACTOR_CODES.
+"""
 
 import pytest
 from unittest.mock import MagicMock
@@ -16,7 +24,7 @@ CUBE_LIST_LITE_RESPONSE = [
         "cubeEndDate": "2026-03",
         "releaseTime": "2026-03-19 08:30",
         "archived": False,
-        "frequencyCode": 5,
+        "frequencyCode": 6,
         "subjectCode": ["18"],
         "surveyCode": ["2301"],
     },
@@ -29,7 +37,7 @@ CUBE_LIST_LITE_RESPONSE = [
         "cubeEndDate": "2025-12",
         "releaseTime": "2026-02-28 08:30",
         "archived": False,
-        "frequencyCode": 7,
+        "frequencyCode": 9,
         "subjectCode": ["36"],
         "surveyCode": ["1901"],
     },
@@ -42,7 +50,7 @@ CUBE_LIST_LITE_RESPONSE = [
         "cubeEndDate": "2026-03",
         "releaseTime": "2026-04-04 08:30",
         "archived": False,
-        "frequencyCode": 5,
+        "frequencyCode": 6,
         "subjectCode": ["14"],
         "surveyCode": ["3701"],
     },
@@ -57,7 +65,7 @@ CUBE_METADATA_RESPONSE = {
         "cubeTitleFr": "Indice des prix à la consommation, mensuel",
         "cubeStartDate": "1914-01",
         "cubeEndDate": "2026-03",
-        "frequencyCode": 5,
+        "frequencyCode": 6,
         "nbSeries": 1000,
         "nbDatapoints": 500000,
         "dimension": [
@@ -102,12 +110,12 @@ CODE_SETS_RESPONSE = {
     "status": "SUCCESS",
     "object": {
         "frequency": [
-            {"frequencyCode": 1, "frequencyDescEn": "Daily", "frequencyDescFr": "Quotidien"},
-            {"frequencyCode": 5, "frequencyDescEn": "Monthly", "frequencyDescFr": "Mensuel"},
+            {"frequencyCode": 1, "frequencyDescEn": "Daily", "frequencyDescFr": "Quotidienne"},
+            {"frequencyCode": 6, "frequencyDescEn": "Monthly", "frequencyDescFr": "Mensuelle"},
         ],
         "scalar": [
             {"scalarFactorCode": 0, "scalarFactorDescEn": "units", "scalarFactorDescFr": "unités"},
-            {"scalarFactorCode": 6, "scalarFactorDescEn": "hundreds", "scalarFactorDescFr": "centaines"},
+            {"scalarFactorCode": 6, "scalarFactorDescEn": "millions", "scalarFactorDescFr": "millions"},
         ],
         "status": [
             {"statusCode": 0, "statusDescEn": "Normal", "statusDescFr": "Normal"},
@@ -132,7 +140,7 @@ SERIES_INFO_RESPONSE = [
             "productId": 18100004,
             "coordinate": "1.1",
             "vectorId": 41690973,
-            "frequencyCode": 5,
+            "frequencyCode": 6,
             "scalarFactorCode": 0,
             "decimals": 1,
             "terminated": 0,
@@ -158,7 +166,7 @@ OBSERVATION_RESPONSE = [
                     "value": 163.4,
                     "decimals": 1,
                     "scalarFactorCode": 0,
-                    "frequencyCode": 5,
+                    "frequencyCode": 6,
                     "statusCode": 0,
                     "symbolCode": 0,
                     "releaseTime": "2026-03-19 08:30",
@@ -172,7 +180,7 @@ OBSERVATION_RESPONSE = [
                     "value": 162.9,
                     "decimals": 1,
                     "scalarFactorCode": 0,
-                    "frequencyCode": 5,
+                    "frequencyCode": 6,
                     "statusCode": 0,
                     "symbolCode": 0,
                     "releaseTime": "2026-02-19 08:30",
@@ -186,7 +194,7 @@ OBSERVATION_RESPONSE = [
                     "value": None,
                     "decimals": 1,
                     "scalarFactorCode": 0,
-                    "frequencyCode": 5,
+                    "frequencyCode": 6,
                     "statusCode": 2,
                     "symbolCode": 0,
                     "releaseTime": "2026-01-21 08:30",
@@ -243,8 +251,8 @@ SERIES_INFO_BY_COORD_RESPONSE = [
             "productId": 35100003,
             "coordinate": "1.12.0.0.0.0.0.0.0.0",
             "vectorId": 32164132,
-            "frequencyCode": 9,
-            "scalarFactorCode": 6,
+            "frequencyCode": 12,
+            "scalarFactorCode": 2,
             "decimals": 2,
             "terminated": 0,
             "SeriesTitleEn": "GDP at basic prices; Canada; Agriculture",
@@ -350,7 +358,7 @@ BULK_VECTOR_RESPONSE = [
                     "value": 150.2,
                     "decimals": 1,
                     "scalarFactorCode": 0,
-                    "frequencyCode": 5,
+                    "frequencyCode": 6,
                     "statusCode": 0,
                     "symbolCode": 0,
                     "releaseTime": "2024-02-15 08:30",

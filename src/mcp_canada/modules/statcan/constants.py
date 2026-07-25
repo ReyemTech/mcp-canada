@@ -25,19 +25,33 @@ CACHE_TTL_OBS = 3600         # 1 hour — observations refresh frequently
 _API_NAME = "statcan-wds"
 
 # Frequency codes (WDS frequencyCode → human-readable label)
+#
+# Transcribed verbatim from StatCan's published code set:
+#   https://www150.statcan.gc.ca/t1/wds/rest/getCodeSets → object.frequency
+# There is no code 3, 5, 8, or 10 — do not fill the gaps. Codes are NOT
+# contiguous and NOT ordered by period length.
+#
+# Verified against live getCodeSets 2026-07-25. `sc_get_code_sets` proxies the
+# same endpoint at runtime, so any drift here makes the server contradict itself;
+# TestStatCanCodeSetDrift (integration) fails if upstream changes.
 FREQUENCY_CODES: dict[int, str] = {
     1: "Daily",
-    2: "Weekly (Sunday)",
-    4: "Bi-weekly",
-    5: "Monthly",
-    6: "Bi-monthly",
-    7: "Quarterly",
-    8: "Semi-annual",
-    9: "Annual",
-    10: "Every 2 years",
-    11: "Every 3 years",
-    12: "Irregular",
+    2: "Weekly",
+    4: "Biweekly",
+    6: "Monthly",
+    7: "Bimonthly",
+    9: "Quarterly",
+    11: "Semi-annual",
+    12: "Annual",
     13: "Every 2 years",
+    14: "Every 3 years",
+    15: "Every 4 years",
+    16: "Every 5 years",
+    17: "Every 10 years",
+    18: "Occasional",
+    19: "Occasional Quarterly",
+    20: "Occasional Monthly",
+    21: "Occasional Daily",
 }
 
 # ---------------------------------------------------------------------------
@@ -63,16 +77,21 @@ SDMX_XML_NAMESPACES: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 # Scalar factor codes (WDS scalarFactorCode → human-readable label)
+# Scalar factor codes (WDS scalarFactorCode → magnitude multiplier label)
+#
+# Transcribed verbatim from StatCan's published code set:
+#   https://www150.statcan.gc.ca/t1/wds/rest/getCodeSets → object.scalar
+# Code N means 10^N — the set is exactly 0-9, strictly ascending. There is no
+# 888 entry. Verified against live getCodeSets 2026-07-25.
 SCALAR_FACTOR_CODES: dict[int, str] = {
     0: "units",
-    1: "thousands",
-    2: "millions",
-    3: "billions",
-    4: "trillions",
-    5: "tens",
-    6: "hundreds",
-    7: "tens of thousands",
-    8: "hundreds of thousands",
+    1: "tens",
+    2: "hundreds",
+    3: "thousands",
+    4: "tens of thousands",
+    5: "hundreds of thousands",
+    6: "millions",
+    7: "tens of millions",
+    8: "hundreds of millions",
     9: "billions",
-    888: "null",
 }

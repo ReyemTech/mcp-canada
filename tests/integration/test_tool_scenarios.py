@@ -824,17 +824,27 @@ class TestStatcanWdsScenarios:
         import datetime
         today = datetime.date.today().isoformat()
         data = await call_tool(mcp_server, "sc_get_changed_cubes", {"date": today})
-        # Shape assertion only — may be empty list before 08:30 EST
-        assert "_meta" in data
-        assert isinstance(data["data"], list)
+        # StatCan WDS has a documented 00:00-08:30 EST maintenance window and
+        # reports UPSTREAM_UNAVAILABLE during it, which is tolerated.
+        live = assert_live_or_transient(data, "sc_get_changed_cubes", "statcan-wds")
+        if live:
+            assert_rows(
+                data,
+                "sc_get_changed_cubes",
+                allow_empty_reason="no tables have changed yet today is normal",
+            )
 
     @pytest.mark.asyncio
     async def test_get_changed_series(self, mcp_server):
         """'Which series changed today?'"""
         data = await call_tool(mcp_server, "sc_get_changed_series")
-        # Shape assertion only — may be empty list before 08:30 EST
-        assert "_meta" in data
-        assert isinstance(data["data"], list)
+        live = assert_live_or_transient(data, "sc_get_changed_series", "statcan-wds")
+        if live:
+            assert_rows(
+                data,
+                "sc_get_changed_series",
+                allow_empty_reason="no series have changed yet today is normal",
+            )
 
     @pytest.mark.asyncio
     async def test_error_handling_invalid_product_id(self, mcp_server):
@@ -849,31 +859,66 @@ class TestStatcanWdsScenarios:
     @pytest.mark.asyncio
     async def test_get_series_info_by_coord(self, mcp_server):
         """'Get series info for CPI Canada all-items by product and coordinate'"""
+        # Coordinate 2.2.0.0... is CPI all-items Canada (vector 41690973).
+        # 1.1.0.0... is syntactically valid but identifies NO published series —
+        # StatCan answers it with responseStatusCode 2 and all-null fields, which
+        # is what the companion no-series test below covers.
+        data = await call_tool(mcp_server, "sc_get_series_info_by_coord", {
+            "product_id": 18100004,
+            "coordinate": "2.2.0.0.0.0.0.0.0.0",
+        })
+        live = assert_live_or_transient(data, "sc_get_series_info_by_coord", "statcan-wds")
+        if live:
+            info = data["data"]
+            for field in ("product_id", "vector_id", "frequency"):
+                assert field in info, f"series info missing {field!r}: {info}"
+            assert info["vector_id"] == 41690973, (
+                f"coordinate 2.2.0.0... is CPI all-items = vector 41690973, "
+                f"got {info['vector_id']}"
+            )
+            assert info["frequency"] == "Monthly", (
+                f"CPI is monthly, got {info['frequency']!r}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_coordinate_with_no_series_is_not_found(self, mcp_server):
+        """'Get series info for a coordinate that has no data' — must be NOT_FOUND.
+
+        Regression cover: StatCan answers an unpopulated coordinate with
+        status=SUCCESS, responseStatusCode=2 and all-null fields. The client used
+        to feed that straight into SeriesInfo and surface
+        "UPSTREAM_ERROR: 6 validation errors", blaming the service for what is
+        really an empty lookup.
+        """
         data = await call_tool(mcp_server, "sc_get_series_info_by_coord", {
             "product_id": 18100004,
             "coordinate": "1.1.0.0.0.0.0.0.0.0",
         })
-        assert "_meta" in data
-        assert data["_meta"]["source"]["api"] == "statcan-wds"
-        assert "product_id" in data["data"]
-        assert "vector_id" in data["data"]
-        assert "frequency" in data["data"]
+        assert "error" in data, f"expected a structured error, got: {data}"
+        code = data["error"]["code"]
+        # UPSTREAM_UNAVAILABLE is possible during the 00:00-08:30 EST window.
+        assert code in ("NOT_FOUND", "UPSTREAM_UNAVAILABLE"), (
+            f"an empty coordinate is NOT_FOUND, not a service fault: {data['error']}"
+        )
+        if code == "NOT_FOUND":
+            assert "validation error" not in data["error"]["message"].lower(), (
+                f"the error must not leak a Pydantic failure: {data['error']}"
+            )
 
     @pytest.mark.asyncio
     async def test_get_data_by_coord(self, mcp_server):
         """'Get the latest 3 observations for CPI Canada all-items by coordinate'"""
         data = await call_tool(mcp_server, "sc_get_data_by_coord", {
             "product_id": 18100004,
-            "coordinate": "1.1.0.0.0.0.0.0.0.0",
+            "coordinate": "2.2.0.0.0.0.0.0.0.0",
             "n": 3,
         })
-        assert "_meta" in data
-        assert data["_meta"]["source"]["api"] == "statcan-wds"
-        assert isinstance(data["data"], list)
-        assert len(data["data"]) >= 1
-        row = data["data"][0]
-        assert "ref_per" in row
-        assert "value" in row
+        live = assert_live_or_transient(data, "sc_get_data_by_coord", "statcan-wds")
+        if live:
+            rows = assert_rows(data, "sc_get_data_by_coord")
+            row = rows[0]
+            assert "ref_per" in row, f"row missing ref_per: {row}"
+            assert "value" in row, f"row missing value: {row}"
 
     @pytest.mark.asyncio
     async def test_get_data_by_date_range(self, mcp_server):
@@ -899,14 +944,26 @@ class TestStatcanWdsScenarios:
             "start_release": "2024-01-01",
             "end_release": "2024-03-31",
         })
-        assert "_meta" in data
-        assert data["_meta"]["source"]["api"] == "statcan-wds"
-        assert isinstance(data["data"], list)
-        # May be empty if no releases in range — assert shape only
-        for row in data["data"]:
-            assert "vector_id" in row
-            assert "ref_per" in row
-            assert "value" in row
+        live = assert_live_or_transient(data, "sc_get_bulk_vector_data", "statcan-wds")
+        if live:
+            # Bulk fetch returns a dict keyed by vector id, not a flat list —
+            # the key IS the answer to "which vector is this row from", so a
+            # flat list would have to repeat it on every row. Same rationale as
+            # the BOC series-keyed shape (D-05, decided case by case).
+            payload = data["data"]
+            assert isinstance(payload, dict), (
+                f"bulk vector data is keyed by vector id, got "
+                f"{type(payload).__name__}: {payload!r:.120}"
+            )
+            assert payload, f"both requested vectors returned nothing: {payload}"
+            for vector_id, rows in payload.items():
+                assert isinstance(rows, list), (
+                    f"vector {vector_id} must map to a list of rows, got "
+                    f"{type(rows).__name__}"
+                )
+                for row in rows:
+                    assert "ref_per" in row, f"row missing ref_per: {row}"
+                    assert "value" in row, f"row missing value: {row}"
 
 
 # ─── SDMX scenarios ───────────────────────────────────────────────────────────

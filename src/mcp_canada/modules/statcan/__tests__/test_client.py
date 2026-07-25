@@ -4,6 +4,8 @@ TDD: RED → GREEN → REFACTOR
 All HTTP calls are mocked; no live network access.
 """
 
+import json
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -1699,6 +1701,7 @@ class TestGetSdmxData:
 
         mock_response = MagicMock()
         mock_response.json.return_value = sdmx_data_json
+        mock_response.text = json.dumps(sdmx_data_json)
         mock_response.raise_for_status = MagicMock()
 
         mock_http = AsyncMock()
@@ -1722,6 +1725,7 @@ class TestGetSdmxData:
 
         mock_response = MagicMock()
         mock_response.json.return_value = sdmx_data_json
+        mock_response.text = json.dumps(sdmx_data_json)
         mock_response.raise_for_status = MagicMock()
 
         mock_http = AsyncMock()
@@ -1751,6 +1755,7 @@ class TestGetSdmxVectorData:
 
         mock_response = MagicMock()
         mock_response.json.return_value = sdmx_vector_json
+        mock_response.text = json.dumps(sdmx_vector_json)
         mock_response.raise_for_status = MagicMock()
 
         mock_http = AsyncMock()
@@ -1778,6 +1783,7 @@ class TestGetSdmxVectorData:
 
         mock_response = MagicMock()
         mock_response.json.return_value = sdmx_vector_json
+        mock_response.text = json.dumps(sdmx_vector_json)
         mock_response.raise_for_status = MagicMock()
 
         mock_http = AsyncMock()

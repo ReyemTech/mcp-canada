@@ -850,11 +850,15 @@ class TestStatcanWdsScenarios:
     async def test_error_handling_invalid_product_id(self, mcp_server):
         """'Get metadata for a nonexistent table ID'"""
         data = await call_tool(mcp_server, "sc_get_cube_metadata", {"product_id": 999999999})
-        # Should return structured error, not raise exception
-        assert "error" in data or "_meta" in data
+        # Error-PATH test: product 999999999 does not exist, so an error IS the
+        # expected result. Asserted in both arms rather than tolerated.
         if "error" in data:
-            assert "code" in data["error"]
-            assert data["error"]["code"] in ("UPSTREAM_ERROR", "UPSTREAM_UNAVAILABLE")
+            assert "code" in data["error"], f"error must carry a code: {data['error']}"
+            assert data["error"]["code"] in ("UPSTREAM_ERROR", "UPSTREAM_UNAVAILABLE"), (
+                f"unexpected error code for a nonexistent product: {data['error']}"
+            )
+        else:
+            assert "_meta" in data, f"expected an error or an envelope, got: {data}"
 
     @pytest.mark.asyncio
     async def test_get_series_info_by_coord(self, mcp_server):
@@ -1302,9 +1306,11 @@ class TestIrccScenarios:
         assert isinstance(rows, list)
 
         # Create table and insert rows (use a subset to keep test fast)
-        sample_rows = rows[:3] if len(rows) >= 3 else rows
-        if not sample_rows:
-            pytest.skip("No PR data returned for year 2023 — skip cross-module test")
+        # 2023 PR data is a closed historical year — empty means the fetch broke,
+        # so this asserts rather than skipping. (It skipped until 2026-07-25,
+        # which hid the datastore dict-binding failure further down.)
+        assert rows, f"IRCC returned no PR rows for 2023: {pr_result}"
+        sample_rows = rows[:3]
 
         # Derive columns from the first row keys
         first_row = sample_rows[0]
@@ -1776,13 +1782,16 @@ class TestQuebecToolScenarios:
     async def test_get_road_works_wfs_csv(self, mcp_server):
         """'What road construction zones are currently active?'"""
         data = await call_tool(mcp_server, "quebec_get_road_works", {})
-        # Road works may be empty if no active construction; empty list is valid (not an error)
         assert "_meta" in data, f"Expected live success from quebec_get_road_works, got: {data}"
-        assert isinstance(data["data"], list)
-        # If data present, verify shape (empty list in off-season is acceptable)
-        if data["data"]:
-            row = data["data"][0]
-            assert "route" in row or "identifier" in row
+        rows = assert_rows(
+            data,
+            "quebec_get_road_works",
+            allow_empty_reason="no active construction zones province-wide is possible",
+        )
+        for row in rows[:1]:
+            assert "route" in row or "identifier" in row, (
+                f"road works row missing both route and identifier: {row}"
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -1791,8 +1800,12 @@ class TestQuebecToolScenarios:
         """'What are current road conditions in Quebec?' — rows must have non-null route/region/status."""
         data = await call_tool(mcp_server, "quebec_get_road_conditions", {})
         assert "_meta" in data, f"Expected _meta envelope, got: {data}"
-        if data["data"]:
-            row = data["data"][0]
+        rows = assert_rows(
+            data,
+            "quebec_get_road_conditions",
+            allow_empty_reason="MTQ winter road conditions are not published outside winter",
+        )
+        for row in rows[:1]:
             assert row.get("route_num") is not None, (
                 "route_num is None — mapper still uses PascalCase keys (expected 'numeroroute')"
             )
@@ -1875,10 +1888,11 @@ class TestQuebecToolScenarios:
             assert row["route_num"] != "00204", (
                 f"Route 204 row leaked through A-20 filter — substring match bug"
             )
-            if row.get("route_name"):
-                assert "route 204" not in row["route_name"].lower(), (
-                    f"Route 204 name leaked: {row['route_name']}"
-                )
+            # route_name is nullable upstream; when present it must not be a
+            # Route 204 leak. `or ""` keeps the assertion on every row.
+            assert "route 204" not in (row.get("route_name") or "").lower(), (
+                f"Route 204 name leaked: {row.get('route_name')}"
+            )
             assert isinstance(row["structure_type"], str), (
                 f"structure_type must be str, got "
                 f"{type(row['structure_type']).__name__}={row['structure_type']}"
@@ -2853,44 +2867,64 @@ class TestNovaScotiaToolScenarios:
         THE ZONE NORMALIZATION PROOF: AMI uses 'health_zone' in the source dataset but
         client _normalize_zone_field must rename it to 'zone' in the output. If 'zone' is
         absent and 'health_zone' appears instead, normalization is broken.
+
+        Queried WITHOUT a sex filter: AMI has no sex column, so filtering by it
+        returns nothing and used to leave this proof unasserted. The sex-filter
+        behaviour is covered separately below.
+        """
+        data = await call_tool(mcp_server, "ns_get_chronic_disease_prevalence", {
+            "disease": "ami",
+            "limit": 5,
+        })
+        assert "_meta" in data, f"Expected live success, got: {data}"
+        assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
+
+        rows = data["data"]["rows"]
+        assert rows, (
+            f"AMI is a published NS chronic-disease dataset — an empty result "
+            f"means the query is broken: {data['data']}"
+        )
+        first = rows[0]
+        # ZONE NORMALIZATION PROOF: 'zone' must be present (not 'health_zone')
+        assert "zone" in first, (
+            f"ZONE NORMALIZATION FAILED: 'zone' must be in the output (AMI source uses "
+            f"'health_zone' renamed to 'zone' by _normalize_zone_field). "
+            f"Got keys: {list(first.keys())}"
+        )
+        assert first.get("zone") is not None, (
+            f"FIELD PRESENCE FAILED: 'zone' must be non-null. Got: {first}"
+        )
+        assert first.get("crude_prevalence_rate") is not None, (
+            f"FIELD PRESENCE FAILED: 'crude_prevalence_rate' must be non-null. Got: {first}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    @pytest.mark.tolerates_upstream_error(
+        reason="AMI has no sex column upstream, so Socrata may 400 on the filter "
+               "or return zero rows; both are correct answers for this dataset"
+    )
+    async def test_chronic_disease_sex_filter_on_dataset_without_sex(self, mcp_server):
+        """'AMI prevalence for women' — documents that AMI carries no sex breakdown.
+
+        Kept as an explicit exemption rather than folded into the zone-normalization
+        test above, where it silently skipped the proof whenever the filter matched
+        nothing.
         """
         data = await call_tool(mcp_server, "ns_get_chronic_disease_prevalence", {
             "disease": "ami",
             "sex": "F",
             "limit": 5,
         })
-        assert "_meta" in data or "error" in data
         if "error" in data:
-            # AMI has no sex field — "F" filter may return 0 rows or UPSTREAM_ERROR
-            # (server-side 400 on unknown column); either is acceptable here
-            assert data["error"]["code"] in ("UPSTREAM_ERROR", "INVALID_INPUT")
-            return
-        assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
-        rows = data["data"]["rows"]
-        assert isinstance(rows, list)
-        # AMI might return empty rows when sex="F" (no sex column) — test with "ami" alone if empty
-        if not rows:
-            # Try without sex filter since AMI has no sex field
-            data2 = await call_tool(mcp_server, "ns_get_chronic_disease_prevalence", {
-                "disease": "ami",
-                "limit": 5,
-            })
-            assert "_meta" in data2, f"Expected live success from ns_get_chronic_disease_prevalence (bare ami query), got: {data2}"
-            rows = data2["data"]["rows"]
-        if rows:
-            first = rows[0]
-            # ZONE NORMALIZATION PROOF: 'zone' must be present (not 'health_zone')
-            assert "zone" in first, (
-                f"ZONE NORMALIZATION FAILED: 'zone' must be in the output (AMI source uses "
-                f"'health_zone' renamed to 'zone' by _normalize_zone_field). "
-                f"Got keys: {list(first.keys())}"
+            assert data["error"]["code"] in ("UPSTREAM_ERROR", "INVALID_INPUT"), (
+                f"a filter on a nonexistent column should surface as an upstream "
+                f"or input error, got: {data['error']}"
             )
-            assert first.get("zone") is not None, (
-                f"FIELD PRESENCE FAILED: 'zone' must be non-null. Got: {first}"
-            )
-            # FIELD PRESENCE: crude_prevalence_rate must be non-null
-            assert first.get("crude_prevalence_rate") is not None, (
-                f"FIELD PRESENCE FAILED: 'crude_prevalence_rate' must be non-null. Got: {first}"
+        else:
+            assert isinstance(data["data"]["rows"], list), (
+                f"a non-matching filter must still return a rows list: {data['data']}"
             )
 
     @pytest.mark.asyncio

@@ -171,6 +171,16 @@ Primary portal is **Données Québec** (CKAN — 1,593 datasets, 139 orgs, 10 th
 - [x] **QC-18**: Agent can get the MELCCFP protected areas registry (Registre des aires protégées) metadata and download URLs (discovery-only)
 - [x] **QC-19**: All Quebec tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, `quebec_` prefix), are discoverable via discover_tools, and 6 prompts + 7 resources are auto-discovered by FileSystemProvider
 
+### Integration Test Integrity (Phase 20.1)
+
+Backfilled 2026-07-25 alongside the phase, which was inserted as urgent work without REQ IDs. These describe the guarantees the phase delivered, verified against the suite at close.
+
+- [x] **TEST-01**: Every path through an integration test reaches an assertion — no one-armed guards over the response, no bare `return`, no data-dependent `pytest.skip`
+- [x] **TEST-02**: A test may tolerate an upstream outage only by asserting the error code is transient (`UPSTREAM_ERROR`, `RATE_LIMITED`, `UPSTREAM_UNAVAILABLE`); `NOT_FOUND` or `INVALID_INPUT` on a call that should succeed fails loudly
+- [x] **TEST-03**: Reintroducing a masking idiom fails the DEFAULT unit suite, not only a live run (`tests/test_integration_test_quality.py`)
+- [x] **TEST-04**: A test that genuinely cannot assert in every branch declares itself with `@pytest.mark.tolerates_upstream_error(reason=...)`; the reason is mandatory and exemptions are capped at 10% of the suite
+- [x] **TEST-05**: Every tool returns a structured error envelope on upstream failure and never raises — enforced for drug_database and nutrient_file via `shared/envelope.py:upstream_guard`
+
 ### MCP Prompts and Resources
 
 - [x] **PR-01**: Every module has a prompts.py with 4-6 @prompt functions auto-discovered by FileSystemProvider
@@ -446,6 +456,11 @@ Primary portal is **data.novascotia.ca** — a **Socrata** (Tyler Technologies) 
 | QC-17 | Phase 16 | Complete |
 | QC-18 | Phase 16 | Complete |
 | QC-19 | Phase 16 | Complete |
+| TEST-01 | Phase 20.1 | Complete |
+| TEST-02 | Phase 20.1 | Complete |
+| TEST-03 | Phase 20.1 | Complete |
+| TEST-04 | Phase 20.1 | Complete |
+| TEST-05 | Phase 20.1 | Complete |
 | PR-01 | Phase 40 | Complete |
 | PR-02 | Phase 40 | Complete |
 | PR-03 | Phase 40 | Complete |

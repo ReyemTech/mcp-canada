@@ -89,6 +89,53 @@ async def test_anna_roberts_ballot_on_vote_333(self):
     """'How did Anna Roberts vote on vote 44-1/333?'"""
 ```
 
+### Every path must reach an assertion
+
+A test that cannot fail is worse than no test. These idioms are BANNED and are
+caught by `tests/test_integration_test_quality.py` in the default unit suite:
+
+```python
+# BANNED — an error response skips the body and the test passes silently
+assert "_meta" in data or "error" in data
+if "_meta" in data:
+    assert ...
+
+# BANNED — abandons the remaining assertions
+if "error" in data:
+    assert data["error"]["code"] == "UPSTREAM_ERROR"
+    return
+
+# BANNED — reports neither pass nor fail; the path was never exercised
+if not results:
+    pytest.skip("nothing found")
+```
+
+Use the helpers in `tests/integration/conftest.py` instead:
+
+```python
+live = assert_live_or_transient(data, "tool_name", "api-name")
+if live:
+    rows = assert_rows(data, "tool_name")   # empty fails unless you justify it
+    assert "field" in rows[0]
+```
+
+`assert_live_or_transient` tolerates a genuine outage — but only
+`UPSTREAM_ERROR`, `RATE_LIMITED` or `UPSTREAM_UNAVAILABLE`. A `NOT_FOUND` on a
+call that should succeed still fails loudly, which is how several shipped bugs
+were finally caught.
+
+**Before tolerating an endpoint, check it is actually transient.** A permanently
+dead endpoint tolerated forever masks a dead tool — Toronto's TTC tools were
+broken for months behind a plausible-looking `UPSTREAM_ERROR`.
+
+If a test genuinely cannot assert in every branch, declare it:
+
+```python
+@pytest.mark.tolerates_upstream_error(reason="AMI has no sex column upstream")
+```
+
+The reason is mandatory and exemptions are capped at 10% of the suite.
+
 ### Rules
 
 - Go in `tests/integration/`

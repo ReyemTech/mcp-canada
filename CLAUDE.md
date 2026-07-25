@@ -74,6 +74,10 @@ Every module in `src/mcp_canada/modules/{name}/`:
 | **OGC WFS 2.0** | `shared/ogc.py` | Phase 15: British Columbia | `GetFeature` with CQL_FILTER; two-step CKAN→WFS workflow |
 | **Socrata** | `shared/socrata.py` | Phase 20: Nova Scotia (data.novascotia.ca) | SODA API: `/api/catalog/v1` discovery + `/resource/{id}.json` SoQL (`$where/$select/$order/$limit`); keyless, optional `X-App-Token` |
 
+**ArcGIS Hub empty-`q` pitfall:** every Hub portal returns **HTTP 400 for `q=`** and 200 when `q` is omitted (verified 2026-07-25 across aurora, newmarket, york_region, markham, manitoba). `shared/arcgis_hub.py:search_hub_datasets` omits the parameter when the query is empty or whitespace — mirroring the `startindex=0` handling. Before that fix, every "list everything" call (e.g. `aurora_list_categories`) returned `UPSTREAM_ERROR`, which read as an outage. Affects York Region, Alberta, Manitoba and Saskatchewan.
+
+**Toronto TTC GTFS — never pin the download URL:** Toronto republishes the feed under fresh dataset AND resource uuids. A pinned `GTFS_ZIP_URL` constant 404'd and left both TTC tools dead behind an `UPSTREAM_ERROR`. The ZIP is resolved at call time from CKAN `package_show` keyed by the dataset **slug** (`ttc-routes-and-schedules`), which survives republishes. See `toronto/client.py:_resolve_gtfs_zip_url`.
+
 **Alberta static reports (AER ST1/ST3/ST39):** Alberta Energy Regulator publishes well/production/pipeline statistics as static XLSX/TXT files at `static.aer.ca/prd/`. These are **not** a portal technology — they're downloaded and parsed via `shared/parsers.py` (`fetch_and_parse`) and routed through per-tool URL templates. See `docs://alberta/aer-data-guide` for the product slug casing and rotation rules. **511 Alberta v2 JSON API** is an undocumented-but-stable raw-JSON feed (not CKAN envelope) used for road events / winter conditions / cameras.
 
 **BC two-step CKAN→WFS workflow:** Discover datasets via `bc_search_datasets` (CKAN) → get `object_name` + `queryable_via_wfs` via `bc_get_dataset_details` → query geospatial features via `bc_query_features` (WFS). See `docs://bc/wfs-query-guide` resource for full CQL syntax and examples.
@@ -93,6 +97,16 @@ Every module in `src/mcp_canada/modules/{name}/`:
 **Every client function must:** return `(data, was_cached)`, use `cached_fetch()` + `get_limiter()`, flatten responses aggressively.
 
 **Don't:** add dependencies, modify `server.py` for new modules, put module tests in top-level `tests/`, skip rate limiting, mix refactoring with feature work.
+
+**Integration tests must be able to fail.** Every path through a test in `tests/integration/` must reach an assertion — no one-armed `if "_meta" in data:` guards, no bare `return`, no data-dependent `pytest.skip`. To tolerate a genuine outage, assert the error code instead:
+
+```python
+live = assert_live_or_transient(data, "tool_name", "api-name")
+if live:
+    assert_rows(data, "tool_name")          # refuses empty unless you say why
+```
+
+`tests/test_integration_test_quality.py` enforces this in the DEFAULT unit suite. A test that genuinely cannot comply declares `@pytest.mark.tolerates_upstream_error(reason=...)` with a mandatory reason.
 
 **After implementing any tool:** add integration tests in `tests/integration/test_tool_scenarios.py` that call the tool through the MCP Client layer (not client functions directly). Think in sample prompts — what would an agent ask? See `.claude/rules/tests.md` for the pattern.
 

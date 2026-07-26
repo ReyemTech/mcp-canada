@@ -18,7 +18,7 @@ from mcp_canada.modules.weather.severe.client import (
     fetch_radar_data,
     fetch_uv_index,
 )
-from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.envelope import make_error, make_response, upstream_guard
 
 _API_URL = BASE_URL
 
@@ -69,6 +69,7 @@ async def wx_get_radar_data(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(API_NAME)
 async def wx_get_lightning(
     lang: Literal["en", "fr"] = "en",
 ) -> dict:

@@ -34,7 +34,7 @@ from mcp_canada.modules.bank_of_canada.constants import (
     FX_GROUP,
     INTEREST_RATE_SERIES,
 )
-from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.envelope import make_error, make_response, upstream_guard
 from mcp_canada.shared.reshape import reshape_observations
 
 # API name and base URL for _meta envelope
@@ -57,6 +57,7 @@ async def _get_all_series_names() -> list[str]:
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def boc_get_exchange_rates(
     currency: str | None = None,
     start_date: str | None = None,
@@ -114,6 +115,7 @@ async def boc_get_exchange_rates(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def boc_get_interest_rates(
     rate_type: str = "all",
     start_date: str | None = None,
@@ -162,6 +164,7 @@ async def boc_get_interest_rates(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def boc_get_commodity_prices(
     commodity_type: str | None = None,
     start_date: str | None = None,
@@ -213,6 +216,7 @@ async def boc_get_commodity_prices(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def boc_get_inflation_data(
     indicator: str | None = None,
     start_date: str | None = None,
@@ -264,6 +268,7 @@ async def boc_get_inflation_data(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def boc_search_series(
     keyword: str,
     lang: Literal["en", "fr"] = "en",
@@ -298,6 +303,7 @@ async def boc_search_series(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def boc_get_series_metadata(
     series_name: str,
     lang: Literal["en", "fr"] = "en",
@@ -337,6 +343,7 @@ async def boc_get_series_metadata(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def boc_get_observations(
     series_names: str,
     start_date: str | None = None,
@@ -386,6 +393,7 @@ async def boc_get_observations(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def boc_list_groups(
     lang: Literal["en", "fr"] = "en",
 ) -> dict:

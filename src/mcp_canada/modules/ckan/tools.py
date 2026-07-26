@@ -26,7 +26,7 @@ from mcp_canada.modules.ckan.client import (
     fetch_search_datasets,
 )
 from mcp_canada.modules.ckan.constants import BASE_URL
-from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.envelope import make_error, make_response, upstream_guard
 
 # API name and base URL for _meta envelope
 _API_NAME = "CKAN Open Data"
@@ -38,6 +38,7 @@ _API_URL = BASE_URL
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ckan_search_datasets(
     query: str,
     filters: str | None = None,
@@ -84,6 +85,7 @@ async def ckan_search_datasets(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ckan_get_dataset_details(
     dataset_id: str,
     lang: Literal["en", "fr"] = "en",
@@ -119,6 +121,7 @@ async def ckan_get_dataset_details(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ckan_list_organizations(
     sort: str = "name asc",
     lang: Literal["en", "fr"] = "en",
@@ -153,6 +156,7 @@ async def ckan_list_organizations(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ckan_search_by_tag(
     tag: str,
     rows: int = 10,
@@ -193,6 +197,7 @@ async def ckan_search_by_tag(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ckan_get_resource(
     resource_id: str,
     lang: Literal["en", "fr"] = "en",
@@ -229,6 +234,7 @@ async def ckan_get_resource(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ckan_list_groups(
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
@@ -262,6 +268,7 @@ async def ckan_list_groups(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ckan_get_dataset_stats(
     lang: Literal["en", "fr"] = "en",
 ) -> dict:

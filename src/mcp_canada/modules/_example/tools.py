@@ -15,11 +15,12 @@ from typing import Literal
 
 from fastmcp.tools import tool
 
-from mcp_canada.shared.envelope import make_response
+from mcp_canada.shared.envelope import make_response, upstream_guard
 from mcp_canada.modules._example.client import fetch_echo
 
 
 @tool
+@upstream_guard('example')
 async def example_echo(
     message: str,
     lang: Literal["en", "fr"] = "en",

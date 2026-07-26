@@ -31,7 +31,7 @@ from mcp_canada.modules.toronto.client import (
     fetch_search_datasets,
     fetch_short_term_rentals,
 )
-from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.envelope import make_error, make_response, upstream_guard
 
 # API name and base URL for _meta envelope
 _API_NAME = "toronto-open-data"
@@ -44,6 +44,7 @@ _API_URL = "https://open.toronto.ca"
 
 
 @tool
+@upstream_guard(_API_NAME)
 async def toronto_search_datasets(
     query: str,
     rows: int = 10,
@@ -88,6 +89,7 @@ async def toronto_search_datasets(
 
 
 @tool
+@upstream_guard(_API_NAME)
 async def toronto_get_dataset_details(
     dataset_id: str,
     lang: Literal["en", "fr"] = "en",
@@ -122,6 +124,7 @@ async def toronto_get_dataset_details(
 
 
 @tool
+@upstream_guard(_API_NAME)
 async def toronto_get_resource(
     resource_id: str,
     lang: Literal["en", "fr"] = "en",
@@ -156,6 +159,7 @@ async def toronto_get_resource(
 
 
 @tool
+@upstream_guard(_API_NAME)
 async def toronto_list_organizations(
     lang: Literal["en", "fr"] = "en",
 ) -> dict[str, Any]:
@@ -188,6 +192,7 @@ async def toronto_list_organizations(
 
 
 @tool
+@upstream_guard(_API_NAME)
 async def toronto_get_dataset_stats(
     lang: Literal["en", "fr"] = "en",
 ) -> dict[str, Any]:

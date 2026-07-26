@@ -1,5 +1,6 @@
 """Shared httpx client factory with tenacity retry logic."""
 
+import json
 from collections.abc import Callable
 from typing import Any
 
@@ -53,6 +54,20 @@ async def api_get(
         async with httpx.AsyncClient(timeout=timeout) as http:
             response = await http.get(url, params=params, headers=headers)
             response.raise_for_status()
-            return response.json()
+            try:
+                return response.json()
+            except json.JSONDecodeError as exc:
+                # An upstream that answers 200 with an HTML error page is an
+                # upstream failure, but json.JSONDecodeError subclasses
+                # ValueError and would be caught by the
+                # `except ValueError -> INVALID_INPUT` arms in statcan, ircc,
+                # manitoba, saskatchewan, nova_scotia, british_columbia and
+                # datastore — blaming the caller for someone else's outage.
+                # httpx.DecodingError is an httpx.HTTPError but NOT a
+                # ValueError, so it bypasses those arms and lands in the
+                # catch-all every module now has.
+                raise httpx.DecodingError(
+                    f"upstream returned a non-JSON body from {url}: {exc}"
+                ) from exc
 
     return await _fetch()

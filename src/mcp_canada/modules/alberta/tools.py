@@ -32,7 +32,11 @@ from typing import Any, Literal
 import httpx  # noqa: F401 — used by Plans 02-07 for UPSTREAM_ERROR branches
 from fastmcp.tools import tool
 
-from mcp_canada.shared.envelope import make_error, make_response  # noqa: F401 — used by Plans 02-07
+from mcp_canada.shared.envelope import (  # noqa: F401 — used by Plans 02-07
+    make_error,
+    make_response,
+    upstream_guard,
+)
 
 from . import client as _client  # noqa: F401 — used by Plans 02-07
 
@@ -114,6 +118,7 @@ __all__ = [
 
 
 @tool
+@upstream_guard(API_NAME_CKAN)
 async def alberta_search_datasets(
     q: str = "",
     organization: str | None = None,
@@ -156,6 +161,7 @@ async def alberta_search_datasets(
 
 
 @tool
+@upstream_guard(API_NAME_CKAN)
 async def alberta_get_dataset_details(
     package_id: str,
     lang: Literal["en", "fr"] = "en",
@@ -246,6 +252,7 @@ async def alberta_query_dataset(
 
 
 @tool
+@upstream_guard(API_NAME_CKAN)
 async def alberta_list_organizations(
     lang: Literal["en", "fr"] = "en",
 ) -> dict[str, Any]:
@@ -274,6 +281,7 @@ async def alberta_list_organizations(
 
 
 @tool
+@upstream_guard(API_NAME_CKAN)
 async def alberta_list_categories(
     lang: Literal["en", "fr"] = "en",
 ) -> dict[str, Any]:
@@ -307,6 +315,7 @@ async def alberta_list_categories(
 
 
 @tool
+@upstream_guard(API_NAME_AER)
 async def alberta_get_well_licences_today(
     lang: Literal["en", "fr"] = "en",
 ) -> dict[str, Any]:
@@ -335,6 +344,7 @@ async def alberta_get_well_licences_today(
 
 
 @tool
+@upstream_guard(API_NAME_AER)
 async def alberta_get_well_licences_archive(
     year: int,
     month: int,
@@ -372,6 +382,7 @@ async def alberta_get_well_licences_archive(
 
 
 @tool
+@upstream_guard(API_NAME_AER)
 async def alberta_get_pipeline_statistics(
     year: int,
     lang: Literal["en", "fr"] = "en",
@@ -408,6 +419,7 @@ async def alberta_get_pipeline_statistics(
 
 
 @tool
+@upstream_guard(API_NAME_AER)
 async def alberta_get_production_volumes(
     product: str,
     lang: Literal["en", "fr"] = "en",
@@ -454,6 +466,7 @@ async def alberta_get_production_volumes(
 
 
 @tool
+@upstream_guard(API_NAME_WMB)
 async def alberta_get_active_fires(
     status: str | None = None,
     max_records: int = 5000,
@@ -489,6 +502,7 @@ async def alberta_get_active_fires(
 
 
 @tool
+@upstream_guard(API_NAME_WMB)
 async def alberta_get_fire_perimeters(
     status: Literal["active", "extinguished"] = "active",
     max_records: int = 5000,
@@ -541,6 +555,7 @@ async def alberta_get_fire_perimeters(
 
 
 @tool
+@upstream_guard(API_NAME_WMB)
 async def alberta_get_fire_bans(
     max_records: int = 5000,
     include_geometry: bool = False,
@@ -574,6 +589,7 @@ async def alberta_get_fire_bans(
 
 
 @tool
+@upstream_guard(API_NAME_WMB)
 async def alberta_get_fire_control_orders(
     category: Literal["fire_control", "ohv_restriction", "forest_area"] = "fire_control",
     max_records: int = 5000,
@@ -632,6 +648,7 @@ async def alberta_get_fire_control_orders(
 
 
 @tool
+@upstream_guard(API_NAME_AHS)
 async def alberta_get_hospitals(
     zone: str | None = None,
     max_records: int = 5000,
@@ -667,6 +684,7 @@ async def alberta_get_hospitals(
 
 
 @tool
+@upstream_guard(API_NAME_AHS)
 async def alberta_get_ahs_zones(
     include_geometry: bool = False,
     lang: Literal["en", "fr"] = "en",
@@ -698,6 +716,7 @@ async def alberta_get_ahs_zones(
 
 
 @tool
+@upstream_guard(API_NAME_AHS)
 async def alberta_get_health_facilities(
     facility_type: Literal["ems", "pcn_clinic"],
     max_records: int = 5000,
@@ -752,6 +771,7 @@ async def alberta_get_health_facilities(
 
 
 @tool
+@upstream_guard(API_NAME_511)
 async def alberta_get_road_events(
     event_type: str | None = None,
     lang: Literal["en", "fr"] = "en",
@@ -782,6 +802,7 @@ async def alberta_get_road_events(
 
 
 @tool
+@upstream_guard(API_NAME_511)
 async def alberta_get_winter_road_conditions(
     area_name: str | None = None,
     lang: Literal["en", "fr"] = "en",
@@ -814,6 +835,7 @@ async def alberta_get_winter_road_conditions(
 
 
 @tool
+@upstream_guard(API_NAME_511)
 async def alberta_get_traffic_cameras(
     lang: Literal["en", "fr"] = "en",
 ) -> dict[str, Any]:
@@ -866,6 +888,7 @@ _POPULATION_BREAKDOWNS = [
 
 
 @tool
+@upstream_guard(API_NAME_GEODISCOVER_AQHI)
 async def alberta_get_air_quality_stations(
     max_records: int = 5000,
     include_geometry: bool = False,
@@ -900,6 +923,7 @@ async def alberta_get_air_quality_stations(
 
 
 @tool
+@upstream_guard(API_NAME_GEODISCOVER_WATER)
 async def alberta_get_water_advisories(
     advisory_type: Literal["river", "water_management", "drought", "ice_cover", "water_sharing"],
     max_records: int = 5000,
@@ -948,6 +972,7 @@ async def alberta_get_water_advisories(
 
 
 @tool
+@upstream_guard(API_NAME_CKAN)
 async def alberta_get_crop_production(
     lang: Literal["en", "fr"] = "en",
 ) -> dict[str, Any]:
@@ -977,6 +1002,7 @@ async def alberta_get_crop_production(
 
 
 @tool
+@upstream_guard(API_NAME_CKAN)
 async def alberta_get_population_estimates(
     breakdown: Literal[
         "csd", "quarterly", "annual", "age_sex", "sub_provincial", "components_of_growth"
@@ -1021,6 +1047,7 @@ async def alberta_get_population_estimates(
 
 
 @tool
+@upstream_guard(API_NAME_GEODISCOVER_PARKS)
 async def alberta_get_provincial_parks(
     max_records: int = 5000,
     include_geometry: bool = False,

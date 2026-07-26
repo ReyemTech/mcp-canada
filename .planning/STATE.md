@@ -6,7 +6,7 @@ current_phase: 20
 current_phase_name: Finish integration de-masking and fix the failures it exposed
 status: awaiting_merge
 stopped_at: "Phase 20.1 complete; PR #2 open with all four CI gates green"
-last_updated: "2026-07-26T02:28:06.297Z"
+last_updated: "2026-07-26T02:32:53.467Z"
 last_activity: 2026-07-25
 last_activity_desc: Phase 20.1 executed end to end
 progress:
@@ -28,15 +28,20 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 ## Current Position
 
-Phase: 20 of 36 (20.1 — integration de-masking: COMPLETE)
+Phase: 20.1 of 36 — COMPLETE and MERGED to main (PR #2, merge commit 98dee90)
 Plan: 6 of 6 complete
-Status: Phase 20.1 complete; next is Phase 20.2 (run /gsd-plan-phase 20.2)
-Last activity: 2026-07-25 — Phase 20.1 executed end to end
+Status: next is Phase 20.2 (run /gsd-plan-phase 20.2)
+Last activity: 2026-07-26 — Phase 20.1 merged; all four CI gates green
 
-Progress: [████░░░░░░] 43%
+Progress: [████░░░░░░] 44%
 
-**Executed and verified:** phases 07-20 and 40 (15 phases, 71 plans, all verification `passed`).
-Suite at reconciliation: 3032 passed, 2 skipped, 97.05% coverage.
+**Executed and verified:** phases 07-20, 20.1 and 40 (16 phases, 77 plans, all verification `passed`).
+Suite at merge: 3127 passed, 2 skipped, 97.08% coverage.
+
+**CI gates green for the first time (2026-07-26).** The workflow ignores `main` and
+runs only on `pull_request`, so these had never executed against this codebase.
+Measured on origin/main before the fix: ruff 96 errors, catalog stale by 189 tools.
+All four now pass on Python 3.12 and 3.13.
 
 **Reconciliation of 2026-07-25** (see git history for the commit):
 

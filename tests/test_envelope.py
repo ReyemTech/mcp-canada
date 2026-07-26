@@ -161,6 +161,62 @@ class TestUpstreamGuard:
         assert result["error"]["code"] == "INVALID_INPUT"
         assert "din must be 8 digits" in result["error"]["message"]
 
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "raised",
+        [KeyError("d"), TypeError("NoneType is not subscriptable"), IndexError("list index"), AttributeError("properties")],
+        ids=["KeyError", "TypeError", "IndexError", "AttributeError"],
+    )
+    async def test_arbitrary_upstream_shape_errors_become_envelopes(self, raised):
+        """The guard must be a real catch-all, not an httpx/ValueError filter.
+
+        tests/test_tool_error_handling.py treats @upstream_guard as proof that a
+        tool cannot leak. That is only true if the guard catches everything.
+        Flattening code raises KeyError/TypeError/IndexError/AttributeError when
+        an upstream returns valid JSON in an unexpected shape -- e.g. a Bank of
+        Canada observation missing "d", or a weather feature with no
+        "properties". Those escaped as raw ToolErrors while the enforcement test
+        still passed.
+        """
+        from mcp_canada.shared.envelope import upstream_guard
+
+        @upstream_guard("test-api")
+        async def boom(lang: str = "en") -> dict:
+            raise raised
+
+        result = await boom()
+        assert "error" in result, f"expected an envelope, got: {result}"
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_pydantic_validation_error_is_upstream_not_caller_error(self):
+        """Upstream schema drift must not be blamed on the caller.
+
+        pydantic.ValidationError subclasses ValueError, so a model built from a
+        malformed upstream payload was reported as INVALID_INPUT -- the same
+        masking as json.JSONDecodeError, one layer up.
+        """
+        import pydantic
+
+        from mcp_canada.shared.envelope import upstream_guard
+
+        class Row(pydantic.BaseModel):
+            value: int
+
+        @upstream_guard("test-api")
+        async def boom(lang: str = "en") -> dict:
+            # Deliberately wrong type — this is the upstream payload we are
+            # simulating, so the type error is the point of the test.
+            Row(value="not-an-int")  # pyright: ignore[reportArgumentType]
+            return {}
+
+        result = await boom()
+        assert result["error"]["code"] == "UPSTREAM_ERROR", (
+            "upstream schema drift reported as caller error: "
+            f"{result['error']['code']}"
+        )
+
     @pytest.mark.asyncio
     async def test_lang_is_propagated(self):
         import httpx

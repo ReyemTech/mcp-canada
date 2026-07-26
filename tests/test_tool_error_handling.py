@@ -112,6 +112,33 @@ def test_guard_detects_a_known_uncovered_shape():
     assert _has_catch_all(covered), "httpx.HTTPError must count as covered"
 
 
+@pytest.mark.asyncio
+async def test_upstream_guard_really_is_a_catch_all():
+    """This detector counts @upstream_guard as coverage — prove that is earned.
+
+    The assumption was false when first written: the guard caught only httpx
+    errors, JSONDecodeError and ValueError, so a KeyError from flattening code
+    escaped as a raw ToolError while this file still reported zero offenders.
+    If someone narrows the guard again, this fails here rather than silently
+    hollowing out every assertion above.
+    """
+    from mcp_canada.shared.envelope import upstream_guard
+
+    class Exotic(Exception):
+        pass
+
+    @upstream_guard("test-api")
+    async def boom(lang: str = "en") -> dict:
+        raise Exotic("something no one predicted")
+
+    result = await boom()
+    assert "error" in result, (
+        "upstream_guard let an arbitrary exception escape — every @upstream_guard "
+        "counted as coverage by this module is therefore unproven"
+    )
+    assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+
 @pytest.mark.parametrize("rendered", ["Exception", "httpx.HTTPError"])
 def test_broad_shapes_count_as_covered(rendered):
     node = ast.parse(

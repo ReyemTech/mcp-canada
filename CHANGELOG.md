@@ -2,6 +2,41 @@
 
 <!-- CHANGELOG -->
 
+## v0.10.2 (2026-07-26)
+
+### Bug Fixes
+
+- **errors**: Give every tool catch-all coverage; stop mislabelling bad JSON
+  ([`d4167a6`](https://github.com/ReyemTech/mcp-canada/commit/d4167a6ecf4da4d4db17c759ba39f3022adeb229))
+
+- **errors**: Make upstream_guard a real catch-all; classify schema drift
+  ([`7d834c8`](https://github.com/ReyemTech/mcp-canada/commit/7d834c82753da01353667f0376a4ad5192b7c0b7))
+
+### Chores
+
+- Sync uv.lock after release
+  ([`fcd80ac`](https://github.com/ReyemTech/mcp-canada/commit/fcd80acfe68d4b74bb9c43665d008e72e88d182e))
+
+### Continuous Integration
+
+- Test on Python 3.14; correct the version classifiers
+  ([`9e2c843`](https://github.com/ReyemTech/mcp-canada/commit/9e2c843bbb41dc555923ccd02e4f130cf0e48521))
+
+### Documentation
+
+- **20.2**: Add ERR-01..ERR-04 requirements and traceability
+  ([`54cac7c`](https://github.com/ReyemTech/mcp-canada/commit/54cac7cc0045377f4a33e5c0dee14581724d0d7e))
+
+- **20.2**: Record live validation and close the state item
+  ([`3521196`](https://github.com/ReyemTech/mcp-canada/commit/35211960ce9392311c7740168e855870320bd284))
+
+- **20.2**: Record the catch-all rule and the JSONDecodeError trap
+  ([`2ac1952`](https://github.com/ReyemTech/mcp-canada/commit/2ac19525a39ba50ea5f48e98209f6eb9e9d5f9d5))
+
+- **20.2**: Verification report
+  ([`e7c0c83`](https://github.com/ReyemTech/mcp-canada/commit/e7c0c83dd55f8d934af748f169087a0f41f3f95d))
+
+
 ## v0.10.1 (2026-07-26)
 
 ### Bug Fixes

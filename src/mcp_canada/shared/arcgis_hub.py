@@ -88,7 +88,7 @@ async def search_hub_datasets(
 async def query_feature_service(
     service_url: str,
     layer_id: int,
-    where: str = "1=1",
+    where: str | None = "1=1",
     out_fields: str = "*",
     include_geometry: bool = False,
     max_records: int = MAX_RECORDS,
@@ -126,7 +126,9 @@ async def query_feature_service(
     async def _fetch_page(client: httpx.AsyncClient) -> bytes:
         page_size = min(DEFAULT_PAGE_SIZE, max_records - offset)
         params: dict[str, Any] = {
-            "where": where,
+            # httpx drops None-valued params; ArcGIS /query rejects a request
+            # with no `where`, which surfaces as a bogus UPSTREAM_ERROR.
+            "where": where or "1=1",
             "outFields": out_fields,
             "f": "geojson",
             "resultOffset": offset,
@@ -213,7 +215,7 @@ async def get_layer_metadata(
 async def get_count(
     service_url: str,
     layer_id: int,
-    where: str = "1=1",
+    where: str | None = "1=1",
     *,
     httpx_client: httpx.AsyncClient | None = None,
 ) -> int:
@@ -233,7 +235,8 @@ async def get_count(
     """
     url = f"{service_url.rstrip('/')}/{layer_id}/query"
     params: dict[str, Any] = {
-        "where": where,
+        # See query_feature_service: a None `where` would be dropped by httpx.
+        "where": where or "1=1",
         "returnCountOnly": "true",
         "f": "json",
     }

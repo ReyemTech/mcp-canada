@@ -301,6 +301,28 @@ class TestQueryFeatureService:
         assert truncated is True
 
     @pytest.mark.asyncio
+    async def test_where_none_is_coerced_to_match_all(self):
+        """where=None must send where='1=1', never omit the parameter.
+
+        httpx drops params whose value is None. ArcGIS FeatureServer /query
+        rejects a request with no `where` (HTTP 200 carrying an error 400
+        "Unable to perform query operation"), which surfaces to agents as a
+        bogus UPSTREAM_ERROR and reads as an outage. Verified live against
+        Saskatchewan Public_Fire_Ban on 2026-07-26.
+        """
+        mock_client = _make_mock_client([FEATURE_SERVICE_PAGE_2_FINAL])
+
+        await query_feature_service(
+            "https://ww8.yorkmaps.ca/arcgis/rest/services/OpenData/Transportation/FeatureServer",
+            layer_id=2,
+            where=None,
+            httpx_client=mock_client,
+        )
+
+        sent_params = mock_client.get.await_args.kwargs["params"]
+        assert sent_params["where"] == "1=1"
+
+    @pytest.mark.asyncio
     async def test_empty_feature_collection_returns_empty_list(self):
         """Empty FeatureCollection returns ([], False)."""
         mock_client = _make_mock_client([FEATURE_SERVICE_EMPTY])

@@ -179,7 +179,14 @@ Backfilled 2026-07-25 alongside the phase, which was inserted as urgent work wit
 - [x] **TEST-02**: A test may tolerate an upstream outage only by asserting the error code is transient (`UPSTREAM_ERROR`, `RATE_LIMITED`, `UPSTREAM_UNAVAILABLE`); `NOT_FOUND` or `INVALID_INPUT` on a call that should succeed fails loudly
 - [x] **TEST-03**: Reintroducing a masking idiom fails the DEFAULT unit suite, not only a live run (`tests/test_integration_test_quality.py`)
 - [x] **TEST-04**: A test that genuinely cannot assert in every branch declares itself with `@pytest.mark.tolerates_upstream_error(reason=...)`; the reason is mandatory and exemptions are capped at 10% of the suite
-- [x] **TEST-05**: Every tool returns a structured error envelope on upstream failure and never raises — enforced for drug_database and nutrient_file via `shared/envelope.py:upstream_guard`
+- [x] **TEST-05**: Every tool returns a structured error envelope on upstream failure and never raises — enforced for drug_database and nutrient_file via `shared/envelope.py:upstream_guard` (generalised to all 271 tools by ERR-01)
+
+### Error Classification (Phase 20.2)
+
+- [x] **ERR-01**: Every `@tool` is covered by a catch-all — `@upstream_guard`, a broad `except Exception`/`httpx.HTTPError`, or a module helper that has one. Catching only `httpx.HTTPStatusError` does not count: it covers a 500 but not a timeout, connect error or malformed body
+- [x] **ERR-02**: Reintroducing an uncovered tool fails the DEFAULT unit suite (`tests/test_tool_error_handling.py`), and the detector carries a self-test so it cannot pass vacuously
+- [x] **ERR-03**: A malformed upstream body is classified as an upstream failure, never as caller error — `shared/http.py:api_get` raises `httpx.DecodingError` (an `HTTPError`, not a `ValueError`) so it bypasses `except ValueError -> INVALID_INPUT` arms
+- [x] **ERR-04**: Genuine argument-validation `ValueError`s still return `INVALID_INPUT` — the decode fix does not swallow real caller errors
 
 ### MCP Prompts and Resources
 
@@ -461,6 +468,10 @@ Primary portal is **data.novascotia.ca** — a **Socrata** (Tyler Technologies) 
 | TEST-03 | Phase 20.1 | Complete |
 | TEST-04 | Phase 20.1 | Complete |
 | TEST-05 | Phase 20.1 | Complete |
+| ERR-01 | Phase 20.2 | Complete |
+| ERR-02 | Phase 20.2 | Complete |
+| ERR-03 | Phase 20.2 | Complete |
+| ERR-04 | Phase 20.2 | Complete |
 | PR-01 | Phase 40 | Complete |
 | PR-02 | Phase 40 | Complete |
 | PR-03 | Phase 40 | Complete |

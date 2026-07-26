@@ -330,13 +330,13 @@ Plans:
 ### Phase 20.2: Normalize tool error handling and guard malformed upstream JSON (INSERTED)
 
 **Goal:** Make every module classify an upstream failure as an upstream failure. `shared/http.py:api_get` returns `response.json()` with no decode guard, so an HTTP 200 carrying an HTML error page raises `json.JSONDecodeError` — a `ValueError` subclass — which lands in the `except ValueError -> INVALID_INPUT` arm of statcan, ircc, manitoba, saskatchewan, nova_scotia, british_columbia and datastore. A real outage is reported as caller error, and `assert_live_or_transient` (which tolerates only UPSTREAM_ERROR / RATE_LIMITED / UPSTREAM_UNAVAILABLE) fails live tests with a misleading code. The guard cannot simply be added at the source: `httpx.DecodingError` is an `HTTPError` but **not** an `HTTPStatusError`, and 5 of 24 modules (bank_of_canada, ckan, ircc, ontario, recalls) catch only `HTTPStatusError` — so a naive central fix converts a mislabelled error into an unhandled one, which is strictly worse and is precisely what Phase 20.1 removed. The work is therefore: normalize the handler shape across all 24 modules first, then add one decode guard in `api_get`. Doing this before Phases 21-39 means ~19 future modules inherit the correct shape instead of enlarging the cleanup.
-**Requirements**: TBD
+**Requirements**: ERR-01..ERR-04
 **Depends on:** Phase 20.1
-**Plans:** 0 plans
+**Plans:** 1/1 plans complete
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 20.2 to break down)
+- [x] 20.2-01-PLAN.md — Catch-all coverage for every tool + decode guard in api_get
 
 ### Phase 21: New Brunswick Government Open Data
 

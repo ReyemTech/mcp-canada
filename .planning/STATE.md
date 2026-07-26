@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
-current_phase: "20.2"
+current_phase: 20.2
 current_phase_name: Normalize tool error handling and guard malformed upstream JSON
 status: awaiting_merge
-stopped_at: "Phase 20.2 complete; PR #3 green on 3.12/3.13/3.14, Codex findings addressed"
-last_updated: "2026-07-26T04:00:00.000Z"
+stopped_at: "Phase 20.2 merged to main (PR #3); next is Phase 21 (New Brunswick)"
+last_updated: "2026-07-26T04:19:16.802Z"
 last_activity: 2026-07-26
 last_activity_desc: Phase 20.2 executed and verified; 317 live tests green
 progress:
@@ -28,22 +28,22 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 ## Current Position
 
-Phase: 20.2 of 36 — COMPLETE, awaiting merge (PR #3)
+Phase: 20.2 of 36 — COMPLETE and MERGED to main (PR #3, merge commit 87fd5ce)
 Plan: 1 of 1 complete
-Status: PR #3 green on Python 3.12/3.13/3.14; both Codex findings fixed; next is Phase 21
+Status: next is Phase 21 (run /gsd-plan-phase 21)
 Last activity: 2026-07-26 — Phase 20.2 executed and verified; 317 live tests green
 
 Phase 20.1 is COMPLETE and MERGED to main (PR #2, merge commit 98dee90).
 
 Progress: [████░░░░░░] 44%
 
-**Executed and verified:** phases 07-20, 20.1 and 40 (16 phases, 77 plans, all verification `passed`).
-Suite at merge: 3127 passed, 2 skipped, 97.08% coverage.
+**Executed and verified:** phases 07-20, 20.1, 20.2 and 40 (17 phases, 78 plans, all verification `passed`).
+Suite at merge: 3145 passed, 2 skipped, 97.09% coverage. Live: 317 integration tests green.
 
 **CI gates green for the first time (2026-07-26).** The workflow ignores `main` and
 runs only on `pull_request`, so these had never executed against this codebase.
 Measured on origin/main before the fix: ruff 96 errors, catalog stale by 189 tools.
-All four now pass on Python 3.12 and 3.13.
+All now pass on Python 3.12, 3.13 and 3.14 (3.14 added in Phase 20.2).
 
 **Reconciliation of 2026-07-25** (see git history for the commit):
 

@@ -273,9 +273,6 @@ class TestWfs:
     @pytest.mark.asyncio
     async def test_wfs_page_all_paginates_until_last_page(self):
         """Two pages (1000 + 500) return 1500 features, truncated=False."""
-        page1 = _make_geojson_response(n_features=3, number_returned=1000)
-        page2 = _make_geojson_response(n_features=2, number_returned=500)
-
         call_count = 0
 
         async def mock_get_features(base_url, type_name, **kwargs):

@@ -1,3 +1,8 @@
+# Test-only pyright relaxation. Runtime assertions in these tests narrow types in
+# ways pyright cannot follow (prompt Message.content and Resource.read() unions),
+# and several cases deliberately pass invalid values to exercise error handling.
+# Source code is still checked strictly -- do not add this to non-test modules.
+# pyright: reportPrivateImportUsage=false
 """Integration tests calling tools through the MCP Client layer.
 
 Each test simulates what an agent does: discover_tools → call_tool → parse response.
@@ -2464,8 +2469,8 @@ class TestSaskatchewanToolScenarios:
         features = data["data"]["features"]
         assert isinstance(features, list)
         assert len(features) >= 1, (
-            f"WSA reservoirs must return at least 1 reservoir. "
-            f"An empty list means the WRONG LAYER (layer 0) was used — layer 26 is required."
+            "WSA reservoirs must return at least 1 reservoir. "
+            "An empty list means the WRONG LAYER (layer 0) was used — layer 26 is required."
         )
         # FIELD PRESENCE: Reservoir_Name must be present (PROVES layer 26 was used)
         reservoir_name_rows = [f for f in features if f.get("Reservoir_Name") is not None]

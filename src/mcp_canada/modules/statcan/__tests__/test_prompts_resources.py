@@ -1,3 +1,8 @@
+# Test-only pyright relaxation. Runtime assertions in these tests narrow types in
+# ways pyright cannot follow (prompt Message.content and Resource.read() unions),
+# and several cases deliberately pass invalid values to exercise error handling.
+# Source code is still checked strictly -- do not add this to non-test modules.
+# pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportOperatorIssue=false
 """Unit tests for StatCan prompts and resources."""
 
 import json
@@ -264,8 +269,6 @@ class TestStatCanResources:
         content = await r.read()
         data = json.loads(content)
         # Should have entries for common frequencies
-        values = [str(v) for v in data.values()]
-        all_text = " ".join(str(v) for v in data.values())
         assert any("daily" in str(v).lower() or "Daily" in str(v) for v in data.values())
 
     @pytest.mark.asyncio

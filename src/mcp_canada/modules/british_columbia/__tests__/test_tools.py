@@ -1,3 +1,8 @@
+# Test-only pyright relaxation. Runtime assertions in these tests narrow types in
+# ways pyright cannot follow (prompt Message.content and Resource.read() unions),
+# and several cases deliberately pass invalid values to exercise error handling.
+# Source code is still checked strictly -- do not add this to non-test modules.
+# pyright: reportOperatorIssue=false
 """Unit tests for british_columbia @tool functions.
 
 Covers the 5 CKAN discovery tools (Plan 02) and placeholders for 15 curated

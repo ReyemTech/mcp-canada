@@ -8,6 +8,7 @@ subjectCode + surveyCode fields from getAllCubesListLite.
 """
 
 import collections
+import json
 import math
 import xml.etree.ElementTree as ET
 from typing import Any
@@ -412,6 +413,16 @@ async def get_code_sets() -> tuple[CodeSets, bool]:
     Raises:
         httpx.HTTPStatusError: On HTTP 4xx/5xx responses.
     """
+    obj, was_cached = await _raw_code_sets_cached()
+    return _flatten_code_sets(obj), was_cached
+
+
+async def _raw_code_sets_cached() -> tuple[dict, bool]:
+    """Fetch the raw getCodeSets object, cached for 7 days.
+
+    Shared by get_code_sets() and the UOM label lookup so both hit one cache
+    entry rather than two.
+    """
     cache_key = "statcan_wds:getCodeSets"
 
     async def _fetcher() -> dict:
@@ -422,12 +433,54 @@ async def get_code_sets() -> tuple[CodeSets, bool]:
             return resp.json()
 
     raw, was_cached = await cached_fetch(cache_key, CACHE_TTL_CODESETS, _fetcher)
-    obj = _unwrap(raw)
-    return _flatten_code_sets(obj), was_cached
+    return _unwrap(raw), was_cached
+
+
+async def _raw_code_sets() -> dict:
+    """Raw getCodeSets object. Seam for tests; see _raw_code_sets_cached."""
+    obj, _ = await _raw_code_sets_cached()
+    return obj
+
+
+async def _uom_label(uom_code: int) -> str | None:
+    """Decode a WDS memberUomCode to its English label.
+
+    Sourced from the live code set rather than a hardcoded map: upstream
+    publishes 464 UOM codes and many are index bases (17 = "2002=100") that
+    cannot be guessed. The previous hand-written catalog had every entry wrong
+    (08-UAT.md Gap 2).
+
+    Returns None for an unknown code, a null upstream label, or any failure —
+    a getCodeSets outage must not take down series-info lookups.
+    """
+    try:
+        obj = await _raw_code_sets()
+        for entry in obj.get("uom") or []:
+            if entry.get("memberUomCode") == uom_code:
+                label = entry.get("memberUomEn")
+                return label or None
+    except Exception:  # noqa: BLE001 — decode is best-effort by design
+        return None
+    return None
+
+
+async def _flatten_series_info_async(obj: dict) -> SeriesInfo:
+    """Flatten a raw series info object and decode its UOM label.
+
+    Separate from the sync _flatten_series_info because the UOM label comes
+    from the cached code set rather than a local map (08-UAT.md Gap 2).
+    """
+    info = _flatten_series_info(obj)
+    info.uom = await _uom_label(info.uom_code)
+    return info
 
 
 def _flatten_series_info(obj: dict) -> SeriesInfo:
-    """Flatten a raw series info object to a SeriesInfo schema instance."""
+    """Flatten a raw series info object to a SeriesInfo schema instance.
+
+    Does NOT populate `uom` — that needs an await against the code set. Callers
+    that want the decoded label should use _flatten_series_info_async.
+    """
     freq_code: int = obj.get("frequencyCode", 0)
     scalar_code: int = obj.get("scalarFactorCode", 0)
     return SeriesInfo(
@@ -506,6 +559,32 @@ def _flatten_code_sets(obj: dict) -> CodeSets:
     )
 
 
+#: WDS responseStatusCode values that mean "the request was understood but there
+#: is no series here" rather than "the service failed". Published in getCodeSets
+#: under wdsResponseStatus: 2 = invalid cube/series combination, 4 = invalid
+#: vector, 5 = invalid product id.
+_NO_SERIES_STATUS = {2, 4, 5}
+
+
+def _require_series(obj: dict, what: str) -> dict:
+    """Raise a clean ValueError when WDS reports no series for the request.
+
+    StatCan answers an unpopulated coordinate with status=SUCCESS and an object
+    whose responseStatusCode is non-zero and every field is null. Passing that
+    to SeriesInfo produced "6 validation errors for SeriesInfo" surfaced as an
+    UPSTREAM_ERROR, which blamed the service for what is really a NOT_FOUND
+    (Phase 20.1).
+    """
+    code = obj.get("responseStatusCode")
+    if code in _NO_SERIES_STATUS:
+        raise ValueError(
+            f"No series exists for {what} (WDS responseStatusCode {code}). "
+            f"The product id and coordinate are valid syntax but do not "
+            f"identify a published series."
+        )
+    return obj
+
+
 async def get_series_info_by_vector(vector_id: int) -> tuple[SeriesInfo, bool]:
     """Fetch series metadata by vectorId.
 
@@ -534,8 +613,8 @@ async def get_series_info_by_vector(vector_id: int) -> tuple[SeriesInfo, bool]:
             return resp.json()
 
     raw, was_cached = await cached_fetch(cache_key, CACHE_TTL_META, _fetcher)
-    obj = _unwrap(raw)
-    return _flatten_series_info(obj), was_cached
+    obj = _require_series(_unwrap(raw), f"vector {vector_id}")
+    return await _flatten_series_info_async(obj), was_cached
 
 
 async def get_series_info_by_coord(
@@ -571,8 +650,8 @@ async def get_series_info_by_coord(
             return resp.json()
 
     raw, was_cached = await cached_fetch(cache_key, CACHE_TTL_META, _fetcher)
-    obj = _unwrap(raw)
-    return _flatten_series_info(obj), was_cached
+    obj = _require_series(_unwrap(raw), f"product {product_id} coordinate {coordinate}")
+    return await _flatten_series_info_async(obj), was_cached
 
 
 async def get_latest_n_by_vector(
@@ -1026,6 +1105,31 @@ def _flatten_sdmx_json(payload: dict) -> list[SDMXObservationRow]:
     return rows
 
 
+#: Marker for StatCan's malformed empty-SDMX body. When a key matches no
+#: observations the service returns HTTP 200 with two surplus closing braces:
+#:     "dataSets": [{ "action": "Information","series":{ }}}}],"structure":...
+#: which is not valid JSON. The empty `series` object is the reliable signal.
+_SDMX_EMPTY_MARKER = '"series":{ }'
+
+
+def _parse_sdmx_body(body: str, what: str) -> dict:
+    """Parse an SDMX JSON body, tolerating the malformed empty-result case.
+
+    Raises ValueError tagged as an upstream fault for anything else, so the tool
+    layer does not misreport a broken response as caller error (Phase 20.1).
+    """
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as exc:
+        if _SDMX_EMPTY_MARKER in body:
+            # No observations for this key — StatCan's empty payload is simply
+            # not valid JSON. Answer semantically instead of failing.
+            return {"dataSets": [], "structure": {}}
+        raise ValueError(
+            f"StatCan SDMX returned an unparseable body for {what}: {exc}"
+        ) from exc
+
+
 async def get_sdmx_structure(product_id: int) -> tuple[SDMXStructure, bool]:
     """Fetch and parse the SDMX dimension structure for a StatCan table.
 
@@ -1102,7 +1206,7 @@ async def get_sdmx_data(
         url = SDMX_BASE_URL + f"data/DF_{product_id}/{key}"
         resp = await http.get(url, params=params, headers={"Accept": "application/json"})
         resp.raise_for_status()
-        payload = resp.json()
+        payload = _parse_sdmx_body(resp.text, f"DF_{product_id} key {key}")
 
     return _flatten_sdmx_json(payload), False
 
@@ -1140,6 +1244,6 @@ async def get_sdmx_vector_data(
         url = SDMX_BASE_URL + f"vector/v{vector_id}"
         resp = await http.get(url, params=params, headers={"Accept": "application/json"})
         resp.raise_for_status()
-        payload = resp.json()
+        payload = _parse_sdmx_body(resp.text, f"vector {vector_id}")
 
     return _flatten_sdmx_json(payload), False

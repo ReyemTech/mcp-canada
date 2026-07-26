@@ -2,16 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
-status: planning
-stopped_at: Completed 20-nova-scotia-government-open-data 20-08-PLAN.md
-last_updated: "2026-06-16T20:39:07.542Z"
-last_activity: 2026-06-17 — Completed quick task 1: de-mask UPSTREAM_ERROR escape-hatch in provincial integration tests
+current_phase: 20
+current_phase_name: Finish integration de-masking and fix the failures it exposed
+status: awaiting_merge
+stopped_at: "Phase 20.1 complete; PR #2 open with all four CI gates green"
+last_updated: "2026-07-26T02:28:06.297Z"
+last_activity: 2026-07-25
+last_activity_desc: Phase 20.1 executed end to end
 progress:
-  total_phases: 34
-  completed_phases: 15
-  total_plans: 72
-  completed_plans: 72
-  percent: 0
+  total_phases: 36
+  completed_phases: 16
+  total_plans: 77
+  completed_plans: 77
+  percent: 44
 ---
 
 # Project State
@@ -21,20 +24,99 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** An agent can combine data from any Canadian government source in a single SQL query — turning isolated APIs into one queryable data platform.
-**Current focus:** Phase 7 — Datastore + SSL
+**Current focus:** Phase 20.1 complete (PR #2) — next is Phase 20.2 (normalize tool error handling), then Phase 21 (New Brunswick)
 
 ## Current Position
 
-Phase: 7 of 10 (Datastore + SSL)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-04-07 — Roadmap created for v1.1 milestone
+Phase: 20 of 36 (20.1 — integration de-masking: COMPLETE)
+Plan: 6 of 6 complete
+Status: Phase 20.1 complete; next is Phase 20.2 (run /gsd-plan-phase 20.2)
+Last activity: 2026-07-25 — Phase 20.1 executed end to end
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [████░░░░░░] 43%
+
+**Executed and verified:** phases 07-20 and 40 (15 phases, 71 plans, all verification `passed`).
+Suite at reconciliation: 3032 passed, 2 skipped, 97.05% coverage.
+
+**Reconciliation of 2026-07-25** (see git history for the commit):
+
+- Phase 17 (Alberta): was `human_needed`. Both live-agent UAT items re-run and
+  confirmed (BM25 discovery ranks `alberta_` tools top-5 on all 5 probe queries;
+  French error strings + `_meta.lang='fr'` verified live). All 3 doc-tracking gaps closed.
+
+- Phase 11 (IRCC): was mechanically `stale` — the report predated plan 11-04, a
+  gap-closure plan. Re-verified with 3 added truths covering 11-04; 11-UAT was
+  already 10/10 against the post-11-04 build.
+
+- REQUIREMENTS.md: 100 checklist boxes and 117 traceability rows were still
+  "Planned" for shipped work. Flipped to Complete against on-disk evidence.
+
+- ROADMAP.md: 61 plan checkboxes flipped to `[x]`.
+
+## Open Items
+
+All items from the 2026-07-25 reconciliation are closed:
+
+1. ~~StatCan `FREQUENCY_CODES` is wrong~~ — **FIXED.** Frequency *and* scalar-factor
+   maps were both shifted; rebuilt from StatCan's published code set, catalogs
+   updated, tautological assertions replaced with literals, live-drift guard added.
+
+2. ~~`sc_get_series_info_by_vector` returns no UOM label~~ — **FIXED.** Decoded `uom`
+   added, sourced from live getCodeSets. Turned up a third fabricated catalog
+   (`data://statcan/uom-codes`, all 15 entries wrong) — replaced with a verified subset.
+
+3. ~~Phases 15 (BC) and 16 (Quebec) have no REQUIREMENTS.md entries~~ — **BACKFILLED.**
+   BC-01..22 and QC-01..19 derived from shipped code and verified against the modules;
+   ROADMAP `Requirements: TBD` lines replaced. Every executed phase now has traceability.
+
+4. ~~3 active debug sessions~~ — **CLOSED.** All three were fixed long ago:
+   `ircc-header-parsing` moved to resolved/ (plan 11-04 shipped its recommendation
+   verbatim); the two BC sessions were stale duplicates of newer files already in
+   resolved/.
+
+Open defect (found 2026-07-26, deferred to its own phase):
+
+- **Alberta wildfire tools are dead upstream.** The entire WMB FeatureServer group
+  now returns `499 Token Required`: `ACTIVE_WILDFIRES`, `ACTIVE_FIRE_PERIMETERS`,
+  `EXTINGUISHED_WILDFIRES`, `EXTINGUISHED_PERIMETERS`, `FIRE_CONTROL_ORDERS`,
+  `OHV_RESTRICTION`. This kills `alberta_get_active_fires`,
+  `alberta_get_fire_perimeters` and `alberta_get_fire_control_orders`.
+  Only `alberta_get_active_fires` has an integration test, and it uses
+  `assert_live_or_transient`, so the token error is tolerated as `UPSTREAM_ERROR`
+  and the test passes silently — the exact masking pattern `.claude/rules/tests.md`
+  warns about after the TTC incident. The other fire tools have no live coverage.
+  Needs a decision: find an unauthenticated endpoint, or return `NOT_CONFIGURED`
+  behind an env-var key like Manitoba 511. Alberta AHS, parks, forest-area and
+  Saskatchewan/Manitoba Hub services were probed at the same time and are healthy.
+
+- **Malformed-JSON masking is broader than the spot Codex flagged.** → **now Phase 20.2.**
+  `upstream_guard` is fixed, which covers drug_database and nutrient_file (they use
+  their own clients). But `shared/http.py:api_get` returns `response.json()` with no
+  decode guard, and ~40 `except ValueError -> INVALID_INPUT` arms across statcan,
+  ircc, manitoba, saskatchewan, nova_scotia, british_columbia and datastore sit
+  downstream of it, so an upstream HTML error page still surfaces as caller error
+  there. Pre-existing, not introduced by Phase 20.1.
+
+  Correction to the first note taken on this: it is **not** a one-line fix inside
+  `api_get`. `httpx.DecodingError` is an `HTTPError` but **not** an
+  `HTTPStatusError`, and 5 of 24 modules (bank_of_canada, ckan, ircc, ontario,
+  recalls) catch only `HTTPStatusError` — a naive central guard would turn a
+  mislabelled error into an *unhandled* one in those five, which is strictly worse
+  and is the exact failure 20.1 removed. Handler shape must be normalized across
+  all 24 modules first. Sequenced before Phase 21 so ~19 future modules inherit the
+  correct shape.
+
+Remaining backlog (not defects):
+
+- `.planning/todos/pending/2026-04-12-research-cross-canada-er-wait-times-datasets.md`
+  — research item; premises refreshed 2026-07-25 against what phases 17-20 learned.
+
+- ROADMAP phases 20.1 and 21-39 carry `Requirements: TBD` — correct, they are unplanned.
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0
 - Average duration: -
 - Total execution time: -
@@ -46,6 +128,7 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 **Recent Trend:**
+
 - Last 5 plans: -
 - Trend: -
 
@@ -322,6 +405,7 @@ Recent decisions affecting current work:
 - Phases 35-39 added: Regional municipalities (Peel, Durham, Halton, Waterloo, Metro Vancouver)
 - Phase 40 added: MCP Prompts and Resources — workflow prompts for guided data exploration, static resources for reference data across all modules
 - Phase 20.1 inserted after Phase 20: Remove UPSTREAM_ERROR escape-hatch pattern from all provincial integration tests (MB/SK/AB/QC/NS) and re-run live integration to surface masked upstream failures before pushing Phase 20 (URGENT)
+- Phase 20.2 inserted after Phase 20.1: Normalize tool error handling and guard malformed upstream JSON — root cause of a masking class surfaced by Codex review on PR #2; sequenced before Phase 21 so ~19 future modules inherit the correct handler shape
 
 ### Pending Todos
 
@@ -342,6 +426,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-16T20:39:07.538Z
-Stopped at: Completed 20-nova-scotia-government-open-data 20-08-PLAN.md
-Resume file: None
+Last session: 2026-07-26
+Stopped at: Phase 20.1 complete; PR #2 open with all four CI gates green
+Resume file: .planning/phases/20.1-remove-upstream-error-escape-hatch-pattern-from-all-provincial-integration-tests-mb-sk-ab-qc-ns-and-re-run-live-integration-to-surface-masked-upstream-failures-before-pushing-phase-20/20.1-CONTEXT.md

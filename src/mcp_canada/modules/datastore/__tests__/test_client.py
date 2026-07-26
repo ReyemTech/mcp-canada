@@ -4,6 +4,8 @@ Tests identifier validation, type inference, and all CRUD operations
 against an in-memory SQLite database.
 """
 
+import json
+
 import pytest
 
 from mcp_canada.modules.datastore.client import (
@@ -338,3 +340,70 @@ class TestDropTable:
         """drop_table with invalid table name raises ValueError."""
         with pytest.raises(ValueError, match="identifier"):
             await drop_table("bad;table")
+
+
+class TestNestedValuesAreStorable:
+    """Nested values must be JSON-encoded, not rejected by the driver.
+
+    Regression cover for the Phase 20.1 defect. Several modules legitimately
+    return nested payloads — IRCC reshapes observations into
+    {"years": {"2023": {"q1": {"jan": 715, ...}}}} — and storing one produced
+
+        DATASTORE_ERROR: Error binding parameter 2: type 'dict' is not supported
+
+    which is sqlite3's message, not an answer. The datastore exists so an agent
+    can combine any module's output in one SQL query, so refusing a whole class
+    of module output defeats its purpose. Nested values are stored as JSON text
+    and remain queryable through SQLite's json_extract().
+    """
+
+    @pytest.mark.asyncio
+    async def test_dict_value_is_stored_as_json(self, patched_db):
+        from mcp_canada.modules.datastore import client as ds
+
+        await ds.create_table("nested", [("label", "TEXT"), ("years", "TEXT")])
+        count, _ = await ds.insert_rows("nested", [
+            {"label": "Afghanistan", "years": {"2023": {"q1": {"jan": 715}}}},
+        ])
+        assert count == 1
+
+        (_cols, rows, _trunc), _ = await ds.run_query("SELECT * FROM nested")
+        stored = rows[0]["years"]
+        assert isinstance(stored, str), (
+            f"a nested value must land as JSON text, got {type(stored).__name__}"
+        )
+        assert json.loads(stored) == {"2023": {"q1": {"jan": 715}}}
+
+    @pytest.mark.asyncio
+    async def test_json_extract_still_works_on_stored_value(self, patched_db):
+        """Storing as JSON keeps the data queryable, which is the whole point."""
+        from mcp_canada.modules.datastore import client as ds
+
+        await ds.create_table("nested2", [("label", "TEXT"), ("years", "TEXT")])
+        await ds.insert_rows("nested2", [
+            {"label": "Afghanistan", "years": {"2023": {"total": 1234}}},
+        ])
+        (_cols, rows, _trunc), _ = await ds.run_query(
+            "SELECT label, json_extract(years, \'$.\"2023\".total\') AS total FROM nested2"
+        )
+        assert rows[0]["total"] == 1234
+
+    @pytest.mark.asyncio
+    async def test_list_value_is_stored_as_json(self, patched_db):
+        from mcp_canada.modules.datastore import client as ds
+
+        await ds.create_table("nested3", [("tags", "TEXT")])
+        await ds.insert_rows("nested3", [{"tags": ["a", "b"]}])
+        (_cols, rows, _trunc), _ = await ds.run_query("SELECT * FROM nested3")
+        assert json.loads(rows[0]["tags"]) == ["a", "b"]
+
+    @pytest.mark.asyncio
+    async def test_scalars_are_untouched(self, patched_db):
+        """Ints stay ints — JSON encoding must not stringify ordinary values."""
+        from mcp_canada.modules.datastore import client as ds
+
+        await ds.create_table("plain", [("n", "INTEGER"), ("s", "TEXT")])
+        await ds.insert_rows("plain", [{"n": 42, "s": "hello"}])
+        (_cols, rows, _trunc), _ = await ds.run_query("SELECT * FROM plain")
+        assert rows[0]["n"] == 42
+        assert rows[0]["s"] == "hello"

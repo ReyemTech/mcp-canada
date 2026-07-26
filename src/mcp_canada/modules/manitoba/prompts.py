@@ -16,8 +16,7 @@ ZERO-parameter resources are in resources.py — see CLAUDE.md rule.
 
 from typing import Annotated, Literal
 
-from fastmcp.prompts import prompt
-from fastmcp.prompts.prompt import Message
+from fastmcp.prompts import Message, prompt
 
 
 __all__ = [

@@ -1,3 +1,8 @@
+# Test-only pyright relaxation. Runtime assertions in these tests narrow types in
+# ways pyright cannot follow (prompt Message.content and Resource.read() unions),
+# and several cases deliberately pass invalid values to exercise error handling.
+# Source code is still checked strictly -- do not add this to non-test modules.
+# pyright: reportAttributeAccessIssue=false
 """Unit tests for Nova Scotia module prompts.py and resources.py.
 
 TDD: Tests written first (RED), then implementation (GREEN).

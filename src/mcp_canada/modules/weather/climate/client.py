@@ -86,14 +86,23 @@ def _flatten_normal(feature: dict) -> dict:
 
 
 def _flatten_trend(feature: dict) -> dict:
-    """Flatten an OGC ahccd-trends feature to a plain dict."""
+    """Flatten an OGC ahccd-trends feature to a plain dict.
+
+    NOTE: ahccd-trends uses bilingual double-underscore property names
+    (`station_id__id_station`), unlike the SCREAMING_CASE of climate-daily and
+    climate-normals. Reading the SCREAMING_CASE names here returned all-None
+    rows and made every filter match zero records (fixed 2026-07-25).
+    """
     props = feature.get("properties") or {}
     return {
-        "station_id": props.get("CLIMATE_IDENTIFIER"),
-        "measurement_type": props.get("MEASUREMENT_TYPE"),
-        "trend": _safe_float(props.get("TREND")),
-        "year_begin": props.get("YEAR_BEGIN"),
-        "year_end": props.get("YEAR_END"),
+        "station_id": props.get("station_id__id_station"),
+        "station_name": props.get("station_name__nom_station"),
+        "measurement_type": props.get("measurement_type__type_mesure"),
+        "trend": _safe_float(props.get("trend_value__valeur_tendance")),
+        "period": props.get("period__periode"),
+        "year_range": props.get("year_range__annees"),
+        "province": props.get("province__province"),
+        "elevation_m": props.get("elevation__elevation"),
     }
 
 
@@ -263,9 +272,13 @@ async def fetch_climate_trends(
 ) -> tuple[list[dict], bool]:
     """Fetch long-term climate trend data from the AHCCD dataset.
 
+    The collection publishes only precipitation measures — "rain", "snow" and
+    "total_precip". There is no temperature trend series here despite the AHCCD
+    name; a temperature filter returns zero records.
+
     Args:
-        station_id: Optional climate station identifier to filter.
-        measurement_type: Optional type filter (e.g. "temperature", "precipitation").
+        station_id: Optional AHCCD station id to filter (e.g. "1100120").
+        measurement_type: Optional type filter — "rain", "snow", or "total_precip".
         limit: Max number of records to return.
 
     Returns:
@@ -273,9 +286,9 @@ async def fetch_climate_trends(
     """
     properties: dict[str, str] = {}
     if station_id is not None:
-        properties["CLIMATE_IDENTIFIER"] = station_id
+        properties["station_id__id_station"] = station_id
     if measurement_type is not None:
-        properties["MEASUREMENT_TYPE"] = measurement_type
+        properties["measurement_type__type_mesure"] = measurement_type
 
     features, _count, was_cached = await ogc_fetch(
         COLL_AHCCD_TRENDS,

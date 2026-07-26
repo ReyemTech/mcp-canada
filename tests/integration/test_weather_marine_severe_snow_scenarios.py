@@ -7,9 +7,16 @@ Run: uv run pytest tests/integration/test_weather_marine_severe_snow_scenarios.p
 """
 
 import pytest
-from tests.integration.conftest import call_tool, discover
+from tests.integration.conftest import (
+    assert_live_or_transient,
+    assert_rows,
+    call_tool,
+    discover,
+)
 
 pytestmark = pytest.mark.integration
+
+API = "msc-geomet"
 
 
 # ─── Marine weather scenarios ─────────────────────────────────────────────────
@@ -24,16 +31,16 @@ class TestMarineWeatherScenarios:
         data = await call_tool(mcp_server, "wx_get_marine_forecast", {
             "province": "NS"
         })
-        # Should return data or empty list — never an exception
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "msc-geomet"
-            assert isinstance(data["data"], list)
-            if data["data"]:
-                forecast = data["data"][0]
-                # Flattened fields should be present
-                assert "area_en" in forecast or "area_fr" in forecast
-                assert "regularForecast" not in forecast  # Must be flattened
+        live = assert_live_or_transient(data, "wx_get_marine_forecast", API)
+        if live:
+            # NS marine areas are forecast year-round.
+            forecast = assert_rows(data, "wx_get_marine_forecast")[0]
+            assert "area_en" in forecast or "area_fr" in forecast, (
+                f"forecast missing both area_en and area_fr: {forecast}"
+            )
+            assert "regularForecast" not in forecast, (
+                f"response must be flattened, found raw nested key: {forecast}"
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
@@ -44,15 +51,26 @@ class TestMarineWeatherScenarios:
         assert "_meta" in data
         assert "data" in data
         # Response data is a dict with tracks list (possibly empty off-season)
-        response_data = data["data"]
-        if isinstance(response_data, dict):
-            assert "tracks" in response_data
-            assert isinstance(response_data["tracks"], list)
-            # Off-season: should have a note
-            if not response_data["tracks"]:
-                assert "note" in response_data
-        elif isinstance(response_data, list):
-            pass  # Empty list is also acceptable
+        payload = data["data"]
+        assert isinstance(payload, (dict, list)), (
+            f"payload must be a dict or list, got {type(payload).__name__}"
+        )
+        if isinstance(payload, dict):
+            assert "tracks" in payload, f"dict payload missing tracks: {payload}"
+            assert isinstance(payload["tracks"], list)
+            if payload["tracks"]:
+                track = payload["tracks"][0]
+                assert isinstance(track, dict), (
+                    f"each track must be an object, got {type(track).__name__}"
+                )
+            else:
+                assert "note" in payload, (
+                    f"an empty track list must explain itself (off-season): {payload}"
+                )
+        else:
+            assert payload == [], (
+                f"a list payload means 'no active storms' and must be empty, got: {payload}"
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
@@ -61,13 +79,21 @@ class TestMarineWeatherScenarios:
         data = await call_tool(mcp_server, "wx_get_thunderstorm_outlook", {
             "province": "ON"
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            response_data = data["data"]
-            if isinstance(response_data, dict):
-                assert "outlooks" in response_data
-            elif isinstance(response_data, list):
-                pass  # empty list is fine
+        live = assert_live_or_transient(data, "wx_get_thunderstorm_outlook", API)
+        if live:
+            payload = data["data"]
+            # The tool returns a dict with an outlooks list, or a bare list when
+            # nothing is active. Both are valid; anything else is a shape defect.
+            assert isinstance(payload, (dict, list)), (
+                f"payload must be a dict or list, got {type(payload).__name__}"
+            )
+            if isinstance(payload, dict):
+                assert "outlooks" in payload, f"dict payload missing outlooks: {payload}"
+            else:
+                assert payload == [], (
+                    f"a list payload means 'no active outlooks' and must be empty, "
+                    f"got: {payload}"
+                )
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
@@ -92,10 +118,13 @@ class TestSevereWeatherScenarios:
         data = await call_tool(mcp_server, "wx_get_radar_data", {
             "lat": 45.4, "lon": -75.7
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "msc-geomet"
-            assert isinstance(data["data"], list)
+        live = assert_live_or_transient(data, "wx_get_radar_data", API)
+        if live:
+            assert_rows(
+                data,
+                "wx_get_radar_data",
+                allow_empty_reason="no precipitation near Ottawa in the window is normal",
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(10)
@@ -115,11 +144,13 @@ class TestSevereWeatherScenarios:
         data = await call_tool(mcp_server, "wx_get_uv_index", {
             "lat": 45.4, "lon": -75.7
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
+        live = assert_live_or_transient(data, "wx_get_uv_index", API)
+        if live:
             uv_data = data["data"]
-            assert "uv_index" in uv_data
-            assert "location_en" in uv_data or "location_fr" in uv_data
+            assert "uv_index" in uv_data, f"payload missing uv_index: {uv_data}"
+            assert "location_en" in uv_data or "location_fr" in uv_data, (
+                f"payload missing both location_en and location_fr: {uv_data}"
+            )
 
 
 # ─── Snow scenarios ───────────────────────────────────────────────────────────
@@ -134,14 +165,11 @@ class TestSnowScenarios:
         data = await call_tool(mcp_server, "wx_get_snow_depth", {
             "lat": 45.4, "lon": -75.7
         })
-        # May return data or NOT_FOUND (no snow in summer, no nearby station)
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "msc-geomet"
+        live = assert_live_or_transient(data, "wx_get_snow_depth", API)
+        if live:
             depth_data = data["data"]
-            assert "station_name" in depth_data
-            assert "snow_depth_cm" in depth_data
-            assert "observed_at" in depth_data
+            for field in ("station_name", "snow_depth_cm", "observed_at"):
+                assert field in depth_data, f"payload missing {field!r}: {depth_data}"
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
@@ -150,15 +178,17 @@ class TestSnowScenarios:
         data = await call_tool(mcp_server, "wx_get_snow_water_equivalent", {
             "lat": 45.4, "lon": -75.7
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
+        live = assert_live_or_transient(data, "wx_get_snow_water_equivalent", API)
+        if live:
             swe_data = data["data"]
             assert "snow_depth_cm" in swe_data
-            assert "swe_mm" in swe_data
-            assert "density_factor" in swe_data
-            assert "note" in swe_data
-            # Note should mention estimation
-            assert "estimate" in swe_data["note"].lower() or "density" in swe_data["note"].lower()
+            assert "swe_mm" in swe_data, f"payload missing swe_mm: {swe_data}"
+            assert "density_factor" in swe_data, f"payload missing density_factor: {swe_data}"
+            assert "note" in swe_data, f"payload missing note: {swe_data}"
+            note = swe_data["note"].lower()
+            assert "estimate" in note or "density" in note, (
+                f"note must disclose that the value is an estimate: {swe_data['note']!r}"
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)

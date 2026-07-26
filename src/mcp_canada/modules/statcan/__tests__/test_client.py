@@ -4,8 +4,26 @@ TDD: RED → GREEN → REFACTOR
 All HTTP calls are mocked; no live network access.
 """
 
+import json
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+
+def _cached_fetch_call(mock_cf, key_fragment: str):
+    """Find the cached_fetch call whose cache key contains key_fragment.
+
+    get_series_info_by_* makes two cached_fetch calls — the series lookup and
+    the shared 7-day getCodeSets fetch used to decode the UOM label — so the
+    bare `.call_args` (last call) is ambiguous.
+    """
+    for call in mock_cf.call_args_list:
+        if key_fragment in call[0][0]:
+            return call
+    raise AssertionError(
+        f"no cached_fetch call with {key_fragment!r} in its key; "
+        f"saw: {[c[0][0] for c in mock_cf.call_args_list]}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -16,7 +34,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 class TestCubeLiteSchema:
     def test_cube_lite_validates_from_fixture(self, cube_list_lite_response):
         from mcp_canada.modules.statcan.schemas import CubeLite
-        from mcp_canada.modules.statcan.constants import FREQUENCY_CODES
 
         raw = cube_list_lite_response[0]
         cube = CubeLite(
@@ -29,13 +46,13 @@ class TestCubeLiteSchema:
             release_time=raw["releaseTime"],
             archived=raw["archived"],
             frequency_code=raw["frequencyCode"],
-            frequency=FREQUENCY_CODES.get(raw["frequencyCode"], "Unknown"),
+            frequency="Monthly",  # literal: fixture is frequencyCode 6
             subject_codes=raw["subjectCode"],
             survey_codes=raw["surveyCode"],
         )
         assert cube.product_id == 18100004
         assert cube.title_en == "Consumer Price Index, monthly"
-        assert cube.frequency_code == 5
+        assert cube.frequency_code == 6
         assert cube.frequency == "Monthly"
         assert cube.subject_codes == ["18"]
 
@@ -63,8 +80,6 @@ class TestCubeLiteSchema:
 class TestCubeMetadataSchema:
     def test_cube_metadata_validates_with_dimensions(self, cube_metadata_response):
         from mcp_canada.modules.statcan.schemas import CubeMetadata, Dimension, DimensionMember
-        from mcp_canada.modules.statcan.constants import FREQUENCY_CODES
-
         obj = cube_metadata_response["object"]
         dimensions = []
         for dim in obj["dimension"]:
@@ -95,7 +110,7 @@ class TestCubeMetadataSchema:
             start_date=obj["cubeStartDate"],
             end_date=obj["cubeEndDate"],
             frequency_code=obj["frequencyCode"],
-            frequency=FREQUENCY_CODES.get(obj["frequencyCode"], "Unknown"),
+            frequency="Monthly",  # literal: fixture is frequencyCode 6
             nb_series=obj["nbSeries"],
             nb_datapoints=obj["nbDatapoints"],
             dimensions=dimensions,
@@ -154,17 +169,15 @@ class TestCodeSetsSchema:
 class TestSeriesInfoSchema:
     def test_series_info_validates_from_fixture(self, series_info_response):
         from mcp_canada.modules.statcan.schemas import SeriesInfo
-        from mcp_canada.modules.statcan.constants import FREQUENCY_CODES, SCALAR_FACTOR_CODES
-
         obj = series_info_response[0]["object"]
         info = SeriesInfo(
             product_id=obj["productId"],
             coordinate=obj["coordinate"],
             vector_id=obj["vectorId"],
             frequency_code=obj["frequencyCode"],
-            frequency=FREQUENCY_CODES.get(obj["frequencyCode"], "Unknown"),
+            frequency="Monthly",  # literal: fixture is frequencyCode 6
             scalar_factor_code=obj["scalarFactorCode"],
-            scalar_factor=SCALAR_FACTOR_CODES.get(obj["scalarFactorCode"], "Unknown"),
+            scalar_factor="units",  # literal: fixture is scalarFactorCode 0
             decimals=obj["decimals"],
             terminated=bool(obj["terminated"]),
             title_en=obj["SeriesTitleEn"],
@@ -180,8 +193,6 @@ class TestSeriesInfoSchema:
 class TestObservationRowSchema:
     def test_observation_row_validates_with_float_value(self, observation_response):
         from mcp_canada.modules.statcan.schemas import ObservationRow
-        from mcp_canada.modules.statcan.constants import FREQUENCY_CODES, SCALAR_FACTOR_CODES
-
         dp = observation_response[0]["object"]["vectorDataPoint"][0]
         row = ObservationRow(
             ref_per=dp["refPer"],
@@ -189,9 +200,9 @@ class TestObservationRowSchema:
             value=dp["value"],
             decimals=dp["decimals"],
             scalar_factor_code=dp["scalarFactorCode"],
-            scalar_factor=SCALAR_FACTOR_CODES.get(dp["scalarFactorCode"], "Unknown"),
+            scalar_factor="units",  # literal: fixture is scalarFactorCode 0
             frequency_code=dp["frequencyCode"],
-            frequency=FREQUENCY_CODES.get(dp["frequencyCode"], "Unknown"),
+            frequency="Monthly",  # literal: fixture is frequencyCode 6
             status_code=dp["statusCode"],
             symbol_code=dp["symbolCode"],
             release_time=dp["releaseTime"],
@@ -203,8 +214,6 @@ class TestObservationRowSchema:
 
     def test_observation_row_allows_none_value(self, observation_response):
         from mcp_canada.modules.statcan.schemas import ObservationRow
-        from mcp_canada.modules.statcan.constants import FREQUENCY_CODES, SCALAR_FACTOR_CODES
-
         dp = observation_response[0]["object"]["vectorDataPoint"][2]
         row = ObservationRow(
             ref_per=dp["refPer"],
@@ -212,9 +221,9 @@ class TestObservationRowSchema:
             value=dp["value"],
             decimals=dp["decimals"],
             scalar_factor_code=dp["scalarFactorCode"],
-            scalar_factor=SCALAR_FACTOR_CODES.get(dp["scalarFactorCode"], "Unknown"),
+            scalar_factor="units",  # literal: fixture is scalarFactorCode 0
             frequency_code=dp["frequencyCode"],
-            frequency=FREQUENCY_CODES.get(dp["frequencyCode"], "Unknown"),
+            frequency="Monthly",  # literal: fixture is frequencyCode 6
             status_code=dp["statusCode"],
             symbol_code=dp["symbolCode"],
             release_time=dp["releaseTime"],
@@ -612,7 +621,7 @@ class TestGetSeriesInfoByVector:
             with patch.object(statcan_client, "_limiter_acquire", new=AsyncMock()):
                 with patch("mcp_canada.modules.statcan.client.cached_fetch", wraps=statcan_client.cached_fetch) as mock_cf:
                     await statcan_client.get_series_info_by_vector(32164132)
-                    call_args = mock_cf.call_args
+                    call_args = _cached_fetch_call(mock_cf, "getSeriesInfoFromVector")
                     assert call_args[0][0] == "statcan_wds:getSeriesInfoFromVector:32164132"
 
     @pytest.mark.asyncio
@@ -634,7 +643,7 @@ class TestGetSeriesInfoByVector:
             with patch.object(statcan_client, "_limiter_acquire", new=AsyncMock()):
                 with patch("mcp_canada.modules.statcan.client.cached_fetch", wraps=statcan_client.cached_fetch) as mock_cf:
                     await statcan_client.get_series_info_by_vector(41690973)
-                    call_args = mock_cf.call_args
+                    call_args = _cached_fetch_call(mock_cf, "getSeriesInfoFromVector")
                     assert call_args[0][1] == CACHE_TTL_META
 
     @pytest.mark.asyncio
@@ -656,7 +665,14 @@ class TestGetSeriesInfoByVector:
             with patch.object(statcan_client, "_limiter_acquire", new=acquire_mock):
                 await statcan_client.get_series_info_by_vector(41690973)
 
-        acquire_mock.assert_called_once()
+        # Two acquisitions on a cold cache: the series lookup plus the shared
+        # 7-day getCodeSets fetch behind the UOM label (08-UAT Gap 2). The code
+        # set is cached for a week, so this is not two requests per call in
+        # practice — but both must pass through the limiter.
+        assert acquire_mock.await_count == 2, (
+            f"expected series lookup + getCodeSets to each acquire the limiter, "
+            f"got {acquire_mock.await_count}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -731,7 +747,7 @@ class TestGetSeriesInfoByCoord:
             with patch.object(statcan_client, "_limiter_acquire", new=AsyncMock()):
                 with patch("mcp_canada.modules.statcan.client.cached_fetch", wraps=statcan_client.cached_fetch) as mock_cf:
                     await statcan_client.get_series_info_by_coord(35100003, "1.12")
-                    call_args = mock_cf.call_args
+                    call_args = _cached_fetch_call(mock_cf, "getSeriesInfoFromCubePidCoord")
                     assert "35100003" in call_args[0][0]
                     assert "1.12.0.0.0.0.0.0.0.0" in call_args[0][0]
 
@@ -754,7 +770,14 @@ class TestGetSeriesInfoByCoord:
             with patch.object(statcan_client, "_limiter_acquire", new=acquire_mock):
                 await statcan_client.get_series_info_by_coord(35100003, "1.12")
 
-        acquire_mock.assert_called_once()
+        # Two acquisitions on a cold cache: the series lookup plus the shared
+        # 7-day getCodeSets fetch behind the UOM label (08-UAT Gap 2). The code
+        # set is cached for a week, so this is not two requests per call in
+        # practice — but both must pass through the limiter.
+        assert acquire_mock.await_count == 2, (
+            f"expected series lookup + getCodeSets to each acquire the limiter, "
+            f"got {acquire_mock.await_count}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1678,6 +1701,7 @@ class TestGetSdmxData:
 
         mock_response = MagicMock()
         mock_response.json.return_value = sdmx_data_json
+        mock_response.text = json.dumps(sdmx_data_json)
         mock_response.raise_for_status = MagicMock()
 
         mock_http = AsyncMock()
@@ -1701,6 +1725,7 @@ class TestGetSdmxData:
 
         mock_response = MagicMock()
         mock_response.json.return_value = sdmx_data_json
+        mock_response.text = json.dumps(sdmx_data_json)
         mock_response.raise_for_status = MagicMock()
 
         mock_http = AsyncMock()
@@ -1730,6 +1755,7 @@ class TestGetSdmxVectorData:
 
         mock_response = MagicMock()
         mock_response.json.return_value = sdmx_vector_json
+        mock_response.text = json.dumps(sdmx_vector_json)
         mock_response.raise_for_status = MagicMock()
 
         mock_http = AsyncMock()
@@ -1757,6 +1783,7 @@ class TestGetSdmxVectorData:
 
         mock_response = MagicMock()
         mock_response.json.return_value = sdmx_vector_json
+        mock_response.text = json.dumps(sdmx_vector_json)
         mock_response.raise_for_status = MagicMock()
 
         mock_http = AsyncMock()

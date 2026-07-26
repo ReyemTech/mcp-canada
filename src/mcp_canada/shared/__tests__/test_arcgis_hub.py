@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
@@ -301,6 +301,28 @@ class TestQueryFeatureService:
         assert truncated is True
 
     @pytest.mark.asyncio
+    async def test_where_none_is_coerced_to_match_all(self):
+        """where=None must send where='1=1', never omit the parameter.
+
+        httpx drops params whose value is None. ArcGIS FeatureServer /query
+        rejects a request with no `where` (HTTP 200 carrying an error 400
+        "Unable to perform query operation"), which surfaces to agents as a
+        bogus UPSTREAM_ERROR and reads as an outage. Verified live against
+        Saskatchewan Public_Fire_Ban on 2026-07-26.
+        """
+        mock_client = _make_mock_client([FEATURE_SERVICE_PAGE_2_FINAL])
+
+        await query_feature_service(
+            "https://ww8.yorkmaps.ca/arcgis/rest/services/OpenData/Transportation/FeatureServer",
+            layer_id=2,
+            where=None,
+            httpx_client=mock_client,
+        )
+
+        sent_params = mock_client.get.await_args.kwargs["params"]
+        assert sent_params["where"] == "1=1"
+
+    @pytest.mark.asyncio
     async def test_empty_feature_collection_returns_empty_list(self):
         """Empty FeatureCollection returns ([], False)."""
         mock_client = _make_mock_client([FEATURE_SERVICE_EMPTY])
@@ -473,3 +495,70 @@ class TestShapeHubDataset:
 
         assert result["description"] == original_desc
         assert not result["description"].endswith("...")
+
+
+class TestEmptyQueryOmitsQParam:
+    """An empty query must omit `q`, not send `q=`.
+
+    Every ArcGIS Hub portal rejects an empty q with HTTP 400 (verified
+    2026-07-25 against aurora, newmarket, york_region, markham and manitoba —
+    all five return 400 for q='' and 200 when q is omitted).
+
+    This broke every "list everything" call across the four Hub-backed modules:
+    York Region's aurora_list_categories and newmarket_search_datasets both
+    surfaced UPSTREAM_ERROR. It read as an upstream outage, and the integration
+    tests' `if "data" in data:` guards skipped their assertions on the error
+    response, so it stayed invisible.
+
+    Mirrors the startindex handling directly below it — startindex=0 is invalid
+    upstream and is likewise omitted rather than sent as zero.
+    """
+
+    @pytest.mark.asyncio
+    async def test_empty_query_omits_q(self):
+        from mcp_canada.shared.arcgis_hub import search_hub_datasets
+
+        client = AsyncMock()
+        response = MagicMock()
+        response.json.return_value = {"features": []}
+        response.raise_for_status = MagicMock()
+        client.get = AsyncMock(return_value=response)
+
+        await search_hub_datasets("https://example.hub.arcgis.com", query="", httpx_client=client)
+
+        params = client.get.await_args.kwargs["params"]
+        assert "q" not in params, (
+            f"an empty q is rejected with HTTP 400 by every Hub portal — omit it "
+            f"instead of sending an empty string. Sent: {params}"
+        )
+        assert params["limit"]
+
+    @pytest.mark.asyncio
+    async def test_whitespace_only_query_omits_q(self):
+        from mcp_canada.shared.arcgis_hub import search_hub_datasets
+
+        client = AsyncMock()
+        response = MagicMock()
+        response.json.return_value = {"features": []}
+        response.raise_for_status = MagicMock()
+        client.get = AsyncMock(return_value=response)
+
+        await search_hub_datasets("https://example.hub.arcgis.com", query="   ", httpx_client=client)
+
+        assert "q" not in client.get.await_args.kwargs["params"], (
+            "a whitespace-only query is equivalent to no query"
+        )
+
+    @pytest.mark.asyncio
+    async def test_real_query_still_sends_q(self):
+        from mcp_canada.shared.arcgis_hub import search_hub_datasets
+
+        client = AsyncMock()
+        response = MagicMock()
+        response.json.return_value = {"features": []}
+        response.raise_for_status = MagicMock()
+        client.get = AsyncMock(return_value=response)
+
+        await search_hub_datasets("https://example.hub.arcgis.com", query="transit", httpx_client=client)
+
+        assert client.get.await_args.kwargs["params"]["q"] == "transit"

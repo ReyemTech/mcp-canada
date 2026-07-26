@@ -26,7 +26,7 @@ from mcp_canada.modules.nutrient_file.client import (
     search_foods,
 )
 from mcp_canada.modules.nutrient_file.constants import BASE_URL
-from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.envelope import make_error, make_response, upstream_guard
 
 # API name and base URL for _meta envelope
 _API_NAME = "Canadian Nutrient File"
@@ -38,6 +38,7 @@ _API_URL = BASE_URL
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def nutrient_search_foods(
     query: str,
     lang: Literal["en", "fr"] = "en",
@@ -64,6 +65,7 @@ async def nutrient_search_foods(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def nutrient_get_food_details(
     food_id: int,
     lang: Literal["en", "fr"] = "en",
@@ -90,6 +92,7 @@ async def nutrient_get_food_details(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def nutrient_get_nutrient_amounts(
     food_id: int,
     lang: Literal["en", "fr"] = "en",
@@ -116,6 +119,7 @@ async def nutrient_get_nutrient_amounts(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def nutrient_get_serving_sizes(
     food_id: int,
     lang: Literal["en", "fr"] = "en",
@@ -142,6 +146,7 @@ async def nutrient_get_serving_sizes(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def nutrient_search_by_food_group(
     food_group_id: int,
     lang: Literal["en", "fr"] = "en",
@@ -168,6 +173,7 @@ async def nutrient_search_by_food_group(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def nutrient_list_nutrients(
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
@@ -193,6 +199,7 @@ async def nutrient_list_nutrients(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def nutrient_list_food_groups(
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
@@ -218,6 +225,7 @@ async def nutrient_list_food_groups(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def nutrient_compare_foods(
     food_ids: list[int],
     format: Literal["by_food", "by_nutrient"] = "by_food",

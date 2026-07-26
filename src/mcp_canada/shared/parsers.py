@@ -87,7 +87,7 @@ def _mask_privacy(value: Any) -> Any:
         return value
     # Handle pandas NA types if pandas is available
     try:
-        import pandas as pd  # noqa: PLC0415
+        import pandas as pd  # noqa: PLC0415 # pyright: ignore[reportMissingImports]
 
         if pd.isna(value):
             return None
@@ -111,7 +111,7 @@ def _parse_xlsx_pandas(
     Returns:
         list of dicts with normalized snake_case keys and privacy-masked values.
     """
-    import pandas as pd  # noqa: PLC0415
+    import pandas as pd  # noqa: PLC0415 # pyright: ignore[reportMissingImports]
 
     df = pd.read_excel(BytesIO(content), sheet_name=sheet, skiprows=skip_rows)
     # Rename columns to normalized keys
@@ -175,7 +175,7 @@ def _parse_xlsx(
     Falls back to openpyxl + stdlib if pandas is not installed.
     """
     try:
-        import pandas  # noqa: F401, PLC0415
+        import pandas  # noqa: F401, PLC0415 # pyright: ignore[reportMissingImports]
 
         return _parse_xlsx_pandas(content, sheet, skip_rows)
     except ImportError:

@@ -1,3 +1,8 @@
+# Test-only pyright relaxation. Runtime assertions in these tests narrow types in
+# ways pyright cannot follow (prompt Message.content and Resource.read() unions),
+# and several cases deliberately pass invalid values to exercise error handling.
+# Source code is still checked strictly -- do not add this to non-test modules.
+# pyright: reportOptionalMemberAccess=false
 """Unit tests for climate sub-module client functions."""
 
 from unittest.mock import AsyncMock, patch
@@ -194,8 +199,8 @@ class TestFetchClimateTrends:
         assert isinstance(result, list)
         assert len(result) == 1
         record = result[0]
-        assert record["station_id"] == "6158731"
-        assert record["measurement_type"] == "temperature"
+        assert record["station_id"] == "1100120"
+        assert record["measurement_type"] == "total_precip"
         assert isinstance(record["trend"], float)
 
     @pytest.mark.asyncio
@@ -206,9 +211,9 @@ class TestFetchClimateTrends:
             new_callable=AsyncMock,
             return_value=([sample_trend_feature], 1, False),
         ) as mock_fetch:
-            await fetch_climate_trends(station_id="6158731")
+            await fetch_climate_trends(station_id="1100120")
         props = mock_fetch.call_args[1].get("properties", {})
-        assert props.get("CLIMATE_IDENTIFIER") == "6158731"
+        assert props.get("station_id__id_station") == "1100120"
 
     @pytest.mark.asyncio
     async def test_filters_by_measurement_type(self, sample_trend_feature):
@@ -218,9 +223,9 @@ class TestFetchClimateTrends:
             new_callable=AsyncMock,
             return_value=([sample_trend_feature], 1, False),
         ) as mock_fetch:
-            await fetch_climate_trends(measurement_type="temperature")
+            await fetch_climate_trends(measurement_type="total_precip")
         props = mock_fetch.call_args[1].get("properties", {})
-        assert props.get("MEASUREMENT_TYPE") == "temperature"
+        assert props.get("measurement_type__type_mesure") == "total_precip"
 
 
 class TestCompareClimatePeriods:
@@ -263,3 +268,84 @@ class TestCompareClimatePeriods:
         assert "deltas" in result
         assert result["deltas"]["mean_temp_c"] == pytest.approx(2.0)
         assert result["deltas"]["total_precip_mm"] == pytest.approx(2.0)
+
+
+class TestClimateTrendsFieldNames:
+    """AHCCD trends must use the collection's real property names.
+
+    Regression cover for the Phase 20.1 defect: fetch_climate_trends filtered on
+    CLIMATE_IDENTIFIER and MEASUREMENT_TYPE, but the ahccd-trends collection
+    names those fields station_id__id_station and measurement_type__type_mesure.
+    Every filtered call therefore matched zero records, and _flatten_trend read
+    the same wrong keys so even an unfiltered call returned rows of all-None.
+
+    The integration test could not catch it: it asserted shape only `if
+    data["data"]:`, so an empty list skipped the body and passed.
+
+    Property names confirmed against the live collection 2026-07-25:
+        identifier__identifiant, station_id__id_station, station_name__nom_station,
+        joined__rejoint, elevation__elevation, period__periode, province__province,
+        year_range__annees, measurement_type__type_mesure, trend_value__valeur_tendance
+    """
+
+    LIVE_FEATURE = {
+        "properties": {
+            "identifier__identifiant": "1100120.Jan.total_precip",
+            "station_id__id_station": "1100120",
+            "station_name__nom_station": "AGASSIZ_CDA",
+            "period__periode": "Jan",
+            "province__province": "BC",
+            "year_range__annees": "1890-2017",
+            "measurement_type__type_mesure": "total_precip",
+            "trend_value__valeur_tendance": 74.81,
+        }
+    }
+
+    @pytest.mark.asyncio
+    async def test_measurement_type_filter_uses_real_field_name(self):
+        from mcp_canada.modules.weather.climate.client import fetch_climate_trends
+
+        spy = AsyncMock(return_value=([self.LIVE_FEATURE], 1, False))
+        with patch("mcp_canada.modules.weather.climate.client.ogc_fetch", new=spy):
+            await fetch_climate_trends(measurement_type="total_precip")
+
+        props = spy.await_args.kwargs["properties"]
+        assert "measurement_type__type_mesure" in props, (
+            f"ahccd-trends names this field measurement_type__type_mesure; "
+            f"MEASUREMENT_TYPE matches zero records. Sent: {props}"
+        )
+        assert props["measurement_type__type_mesure"] == "total_precip"
+
+    @pytest.mark.asyncio
+    async def test_station_filter_uses_real_field_name(self):
+        from mcp_canada.modules.weather.climate.client import fetch_climate_trends
+
+        spy = AsyncMock(return_value=([self.LIVE_FEATURE], 1, False))
+        with patch("mcp_canada.modules.weather.climate.client.ogc_fetch", new=spy):
+            await fetch_climate_trends(station_id="1100120")
+
+        props = spy.await_args.kwargs["properties"]
+        assert "station_id__id_station" in props, (
+            f"ahccd-trends names this field station_id__id_station, not "
+            f"CLIMATE_IDENTIFIER. Sent: {props}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_flattener_reads_real_field_names(self):
+        """Rows must carry values, not None from mis-keyed lookups."""
+        from mcp_canada.modules.weather.climate.client import fetch_climate_trends
+
+        with patch(
+            "mcp_canada.modules.weather.climate.client.ogc_fetch",
+            new=AsyncMock(return_value=([self.LIVE_FEATURE], 1, False)),
+        ):
+            rows, _ = await fetch_climate_trends()
+
+        row = rows[0]
+        assert row["station_id"] == "1100120", f"station_id not read: {row}"
+        assert row["measurement_type"] == "total_precip", f"measurement_type not read: {row}"
+        assert row["trend"] == 74.81, f"trend not read: {row}"
+        assert row["station_name"] == "AGASSIZ_CDA", f"station_name not read: {row}"
+        assert row["period"] == "Jan", f"period not read: {row}"
+        assert row["year_range"] == "1890-2017", f"year_range not read: {row}"
+        assert row["province"] == "BC", f"province not read: {row}"

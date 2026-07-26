@@ -34,21 +34,29 @@ def statcan_frequency_codes() -> str:
     Maps WDS frequencyCode integers to bilingual labels.
     Use this catalog to interpret the frequencyCode field in sc_get_cube_metadata.
     Format: {"code": {"en": "English label", "fr": "Libellé en français"}}
+
+    Codes are transcribed from StatCan's published set (getCodeSets) and are NOT
+    contiguous — there is no 3, 5, 8, or 10.
     """
     return json.dumps(
         {
-            "1": {"en": "Daily", "fr": "Quotidien"},
-            "2": {"en": "Weekly (Sunday)", "fr": "Hebdomadaire (dimanche)"},
-            "4": {"en": "Bi-weekly", "fr": "Bihebdomadaire"},
-            "5": {"en": "Monthly", "fr": "Mensuel"},
-            "6": {"en": "Bi-monthly", "fr": "Bimestriel"},
-            "7": {"en": "Quarterly", "fr": "Trimestriel"},
-            "8": {"en": "Semi-annual", "fr": "Semestriel"},
-            "9": {"en": "Annual", "fr": "Annuel"},
-            "10": {"en": "Every 2 years", "fr": "Tous les 2 ans"},
-            "11": {"en": "Every 3 years", "fr": "Tous les 3 ans"},
-            "12": {"en": "Irregular", "fr": "Irrégulier"},
-            "13": {"en": "Every 5 years", "fr": "Tous les 5 ans"},
+            "1": {"en": "Daily", "fr": "Quotidienne"},
+            "2": {"en": "Weekly", "fr": "Hebdomadaire"},
+            "4": {"en": "Biweekly", "fr": "Aux 2 semaines"},
+            "6": {"en": "Monthly", "fr": "Mensuelle"},
+            "7": {"en": "Bimonthly", "fr": "Aux 2 mois"},
+            "9": {"en": "Quarterly", "fr": "Trimestrielle"},
+            "11": {"en": "Semi-annual", "fr": "Semestrielle"},
+            "12": {"en": "Annual", "fr": "Annuelle"},
+            "13": {"en": "Every 2 years", "fr": "Aux 2 ans"},
+            "14": {"en": "Every 3 years", "fr": "Aux 3 ans"},
+            "15": {"en": "Every 4 years", "fr": "Aux 4 ans"},
+            "16": {"en": "Every 5 years", "fr": "Aux 5 ans"},
+            "17": {"en": "Every 10 years", "fr": "Aux 10 ans"},
+            "18": {"en": "Occasional", "fr": "Occasionnelle"},
+            "19": {"en": "Occasional Quarterly", "fr": "Occasionnelle trimestrielle"},
+            "20": {"en": "Occasional Monthly", "fr": "Occasionnelle mensuelle"},
+            "21": {"en": "Occasional Daily", "fr": "Occasionnelle quotidienne"},
         },
         ensure_ascii=False,
         indent=2,
@@ -67,19 +75,21 @@ def statcan_scalar_factor_codes() -> str:
     Maps WDS scalarFactorCode integers to bilingual labels indicating the
     unit multiplier applied to observation values.
     Format: {"code": {"en": "English label", "fr": "Libellé en français"}}
+
+    Code N means 10^N. The published set is exactly 0-9; there is no 888.
     """
     return json.dumps(
         {
-            "0": {"en": "Units (no multiplier)", "fr": "Unités (aucun multiplicateur)"},
-            "1": {"en": "Thousands", "fr": "Milliers"},
-            "2": {"en": "Millions", "fr": "Millions"},
-            "3": {"en": "Billions", "fr": "Milliards"},
-            "4": {"en": "Trillions", "fr": "Billions"},
-            "5": {"en": "Tens", "fr": "Dizaines"},
-            "6": {"en": "Hundreds", "fr": "Centaines"},
-            "7": {"en": "Tens of thousands", "fr": "Dizaines de milliers"},
-            "8": {"en": "Hundreds of thousands", "fr": "Centaines de milliers"},
-            "888": {"en": "Not applicable", "fr": "Sans objet"},
+            "0": {"en": "units", "fr": "unités"},
+            "1": {"en": "tens", "fr": "dizaines"},
+            "2": {"en": "hundreds", "fr": "centaines"},
+            "3": {"en": "thousands", "fr": "milliers"},
+            "4": {"en": "tens of thousands", "fr": "dizaines de milliers"},
+            "5": {"en": "hundreds of thousands", "fr": "centaines de milliers"},
+            "6": {"en": "millions", "fr": "millions"},
+            "7": {"en": "tens of millions", "fr": "dizaines de millions"},
+            "8": {"en": "hundreds of millions", "fr": "centaines de millions"},
+            "9": {"en": "billions", "fr": "milliards"},
         },
         ensure_ascii=False,
         indent=2,
@@ -128,27 +138,53 @@ def statcan_status_codes() -> str:
 def statcan_uom_codes() -> str:
     """Common units of measure (UOM) codes used in Statistics Canada WDS series.
 
-    Maps WDS uomCode integers to bilingual unit descriptions.
-    Use this catalog to interpret the uomCode field in sc_get_series_info_by_vector.
+    Maps WDS memberUomCode integers to bilingual unit descriptions.
     Format: {"code": {"en": "English unit", "fr": "Unité en français"}}
+
+    This is a COMMON SUBSET (31 of 464 upstream codes), transcribed verbatim
+    from getCodeSets. sc_get_series_info_by_vector now decodes `uom` inline, so
+    this catalog is a quick reference rather than the lookup path; use
+    sc_get_code_sets for the full set.
+
+    Note codes are not semantic: 17 is the index base "2002=100", not a
+    currency. An earlier hand-written version of this catalog guessed the
+    labels and had all 15 of its entries wrong (08-UAT.md Gap 2) — do not add
+    entries here without checking them against getCodeSets.
     """
     return json.dumps(
         {
-            "0": {"en": "Not applicable", "fr": "Sans objet"},
-            "1": {"en": "Number", "fr": "Nombre"},
-            "11": {"en": "Persons", "fr": "Personnes"},
-            "15": {"en": "Dollars", "fr": "Dollars"},
-            "17": {"en": "Canadian dollars", "fr": "Dollars canadiens"},
-            "20": {"en": "Percentage", "fr": "Pourcentage"},
-            "21": {"en": "Percent change", "fr": "Variation en pourcentage"},
-            "22": {"en": "Rate per 1,000", "fr": "Taux pour 1 000"},
-            "23": {"en": "Rate per 100,000", "fr": "Taux pour 100 000"},
-            "39": {"en": "Index (2012=100)", "fr": "Indice (2012=100)"},
-            "40": {"en": "Index (2002=100)", "fr": "Indice (2002=100)"},
-            "50": {"en": "Hours", "fr": "Heures"},
-            "60": {"en": "Kilograms", "fr": "Kilogrammes"},
-            "81": {"en": "Tonnes", "fr": "Tonnes métriques"},
-            "301": {"en": "Tonnes (thousands)", "fr": "Tonnes (milliers)"},
+            "_note": (
+                "Common subset of 31 codes; StatCan publishes 464. "
+                "Call sc_get_code_sets for the complete uom set, or read the "
+                "decoded `uom` field on sc_get_series_info_by_vector."
+            ),
+            "17": {"en": "2002=100", "fr": "2002=100"},
+            "20": {"en": "2007=100", "fr": "2007=100"},
+            "21": {"en": "2010=100", "fr": "2010=100"},
+            "34": {"en": "Barrels", "fr": "Barils"},
+            "72": {"en": "Cubic metres", "fr": "Mètres cubes"},
+            "81": {"en": "Dollars", "fr": "Dollars"},
+            "133": {"en": "Employees", "fr": "Employés"},
+            "148": {"en": "Head", "fr": "Tête"},
+            "149": {"en": "Hectares", "fr": "Hectares"},
+            "152": {"en": "Hours", "fr": "Heures"},
+            "154": {"en": "Households", "fr": "Ménages"},
+            "160": {"en": "Index", "fr": "Indice"},
+            "192": {"en": "Kilograms", "fr": "Kilogrammes"},
+            "196": {"en": "Kilometres", "fr": "Kilomètres"},
+            "203": {"en": "Litres", "fr": "Litres"},
+            "210": {"en": "Megawatt hours", "fr": "Mégawatt heures"},
+            "223": {"en": "Number", "fr": "Nombre"},
+            "239": {"en": "Percent", "fr": "Pourcent"},
+            "249": {"en": "Persons", "fr": "Personnes"},
+            "257": {"en": "Rate", "fr": "Taux"},
+            "271": {"en": "Ratio", "fr": "Ratio"},
+            "281": {"en": "Square metres", "fr": "Mètres carrés"},
+            "287": {"en": "Tonnes", "fr": "Tonnes"},
+            "300": {"en": "Units", "fr": "Unités"},
+            "301": {"en": "Vehicle-kilometres", "fr": "Véhicule-kilomètres"},
+            "308": {"en": "Years", "fr": "Années"},
+            "383": {"en": "2012=100", "fr": "2012=100"},
         },
         ensure_ascii=False,
         indent=2,

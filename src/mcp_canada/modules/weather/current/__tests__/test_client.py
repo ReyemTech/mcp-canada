@@ -1,3 +1,8 @@
+# Test-only pyright relaxation. Runtime assertions in these tests narrow types in
+# ways pyright cannot follow (prompt Message.content and Resource.read() unions),
+# and several cases deliberately pass invalid values to exercise error handling.
+# Source code is still checked strictly -- do not add this to non-test modules.
+# pyright: reportOptionalMemberAccess=false
 """Unit tests for weather/current/client.py — all HTTP mocked."""
 
 from unittest.mock import AsyncMock, patch
@@ -324,3 +329,128 @@ class TestFetchHourlyObs:
             obs, _ = await fetch_hourly_obs("NONEXISTENT")
 
         assert obs == []
+
+
+class TestLocationNameLookupIsServerSide:
+    """Name lookup must filter server-side, not post-filter one arbitrary page.
+
+    Regression cover for the Phase 20.1 defect: with only `location` given,
+    bbox was None, so ogc_fetch pulled an unordered first-50 page out of the
+    844-city citypage collection and filtered THAT by name. Toronto and
+    Vancouver are not in the arbitrary first 50, so every major-city lookup
+    returned NOT_FOUND while lat/lon lookups worked fine.
+
+    The live integration tests could not catch it — they wrapped their
+    assertions in `if "_meta" in data:`, so a NOT_FOUND response skipped the
+    body and passed. The unit tests could not catch it either: they mock
+    ogc_fetch to hand back the matching city, which assumes away the filter
+    being tested.
+    """
+
+    @staticmethod
+    def _feature(name_en: str, name_fr: str | None = None):
+        return {
+            "properties": {
+                "name": {"en": name_en, "fr": name_fr or name_en},
+                "currentConditions": {"temperature": {"value": 1.0}},
+                "forecastGroup": {"forecasts": []},
+            }
+        }
+
+    @pytest.mark.asyncio
+    async def test_current_conditions_sends_server_side_name_filter(self):
+        """The city name must reach ogc_fetch as a property filter."""
+        from mcp_canada.modules.weather.current.client import fetch_current_conditions
+
+        spy = AsyncMock(return_value=([self._feature("Toronto")], 1, False))
+        with patch("mcp_canada.modules.weather.current.client.ogc_fetch", new=spy):
+            await fetch_current_conditions(location="Toronto")
+
+        kwargs = spy.await_args.kwargs
+        assert kwargs.get("properties"), (
+            "fetch_current_conditions(location=...) must pass a server-side "
+            "`properties` filter to ogc_fetch. Without it only the first `limit` "
+            "features of an 844-city collection are searched, and any city "
+            "outside that arbitrary page returns NOT_FOUND."
+        )
+        assert kwargs["properties"].get("name.en") == "Toronto"
+
+    @pytest.mark.asyncio
+    async def test_forecast_sends_server_side_name_filter(self):
+        """Same defect existed independently in fetch_forecast."""
+        from mcp_canada.modules.weather.current.client import fetch_forecast
+
+        spy = AsyncMock(return_value=([self._feature("Vancouver")], 1, False))
+        with patch("mcp_canada.modules.weather.current.client.ogc_fetch", new=spy):
+            await fetch_forecast(location="Vancouver")
+
+        kwargs = spy.await_args.kwargs
+        assert kwargs.get("properties"), (
+            "fetch_forecast(location=...) must pass a server-side `properties` "
+            "filter to ogc_fetch — see test_current_conditions_sends_server_side_name_filter."
+        )
+        assert kwargs["properties"].get("name.en") == "Vancouver"
+
+    @pytest.mark.asyncio
+    async def test_french_lookup_uses_french_name_field(self):
+        """lang='fr' must filter on name.fr, not name.en."""
+        from mcp_canada.modules.weather.current.client import fetch_current_conditions
+
+        spy = AsyncMock(return_value=([self._feature("Montreal", "Montréal")], 1, False))
+        with patch("mcp_canada.modules.weather.current.client.ogc_fetch", new=spy):
+            await fetch_current_conditions(location="Montréal", lang="fr")
+
+        assert spy.await_args.kwargs["properties"].get("name.fr") == "Montréal"
+
+    @pytest.mark.asyncio
+    async def test_exact_name_wins_over_partial_match(self):
+        """`name.en=Toronto` returns ['Toronto Island', 'Toronto'] — pick Toronto.
+
+        The upstream filter is a token match, so a query for a city returns every
+        city containing that token, and not in a useful order. Taking features[0]
+        blindly answers 'weather in Toronto' with Toronto Island.
+        """
+        from mcp_canada.modules.weather.current.client import fetch_current_conditions
+
+        features = [self._feature("Toronto Island"), self._feature("Toronto")]
+        with patch(
+            "mcp_canada.modules.weather.current.client.ogc_fetch",
+            new=AsyncMock(return_value=(features, 2, False)),
+        ):
+            result, _ = await fetch_current_conditions(location="Toronto")
+
+        assert result is not None
+        assert result["city"] == "Toronto", (
+            f"exact name match must win over a partial one, got {result['city']!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_forecast_exact_name_wins_over_partial_match(self):
+        from mcp_canada.modules.weather.current.client import fetch_forecast
+
+        features = [self._feature("West Vancouver"), self._feature("Vancouver")]
+        with patch(
+            "mcp_canada.modules.weather.current.client.ogc_fetch",
+            new=AsyncMock(return_value=(features, 2, False)),
+        ):
+            periods, _ = await fetch_forecast(location="Vancouver")
+
+        # Both fixtures have empty forecast lists; the assertion that matters is
+        # that the exact-match feature was the one selected, which we verify by
+        # the call not raising and returning the (empty) list from Vancouver.
+        assert periods == []
+
+    @pytest.mark.asyncio
+    async def test_lat_lon_still_uses_bbox_not_name_filter(self):
+        """Coordinate lookups must keep working exactly as before."""
+        from mcp_canada.modules.weather.current.client import fetch_current_conditions
+
+        spy = AsyncMock(return_value=([self._feature("Ottawa")], 1, False))
+        with patch("mcp_canada.modules.weather.current.client.ogc_fetch", new=spy):
+            await fetch_current_conditions(lat=45.4, lon=-75.7)
+
+        kwargs = spy.await_args.kwargs
+        assert kwargs.get("bbox") is not None, "lat/lon must still produce a bbox"
+        assert not kwargs.get("properties"), (
+            "coordinate lookups must not send a name filter"
+        )

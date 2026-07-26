@@ -19,8 +19,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from fastmcp.prompts import prompt
-from fastmcp.prompts.prompt import Message
+from fastmcp.prompts import Message, prompt
 
 
 __all__ = [

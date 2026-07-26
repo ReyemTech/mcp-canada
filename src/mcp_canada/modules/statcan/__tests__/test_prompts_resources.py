@@ -1,3 +1,8 @@
+# Test-only pyright relaxation. Runtime assertions in these tests narrow types in
+# ways pyright cannot follow (prompt Message.content and Resource.read() unions),
+# and several cases deliberately pass invalid values to exercise error handling.
+# Source code is still checked strictly -- do not add this to non-test modules.
+# pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportOperatorIssue=false
 """Unit tests for StatCan prompts and resources."""
 
 import json
@@ -264,8 +269,6 @@ class TestStatCanResources:
         content = await r.read()
         data = json.loads(content)
         # Should have entries for common frequencies
-        values = [str(v) for v in data.values()]
-        all_text = " ".join(str(v) for v in data.values())
         assert any("daily" in str(v).lower() or "Daily" in str(v) for v in data.values())
 
     @pytest.mark.asyncio
@@ -345,9 +348,13 @@ class TestStatCanResources:
         )
         content = await r.read()
         data = json.loads(content)
-        first_val = next(iter(data.values()))
-        assert "en" in first_val
-        assert "fr" in first_val
+        # `_note` documents that this is a 31-of-464 subset; every other key is
+        # a numeric UOM code mapping to a bilingual pair.
+        codes = {k: v for k, v in data.items() if not k.startswith("_")}
+        assert codes, "catalog must contain at least one code entry"
+        for code, val in codes.items():
+            assert code.isdigit(), f"unexpected non-code key: {code}"
+            assert "en" in val and "fr" in val, f"code {code} missing a language"
 
     # ------------------------------------------------------------------
     # docs://statcan/wds-guide

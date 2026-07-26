@@ -52,7 +52,7 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 
-async def _api_get(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+async def _api_get(path: str, params: dict[str, Any] | None = None) -> Any:
     """Fetch from BC Data Catalogue CKAN API and unwrap the CKAN success envelope.
 
     shared/http.py:api_get already returns parsed JSON (dict) — never a Response.

@@ -1,3 +1,8 @@
+# Test-only pyright relaxation. Runtime assertions in these tests narrow types in
+# ways pyright cannot follow (prompt Message.content and Resource.read() unions),
+# and several cases deliberately pass invalid values to exercise error handling.
+# Source code is still checked strictly -- do not add this to non-test modules.
+# pyright: reportAttributeAccessIssue=false
 """Saskatchewan prompts and resources tests.
 
 Plan 06 fills the test bodies for 6 prompts and 7 resources.

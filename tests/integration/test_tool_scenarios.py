@@ -1,3 +1,8 @@
+# Test-only pyright relaxation. Runtime assertions in these tests narrow types in
+# ways pyright cannot follow (prompt Message.content and Resource.read() unions),
+# and several cases deliberately pass invalid values to exercise error handling.
+# Source code is still checked strictly -- do not add this to non-test modules.
+# pyright: reportPrivateImportUsage=false
 """Integration tests calling tools through the MCP Client layer.
 
 Each test simulates what an agent does: discover_tools → call_tool → parse response.
@@ -8,7 +13,15 @@ Run: uv run pytest tests/integration/test_tool_scenarios.py -v -m integration --
 
 import aiosqlite
 import pytest
-from tests.integration.conftest import call_tool, call_direct_tool, discover
+from tests.integration.conftest import (
+    assert_feature_payload,
+    assert_live_or_transient,
+    assert_rows,
+    assert_series_payload,
+    call_direct_tool,
+    call_tool,
+    discover,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -31,10 +44,11 @@ class TestBocScenarios:
         data = await call_tool(mcp_server, "boc_get_exchange_rates", {"currency": "USD", "recent": 1})
         assert "_meta" in data
         assert data["_meta"]["source"]["api"] == "bank-of-canada-valet"
-        assert len(data["data"]) >= 1
-        row = data["data"][0]
-        assert row["series_name"] == "FXUSDCAD"
-        assert 0.5 < row["value"] < 3.0
+        payload = assert_series_payload(data, "boc_get_exchange_rates", "FXUSDCAD")
+        rates = list(payload["FXUSDCAD"]["observations"].values())
+        assert all(0.5 < v < 3.0 for v in rates), (
+            f"USD/CAD outside a plausible range: {rates}"
+        )
 
     @pytest.mark.asyncio
     async def test_exchange_rate_date_range(self, mcp_server):
@@ -42,8 +56,16 @@ class TestBocScenarios:
         data = await call_tool(mcp_server, "boc_get_exchange_rates", {
             "currency": "EUR", "start_date": "2026-03-01", "end_date": "2026-03-31"
         })
-        assert len(data["data"]) >= 15
-        assert all(r["series_name"] == "FXEURCAD" for r in data["data"])
+        payload = assert_series_payload(data, "boc_get_exchange_rates", "FXEURCAD")
+        observations = payload["FXEURCAD"]["observations"]
+        # ~21 banking days in March; allow for holidays but require a full month.
+        assert len(observations) >= 15, (
+            f"expected a month of EUR/CAD observations, got {len(observations)}: "
+            f"{sorted(observations)[:5]}"
+        )
+        assert list(payload) == ["FXEURCAD"], (
+            f"a single-currency query must return exactly one series: {list(payload)}"
+        )
 
     @pytest.mark.asyncio
     async def test_compare_usd_eur_gbp(self, mcp_server):
@@ -51,30 +73,34 @@ class TestBocScenarios:
         data = await call_tool(mcp_server, "boc_get_observations", {
             "series_names": "FXUSDCAD,FXEURCAD,FXGBPCAD", "recent": 3
         })
-        series = {r["series_name"] for r in data["data"]}
-        assert "FXUSDCAD" in series
-        assert "FXEURCAD" in series
-        assert "FXGBPCAD" in series
+        assert_series_payload(
+            data, "boc_get_observations", "FXUSDCAD", "FXEURCAD", "FXGBPCAD"
+        )
 
     @pytest.mark.asyncio
     async def test_current_policy_rate(self, mcp_server):
         """'What is the Bank of Canada policy rate?'"""
         data = await call_tool(mcp_server, "boc_get_interest_rates", {"rate_type": "policy", "recent": 1})
-        assert len(data["data"]) >= 1
-        assert 0 < data["data"][0]["value"] < 20
+        payload = assert_series_payload(data, "boc_get_interest_rates")
+        assert payload, f"policy rate query returned no series: {payload}"
+        rates = [v for s in payload.values() for v in s["observations"].values()]
+        assert rates, f"policy rate series carried no observations: {payload}"
+        assert all(0 < v < 20 for v in rates), (
+            f"policy rate outside a plausible range: {rates}"
+        )
 
     @pytest.mark.asyncio
     async def test_inflation_cpi(self, mcp_server):
         """'What's the latest Canadian CPI?'"""
         data = await call_tool(mcp_server, "boc_get_inflation_data", {"recent": 3})
         assert "_meta" in data
-        assert len(data["data"]) >= 1
+        assert assert_series_payload(data, "boc_get_inflation_data")
 
     @pytest.mark.asyncio
     async def test_commodity_energy(self, mcp_server):
         """'Show me energy commodity prices.'"""
         data = await call_tool(mcp_server, "boc_get_commodity_prices", {"commodity_type": "energy", "recent": 3})
-        assert len(data["data"]) >= 1
+        assert assert_series_payload(data, "boc_get_commodity_prices")
 
     @pytest.mark.asyncio
     async def test_series_search(self, mcp_server):
@@ -483,7 +509,10 @@ class TestCrossModuleScenarios:
     async def test_exchange_rate_plus_trade(self, mcp_server):
         """'Get USD/CAD and find trade datasets.'"""
         fx = await call_tool(mcp_server, "boc_get_exchange_rates", {"currency": "USD", "recent": 1})
-        assert fx["data"][0]["value"] is not None
+        fx_payload = assert_series_payload(fx, "boc_get_exchange_rates", "FXUSDCAD")
+        assert all(
+            v is not None for v in fx_payload["FXUSDCAD"]["observations"].values()
+        ), f"USD/CAD observations must carry values: {fx_payload}"
 
         trade = await call_tool(mcp_server, "ckan_search_datasets", {"query": "trade", "rows": 3})
         assert "_meta" in trade
@@ -800,56 +829,105 @@ class TestStatcanWdsScenarios:
         import datetime
         today = datetime.date.today().isoformat()
         data = await call_tool(mcp_server, "sc_get_changed_cubes", {"date": today})
-        # Shape assertion only — may be empty list before 08:30 EST
-        assert "_meta" in data
-        assert isinstance(data["data"], list)
+        # StatCan WDS has a documented 00:00-08:30 EST maintenance window and
+        # reports UPSTREAM_UNAVAILABLE during it, which is tolerated.
+        live = assert_live_or_transient(data, "sc_get_changed_cubes", "statcan-wds")
+        if live:
+            assert_rows(
+                data,
+                "sc_get_changed_cubes",
+                allow_empty_reason="no tables have changed yet today is normal",
+            )
 
     @pytest.mark.asyncio
     async def test_get_changed_series(self, mcp_server):
         """'Which series changed today?'"""
         data = await call_tool(mcp_server, "sc_get_changed_series")
-        # Shape assertion only — may be empty list before 08:30 EST
-        assert "_meta" in data
-        assert isinstance(data["data"], list)
+        live = assert_live_or_transient(data, "sc_get_changed_series", "statcan-wds")
+        if live:
+            assert_rows(
+                data,
+                "sc_get_changed_series",
+                allow_empty_reason="no series have changed yet today is normal",
+            )
 
     @pytest.mark.asyncio
     async def test_error_handling_invalid_product_id(self, mcp_server):
         """'Get metadata for a nonexistent table ID'"""
         data = await call_tool(mcp_server, "sc_get_cube_metadata", {"product_id": 999999999})
-        # Should return structured error, not raise exception
-        assert "error" in data or "_meta" in data
+        # Error-PATH test: product 999999999 does not exist, so an error IS the
+        # expected result. Asserted in both arms rather than tolerated.
         if "error" in data:
-            assert "code" in data["error"]
-            assert data["error"]["code"] in ("UPSTREAM_ERROR", "UPSTREAM_UNAVAILABLE")
+            assert "code" in data["error"], f"error must carry a code: {data['error']}"
+            assert data["error"]["code"] in ("UPSTREAM_ERROR", "UPSTREAM_UNAVAILABLE"), (
+                f"unexpected error code for a nonexistent product: {data['error']}"
+            )
+        else:
+            assert "_meta" in data, f"expected an error or an envelope, got: {data}"
 
     @pytest.mark.asyncio
     async def test_get_series_info_by_coord(self, mcp_server):
         """'Get series info for CPI Canada all-items by product and coordinate'"""
+        # Coordinate 2.2.0.0... is CPI all-items Canada (vector 41690973).
+        # 1.1.0.0... is syntactically valid but identifies NO published series —
+        # StatCan answers it with responseStatusCode 2 and all-null fields, which
+        # is what the companion no-series test below covers.
+        data = await call_tool(mcp_server, "sc_get_series_info_by_coord", {
+            "product_id": 18100004,
+            "coordinate": "2.2.0.0.0.0.0.0.0.0",
+        })
+        live = assert_live_or_transient(data, "sc_get_series_info_by_coord", "statcan-wds")
+        if live:
+            info = data["data"]
+            for field in ("product_id", "vector_id", "frequency"):
+                assert field in info, f"series info missing {field!r}: {info}"
+            assert info["vector_id"] == 41690973, (
+                f"coordinate 2.2.0.0... is CPI all-items = vector 41690973, "
+                f"got {info['vector_id']}"
+            )
+            assert info["frequency"] == "Monthly", (
+                f"CPI is monthly, got {info['frequency']!r}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_coordinate_with_no_series_is_not_found(self, mcp_server):
+        """'Get series info for a coordinate that has no data' — must be NOT_FOUND.
+
+        Regression cover: StatCan answers an unpopulated coordinate with
+        status=SUCCESS, responseStatusCode=2 and all-null fields. The client used
+        to feed that straight into SeriesInfo and surface
+        "UPSTREAM_ERROR: 6 validation errors", blaming the service for what is
+        really an empty lookup.
+        """
         data = await call_tool(mcp_server, "sc_get_series_info_by_coord", {
             "product_id": 18100004,
             "coordinate": "1.1.0.0.0.0.0.0.0.0",
         })
-        assert "_meta" in data
-        assert data["_meta"]["source"]["api"] == "statcan-wds"
-        assert "product_id" in data["data"]
-        assert "vector_id" in data["data"]
-        assert "frequency" in data["data"]
+        assert "error" in data, f"expected a structured error, got: {data}"
+        code = data["error"]["code"]
+        # UPSTREAM_UNAVAILABLE is possible during the 00:00-08:30 EST window.
+        assert code in ("NOT_FOUND", "UPSTREAM_UNAVAILABLE"), (
+            f"an empty coordinate is NOT_FOUND, not a service fault: {data['error']}"
+        )
+        if code == "NOT_FOUND":
+            assert "validation error" not in data["error"]["message"].lower(), (
+                f"the error must not leak a Pydantic failure: {data['error']}"
+            )
 
     @pytest.mark.asyncio
     async def test_get_data_by_coord(self, mcp_server):
         """'Get the latest 3 observations for CPI Canada all-items by coordinate'"""
         data = await call_tool(mcp_server, "sc_get_data_by_coord", {
             "product_id": 18100004,
-            "coordinate": "1.1.0.0.0.0.0.0.0.0",
+            "coordinate": "2.2.0.0.0.0.0.0.0.0",
             "n": 3,
         })
-        assert "_meta" in data
-        assert data["_meta"]["source"]["api"] == "statcan-wds"
-        assert isinstance(data["data"], list)
-        assert len(data["data"]) >= 1
-        row = data["data"][0]
-        assert "ref_per" in row
-        assert "value" in row
+        live = assert_live_or_transient(data, "sc_get_data_by_coord", "statcan-wds")
+        if live:
+            rows = assert_rows(data, "sc_get_data_by_coord")
+            row = rows[0]
+            assert "ref_per" in row, f"row missing ref_per: {row}"
+            assert "value" in row, f"row missing value: {row}"
 
     @pytest.mark.asyncio
     async def test_get_data_by_date_range(self, mcp_server):
@@ -875,14 +953,26 @@ class TestStatcanWdsScenarios:
             "start_release": "2024-01-01",
             "end_release": "2024-03-31",
         })
-        assert "_meta" in data
-        assert data["_meta"]["source"]["api"] == "statcan-wds"
-        assert isinstance(data["data"], list)
-        # May be empty if no releases in range — assert shape only
-        for row in data["data"]:
-            assert "vector_id" in row
-            assert "ref_per" in row
-            assert "value" in row
+        live = assert_live_or_transient(data, "sc_get_bulk_vector_data", "statcan-wds")
+        if live:
+            # Bulk fetch returns a dict keyed by vector id, not a flat list —
+            # the key IS the answer to "which vector is this row from", so a
+            # flat list would have to repeat it on every row. Same rationale as
+            # the BOC series-keyed shape (D-05, decided case by case).
+            payload = data["data"]
+            assert isinstance(payload, dict), (
+                f"bulk vector data is keyed by vector id, got "
+                f"{type(payload).__name__}: {payload!r:.120}"
+            )
+            assert payload, f"both requested vectors returned nothing: {payload}"
+            for vector_id, rows in payload.items():
+                assert isinstance(rows, list), (
+                    f"vector {vector_id} must map to a list of rows, got "
+                    f"{type(rows).__name__}"
+                )
+                for row in rows:
+                    assert "ref_per" in row, f"row missing ref_per: {row}"
+                    assert "value" in row, f"row missing value: {row}"
 
 
 # ─── SDMX scenarios ───────────────────────────────────────────────────────────
@@ -1172,14 +1262,33 @@ class TestIrccScenarios:
 
     @pytest.mark.asyncio
     async def test_ircc_invalid_breakdown(self, mcp_server):
-        """'What happens with a bad breakdown?'"""
-        result = await call_tool(
-            mcp_server,
-            "ircc_get_permanent_residents",
-            {"breakdown": "nonexistent"},
-        )
-        assert "error" in result
-        assert result["error"]["code"] == "INVALID_INPUT"
+        """'What happens with a bad breakdown?'
+
+        `breakdown` is Literal-typed, so Pydantic rejects an unknown value at
+        the MCP boundary BEFORE the tool body runs. The tool's own INVALID_INPUT
+        branch is therefore unreachable for this parameter — the type system is
+        the earlier and better gate, and the resulting ToolError names every
+        valid option, which a bare INVALID_INPUT string would not.
+
+        This test previously expected a dict and failed with an unhandled
+        ToolError; it now asserts the behaviour that actually protects the agent.
+        """
+        from fastmcp.exceptions import ToolError
+
+        with pytest.raises(ToolError) as exc:
+            await call_tool(
+                mcp_server,
+                "ircc_get_permanent_residents",
+                {"breakdown": "nonexistent"},
+            )
+
+        message = str(exc.value)
+        assert "breakdown" in message, f"error must name the offending parameter: {message}"
+        for valid in ("country", "province", "gender"):
+            assert valid in message, (
+                f"the rejection must list valid options so the agent can retry; "
+                f"{valid!r} missing from: {message}"
+            )
 
     @pytest.mark.asyncio
     async def test_ircc_list_datasets(self, mcp_server):
@@ -1202,9 +1311,11 @@ class TestIrccScenarios:
         assert isinstance(rows, list)
 
         # Create table and insert rows (use a subset to keep test fast)
-        sample_rows = rows[:3] if len(rows) >= 3 else rows
-        if not sample_rows:
-            pytest.skip("No PR data returned for year 2023 — skip cross-module test")
+        # 2023 PR data is a closed historical year — empty means the fetch broke,
+        # so this asserts rather than skipping. (It skipped until 2026-07-25,
+        # which hid the datastore dict-binding failure further down.)
+        assert rows, f"IRCC returned no PR rows for 2023: {pr_result}"
+        sample_rows = rows[:3]
 
         # Derive columns from the first row keys
         first_row = sample_rows[0]
@@ -1328,11 +1439,9 @@ class TestYorkRegionToolScenarios:
         data = await call_tool(mcp_server, "york_region_get_transit_stops", {
             "query": "Finch",
         })
-        assert "_meta" in data
-        # Response has features list (may be empty on API error but structure must be present)
-        assert "data" in data or "error" in data
-        if "data" in data:
-            assert isinstance(data["data"], list)
+        live = assert_live_or_transient(data, "york_region_get_transit_stops", "arcgis-hub")
+        if live:
+            assert_feature_payload(data, "york_region_get_transit_stops")
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(90)
@@ -1341,9 +1450,13 @@ class TestYorkRegionToolScenarios:
         data = await call_tool(mcp_server, "york_region_get_public_health", {
             "location_type": "hospital",
         })
-        assert "_meta" in data or "error" in data
-        if "data" in data:
-            assert isinstance(data["data"], list)
+        live = assert_live_or_transient(data, "york_region_get_public_health", "arcgis-hub")
+        if live:
+            payload = assert_feature_payload(data, "york_region_get_public_health")
+            assert payload["features"], (
+                f"York Region has hospitals — an empty feature list means the "
+                f"location_type filter is broken: {payload}"
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(90)
@@ -1352,17 +1465,24 @@ class TestYorkRegionToolScenarios:
         data = await call_tool(mcp_server, "markham_get_addresses", {
             "street": "Main",
         })
-        assert "_meta" in data or "error" in data
-        if "data" in data:
-            assert isinstance(data["data"], list)
+        live = assert_live_or_transient(data, "markham_get_addresses", "arcgis-hub")
+        if live:
+            payload = assert_feature_payload(data, "markham_get_addresses")
+            assert payload["features"], (
+                f"Markham has Main Street addresses — empty means the street "
+                f"filter is broken: {payload}"
+            )
 
     @pytest.mark.asyncio
     async def test_aurora_list_categories_live(self, mcp_server):
         """'What dataset categories exist in Aurora open data?'"""
         data = await call_tool(mcp_server, "aurora_list_categories")
-        assert "_meta" in data or "error" in data
-        if "data" in data:
-            assert isinstance(data["data"], list)
+        live = assert_live_or_transient(data, "aurora_list_categories", "arcgis-hub")
+        if live:
+            # Regression cover: this returned UPSTREAM_ERROR until 2026-07-25
+            # because the shared Hub client sent `q=` on a no-query listing and
+            # every Hub portal 400s on an empty q.
+            assert_rows(data, "aurora_list_categories")
 
     @pytest.mark.asyncio
     async def test_newmarket_search_datasets_live(self, mcp_server):
@@ -1371,9 +1491,11 @@ class TestYorkRegionToolScenarios:
             "query": "",
             "limit": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "data" in data:
-            assert isinstance(data["data"], list)
+        live = assert_live_or_transient(data, "newmarket_search_datasets", "arcgis-hub")
+        if live:
+            # Same empty-q regression as aurora_list_categories — an empty query
+            # is the whole point of this test, so it exercises the fixed path.
+            assert_rows(data, "newmarket_search_datasets")
 
     @pytest.mark.asyncio
     async def test_no_vaughan_tools_in_catalog(self, mcp_server):
@@ -1406,7 +1528,21 @@ class TestYorkRegionToolScenarios:
 
 @pytest.mark.asyncio
 class TestBcToolScenarios:
-    """BC open data tool integration scenarios — live BCDC CKAN + BCGW WFS endpoints."""
+    """BC open data tool integration scenarios — live BCDC CKAN + BCGW WFS endpoints.
+
+    Pinned package ids (D-11): the WFS-routing tests used to discover a dataset
+    by searching, then pytest.skip() when the search came back empty. A skip
+    reports neither pass nor fail, so "BCDC search returned no results" silently
+    meant the routing path under test was never exercised. These two datasets are
+    canonical, long-lived BCDC entries; if either ever disappears the test fails
+    loudly, which is the point.
+    """
+
+    #: BC Wildfire Fire Perimeters - Historical (queryable_via_wfs=True,
+    #: WHSE_LAND_AND_NATURAL_RESOURCE.PROT_HISTORICAL_FIRE_POLYS_SP)
+    WFS_PACKAGE_ID = "22c7cb44-1463-48f7-8e47-88857f207702"
+    #: BC Greenhouse Gas Emissions (queryable_via_wfs=False, 11 file resources)
+    NON_WFS_PACKAGE_ID = "7ec1a555-122e-4173-9536-1731dfd63b5c"
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(60)
@@ -1416,11 +1552,10 @@ class TestBcToolScenarios:
             "q": "wildfire",
             "rows": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "data" in data:
-            assert isinstance(data["data"], list)
-            assert len(data["data"]) >= 1
-            titles = [d.get("title", "").lower() for d in data["data"]]
+        live = assert_live_or_transient(data, "bc_search_datasets")
+        if live:
+            results = assert_rows(data, "bc_search_datasets")
+            titles = [d.get("title", "").lower() for d in results]
             assert any("wildfire" in t or "fire" in t for t in titles), (
                 f"No wildfire-related dataset found: {titles}"
             )
@@ -1432,15 +1567,15 @@ class TestBcToolScenarios:
         data = await call_tool(mcp_server, "bc_get_active_fires", {
             "max_records": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "bc-wfs"
-            assert "data" in data
-            # data is {"features": [...], "truncated": bool}
-            assert isinstance(data["data"], dict)
-            assert "features" in data["data"]
-            assert isinstance(data["data"]["features"], list)
-            assert "truncated" in data["data"]
+        live = assert_live_or_transient(data, "bc_get_active_fires", "bc-wfs")
+        if live:
+            payload = data["data"]
+            assert isinstance(payload, dict), (
+                f"WFS tools return a dict, got {type(payload).__name__}"
+            )
+            assert "features" in payload, f"payload missing features: {payload}"
+            assert isinstance(payload["features"], list)
+            assert "truncated" in payload, f"payload missing truncated: {payload}"
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(90)
@@ -1450,14 +1585,17 @@ class TestBcToolScenarios:
             "year": 2023,
             "max_records": 10,
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "bc-wfs"
-            # data is {"features": [...], "truncated": bool}
-            assert isinstance(data["data"], dict)
-            assert "features" in data["data"]
-            features = data["data"]["features"]
-            assert len(features) >= 1 or data["data"].get("truncated") is True
+        live = assert_live_or_transient(data, "bc_get_fire_perimeters", "bc-wfs")
+        if live:
+            payload = data["data"]
+            assert isinstance(payload, dict), (
+                f"WFS tools return a dict, got {type(payload).__name__}"
+            )
+            assert "features" in payload, f"payload missing features: {payload}"
+            # 2023 was a record BC fire season — an empty result is a defect.
+            assert payload["features"] or payload.get("truncated") is True, (
+                f"2023 fire perimeters must return features: {payload}"
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(60)
@@ -1467,19 +1605,18 @@ class TestBcToolScenarios:
             "designation": "PROVINCIAL PARK",
             "max_records": 10,
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "bc-wfs"
-            # data is {"features": [...], "truncated": bool}
-            assert isinstance(data["data"], dict)
-            assert "features" in data["data"]
-            features = data["data"]["features"]
-            if features:
-                # Verify known field names are present
-                sample = features[0]
-                assert any(
-                    k in sample for k in ("PROTECTED_LANDS_NAME", "PROTECTED_LANDS_DESIGNATION", "PROT_LANDS_NAME")
-                ), f"Expected park field names not found: {list(sample.keys())[:10]}"
+        live = assert_live_or_transient(data, "bc_get_protected_areas", "bc-wfs")
+        if live:
+            payload = data["data"]
+            assert "features" in payload, f"payload missing features: {payload}"
+            # BC has hundreds of provincial parks — empty means broken.
+            features = payload["features"]
+            assert features, f"PROVINCIAL PARK designation returned nothing: {payload}"
+            sample = features[0]
+            assert any(
+                k in sample
+                for k in ("PROTECTED_LANDS_NAME", "PROTECTED_LANDS_DESIGNATION", "PROT_LANDS_NAME")
+            ), f"Expected park field names not found: {list(sample.keys())[:10]}"
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(60)
@@ -1489,12 +1626,14 @@ class TestBcToolScenarios:
             "tenure_type": "mineral",
             "max_records": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "bc-wfs"
-            # data is {"features": [...], "truncated": bool}
-            assert isinstance(data["data"], dict)
-            assert "features" in data["data"]
+        live = assert_live_or_transient(data, "bc_get_mining_tenure", "bc-wfs")
+        if live:
+            payload = data["data"]
+            assert "features" in payload, f"payload missing features: {payload}"
+            assert payload["features"], (
+                f"BC has thousands of active mineral claims — empty means the "
+                f"tenure_type filter is broken: {payload}"
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(60)
@@ -1508,64 +1647,59 @@ class TestBcToolScenarios:
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(90)
+    async def test_dataset_details_exposes_wfs_routing_metadata(self, mcp_server):
+        """The two-step workflow depends on details carrying the WFS routing flags."""
+        details = await call_tool(mcp_server, "bc_get_dataset_details", {
+            "package_id": self.WFS_PACKAGE_ID,
+        })
+        live = assert_live_or_transient(details, "bc_get_dataset_details")
+        if live:
+            dd = details["data"]
+            assert dd.get("queryable_via_wfs") is True, (
+                f"{self.WFS_PACKAGE_ID} (BC Wildfire Fire Perimeters - Historical) "
+                f"must be WFS-queryable — bc_query_features routing depends on this "
+                f"flag. Got: {dd.get('queryable_via_wfs')!r}"
+            )
+            assert dd.get("object_name"), (
+                f"a WFS-queryable dataset must expose object_name: {dd}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(90)
     async def test_query_features_routes_to_wfs(self, mcp_server):
         """bc_query_features routes to WFS when dataset has queryable_via_wfs=True."""
-        # Step 1: search for a known WFS dataset
-        search_data = await call_tool(mcp_server, "bc_search_datasets", {
-            "q": "fire perimeters",
-            "rows": 5,
-        })
-        if "error" in search_data or not search_data.get("data"):
-            pytest.skip("BCDC search returned no results")
-        # Step 2: find a dataset with queryable_via_wfs
-        wfs_dataset = None
-        for ds in search_data["data"]:
-            details = await call_tool(mcp_server, "bc_get_dataset_details", {
-                "package_id": ds["id"],
-            })
-            if details.get("data", {}).get("queryable_via_wfs"):
-                wfs_dataset = details["data"]
-                break
-        if wfs_dataset is None:
-            pytest.skip("No WFS-queryable dataset found in search results")
-        # Step 3: query via bc_query_features (requires package_id, not object_name)
-        pkg_id = wfs_dataset.get("id")
-        if not pkg_id:
-            pytest.skip("Dataset has no id")
         result = await call_tool(mcp_server, "bc_query_features", {
-            "package_id": pkg_id,
+            "package_id": self.WFS_PACKAGE_ID,
             "max_records": 3,
         })
-        assert "_meta" in result or "error" in result
-        if "_meta" in result:
-            assert result["_meta"]["source"]["api"] == "bc-wfs"
+        live = assert_live_or_transient(result, "bc_query_features", "bc-wfs")
+        if live:
+            payload = result["data"]
+            assert isinstance(payload, dict), (
+                f"the WFS route returns a dict, got {type(payload).__name__} — "
+                f"a list would mean it fell through to the file parser"
+            )
+            assert "features" in payload, f"WFS payload missing features: {payload}"
 
     @pytest.mark.asyncio
     @pytest.mark.timeout(90)
     async def test_query_features_routes_to_file_parser(self, mcp_server):
-        """bc_query_features routes to file parser when dataset has queryable_via_wfs=False."""
-        # Search for likely non-WFS datasets (e.g. XLSX/CSV-only)
-        search_data = await call_tool(mcp_server, "bc_search_datasets", {
-            "q": "statistics report",
-            "rows": 10,
+        """bc_query_features routes to the file parser when queryable_via_wfs=False."""
+        details = await call_tool(mcp_server, "bc_get_dataset_details", {
+            "package_id": self.NON_WFS_PACKAGE_ID,
         })
-        if "error" in search_data or not search_data.get("data"):
-            pytest.skip("BCDC search returned no results")
-        csv_dataset = None
-        for ds in search_data["data"]:
-            details = await call_tool(mcp_server, "bc_get_dataset_details", {
-                "package_id": ds["id"],
-            })
-            details_data = details.get("data", {})
-            if not details_data.get("queryable_via_wfs") and details_data.get("resources"):
-                # Must have at least one downloadable resource
-                csv_dataset = details_data
-                break
-        if csv_dataset is None:
-            pytest.skip("No non-WFS dataset with resources found in search results")
-        # Verify structure — the tool should return _meta or error, not raise an exception
-        assert csv_dataset.get("queryable_via_wfs") is False
-        assert isinstance(csv_dataset.get("resources", []), list)
+        live = assert_live_or_transient(details, "bc_get_dataset_details")
+        if live:
+            dd = details["data"]
+            assert dd.get("queryable_via_wfs") is False, (
+                f"{self.NON_WFS_PACKAGE_ID} (BC Greenhouse Gas Emissions) is a "
+                f"file-resource dataset and must NOT be WFS-queryable — this test "
+                f"exercises the non-WFS branch. Got: {dd.get('queryable_via_wfs')!r}"
+            )
+            resources = dd.get("resources") or []
+            assert isinstance(resources, list) and resources, (
+                f"the file-parser route needs downloadable resources: {dd}"
+            )
 
 
 # ─── Quebec Government Open Data scenarios ───────────────────────────────────
@@ -1653,13 +1787,16 @@ class TestQuebecToolScenarios:
     async def test_get_road_works_wfs_csv(self, mcp_server):
         """'What road construction zones are currently active?'"""
         data = await call_tool(mcp_server, "quebec_get_road_works", {})
-        # Road works may be empty if no active construction; empty list is valid (not an error)
         assert "_meta" in data, f"Expected live success from quebec_get_road_works, got: {data}"
-        assert isinstance(data["data"], list)
-        # If data present, verify shape (empty list in off-season is acceptable)
-        if data["data"]:
-            row = data["data"][0]
-            assert "route" in row or "identifier" in row
+        rows = assert_rows(
+            data,
+            "quebec_get_road_works",
+            allow_empty_reason="no active construction zones province-wide is possible",
+        )
+        for row in rows[:1]:
+            assert "route" in row or "identifier" in row, (
+                f"road works row missing both route and identifier: {row}"
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -1668,8 +1805,12 @@ class TestQuebecToolScenarios:
         """'What are current road conditions in Quebec?' — rows must have non-null route/region/status."""
         data = await call_tool(mcp_server, "quebec_get_road_conditions", {})
         assert "_meta" in data, f"Expected _meta envelope, got: {data}"
-        if data["data"]:
-            row = data["data"][0]
+        rows = assert_rows(
+            data,
+            "quebec_get_road_conditions",
+            allow_empty_reason="MTQ winter road conditions are not published outside winter",
+        )
+        for row in rows[:1]:
             assert row.get("route_num") is not None, (
                 "route_num is None — mapper still uses PascalCase keys (expected 'numeroroute')"
             )
@@ -1750,12 +1891,13 @@ class TestQuebecToolScenarios:
                 f"route_num should be zero-padded form '00020', got {row['route_num']}"
             )
             assert row["route_num"] != "00204", (
-                f"Route 204 row leaked through A-20 filter — substring match bug"
+                "Route 204 row leaked through A-20 filter — substring match bug"
             )
-            if row.get("route_name"):
-                assert "route 204" not in row["route_name"].lower(), (
-                    f"Route 204 name leaked: {row['route_name']}"
-                )
+            # route_name is nullable upstream; when present it must not be a
+            # Route 204 leak. `or ""` keeps the assertion on every row.
+            assert "route 204" not in (row.get("route_name") or "").lower(), (
+                f"Route 204 name leaked: {row.get('route_name')}"
+            )
             assert isinstance(row["structure_type"], str), (
                 f"structure_type must be str, got "
                 f"{type(row['structure_type']).__name__}={row['structure_type']}"
@@ -1842,12 +1984,15 @@ class TestAlbertaToolScenarios:
             "format": "CSV",
             "rows": 5,
         })
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "alberta-open-data"
-            # Results shape: {"count": int, "results": [...]}
-            assert "results" in data["data"]
-            assert data["data"].get("count", 0) >= 0
+        live = assert_live_or_transient(data, "alberta_search_datasets", "alberta-open-data")
+        if live:
+            payload = data["data"]
+            assert "results" in payload, f"payload missing results: {list(payload)}"
+            # open.alberta.ca has thousands of wildfire CSVs — zero means the
+            # search or the format filter is broken, not that Alberta is quiet.
+            assert payload["results"], (
+                f"wildfire+CSV search returned nothing: {payload}"
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -1855,12 +2000,11 @@ class TestAlbertaToolScenarios:
     async def test_active_fires_now(self, mcp_server):
         """'How many active wildfires in Alberta right now?' — live WMBappServices FeatureServer."""
         data = await call_tool(mcp_server, "alberta_get_active_fires", {})
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "alberta-wmb-arcgis"
-            assert "features" in data["data"]
-            assert isinstance(data["data"]["features"], list)
-            # Don't assert exact count — varies seasonally (May-October peak)
+        live = assert_live_or_transient(data, "alberta_get_active_fires", "alberta-wmb-arcgis")
+        if live:
+            # Feature count is NOT asserted — active fires vary seasonally and
+            # zero is a legitimate winter reading. The shape must still hold.
+            assert_feature_payload(data, "alberta_get_active_fires")
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -1868,15 +2012,18 @@ class TestAlbertaToolScenarios:
     async def test_alberta_hospitals(self, mcp_server):
         """'List Alberta hospitals' — live AHSGIS FeatureServer (~101 hospitals)."""
         data = await call_tool(mcp_server, "alberta_get_hospitals", {})
-        assert "_meta" in data or "error" in data
-        if "_meta" in data:
-            assert data["_meta"]["source"]["api"] == "alberta-ahs-arcgis"
-            assert "features" in data["data"]
-            # ~101 hospitals expected; allow generous ±50 window for live drift
-            if isinstance(data["data"].get("count"), int):
-                assert 50 <= data["data"]["count"] <= 250, (
-                    f"Alberta hospital count unexpectedly far from ~101: {data['data']['count']}"
-                )
+        live = assert_live_or_transient(data, "alberta_get_hospitals", "alberta-ahs-arcgis")
+        if live:
+            payload = assert_feature_payload(data, "alberta_get_hospitals")
+            count = payload.get("count")
+            assert isinstance(count, int), (
+                f"the AHS hospital layer must report a count, got {count!r} — "
+                f"a missing count previously skipped this assertion entirely"
+            )
+            # ~101 hospitals expected; generous window for live drift.
+            assert 50 <= count <= 250, (
+                f"Alberta hospital count unexpectedly far from ~101: {count}"
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -2322,8 +2469,8 @@ class TestSaskatchewanToolScenarios:
         features = data["data"]["features"]
         assert isinstance(features, list)
         assert len(features) >= 1, (
-            f"WSA reservoirs must return at least 1 reservoir. "
-            f"An empty list means the WRONG LAYER (layer 0) was used — layer 26 is required."
+            "WSA reservoirs must return at least 1 reservoir. "
+            "An empty list means the WRONG LAYER (layer 0) was used — layer 26 is required."
         )
         # FIELD PRESENCE: Reservoir_Name must be present (PROVES layer 26 was used)
         reservoir_name_rows = [f for f in features if f.get("Reservoir_Name") is not None]
@@ -2725,44 +2872,64 @@ class TestNovaScotiaToolScenarios:
         THE ZONE NORMALIZATION PROOF: AMI uses 'health_zone' in the source dataset but
         client _normalize_zone_field must rename it to 'zone' in the output. If 'zone' is
         absent and 'health_zone' appears instead, normalization is broken.
+
+        Queried WITHOUT a sex filter: AMI has no sex column, so filtering by it
+        returns nothing and used to leave this proof unasserted. The sex-filter
+        behaviour is covered separately below.
+        """
+        data = await call_tool(mcp_server, "ns_get_chronic_disease_prevalence", {
+            "disease": "ami",
+            "limit": 5,
+        })
+        assert "_meta" in data, f"Expected live success, got: {data}"
+        assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
+
+        rows = data["data"]["rows"]
+        assert rows, (
+            f"AMI is a published NS chronic-disease dataset — an empty result "
+            f"means the query is broken: {data['data']}"
+        )
+        first = rows[0]
+        # ZONE NORMALIZATION PROOF: 'zone' must be present (not 'health_zone')
+        assert "zone" in first, (
+            f"ZONE NORMALIZATION FAILED: 'zone' must be in the output (AMI source uses "
+            f"'health_zone' renamed to 'zone' by _normalize_zone_field). "
+            f"Got keys: {list(first.keys())}"
+        )
+        assert first.get("zone") is not None, (
+            f"FIELD PRESENCE FAILED: 'zone' must be non-null. Got: {first}"
+        )
+        assert first.get("crude_prevalence_rate") is not None, (
+            f"FIELD PRESENCE FAILED: 'crude_prevalence_rate' must be non-null. Got: {first}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    @pytest.mark.tolerates_upstream_error(
+        reason="AMI has no sex column upstream, so Socrata may 400 on the filter "
+               "or return zero rows; both are correct answers for this dataset"
+    )
+    async def test_chronic_disease_sex_filter_on_dataset_without_sex(self, mcp_server):
+        """'AMI prevalence for women' — documents that AMI carries no sex breakdown.
+
+        Kept as an explicit exemption rather than folded into the zone-normalization
+        test above, where it silently skipped the proof whenever the filter matched
+        nothing.
         """
         data = await call_tool(mcp_server, "ns_get_chronic_disease_prevalence", {
             "disease": "ami",
             "sex": "F",
             "limit": 5,
         })
-        assert "_meta" in data or "error" in data
         if "error" in data:
-            # AMI has no sex field — "F" filter may return 0 rows or UPSTREAM_ERROR
-            # (server-side 400 on unknown column); either is acceptable here
-            assert data["error"]["code"] in ("UPSTREAM_ERROR", "INVALID_INPUT")
-            return
-        assert data["_meta"]["source"]["api"] == "nova-scotia-socrata"
-        rows = data["data"]["rows"]
-        assert isinstance(rows, list)
-        # AMI might return empty rows when sex="F" (no sex column) — test with "ami" alone if empty
-        if not rows:
-            # Try without sex filter since AMI has no sex field
-            data2 = await call_tool(mcp_server, "ns_get_chronic_disease_prevalence", {
-                "disease": "ami",
-                "limit": 5,
-            })
-            assert "_meta" in data2, f"Expected live success from ns_get_chronic_disease_prevalence (bare ami query), got: {data2}"
-            rows = data2["data"]["rows"]
-        if rows:
-            first = rows[0]
-            # ZONE NORMALIZATION PROOF: 'zone' must be present (not 'health_zone')
-            assert "zone" in first, (
-                f"ZONE NORMALIZATION FAILED: 'zone' must be in the output (AMI source uses "
-                f"'health_zone' renamed to 'zone' by _normalize_zone_field). "
-                f"Got keys: {list(first.keys())}"
+            assert data["error"]["code"] in ("UPSTREAM_ERROR", "INVALID_INPUT"), (
+                f"a filter on a nonexistent column should surface as an upstream "
+                f"or input error, got: {data['error']}"
             )
-            assert first.get("zone") is not None, (
-                f"FIELD PRESENCE FAILED: 'zone' must be non-null. Got: {first}"
-            )
-            # FIELD PRESENCE: crude_prevalence_rate must be non-null
-            assert first.get("crude_prevalence_rate") is not None, (
-                f"FIELD PRESENCE FAILED: 'crude_prevalence_rate' must be non-null. Got: {first}"
+        else:
+            assert isinstance(data["data"]["rows"], list), (
+                f"a non-matching filter must still return a rows list: {data['data']}"
             )
 
     @pytest.mark.asyncio
@@ -2872,4 +3039,129 @@ class TestNovaScotiaToolScenarios:
         )
         assert "hospital" in data["error"]["valid"], (
             f"valid= list must include 'hospital'. Got: {data['error']['valid']}"
+        )
+
+
+@pytest.mark.integration
+class TestStatCanCodeSetDrift:
+    """Guard the hardcoded WDS decode maps against StatCan's live code set.
+
+    Regression cover for 08-UAT.md Gap 1: `FREQUENCY_CODES` was shifted from code
+    6 onward (monthly CPI reported as "Bi-monthly") and `SCALAR_FACTOR_CODES` was
+    shifted from code 1 onward (a 100x magnitude misread). Unit tests could not
+    catch it — they asserted the maps against themselves — and the server
+    contradicted itself, because `sc_get_code_sets` proxies the live endpoint
+    while every other sc_ tool decoded against the stale local copy.
+
+    These tests fail if the local maps and upstream ever diverge again.
+    """
+
+    @pytest.mark.asyncio
+    async def test_frequency_map_matches_live_code_set(self, mcp_server):
+        """'Do our frequency labels still match what StatCan publishes?'"""
+        from mcp_canada.modules.statcan.constants import FREQUENCY_CODES
+
+        data = await call_tool(mcp_server, "sc_get_code_sets", {})
+        assert "_meta" in data, f"expected envelope, got: {data}"
+        live = {e["code"]: e["desc_en"] for e in data["data"]["frequency"]}
+
+        assert live, "live frequency code set came back empty"
+        assert FREQUENCY_CODES == live, (
+            "FREQUENCY_CODES has drifted from StatCan's published set.\n"
+            f"  only local: {set(FREQUENCY_CODES) - set(live)}\n"
+            f"  only live:  {set(live) - set(FREQUENCY_CODES)}\n"
+            f"  mismatched: "
+            f"{ {k: (FREQUENCY_CODES[k], live[k]) for k in set(FREQUENCY_CODES) & set(live) if FREQUENCY_CODES[k] != live[k]} }"
+        )
+
+    @pytest.mark.asyncio
+    async def test_scalar_map_matches_live_code_set(self, mcp_server):
+        """'Do our scalar multiplier labels still match StatCan?'"""
+        from mcp_canada.modules.statcan.constants import SCALAR_FACTOR_CODES
+
+        data = await call_tool(mcp_server, "sc_get_code_sets", {})
+        live = {e["code"]: e["desc_en"] for e in data["data"]["scalar"]}
+
+        assert live, "live scalar code set came back empty"
+        assert SCALAR_FACTOR_CODES == live, (
+            "SCALAR_FACTOR_CODES has drifted from StatCan's published set.\n"
+            f"  only local: {set(SCALAR_FACTOR_CODES) - set(live)}\n"
+            f"  only live:  {set(live) - set(SCALAR_FACTOR_CODES)}\n"
+            f"  mismatched: "
+            f"{ {k: (SCALAR_FACTOR_CODES[k], live[k]) for k in set(SCALAR_FACTOR_CODES) & set(live) if SCALAR_FACTOR_CODES[k] != live[k]} }"
+        )
+
+    @pytest.mark.asyncio
+    async def test_monthly_cpi_is_labelled_monthly(self, mcp_server):
+        """'Is monthly CPI actually reported as monthly?' — the original defect.
+
+        Vector 41690973 is CPI all-items Canada, frequencyCode 6. Before the fix
+        every observation came back labelled "Bi-monthly" despite reference
+        periods exactly one month apart.
+        """
+        data = await call_tool(
+            mcp_server, "sc_get_data_by_vector", {"vector_id": 41690973, "n": 3}
+        )
+        assert "_meta" in data, f"expected envelope, got: {data}"
+        rows = data["data"]
+        assert rows, "no observations returned"
+        for row in rows:
+            assert row["frequency_code"] == 6, (
+                f"CPI should be frequencyCode 6, got {row['frequency_code']}"
+            )
+            assert row["frequency"] == "Monthly", (
+                f"frequencyCode 6 must decode to 'Monthly', got {row['frequency']!r}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_resource_catalog_agrees_with_live_code_set(self, mcp_server):
+        """The data:// catalog agents read must not contradict the live API."""
+        import json as _json
+        from mcp_canada.modules.statcan.resources import statcan_frequency_codes
+
+        data = await call_tool(mcp_server, "sc_get_code_sets", {})
+        live = {e["code"]: e["desc_en"] for e in data["data"]["frequency"]}
+        catalog = {int(k): v["en"] for k, v in _json.loads(statcan_frequency_codes()).items()}
+
+        assert catalog == live, (
+            "data://statcan/frequency-codes disagrees with the live code set: "
+            f"{ {k: (catalog.get(k), live.get(k)) for k in set(catalog) | set(live) if catalog.get(k) != live.get(k)} }"
+        )
+
+    @pytest.mark.asyncio
+    async def test_series_info_decodes_uom_label(self, mcp_server):
+        """'What unit is this CPI series in?' — 08-UAT Gap 2.
+
+        Vector 41690973 is memberUomCode 17, which upstream means "2002=100"
+        (the CPI index base). Before the fix the response carried the bare code
+        with no label, and the data://statcan/uom-codes catalog claimed 17 meant
+        "Canadian dollars".
+        """
+        data = await call_tool(
+            mcp_server, "sc_get_series_info_by_vector", {"vector_id": 41690973}
+        )
+        assert "_meta" in data, f"expected envelope, got: {data}"
+        info = data["data"]
+        assert info["uom_code"] == 17
+        assert info.get("uom") == "2002=100", (
+            f"uom_code must be decoded alongside frequency/scalar, got {info.get('uom')!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_uom_catalog_subset_matches_live(self, mcp_server):
+        """Every embedded UOM entry must be a real upstream value."""
+        import json as _json
+        from mcp_canada.modules.statcan.resources import statcan_uom_codes
+
+        data = await call_tool(mcp_server, "sc_get_code_sets", {})
+        live = {e["code"]: e["desc_en"] for e in data["data"]["uom"]}
+        catalog = {
+            int(k): v["en"]
+            for k, v in _json.loads(statcan_uom_codes()).items()
+            if not k.startswith("_")
+        }
+
+        wrong = {k: (v, live.get(k)) for k, v in catalog.items() if live.get(k) != v}
+        assert not wrong, (
+            f"data://statcan/uom-codes has entries that do not exist upstream: {wrong}"
         )

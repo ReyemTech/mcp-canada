@@ -1,3 +1,8 @@
+# Test-only pyright relaxation. Runtime assertions in these tests narrow types in
+# ways pyright cannot follow (prompt Message.content and Resource.read() unions),
+# and several cases deliberately pass invalid values to exercise error handling.
+# Source code is still checked strictly -- do not add this to non-test modules.
+# pyright: reportArgumentType=false
 """alberta module tool tests. Bodies added by Plans 02-07.
 
 Plan 09 adds parametrized envelope/lang test classes (TestAlbertaEnvelopes,

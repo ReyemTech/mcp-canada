@@ -75,6 +75,10 @@ class SeriesInfo(BaseModel):
     title_en: str
     title_fr: str
     uom_code: int
+    # Decoded from the live getCodeSets uom set (464 entries, hand-maintenance
+    # is not viable — see 08-UAT.md Gap 2). None when the code set is
+    # unavailable or the code carries a null label upstream.
+    uom: str | None = None
 
 
 class ObservationRow(BaseModel):

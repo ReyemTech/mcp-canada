@@ -31,7 +31,7 @@ from mcp_canada.modules.drug_database.client import (
     fetch_therapeutic_class,
 )
 from mcp_canada.modules.drug_database.constants import BASE_URL
-from mcp_canada.shared.envelope import INVALID_INPUT, make_error, make_response
+from mcp_canada.shared.envelope import INVALID_INPUT, make_error, make_response, upstream_guard
 
 # API name and base URL for _meta envelope
 _API_NAME = "Drug Product Database"
@@ -43,6 +43,7 @@ _API_URL = BASE_URL
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def drug_search(
     brand_name: str | None = None,
     din: str | None = None,
@@ -92,6 +93,7 @@ async def drug_search(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def drug_get_details(
     drug_code: int,
     lang: Literal["en", "fr"] = "en",
@@ -123,6 +125,7 @@ async def drug_get_details(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def drug_get_ingredients(
     drug_code: int,
     lang: Literal["en", "fr"] = "en",
@@ -153,6 +156,7 @@ async def drug_get_ingredients(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def drug_get_routes(
     drug_code: int,
     lang: Literal["en", "fr"] = "en",
@@ -183,6 +187,7 @@ async def drug_get_routes(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def drug_search_companies(
     company_name: str,
     lang: Literal["en", "fr"] = "en",
@@ -212,6 +217,7 @@ async def drug_search_companies(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def drug_get_schedule(
     drug_code: int,
     lang: Literal["en", "fr"] = "en",
@@ -242,6 +248,7 @@ async def drug_get_schedule(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def drug_get_therapeutic_class(
     drug_code: int,
     lang: Literal["en", "fr"] = "en",
@@ -273,6 +280,7 @@ async def drug_get_therapeutic_class(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def drug_get_status(
     drug_code: int,
     lang: Literal["en", "fr"] = "en",

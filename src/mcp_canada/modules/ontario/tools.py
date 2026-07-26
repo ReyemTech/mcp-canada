@@ -12,6 +12,7 @@ Each tool follows the 5-file module pattern:
 - BM25-optimized docstrings with Keywords: and Use for: lines
 """
 
+import re
 from typing import Any, Literal
 
 import httpx
@@ -220,8 +221,6 @@ async def ontario_get_dataset_stats(
 # Tool 6: Get population projections
 # ---------------------------------------------------------------------------
 
-
-import re
 
 _RE_AGE_GROUP = re.compile(r"^col_(\d+)_to_(\d+)$")
 _RE_AGE_SINGLE = re.compile(r"^col_(\d+)$")

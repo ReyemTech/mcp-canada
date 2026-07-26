@@ -1,5 +1,10 @@
 """Response envelope and error builders for standardized tool responses."""
 
+import functools
+import json
+import httpx
+from collections.abc import Callable
+
 from datetime import datetime, timezone
 from typing import Any
 
@@ -65,3 +70,56 @@ def make_error(code: str, message: str, lang: str = "en", **extra: Any) -> dict[
             **extra,
         }
     }
+
+
+def upstream_guard(api_name: str) -> Callable:
+    """Turn an unhandled upstream exception into a structured error envelope.
+
+    Project rule: a tool returns ``make_error(...)`` on failure and never raises
+    (``.claude/rules/modules.md``). drug_database and nutrient_file shipped 16
+    tools between them with no exception handling at all, so a slow Health
+    Canada response escaped as a raw fastmcp ToolError — "Upstream request timed
+    out, please retry" — instead of an envelope an agent (or a hardened test)
+    can reason about. Nine live scenarios failed that way under full-suite load
+    while passing in isolation (Phase 20.1).
+
+    Applied UNDER ``@tool`` so the tool decorator still sees the real signature:
+
+        @tool
+        @upstream_guard(_API_NAME)
+        async def drug_search(...) -> dict:
+
+    ``functools.wraps`` sets ``__wrapped__``, which ``inspect.signature`` follows,
+    so parameter names, annotations and defaults survive for registration.
+    """
+    def decorator(fn: Callable) -> Callable:
+        @functools.wraps(fn)
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            lang = kwargs.get("lang", "en")
+            try:
+                return await fn(*args, **kwargs)
+            except httpx.HTTPStatusError as exc:
+                return make_error(
+                    "UPSTREAM_ERROR",
+                    f"{api_name} returned HTTP {exc.response.status_code}",
+                    lang=lang,
+                )
+            except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPError) as exc:
+                return make_error(
+                    "UPSTREAM_ERROR",
+                    f"{api_name} request failed: {type(exc).__name__}: {exc}",
+                    lang=lang,
+                )
+            except json.JSONDecodeError as exc:
+                # Must precede the ValueError arm — JSONDecodeError subclasses it.
+                # An upstream HTML error page reaching httpx's .json() is an
+                # upstream failure, not a bad argument from the caller.
+                return make_error(
+                    "UPSTREAM_ERROR",
+                    f"{api_name} returned a malformed JSON body: {exc}",
+                    lang=lang,
+                )
+            except ValueError as exc:
+                return make_error("INVALID_INPUT", str(exc), lang=lang)
+        return wrapper
+    return decorator

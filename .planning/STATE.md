@@ -5,16 +5,16 @@ milestone_name: Statistics Canada + Datastore
 current_phase: 20
 current_phase_name: Finish integration de-masking and fix the failures it exposed
 status: awaiting_merge
-stopped_at: Phase 20.1 complete; PR #2 open with all four CI gates green
-last_updated: "2026-07-26T00:00:00.000Z"
-last_activity: 2026-07-26
-last_activity_desc: Phase 20.1 verified; CI gates fixed and green on PR #2
+stopped_at: "Phase 20.1 complete; PR #2 open with all four CI gates green"
+last_updated: "2026-07-26T02:28:06.297Z"
+last_activity: 2026-07-25
+last_activity_desc: Phase 20.1 executed end to end
 progress:
-  total_phases: 35
+  total_phases: 36
   completed_phases: 16
   total_plans: 77
   completed_plans: 77
-  percent: 46
+  percent: 44
 ---
 
 # Project State
@@ -24,13 +24,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** An agent can combine data from any Canadian government source in a single SQL query — turning isolated APIs into one queryable data platform.
-**Current focus:** Phase 20.1 complete — next is Phase 21 (New Brunswick)
+**Current focus:** Phase 20.1 complete (PR #2) — next is Phase 20.2 (normalize tool error handling), then Phase 21 (New Brunswick)
 
 ## Current Position
 
-Phase: 20 of 35 (20.1 — integration de-masking: COMPLETE)
+Phase: 20 of 36 (20.1 — integration de-masking: COMPLETE)
 Plan: 6 of 6 complete
-Status: Phase 20.1 complete; ready to plan Phase 21
+Status: Phase 20.1 complete; next is Phase 20.2 (run /gsd-plan-phase 20.2)
 Last activity: 2026-07-25 — Phase 20.1 executed end to end
 
 Progress: [████░░░░░░] 43%
@@ -89,15 +89,22 @@ Open defect (found 2026-07-26, deferred to its own phase):
   behind an env-var key like Manitoba 511. Alberta AHS, parks, forest-area and
   Saskatchewan/Manitoba Hub services were probed at the same time and are healthy.
 
-- **Malformed-JSON masking is broader than the spot Codex flagged.** `upstream_guard`
-  is fixed, which covers drug_database and nutrient_file (they use their own clients).
-  But `shared/http.py:api_get` returns `response.json()` with no decode guard, and
-  ~40 `except ValueError -> INVALID_INPUT` arms across statcan, ircc, manitoba,
-  saskatchewan, nova_scotia, british_columbia and datastore sit downstream of it.
-  An upstream HTML error page therefore still surfaces as caller error in those
-  modules. Pre-existing, not introduced by Phase 20.1. The high-leverage fix is one
-  decode guard inside `api_get` rather than 40 call-site edits — deliberately left
-  out of PR #2 to keep it scoped.
+- **Malformed-JSON masking is broader than the spot Codex flagged.** → **now Phase 20.2.**
+  `upstream_guard` is fixed, which covers drug_database and nutrient_file (they use
+  their own clients). But `shared/http.py:api_get` returns `response.json()` with no
+  decode guard, and ~40 `except ValueError -> INVALID_INPUT` arms across statcan,
+  ircc, manitoba, saskatchewan, nova_scotia, british_columbia and datastore sit
+  downstream of it, so an upstream HTML error page still surfaces as caller error
+  there. Pre-existing, not introduced by Phase 20.1.
+
+  Correction to the first note taken on this: it is **not** a one-line fix inside
+  `api_get`. `httpx.DecodingError` is an `HTTPError` but **not** an
+  `HTTPStatusError`, and 5 of 24 modules (bank_of_canada, ckan, ircc, ontario,
+  recalls) catch only `HTTPStatusError` — a naive central guard would turn a
+  mislabelled error into an *unhandled* one in those five, which is strictly worse
+  and is the exact failure 20.1 removed. Handler shape must be normalized across
+  all 24 modules first. Sequenced before Phase 21 so ~19 future modules inherit the
+  correct shape.
 
 Remaining backlog (not defects):
 
@@ -398,6 +405,7 @@ Recent decisions affecting current work:
 - Phases 35-39 added: Regional municipalities (Peel, Durham, Halton, Waterloo, Metro Vancouver)
 - Phase 40 added: MCP Prompts and Resources — workflow prompts for guided data exploration, static resources for reference data across all modules
 - Phase 20.1 inserted after Phase 20: Remove UPSTREAM_ERROR escape-hatch pattern from all provincial integration tests (MB/SK/AB/QC/NS) and re-run live integration to surface masked upstream failures before pushing Phase 20 (URGENT)
+- Phase 20.2 inserted after Phase 20.1: Normalize tool error handling and guard malformed upstream JSON — root cause of a masking class surfaced by Codex review on PR #2; sequenced before Phase 21 so ~19 future modules inherit the correct handler shape
 
 ### Pending Todos
 

@@ -19,10 +19,11 @@ from mcp_canada.modules.weather.current.client import (
     fetch_hourly_obs,
     fetch_stations,
 )
-from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.envelope import make_error, make_response, upstream_guard
 
 
 @tool
+@upstream_guard(API_NAME)
 async def wx_get_current_conditions(
     location: str | None = None,
     lat: float | None = None,
@@ -61,6 +62,7 @@ async def wx_get_current_conditions(
 
 
 @tool
+@upstream_guard(API_NAME)
 async def wx_get_forecast(
     location: str | None = None,
     lat: float | None = None,
@@ -105,6 +107,7 @@ async def wx_get_forecast(
 
 
 @tool
+@upstream_guard(API_NAME)
 async def wx_get_weather_alerts(
     province: str | None = None,
     alert_type: str | None = None,
@@ -137,6 +140,7 @@ async def wx_get_weather_alerts(
 
 
 @tool
+@upstream_guard(API_NAME)
 async def wx_search_stations(
     province: str | None = None,
     lat: float | None = None,
@@ -176,6 +180,7 @@ async def wx_search_stations(
 
 
 @tool
+@upstream_guard(API_NAME)
 async def wx_get_station_data(
     station_id: str,
     date: str | None = None,

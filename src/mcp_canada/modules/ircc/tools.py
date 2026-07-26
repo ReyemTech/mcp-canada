@@ -28,7 +28,7 @@ from mcp_canada.modules.ircc.client import (
     fetch_work_permits_tfwp,
 )
 from mcp_canada.modules.ircc.constants import DATASET_REGISTRY
-from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.envelope import make_error, make_response, upstream_guard
 from mcp_canada.shared.reshape import reshape_temporal_columns
 
 _API_NAME = "IRCC Open Data"
@@ -48,6 +48,7 @@ def _registry_url(dataset_key: str, breakdown: str, lang: str) -> str:
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ircc_get_permanent_residents(
     breakdown: Literal[
         "country", "province", "gender", "age", "cma", "noc",
@@ -86,6 +87,7 @@ async def ircc_get_permanent_residents(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ircc_get_study_permits(
     breakdown: Literal[
         "country", "province_level", "gender", "annual_country", "annual_province"
@@ -122,6 +124,7 @@ async def ircc_get_study_permits(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ircc_get_work_permits(
     permit_type: Literal["imp", "tfwp"] = "imp",
     breakdown: str = "province_program",
@@ -168,6 +171,7 @@ async def ircc_get_work_permits(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ircc_get_express_entry(
     stream: Literal["admissions", "invited"] = "admissions",
     breakdown: str = "gender",
@@ -214,6 +218,7 @@ async def ircc_get_express_entry(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ircc_get_tr_to_pr(
     breakdown: Literal["study_permit", "imp", "tfwp", "pgwp"] = "study_permit",
     year: int | None = None,
@@ -248,6 +253,7 @@ async def ircc_get_tr_to_pr(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ircc_get_asylum(
     breakdown: Literal["province_office", "province_age", "province_gender"] = "province_office",
     year: int | None = None,
@@ -282,6 +288,7 @@ async def ircc_get_asylum(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ircc_get_ops(
     breakdown: Literal[
         "pr_intake", "copr_issued", "study_processed",
@@ -321,6 +328,7 @@ async def ircc_get_ops(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ircc_get_afghan(
     breakdown: Literal["gender", "age", "education", "language"] = "gender",
     year: int | None = None,
@@ -355,6 +363,7 @@ async def ircc_get_afghan(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ircc_get_adhoc_pr(
     breakdown: Literal[
         "category_1980", "country_1980", "province_cat_2000", "province_citz_2000"
@@ -391,6 +400,7 @@ async def ircc_get_adhoc_pr(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ircc_get_citizenship(
     breakdown: Literal["country"] = "country",
     recent: int | None = None,
@@ -424,6 +434,7 @@ async def ircc_get_citizenship(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def ircc_list_datasets(
     lang: Literal["en", "fr"] = "en",
 ) -> dict:

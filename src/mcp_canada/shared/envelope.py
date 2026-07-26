@@ -3,6 +3,7 @@
 import functools
 import json
 import httpx
+import pydantic
 from collections.abc import Callable
 
 from datetime import datetime, timezone
@@ -119,7 +120,32 @@ def upstream_guard(api_name: str) -> Callable:
                     f"{api_name} returned a malformed JSON body: {exc}",
                     lang=lang,
                 )
+            except pydantic.ValidationError as exc:
+                # Also precedes ValueError — pydantic.ValidationError subclasses
+                # it. These models validate UPSTREAM payloads, so a failure here
+                # is upstream schema drift, not a bad argument from the caller.
+                return make_error(
+                    "UPSTREAM_ERROR",
+                    f"{api_name} returned a payload that failed validation: {exc}",
+                    lang=lang,
+                )
             except ValueError as exc:
+                # Reached only by an explicit `raise ValueError` for a genuinely
+                # bad argument — the two upstream-shaped ValueError subclasses
+                # are intercepted above.
                 return make_error("INVALID_INPUT", str(exc), lang=lang)
+            except Exception as exc:  # noqa: BLE001 — tools must never raise
+                # Real catch-all. Flattening code raises KeyError/TypeError/
+                # IndexError/AttributeError when an upstream returns valid JSON
+                # in an unexpected shape (a BoC observation with no "d", a
+                # weather feature with no "properties"). Without this arm those
+                # escaped as raw ToolErrors while tests/test_tool_error_handling.py
+                # — which treats this decorator as proof of coverage — still passed.
+                return make_error(
+                    "UPSTREAM_ERROR",
+                    f"{api_name} returned an unexpected response shape: "
+                    f"{type(exc).__name__}: {exc}",
+                    lang=lang,
+                )
         return wrapper
     return decorator

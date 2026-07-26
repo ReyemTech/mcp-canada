@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
-current_phase: 20
-current_phase_name: Finish integration de-masking and fix the failures it exposed
+current_phase: "20.2"
+current_phase_name: Normalize tool error handling and guard malformed upstream JSON
 status: awaiting_merge
-stopped_at: "Phase 20.1 complete; PR #2 open with all four CI gates green"
-last_updated: "2026-07-26T02:32:53.467Z"
-last_activity: 2026-07-25
-last_activity_desc: Phase 20.1 executed end to end
+stopped_at: "Phase 20.2 complete; PR #3 green on 3.12/3.13/3.14, Codex findings addressed"
+last_updated: "2026-07-26T04:00:00.000Z"
+last_activity: 2026-07-26
+last_activity_desc: Phase 20.2 executed and verified; 317 live tests green
 progress:
   total_phases: 36
   completed_phases: 16
@@ -28,10 +28,12 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 ## Current Position
 
-Phase: 20.1 of 36 — COMPLETE and MERGED to main (PR #2, merge commit 98dee90)
-Plan: 6 of 6 complete
-Status: next is Phase 20.2 (run /gsd-plan-phase 20.2)
-Last activity: 2026-07-26 — Phase 20.1 merged; all four CI gates green
+Phase: 20.2 of 36 — COMPLETE, awaiting merge (PR #3)
+Plan: 1 of 1 complete
+Status: PR #3 green on Python 3.12/3.13/3.14; both Codex findings fixed; next is Phase 21
+Last activity: 2026-07-26 — Phase 20.2 executed and verified; 317 live tests green
+
+Phase 20.1 is COMPLETE and MERGED to main (PR #2, merge commit 98dee90).
 
 Progress: [████░░░░░░] 44%
 
@@ -94,7 +96,7 @@ Open defect (found 2026-07-26, deferred to its own phase):
   behind an env-var key like Manitoba 511. Alberta AHS, parks, forest-area and
   Saskatchewan/Manitoba Hub services were probed at the same time and are healthy.
 
-- **Malformed-JSON masking is broader than the spot Codex flagged.** → **now Phase 20.2.**
+- ~~**Malformed-JSON masking is broader than the spot Codex flagged.**~~ → **CLOSED by Phase 20.2** (PR #3). The sweep found the problem was wider than this note assumed: 108 of 271 tools had no catch-all at all, not just 7 modules with a mislabelling `ValueError` arm. Codex then found two further defects in the fix itself — `upstream_guard` was never a true catch-all (a `KeyError` still escaped), and `pydantic.ValidationError` also subclasses `ValueError`, so upstream schema drift was blamed on the caller. Both fixed. Original note kept below for the record:
   `upstream_guard` is fixed, which covers drug_database and nutrient_file (they use
   their own clients). But `shared/http.py:api_get` returns `response.json()` with no
   decode guard, and ~40 `except ValueError -> INVALID_INPUT` arms across statcan,

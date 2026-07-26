@@ -12,7 +12,7 @@ from typing import Any, Literal
 import httpx
 from fastmcp.tools import tool
 
-from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.envelope import make_error, make_response, upstream_guard
 from mcp_canada.shared.ogc import WfsError
 from mcp_canada.shared.parsers import fetch_and_parse
 
@@ -124,6 +124,7 @@ def _pick_file_resource(resources: list[dict[str, Any]]) -> dict[str, Any] | Non
 
 
 @tool
+@upstream_guard('bc-data-catalogue')
 async def bc_search_datasets(
     q: str,
     rows: int = 20,
@@ -183,6 +184,7 @@ async def bc_search_datasets(
 
 
 @tool
+@upstream_guard('bc-data-catalogue')
 async def bc_get_dataset_details(
     package_id: str,
     lang: Literal["en", "fr"] = "en",
@@ -335,6 +337,7 @@ async def bc_query_features(
 
 
 @tool
+@upstream_guard('bc-data-catalogue')
 async def bc_list_organizations(
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
@@ -369,6 +372,7 @@ async def bc_list_organizations(
 
 
 @tool
+@upstream_guard('bc-data-catalogue')
 async def bc_list_categories(
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
@@ -423,6 +427,7 @@ def _append_like(cql: str | None, field: str, value: str) -> str:
 
 
 @tool
+@upstream_guard('bc-wfs')
 async def bc_get_active_fires(
     status: str | None = None,
     centre: str | None = None,
@@ -473,6 +478,7 @@ async def bc_get_active_fires(
 
 
 @tool
+@upstream_guard('bc-wfs')
 async def bc_get_fire_perimeters(
     year: int | None = None,
     cause: str | None = None,
@@ -528,6 +534,7 @@ async def bc_get_fire_perimeters(
 
 
 @tool
+@upstream_guard('bc-wfs')
 async def bc_get_forest_tenure(
     status: str | None = "ACTIVE",
     tenure_type: str | None = None,
@@ -581,6 +588,7 @@ async def bc_get_forest_tenure(
 
 
 @tool
+@upstream_guard('bc-wfs')
 async def bc_get_cut_blocks(
     status: str | None = "ACTIVE",
     district: str | None = None,
@@ -631,6 +639,7 @@ async def bc_get_cut_blocks(
 
 
 @tool
+@upstream_guard('bc-wfs')
 async def bc_get_protected_areas(
     designation: str | None = None,
     min_area_ha: float | None = None,
@@ -681,6 +690,7 @@ async def bc_get_protected_areas(
 
 
 @tool
+@upstream_guard('bc-wfs')
 async def bc_get_water_wells(
     city: str | None = None,
     well_class: str | None = None,
@@ -745,6 +755,7 @@ async def bc_get_water_wells(
 
 
 @tool
+@upstream_guard('bc-wfs')
 async def bc_get_wildfire_weather_stations(
     name: str | None = None,
     min_elevation: int | None = None,
@@ -791,6 +802,7 @@ async def bc_get_wildfire_weather_stations(
 
 
 @tool
+@upstream_guard('bc-wfs')
 async def bc_get_local_parks(
     municipality: str | None = None,
     regional_district: str | None = None,
@@ -843,6 +855,7 @@ _TENURE_TYPE_MAP: dict[str, str] = {"mineral": "M", "placer": "P"}
 
 
 @tool
+@upstream_guard('bc-wfs')
 async def bc_get_mining_tenure(
     tenure_type: str | None = None,
     owner_name: str | None = None,
@@ -900,6 +913,7 @@ async def bc_get_mining_tenure(
 
 
 @tool
+@upstream_guard('bc-wfs')
 async def bc_get_fish_habitat(
     feature_code: str | None = None,
     max_records: int = MAX_RECORDS,
@@ -944,6 +958,7 @@ async def bc_get_fish_habitat(
 
 
 @tool
+@upstream_guard('bc-wfs')
 async def bc_get_emergency_rooms(
     locality: str | None = None,
     wheelchair_accessible: bool | None = None,
@@ -991,6 +1006,7 @@ async def bc_get_emergency_rooms(
 
 
 @tool
+@upstream_guard('bc-wfs')
 async def bc_get_walk_in_clinics(
     locality: str | None = None,
     max_records: int = MAX_RECORDS,
@@ -1035,6 +1051,7 @@ async def bc_get_walk_in_clinics(
 
 
 @tool
+@upstream_guard('bc-wfs')
 async def bc_get_highway_profiles(
     highway_number: str | None = None,
     admin_unit: str | None = None,
@@ -1085,6 +1102,7 @@ async def bc_get_highway_profiles(
 
 
 @tool
+@upstream_guard('bc-wfs')
 async def bc_get_road_structures(
     structure_type: str | None = None,
     max_records: int = MAX_RECORDS,
@@ -1131,6 +1149,7 @@ async def bc_get_road_structures(
 
 
 @tool
+@upstream_guard('bc-wfs')
 async def bc_get_climate_stations(
     name: str | None = None,
     min_elevation: int | None = None,

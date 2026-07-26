@@ -20,7 +20,7 @@ from typing import Any, Literal
 import httpx
 from fastmcp.tools import tool
 
-from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.envelope import make_error, make_response, upstream_guard
 
 from . import client as _client
 from .constants import AQ_INDEX_URL, BASE_URL
@@ -56,6 +56,7 @@ __all__ = [
 
 
 @tool
+@upstream_guard(API_NAME)
 async def quebec_search_datasets(
     q: str,
     rows: int = 20,
@@ -102,6 +103,7 @@ async def quebec_search_datasets(
 
 
 @tool
+@upstream_guard(API_NAME)
 async def quebec_get_dataset_details(
     package_id: str,
     lang: Literal["en", "fr"] = "en",
@@ -180,6 +182,7 @@ async def quebec_query_dataset(
 
 
 @tool
+@upstream_guard(API_NAME)
 async def quebec_list_organizations(
     lang: Literal["en", "fr"] = "en",
 ) -> dict[str, Any]:
@@ -205,6 +208,7 @@ async def quebec_list_organizations(
 
 
 @tool
+@upstream_guard(API_NAME)
 async def quebec_list_categories(
     lang: Literal["en", "fr"] = "en",
 ) -> dict[str, Any]:
@@ -240,6 +244,7 @@ _MAMH_CSV_URL = "https://donneesouvertes.affmunqc.net/repertoire/MUN.csv"
 
 
 @tool
+@upstream_guard(API_NAME)
 async def quebec_get_health_installations(
     instal_type: str | None = None,
     rss_name: str | None = None,
@@ -280,6 +285,7 @@ async def quebec_get_health_installations(
 
 
 @tool
+@upstream_guard(API_NAME)
 async def quebec_get_er_wait_times(
     installation: str | None = None,
     limit: int = 200,
@@ -468,6 +474,7 @@ async def quebec_get_bridge_structures(
 
 
 @tool
+@upstream_guard(API_NAME)
 async def quebec_get_forest_fires_history(
     lang: Literal["en", "fr"] = "en",
 ) -> dict[str, Any]:
@@ -498,6 +505,7 @@ async def quebec_get_forest_fires_history(
 
 
 @tool
+@upstream_guard(API_NAME)
 async def quebec_get_air_quality_stations(
     active_only: bool = True,
     limit: int = 500,
@@ -559,6 +567,7 @@ async def quebec_get_air_quality_index(
 
 
 @tool
+@upstream_guard(API_NAME)
 async def quebec_get_water_quality_monitoring(
     lang: Literal["en", "fr"] = "en",
 ) -> dict[str, Any]:
@@ -618,6 +627,7 @@ async def quebec_get_electricity_data(
 
 
 @tool
+@upstream_guard(API_NAME)
 async def quebec_get_protected_areas(
     lang: Literal["en", "fr"] = "en",
 ) -> dict[str, Any]:

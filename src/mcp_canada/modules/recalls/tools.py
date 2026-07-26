@@ -25,7 +25,7 @@ from mcp_canada.modules.recalls.constants import (
     BASE_URL,
     CATEGORIES,
 )
-from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.envelope import make_error, make_response, upstream_guard
 
 # API name and base URL for _meta envelope
 _API_NAME = "Health Canada Recalls"
@@ -37,6 +37,7 @@ _API_URL = BASE_URL
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def recalls_get_recent(
     limit: int = 25,
     offset: int = 0,
@@ -72,6 +73,7 @@ async def recalls_get_recent(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def recalls_search(
     keyword: str,
     category: str | None = None,
@@ -126,6 +128,7 @@ async def recalls_search(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def recalls_get_details(
     recall_id: str,
     lang: Literal["en", "fr"] = "en",
@@ -160,6 +163,7 @@ async def recalls_get_details(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def recalls_get_food(
     keyword: str | None = None,
     limit: int = 25,
@@ -202,6 +206,7 @@ async def recalls_get_food(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def recalls_get_vehicles(
     keyword: str | None = None,
     limit: int = 25,
@@ -244,6 +249,7 @@ async def recalls_get_vehicles(
 # ---------------------------------------------------------------------------
 
 @tool
+@upstream_guard(_API_NAME)
 async def recalls_get_health_products(
     keyword: str | None = None,
     limit: int = 25,

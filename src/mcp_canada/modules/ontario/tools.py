@@ -27,7 +27,7 @@ from mcp_canada.modules.ontario.client import (
     fetch_search_datasets,
 )
 from mcp_canada.modules.ontario.constants import BASE_URL
-from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.envelope import make_error, make_response, upstream_guard
 
 # API name and base URL for _meta envelope
 _API_NAME = "Ontario Data Catalogue"
@@ -40,6 +40,7 @@ _API_URL = BASE_URL
 
 
 @tool
+@upstream_guard(_API_NAME)
 async def ontario_search_datasets(
     query: str,
     filters: str | None = None,
@@ -84,6 +85,7 @@ async def ontario_search_datasets(
 
 
 @tool
+@upstream_guard(_API_NAME)
 async def ontario_get_dataset_details(
     dataset_id: str,
     lang: Literal["en", "fr"] = "en",
@@ -118,6 +120,7 @@ async def ontario_get_dataset_details(
 
 
 @tool
+@upstream_guard(_API_NAME)
 async def ontario_get_resource(
     resource_id: str,
     lang: Literal["en", "fr"] = "en",
@@ -152,6 +155,7 @@ async def ontario_get_resource(
 
 
 @tool
+@upstream_guard(_API_NAME)
 async def ontario_list_organizations(
     sort: str = "name asc",
     lang: Literal["en", "fr"] = "en",
@@ -185,6 +189,7 @@ async def ontario_list_organizations(
 
 
 @tool
+@upstream_guard(_API_NAME)
 async def ontario_get_dataset_stats(
     lang: Literal["en", "fr"] = "en",
 ) -> dict:
@@ -295,6 +300,7 @@ def _filter_population_rows(
 
 
 @tool
+@upstream_guard(_API_NAME)
 async def ontario_get_population_projections(
     scenario: str | None = None,
     year: int | None = None,

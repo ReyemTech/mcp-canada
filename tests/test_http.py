@@ -237,3 +237,64 @@ async def test_api_get_retries_on_429():
 
     assert result == {"data": "ok"}
     assert call_count == 3
+
+
+@pytest.mark.asyncio
+async def test_api_get_raises_decoding_error_not_valueerror_on_malformed_body():
+    """HTTP 200 carrying HTML must not surface as a ValueError.
+
+    json.JSONDecodeError subclasses ValueError, so a Health Canada / CKAN error
+    page reaching .json() lands in the `except ValueError -> INVALID_INPUT` arms
+    of statcan, ircc, manitoba, saskatchewan, nova_scotia, british_columbia and
+    datastore — blaming the caller for an upstream outage. Raising
+    httpx.DecodingError keeps it out of those arms while remaining an
+    httpx.HTTPError, which every module's catch-all already maps to
+    UPSTREAM_ERROR.
+    """
+    import json
+
+    from mcp_canada.shared.http import api_get
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.side_effect = json.JSONDecodeError("Expecting value", "<html>", 0)
+
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+    mock_client.get.return_value = mock_response
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        with pytest.raises(httpx.DecodingError):
+            await api_get("https://example.com/api")
+
+
+@pytest.mark.asyncio
+async def test_api_get_decoding_error_is_not_a_valueerror():
+    """Pin the property the seven ValueError-arm modules depend on."""
+    import json
+
+    from mcp_canada.shared.http import api_get
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.side_effect = json.JSONDecodeError("Expecting value", "<html>", 0)
+
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+    mock_client.get.return_value = mock_response
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        try:
+            await api_get("https://example.com/api")
+        except Exception as exc:  # noqa: BLE001 — asserting the type below
+            assert not isinstance(exc, ValueError), (
+                "a ValueError subclass would be swallowed by `except ValueError` "
+                "arms and reported as INVALID_INPUT"
+            )
+            assert isinstance(exc, httpx.HTTPError), (
+                "must stay an HTTPError so existing catch-alls map it to UPSTREAM_ERROR"
+            )
+        else:
+            pytest.fail("api_get should have raised on a malformed body")

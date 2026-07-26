@@ -21,7 +21,7 @@ from typing import Any, Literal
 import httpx
 from fastmcp.tools import tool
 
-from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.envelope import make_error, make_response, upstream_guard
 
 from . import client as _client
 from .client import Five11NotConfigured
@@ -95,6 +95,7 @@ __all__ = [
 
 
 @tool
+@upstream_guard(_API_NAME_HUB)
 async def manitoba_search_datasets(
     query: str = "",
     category: str | None = None,
@@ -133,6 +134,7 @@ async def manitoba_search_datasets(
 
 
 @tool
+@upstream_guard(_API_NAME_HUB)
 async def manitoba_get_dataset_details(
     dataset_id: str,
     lang: Literal["en", "fr"] = "en",
@@ -217,6 +219,7 @@ async def manitoba_query_dataset(
 
 
 @tool
+@upstream_guard(_API_NAME_HUB)
 async def manitoba_list_organizations(
     lang: Literal["en", "fr"] = "en",
 ) -> dict[str, Any]:
@@ -245,6 +248,7 @@ async def manitoba_list_organizations(
 
 
 @tool
+@upstream_guard(_API_NAME_HUB)
 async def manitoba_list_categories(
     lang: Literal["en", "fr"] = "en",
 ) -> dict[str, Any]:
@@ -278,6 +282,7 @@ async def manitoba_list_categories(
 
 
 @tool
+@upstream_guard(_API_NAME_FLOOD)
 async def manitoba_get_flood_alerts(
     include_geometry: bool = True,
     lang: Literal["en", "fr"] = "en",
@@ -342,6 +347,7 @@ async def manitoba_get_river_stations(
 
 
 @tool
+@upstream_guard(_API_NAME_WATERWAYS)
 async def manitoba_get_provincial_waterways(
     f_type: str | None = None,
     max_records: int = 5000,

@@ -2,6 +2,106 @@
 
 <!-- CHANGELOG -->
 
+## v0.10.1 (2026-07-26)
+
+### Bug Fixes
+
+- **arcgis**: Coerce where=None to "1=1" instead of dropping the parameter
+  ([`0c27994`](https://github.com/ReyemTech/mcp-canada/commit/0c27994c92fa540432712b72629a8ddaf970e8c6))
+
+- **ci**: Regenerate stale tool catalog; drop redundant fixture import
+  ([`75994ac`](https://github.com/ReyemTech/mcp-canada/commit/75994ac8767486c47db68cb71c656fd91b32b5db))
+
+- **envelope**: Classify malformed upstream JSON as UPSTREAM_ERROR
+  ([`50b314b`](https://github.com/ReyemTech/mcp-canada/commit/50b314bf5e87724b11099a50c3ad80736df74c10))
+
+- **hub,york-region**: Omit empty q; case-insensitive LIKE filters; de-mask YR+AB
+  ([`f0af03e`](https://github.com/ReyemTech/mcp-canada/commit/f0af03e42db536f5648c5ed09ab67d246582abee))
+
+- **statcan**: Correct FREQUENCY_CODES and SCALAR_FACTOR_CODES against published set
+  ([`30f1123`](https://github.com/ReyemTech/mcp-canada/commit/30f112343d268570dc4a285f06ff7556283de257))
+
+- **statcan**: Decode UOM label on series info; close 3 resolved debug sessions
+  ([`3d59926`](https://github.com/ReyemTech/mcp-canada/commit/3d599269698ac2a43b6317cbe126c062faaeb248))
+
+- **statcan**: Handle empty coordinates and malformed empty SDMX bodies
+  ([`22ee328`](https://github.com/ReyemTech/mcp-canada/commit/22ee328eac27e683c30ee9193461b20556d913b0))
+
+- **toronto,datastore**: Resolve GTFS url from CKAN; store nested values as JSON
+  ([`9606c3e`](https://github.com/ReyemTech/mcp-canada/commit/9606c3e7c759f5ede9de9bdb06ab862c46714b0e))
+
+- **types**: Clear the remaining pyright errors in source code
+  ([`34fa7d5`](https://github.com/ReyemTech/mcp-canada/commit/34fa7d573b0777472fff566fb2efa9f8a2cac649))
+
+- **weather**: Correct ahccd-trends field names; de-mask weather/climate tests
+  ([`5c9028b`](https://github.com/ReyemTech/mcp-canada/commit/5c9028b02d30c876ed2343204c26d971b6935a89))
+
+- **weather**: Resolve city names server-side; de-mask weather/current tests
+  ([`9cb317d`](https://github.com/ReyemTech/mcp-canada/commit/9cb317d8dd0e8692b8821361fa7becc6ebb9477b))
+
+### Chores
+
+- Sync uv.lock after release
+  ([`f2deb22`](https://github.com/ReyemTech/mcp-canada/commit/f2deb2285ebeb4868a278d1d9189add038afa27d))
+
+- **ci**: Fix remaining lint and relax pyright on test files
+  ([`fc3c856`](https://github.com/ReyemTech/mcp-canada/commit/fc3c85612c885843dd36f4fe4c344fa14d7c5c95))
+
+### Code Style
+
+- **20.1**: Drop extraneous f-string prefixes in the masking guard
+  ([`5e49541`](https://github.com/ReyemTech/mcp-canada/commit/5e4954103ff0ce6b09fcc4403fe0884a2800985e))
+
+- **20.1**: Fix lint introduced during the phase
+  ([`278a292`](https://github.com/ReyemTech/mcp-canada/commit/278a2924588fdfff32655508c6b5d27b334e3514))
+
+### Documentation
+
+- Record the ArcGIS where=None masking pitfall
+  ([`6e64559`](https://github.com/ReyemTech/mcp-canada/commit/6e645595314113c1251351c6f8ba820700398151))
+
+- **20.1**: Capture phase context
+  ([`be4a90e`](https://github.com/ReyemTech/mcp-canada/commit/be4a90e13151ef4d99b405951adf87d5e37ea663))
+
+- **20.1**: Rename phase, backfill TEST-* requirements, record the pitfalls
+  ([`deaa69f`](https://github.com/ReyemTech/mcp-canada/commit/deaa69f2a623e9da4034c58a6195cbc8c7ac82fc))
+
+- **20.1**: Verification report and state rollforward — phase complete
+  ([`b88dcd1`](https://github.com/ReyemTech/mcp-canada/commit/b88dcd14b68b8c00bb2d4313cfd4335b80604b18))
+
+- **planning**: Backfill BC and Quebec requirements; refresh ER wait-times todo
+  ([`50d5150`](https://github.com/ReyemTech/mcp-canada/commit/50d5150c44aa47e54b6d3bc062108b2bbf5e6ad1))
+
+- **planning**: Reconcile state with what is actually on disk
+  ([`5000dd9`](https://github.com/ReyemTech/mcp-canada/commit/5000dd9c0bdaeb35c61792861961a998c241a6f5))
+
+- **roadmap**: Insert Phase 20.2 — normalize tool error handling
+  ([`ac1223a`](https://github.com/ReyemTech/mcp-canada/commit/ac1223aba39bb4a50036170a45576e3382322bab))
+
+- **state**: Close Phase 20.1 — merged to main
+  ([`9fa02dd`](https://github.com/ReyemTech/mcp-canada/commit/9fa02dd8db8ee1639af71ff1d92f945c31f4a7db))
+
+- **state**: Record phase 20.1 context session
+  ([`faac35f`](https://github.com/ReyemTech/mcp-canada/commit/faac35f3659fc81ea951aac307b6a1af6d88e8e4))
+
+- **state**: Roll state forward and record the Alberta wildfire outage
+  ([`ccbaa6e`](https://github.com/ReyemTech/mcp-canada/commit/ccbaa6e23b38a309d47c91a6a257cac7e4de4dc3))
+
+### Testing
+
+- **20.1**: Add the masking guard; audit PRESERVE list; structured upstream errors
+  ([`2bac1c3`](https://github.com/ReyemTech/mcp-canada/commit/2bac1c386be5bc83b17f5a378d0237665fa66601))
+
+- **20.1**: Align BOC integration tests and docs with the intentional shape change
+  ([`e48964c`](https://github.com/ReyemTech/mcp-canada/commit/e48964c495e3b5e82f7b8c540a50bfceace12d62))
+
+- **20.1**: De-mask BC scenarios; pin WFS-routing tests to stable datasets
+  ([`4198c5c`](https://github.com/ReyemTech/mcp-canada/commit/4198c5c4f9e4be8c59ea2fd4bfaf654f9578882b))
+
+- **20.1**: De-mask remaining weather files, live_apis; fix invented AQHI ids
+  ([`134eec2`](https://github.com/ReyemTech/mcp-canada/commit/134eec2217ca4be368ef4b89263ba86f976ce6c8))
+
+
 ## v0.10.0 (2026-06-17)
 
 ### Bug Fixes

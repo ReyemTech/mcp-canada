@@ -89,6 +89,16 @@ Open defect (found 2026-07-26, deferred to its own phase):
   behind an env-var key like Manitoba 511. Alberta AHS, parks, forest-area and
   Saskatchewan/Manitoba Hub services were probed at the same time and are healthy.
 
+- **Malformed-JSON masking is broader than the spot Codex flagged.** `upstream_guard`
+  is fixed, which covers drug_database and nutrient_file (they use their own clients).
+  But `shared/http.py:api_get` returns `response.json()` with no decode guard, and
+  ~40 `except ValueError -> INVALID_INPUT` arms across statcan, ircc, manitoba,
+  saskatchewan, nova_scotia, british_columbia and datastore sit downstream of it.
+  An upstream HTML error page therefore still surfaces as caller error in those
+  modules. Pre-existing, not introduced by Phase 20.1. The high-leverage fix is one
+  decode guard inside `api_get` rather than 40 call-site edits — deliberately left
+  out of PR #2 to keep it scoped.
+
 Remaining backlog (not defects):
 
 - `.planning/todos/pending/2026-04-12-research-cross-canada-er-wait-times-datasets.md`

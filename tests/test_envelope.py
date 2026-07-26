@@ -121,6 +121,47 @@ class TestUpstreamGuard:
         assert "503" in result["error"]["message"]
 
     @pytest.mark.asyncio
+    async def test_malformed_json_body_is_an_upstream_error_not_invalid_input(self):
+        """HTTP 200 carrying HTML must blame the upstream, not the caller.
+
+        json.JSONDecodeError subclasses ValueError, so httpx's .json() raising on
+        a Health Canada error page fell through to the ValueError handler and came
+        back as INVALID_INPUT — a valid tool call blamed for an upstream outage.
+        assert_live_or_transient tolerates only UPSTREAM_ERROR/RATE_LIMITED/
+        UPSTREAM_UNAVAILABLE, so this also broke live tests with a misleading code.
+        """
+        import httpx
+        from mcp_canada.shared.envelope import upstream_guard
+
+        @upstream_guard("test-api")
+        async def boom(lang: str = "en") -> dict:
+            response = httpx.Response(
+                200,
+                text="<html>503 Service Unavailable</html>",
+                request=httpx.Request("GET", "https://example.test"),
+            )
+            return response.json()
+
+        result = await boom()
+        assert result["error"]["code"] == "UPSTREAM_ERROR", (
+            f"malformed upstream JSON must not be reported as caller error: {result}"
+        )
+        assert "test-api" in result["error"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_genuine_value_error_is_still_invalid_input(self):
+        """The JSONDecodeError fix must not swallow real argument validation."""
+        from mcp_canada.shared.envelope import upstream_guard
+
+        @upstream_guard("test-api")
+        async def boom(lang: str = "en") -> dict:
+            raise ValueError("din must be 8 digits")
+
+        result = await boom()
+        assert result["error"]["code"] == "INVALID_INPUT"
+        assert "din must be 8 digits" in result["error"]["message"]
+
+    @pytest.mark.asyncio
     async def test_lang_is_propagated(self):
         import httpx
         from mcp_canada.shared.envelope import upstream_guard

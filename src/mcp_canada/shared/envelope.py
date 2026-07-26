@@ -1,6 +1,7 @@
 """Response envelope and error builders for standardized tool responses."""
 
 import functools
+import json
 import httpx
 from collections.abc import Callable
 
@@ -107,6 +108,15 @@ def upstream_guard(api_name: str) -> Callable:
                 return make_error(
                     "UPSTREAM_ERROR",
                     f"{api_name} request failed: {type(exc).__name__}: {exc}",
+                    lang=lang,
+                )
+            except json.JSONDecodeError as exc:
+                # Must precede the ValueError arm — JSONDecodeError subclasses it.
+                # An upstream HTML error page reaching httpx's .json() is an
+                # upstream failure, not a bad argument from the caller.
+                return make_error(
+                    "UPSTREAM_ERROR",
+                    f"{api_name} returned a malformed JSON body: {exc}",
                     lang=lang,
                 )
             except ValueError as exc:

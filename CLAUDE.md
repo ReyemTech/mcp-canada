@@ -96,6 +96,10 @@ Every module in `src/mcp_canada/modules/{name}/`:
 
 **Every `@tool` must:** use standalone `@tool` from `fastmcp.tools`, include `lang: Literal["en", "fr"]`, return `make_response()`/`make_error()`, have `Use for:` + `Keywords:` in docstring, use module prefix (`boc_`, `parl_`, etc.).
 
+**Every `@tool` must have catch-all error coverage** — enforced by `tests/test_tool_error_handling.py` in the default unit suite. Satisfy it with `@upstream_guard(<api_name>)` beneath `@tool` (preferred — it is additive, so any handlers inside the function still run first), a broad `except Exception`/`httpx.HTTPError`, or delegation to a module helper that has one. **Catching only `httpx.HTTPStatusError` is not enough:** it covers a 500 but not a timeout, a connect error or a malformed body, each of which escapes as a raw `ToolError`. Phase 20.2 found 108 of 271 tools in that state.
+
+**Never let `json.JSONDecodeError` reach an `except ValueError` arm.** It subclasses `ValueError`, so an upstream answering HTTP 200 with an HTML error page gets reported as `INVALID_INPUT` — blaming the caller for someone else's outage, and failing live tests with a misleading code (`assert_live_or_transient` tolerates only `UPSTREAM_ERROR`/`RATE_LIMITED`/`UPSTREAM_UNAVAILABLE`). `shared/http.py:api_get` converts it to `httpx.DecodingError`, which is an `HTTPError` but not a `ValueError`. Any client calling `.json()` directly must do the same.
+
 **Every client function must:** return `(data, was_cached)`, use `cached_fetch()` + `get_limiter()`, flatten responses aggressively.
 
 **Don't:** add dependencies, modify `server.py` for new modules, put module tests in top-level `tests/`, skip rate limiting, mix refactoring with feature work.

@@ -15,7 +15,6 @@ import json
 
 import pytest
 from fastmcp import Client
-from tests.integration.conftest import mcp_server  # noqa: F401 — session fixture
 
 pytestmark = pytest.mark.integration
 

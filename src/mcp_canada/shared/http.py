@@ -29,10 +29,15 @@ def decode_json(response: httpx.Response, url: str = "") -> Any:
     """
     try:
         return response.json()
-    except json.JSONDecodeError as exc:
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        # UnicodeDecodeError, not JSONDecodeError, is what a body that is not
+        # valid UTF-8/16/32 raises (b"\xff", a truncated multi-byte sequence).
+        # It subclasses ValueError too, so guarding only JSONDecodeError left
+        # the same masking in place for a mangled body.
         where = f" from {url}" if url else ""
         raise httpx.DecodingError(
-            f"upstream returned a non-JSON body{where}: {exc}"
+            f"upstream returned an undecodable body{where}: "
+            f"{type(exc).__name__}: {exc}"
         ) from exc
 
 
@@ -40,10 +45,12 @@ def decode_json_bytes(content: bytes, url: str = "") -> Any:
     """``decode_json`` for callers holding raw bytes (OGC WFS reads .content)."""
     try:
         return json.loads(content)
-    except json.JSONDecodeError as exc:
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        # See decode_json — UnicodeDecodeError is also a ValueError subclass.
         where = f" from {url}" if url else ""
         raise httpx.DecodingError(
-            f"upstream returned a non-JSON body{where}: {exc}"
+            f"upstream returned an undecodable body{where}: "
+            f"{type(exc).__name__}: {exc}"
         ) from exc
 
 

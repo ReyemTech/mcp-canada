@@ -217,6 +217,28 @@ class TestUpstreamGuard:
             f"{result['error']['code']}"
         )
 
+
+    @pytest.mark.asyncio
+    async def test_undecodable_bytes_are_upstream_not_caller_error(self):
+        """UnicodeDecodeError is a ValueError too — same trap as JSONDecodeError.
+
+        Clients that call .json() directly (drug_database, nutrient_file,
+        recalls, ckan, statcan) raise UnicodeDecodeError when a body is not
+        valid UTF-8/16/32. It subclasses ValueError, so it fell into the
+        INVALID_INPUT arm. Codex flagged this for shared/http.py on PR #4; the
+        guard had the identical arm ordering.
+        """
+        from mcp_canada.shared.envelope import upstream_guard
+
+        @upstream_guard("test-api")
+        async def boom(lang: str = "en") -> dict:
+            raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+        result = await boom()
+        assert result["error"]["code"] == "UPSTREAM_ERROR", (
+            "an undecodable upstream body was reported as caller error"
+        )
+
     @pytest.mark.asyncio
     async def test_lang_is_propagated(self):
         import httpx

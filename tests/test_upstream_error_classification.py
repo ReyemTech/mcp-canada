@@ -210,3 +210,46 @@ def test_no_shared_portal_client_decodes_json_unguarded():
         "raw JSON decode outside decode_json/decode_json_bytes — a malformed "
         f"upstream body will be reported as INVALID_INPUT: {offenders}"
     )
+
+
+@pytest.mark.parametrize(
+    ("label", "content"),
+    [
+        ("lone-0xff", b"\xff"),
+        ("invalid-utf8-inside-json", b'{"a": "\xff\xfe\xfd"}'),
+        ("lone-continuation-byte", b"\x80\x81"),
+    ],
+)
+def test_invalid_byte_encoding_is_also_an_upstream_error(label, content):
+    """Undecodable bytes must not be blamed on the caller either.
+
+    json.loads / response.json() raise UnicodeDecodeError -- NOT
+    json.JSONDecodeError -- when the body is not valid UTF-8/16/32. Since
+    UnicodeDecodeError is *also* a ValueError, guarding only JSONDecodeError
+    left the same masking in place for a mangled or truncated body: the
+    saskatchewan/manitoba `except ValueError` arms would still report
+    INVALID_INPUT. Caught by Codex review on PR #4.
+    """
+    from mcp_canada.shared.http import decode_json, decode_json_bytes
+
+    with pytest.raises(httpx.DecodingError):
+        decode_json_bytes(content, "https://example.test")
+
+    response = MagicMock(spec=httpx.Response)
+    response.json.side_effect = UnicodeDecodeError("utf-8", content, 0, 1, "invalid start byte")
+    with pytest.raises(httpx.DecodingError):
+        decode_json(response, "https://example.test")
+
+
+def test_decode_helpers_never_raise_a_valueerror_subclass():
+    """The whole point: nothing escaping these helpers may be a ValueError."""
+    from mcp_canada.shared.http import decode_json_bytes
+
+    for content in (b"\xff", b"<html>503</html>", b"", b"{unclosed"):
+        try:
+            decode_json_bytes(content)
+        except Exception as exc:  # noqa: BLE001 — asserting the type
+            assert not isinstance(exc, ValueError), (
+                f"{content!r} raised {type(exc).__name__}, a ValueError subclass — "
+                "it would be swallowed by an `except ValueError` arm"
+            )

@@ -111,13 +111,16 @@ def upstream_guard(api_name: str) -> Callable:
                     f"{api_name} request failed: {type(exc).__name__}: {exc}",
                     lang=lang,
                 )
-            except json.JSONDecodeError as exc:
-                # Must precede the ValueError arm — JSONDecodeError subclasses it.
-                # An upstream HTML error page reaching httpx's .json() is an
-                # upstream failure, not a bad argument from the caller.
+            except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+                # Must precede the ValueError arm — both subclass it. An
+                # upstream HTML error page reaching httpx's .json() raises
+                # JSONDecodeError; a body that is not valid UTF-8/16/32 raises
+                # UnicodeDecodeError. Either is an upstream failure, not a bad
+                # argument from the caller.
                 return make_error(
                     "UPSTREAM_ERROR",
-                    f"{api_name} returned a malformed JSON body: {exc}",
+                    f"{api_name} returned an undecodable body: "
+                    f"{type(exc).__name__}: {exc}",
                     lang=lang,
                 )
             except pydantic.ValidationError as exc:

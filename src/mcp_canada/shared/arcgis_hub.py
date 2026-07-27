@@ -18,6 +18,8 @@ from typing import Any
 
 import httpx
 
+from mcp_canada.shared.http import decode_json, decode_json_bytes
+
 from mcp_canada.shared.parsers import _parse_geojson
 
 # ---------------------------------------------------------------------------
@@ -77,12 +79,12 @@ async def search_hub_datasets(
     if httpx_client is not None:
         response = await httpx_client.get(url, params=params)
         response.raise_for_status()
-        return response.json()
+        return decode_json(response, url)
 
     async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
         response = await client.get(url, params=params)
         response.raise_for_status()
-        return response.json()
+        return decode_json(response, url)
 
 
 async def query_feature_service(
@@ -194,12 +196,12 @@ async def get_layer_metadata(
     if httpx_client is not None:
         response = await httpx_client.get(url, params=params)
         response.raise_for_status()
-        data = response.json()
+        data = decode_json(response, url)
     else:
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
             response = await client.get(url, params=params)
             response.raise_for_status()
-            data = response.json()
+            data = decode_json(response, url)
 
     return {
         "max_record_count": int(data.get("maxRecordCount", DEFAULT_PAGE_SIZE)),
@@ -244,12 +246,12 @@ async def get_count(
     if httpx_client is not None:
         response = await httpx_client.get(url, params=params)
         response.raise_for_status()
-        data = response.json()
+        data = decode_json(response, url)
     else:
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
             response = await client.get(url, params=params)
             response.raise_for_status()
-            data = response.json()
+            data = decode_json(response, url)
 
     return int(data.get("count", 0))
 
@@ -289,6 +291,9 @@ def shape_hub_dataset(feature: dict[str, Any]) -> dict[str, Any]:
 
 
 def _parse_raw_json(content: bytes) -> dict[str, Any]:
-    """Parse raw bytes as JSON and return the dict (for checking vendor extensions)."""
-    import json
-    return json.loads(content)
+    """Parse raw bytes as JSON and return the dict (for checking vendor extensions).
+
+    Decodes via the shared helper so a malformed body raises httpx.DecodingError
+    rather than a ValueError subclass — see shared/http.py:decode_json.
+    """
+    return decode_json_bytes(content)

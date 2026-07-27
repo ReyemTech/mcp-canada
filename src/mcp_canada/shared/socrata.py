@@ -29,6 +29,8 @@ from typing import Any
 
 import httpx
 
+from mcp_canada.shared.http import decode_json
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -85,12 +87,12 @@ async def search_catalog(
     if httpx_client is not None:
         response = await httpx_client.get(url, params=params, headers=headers)
         response.raise_for_status()
-        return response.json()
+        return decode_json(response, url)
 
     async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
         response = await client.get(url, params=params, headers=headers)
         response.raise_for_status()
-        return response.json()
+        return decode_json(response, url)
 
 
 async def get_dataset_metadata(
@@ -125,12 +127,12 @@ async def get_dataset_metadata(
     if httpx_client is not None:
         response = await httpx_client.get(url, headers=headers)
         response.raise_for_status()
-        data = response.json()
+        data = decode_json(response, url)
     else:
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
             response = await client.get(url, headers=headers)
             response.raise_for_status()
-            data = response.json()
+            data = decode_json(response, url)
 
     return _flatten_metadata(data)
 
@@ -195,12 +197,12 @@ async def query_dataset(
     if httpx_client is not None:
         response = await httpx_client.get(url, params=params, headers=headers)
         response.raise_for_status()
-        return response.json()
+        return decode_json(response, url)
 
     async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
         response = await client.get(url, params=params, headers=headers)
         response.raise_for_status()
-        return response.json()
+        return decode_json(response, url)
 
 
 def shape_catalog_result(result: dict[str, Any]) -> dict[str, Any]:

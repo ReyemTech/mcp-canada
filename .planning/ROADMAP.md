@@ -349,6 +349,17 @@ Plans:
 
 - [x] 20.3-01 — decode_json helpers + route all 14 sites + structural guard
 
+### Phase 20.4: Invert the ValueError default so caller error is opt-in (INSERTED)
+
+**Goal:** Remove the defect behind four Codex findings across three PRs. `json.JSONDecodeError` (PR#2), `pydantic.ValidationError` (PR#3) and `UnicodeDecodeError` (PR#4) all subclass `ValueError`, so each in turn was captured by an `except ValueError -> INVALID_INPUT` arm and an upstream outage was reported as the caller's mistake. Each was patched by intercepting one more subclass above that arm — a deny-list that cannot be completed, because `ValueError` is Python's generic bad-value base and any library may add to it. This phase declares blame at the raise site instead (`shared/errors.py`: `InvalidInput` / `NotFound` / `UpstreamData`) and makes a plain `ValueError` default to `UPSTREAM_ERROR`, so an unrecognised subclass is classified safely with no code change. Scope: 31 bare raises classified, 35 handler arms flipped, statcan's 10 message-sniffing arms deleted, and 9 already-misclassified sites corrected. All markers subclass `ValueError` so unmigrated handlers keep working.
+**Requirements**: ERR-06, ERR-07
+**Depends on:** Phase 20.3
+**Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 20.4-01 — errors.py markers + classify 31 raises + flip 35 arms + structural guard
+
 ### Phase 21: New Brunswick Government Open Data
 
 **Goal:** [To be planned]

@@ -22,6 +22,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
+from mcp_canada.shared.errors import InvalidInput
+
 TRANSIENT = {"UPSTREAM_ERROR", "RATE_LIMITED", "UPSTREAM_UNAVAILABLE"}
 
 
@@ -84,7 +86,7 @@ async def test_genuine_bad_input_is_still_invalid_input():
 
     with patch(
         "mcp_canada.modules.ircc.tools.fetch_permanent_residents",
-        new=AsyncMock(side_effect=ValueError("unknown breakdown 'bogus'")),
+        new=AsyncMock(side_effect=InvalidInput("unknown breakdown 'bogus'")),
     ):
         result = await ircc_get_permanent_residents(lang="en")
 

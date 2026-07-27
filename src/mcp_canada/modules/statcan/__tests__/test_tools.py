@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+from mcp_canada.shared.errors import InvalidInput
 
 # ─── Quality tests ────────────────────────────────────────────────────────────
 
@@ -709,7 +710,7 @@ class TestScGetSdmxStructure:
     async def test_value_error_returns_invalid_input(self):
         with patch(
             "mcp_canada.modules.statcan.tools.get_sdmx_structure",
-            new=AsyncMock(side_effect=ValueError("bad product")),
+            new=AsyncMock(side_effect=InvalidInput("bad product")),
         ):
             from mcp_canada.modules.statcan.tools import sc_get_sdmx_structure
             result = await sc_get_sdmx_structure(999)

@@ -43,6 +43,7 @@ from .constants import (
     WATERBODY_DATA_FS_URL,
     WATERWAY_TYPES,
 )
+from mcp_canada.shared.errors import InvalidInput, NotFound
 
 # Source identifiers for the _meta envelope
 _API_NAME_511 = "manitoba-511"
@@ -153,7 +154,7 @@ async def manitoba_get_dataset_details(
             item_id=dataset_id.strip(),
             lang=lang,
         )
-    except ValueError:
+    except NotFound:
         msg = (
             f"Jeu de données introuvable: {dataset_id}"
             if lang == "fr"
@@ -367,7 +368,7 @@ async def manitoba_get_provincial_waterways(
             include_geometry=include_geometry,
             lang=lang,
         )
-    except ValueError as exc:
+    except InvalidInput as exc:
         msg = (
             f"Type de voie navigable invalide. Options valides: {', '.join(WATERWAY_TYPES)}"
             if lang == "fr"
@@ -475,7 +476,7 @@ async def manitoba_get_livestock_prices(
             livestock=livestock,
             lang=lang,
         )
-    except ValueError as exc:
+    except InvalidInput as exc:
         msg = (
             "Type de bétail invalide. Options valides: cattle, hog"
             if lang == "fr"

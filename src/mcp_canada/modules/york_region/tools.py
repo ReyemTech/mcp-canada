@@ -32,6 +32,7 @@ from mcp_canada.modules.york_region.client import (
 )
 from mcp_canada.modules.york_region.constants import PORTAL_URLS
 from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.errors import InvalidInput, NotFound, UpstreamData
 
 API_NAME = "arcgis-hub"
 
@@ -49,8 +50,14 @@ async def _call_client(
 ) -> dict[str, Any]:
     """Run a client coroutine and wrap result with make_response / make_error.
 
-    Centralises NoPortalError -> NOT_FOUND, HTTP 404 -> NOT_FOUND,
-    other HTTPStatusError -> UPSTREAM_ERROR, generic Exception -> UPSTREAM_ERROR.
+    Centralises the classified markers, NoPortalError -> NOT_FOUND,
+    HTTP 404 -> NOT_FOUND, other HTTPStatusError -> UPSTREAM_ERROR,
+    generic Exception -> UPSTREAM_ERROR.
+
+    The marker arms must come first. These tools carry no ``@upstream_guard``
+    (this helper is their catch-all), so without them an unknown dataset id
+    raised as ``NotFound`` fell into the generic arm below and a routine
+    missing record was reported as an upstream outage.
     """
     try:
         data, cached = await coro
@@ -61,6 +68,12 @@ async def _call_client(
             cached=cached,
             lang=lang,
         )
+    except InvalidInput as e:
+        return make_error("INVALID_INPUT", str(e), lang=lang)
+    except NotFound as e:
+        return make_error("NOT_FOUND", str(e), lang=lang)
+    except UpstreamData as e:
+        return make_error("UPSTREAM_ERROR", f"upstream returned unusable data: {e}", lang=lang)
     except NoPortalError as e:
         return make_error("NOT_FOUND", str(e), lang=lang)
     except httpx.HTTPStatusError as e:

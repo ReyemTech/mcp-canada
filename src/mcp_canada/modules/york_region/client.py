@@ -54,6 +54,7 @@ from mcp_canada.modules.york_region.constants import (
     MARKHAM_ADDRESSES_LAYER,
     MARKHAM_ROADS_LAYER,
 )
+from mcp_canada.shared.errors import NotFound
 
 
 # ---------------------------------------------------------------------------
@@ -208,7 +209,7 @@ async def fetch_get_dataset_details(
         )
         features = raw.get("features", [])
         if not features:
-            raise ValueError(f"dataset not found: {dataset_id}")
+            raise NotFound(f"dataset not found: {dataset_id}")
         return shape_hub_dataset(features[0])
 
     return await cached_fetch(cache_key, CACHE_TTL_SEARCH, _fetcher)

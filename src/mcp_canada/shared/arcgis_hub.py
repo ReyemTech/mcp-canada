@@ -21,6 +21,7 @@ import httpx
 from mcp_canada.shared.http import decode_json, decode_json_bytes
 
 from mcp_canada.shared.parsers import _parse_geojson
+from mcp_canada.shared.errors import NotFound
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -67,7 +68,7 @@ async def search_hub_datasets(
         httpx.HTTPStatusError: On 4xx/5xx responses.
     """
     if portal_base_url is None:
-        raise ValueError("portal has no public ArcGIS Hub open data portal")
+        raise NotFound("portal has no public ArcGIS Hub open data portal")
 
     url = portal_base_url.rstrip("/") + HUB_SEARCH_PATH
     params: dict[str, Any] = {"limit": limit}

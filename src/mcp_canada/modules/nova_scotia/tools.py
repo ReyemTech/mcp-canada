@@ -38,6 +38,7 @@ from .constants import (
     DS_LTC_RCF_FACILITIES,
     DS_BIRTHS_DEATHS,
 )
+from mcp_canada.shared.errors import InvalidInput
 
 
 # ---------------------------------------------------------------------------
@@ -517,7 +518,7 @@ async def ns_get_health_facilities(
             cached=cached,
             lang=lang,
         )
-    except ValueError as exc:
+    except InvalidInput as exc:
         # Secondary guard: client also raises ValueError on invalid facility_type
         return make_error("INVALID_INPUT", str(exc), lang=lang, valid=_VALID)
     except Exception as exc:
@@ -607,7 +608,7 @@ async def ns_get_chronic_disease_prevalence(
             cached=cached,
             lang=lang,
         )
-    except ValueError as exc:
+    except InvalidInput as exc:
         # Secondary guard: client also validates disease
         return make_error("INVALID_INPUT", str(exc), lang=lang, valid=_VALID)
     except Exception as exc:

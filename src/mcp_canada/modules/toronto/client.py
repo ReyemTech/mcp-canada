@@ -36,6 +36,7 @@ from mcp_canada.modules.toronto.constants import (
 from mcp_canada.shared.cache import cached_fetch
 from mcp_canada.shared.parsers import _parse_csv
 from mcp_canada.shared.rate_limiter import get_limiter
+from mcp_canada.shared.errors import UpstreamData
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +257,7 @@ async def _resolve_gtfs_zip_url(package: dict[str, Any]) -> str:
     for resource in package.get("resources") or []:
         if str(resource.get("format", "")).upper() == "ZIP" and resource.get("url"):
             return str(resource["url"])
-    raise ValueError(
+    raise UpstreamData(
         "TTC GTFS package exposes no ZIP resource — Toronto Open Data may have "
         f"restructured the dataset. Resources: "
         f"{[r.get('format') for r in package.get('resources') or []]}"

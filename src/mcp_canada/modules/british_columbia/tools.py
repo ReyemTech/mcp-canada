@@ -44,6 +44,7 @@ from .constants import (
     WEATHER_STATIONS_LAYER,
     WFS_BASE_URL,
 )
+from mcp_canada.shared.errors import InvalidInput
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +93,7 @@ def _build_cql(filters: dict[str, Any] | None) -> str | None:
                     items.append(f"'{str(item).replace(chr(39), chr(39)*2)}'")
             clauses.append(f"{field} IN ({','.join(items)})")
         else:
-            raise ValueError(f"Unsupported filter value type for '{key}': {type(value)}")
+            raise InvalidInput(f"Unsupported filter value type for '{key}': {type(value)}")
 
     return " AND ".join(clauses) if clauses else None
 
@@ -268,7 +269,7 @@ async def bc_query_features(
     # Build CQL filter from simplified filter dict
     try:
         cql = _build_cql(filters)
-    except ValueError as exc:
+    except InvalidInput as exc:
         return make_error("INVALID_INPUT", str(exc), lang=lang)
 
     if details.get("queryable_via_wfs"):

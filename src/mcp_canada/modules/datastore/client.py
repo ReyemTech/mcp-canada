@@ -17,6 +17,7 @@ from mcp_canada.modules.datastore.constants import (
     IDENTIFIER_RE,
     MAX_QUERY_ROWS,
 )
+from mcp_canada.shared.errors import InvalidInput
 
 # Module-level singleton connection
 _db: aiosqlite.Connection | None = None
@@ -30,7 +31,7 @@ def _validate_identifier(name: str) -> None:
     This prevents SQL injection through table and column names.
     """
     if not IDENTIFIER_RE.match(name):
-        raise ValueError(
+        raise InvalidInput(
             f"Invalid identifier {name!r}: must match ^[a-zA-Z_][a-zA-Z0-9_]{{0,63}}$ "
             "(letters, digits, underscores only; cannot start with a digit; max 64 chars)"
         )
@@ -204,7 +205,7 @@ async def run_query(sql: str) -> tuple[tuple[list[str], list[dict], bool], bool]
 
     allowed = any(upper.startswith(prefix) for prefix in ALLOWED_QUERY_PREFIXES)
     if not allowed:
-        raise ValueError(
+        raise InvalidInput(
             f"Query not allowed. Only {', '.join(ALLOWED_QUERY_PREFIXES)} statements are permitted."
         )
 

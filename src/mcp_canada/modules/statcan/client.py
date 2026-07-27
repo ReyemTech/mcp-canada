@@ -49,6 +49,7 @@ from mcp_canada.modules.statcan.schemas import (
 )
 from mcp_canada.shared.cache import cached_fetch
 from mcp_canada.shared.rate_limiter import get_limiter
+from mcp_canada.shared.errors import InvalidInput, NotFound, UpstreamData
 
 
 def _make_statcan_client(timeout: float = 30.0) -> httpx.AsyncClient:
@@ -82,7 +83,7 @@ async def _statcan_fetch(
                 resp = await http.post(url, json=json)
             resp.raise_for_status()
             if not resp.content:
-                raise ValueError("StatCan returned empty response body")
+                raise UpstreamData("StatCan returned empty response body")
             return resp.json()
 
     return await _do_fetch()
@@ -159,7 +160,7 @@ def _unwrap(raw: Any) -> Any:
         obj = envelope.get("object", {})
         if isinstance(obj, dict) and obj.get("responseStatusCode") == 2:
             return obj
-        raise ValueError(str(obj or "WDS request failed"))
+        raise UpstreamData(str(obj or "WDS request failed"))
     return envelope["object"]
 
 
@@ -577,7 +578,7 @@ def _require_series(obj: dict, what: str) -> dict:
     """
     code = obj.get("responseStatusCode")
     if code in _NO_SERIES_STATUS:
-        raise ValueError(
+        raise NotFound(
             f"No series exists for {what} (WDS responseStatusCode {code}). "
             f"The product id and coordinate are valid syntax but do not "
             f"identify a published series."
@@ -1125,7 +1126,7 @@ def _parse_sdmx_body(body: str, what: str) -> dict:
             # No observations for this key — StatCan's empty payload is simply
             # not valid JSON. Answer semantically instead of failing.
             return {"dataSets": [], "structure": {}}
-        raise ValueError(
+        raise UpstreamData(
             f"StatCan SDMX returned an unparseable body for {what}: {exc}"
         ) from exc
 
@@ -1189,7 +1190,7 @@ async def get_sdmx_data(
         httpx.HTTPStatusError: On HTTP 4xx/5xx responses.
     """
     if last_n is not None and (start_period or end_period):
-        raise ValueError(
+        raise InvalidInput(
             "Cannot use both lastN and date range (startPeriod/endPeriod) simultaneously"
         )
 

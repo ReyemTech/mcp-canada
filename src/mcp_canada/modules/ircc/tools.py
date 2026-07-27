@@ -30,6 +30,7 @@ from mcp_canada.modules.ircc.client import (
 from mcp_canada.modules.ircc.constants import DATASET_REGISTRY
 from mcp_canada.shared.envelope import make_error, make_response, upstream_guard
 from mcp_canada.shared.reshape import reshape_temporal_columns
+from mcp_canada.shared.errors import InvalidInput
 
 _API_NAME = "IRCC Open Data"
 _API_BASE = "https://www.ircc.canada.ca/opendata-donneesouvertes/data/"
@@ -68,7 +69,7 @@ async def ircc_get_permanent_residents(
     """
     try:
         rows, cached = await fetch_permanent_residents(breakdown=breakdown, lang=lang)
-    except ValueError as exc:
+    except InvalidInput as exc:
         return make_error("INVALID_INPUT", str(exc), lang=lang)
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
@@ -105,7 +106,7 @@ async def ircc_get_study_permits(
     """
     try:
         rows, cached = await fetch_study_permits(breakdown=breakdown, lang=lang)
-    except ValueError as exc:
+    except InvalidInput as exc:
         return make_error("INVALID_INPUT", str(exc), lang=lang)
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
@@ -152,7 +153,7 @@ async def ircc_get_work_permits(
 
     try:
         rows, cached = await fetch_fn(breakdown=breakdown, lang=lang)
-    except ValueError as exc:
+    except InvalidInput as exc:
         return make_error("INVALID_INPUT", str(exc), lang=lang)
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
@@ -199,7 +200,7 @@ async def ircc_get_express_entry(
 
     try:
         rows, cached = await fetch_fn(breakdown=breakdown, lang=lang)
-    except ValueError as exc:
+    except InvalidInput as exc:
         return make_error("INVALID_INPUT", str(exc), lang=lang)
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
@@ -234,7 +235,7 @@ async def ircc_get_tr_to_pr(
     """
     try:
         rows, cached = await fetch_tr_to_pr(breakdown=breakdown, lang=lang)
-    except ValueError as exc:
+    except InvalidInput as exc:
         return make_error("INVALID_INPUT", str(exc), lang=lang)
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
@@ -269,7 +270,7 @@ async def ircc_get_asylum(
     """
     try:
         rows, cached = await fetch_asylum(breakdown=breakdown, lang=lang)
-    except ValueError as exc:
+    except InvalidInput as exc:
         return make_error("INVALID_INPUT", str(exc), lang=lang)
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
@@ -309,7 +310,7 @@ async def ircc_get_ops(
     """
     try:
         rows, cached = await fetch_ops(breakdown=breakdown, lang=lang)
-    except ValueError as exc:
+    except InvalidInput as exc:
         return make_error("INVALID_INPUT", str(exc), lang=lang)
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
@@ -344,7 +345,7 @@ async def ircc_get_afghan(
     """
     try:
         rows, cached = await fetch_afghan(breakdown=breakdown, lang=lang)
-    except ValueError as exc:
+    except InvalidInput as exc:
         return make_error("INVALID_INPUT", str(exc), lang=lang)
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
@@ -381,7 +382,7 @@ async def ircc_get_adhoc_pr(
     """
     try:
         rows, cached = await fetch_adhoc_pr(breakdown=breakdown, lang=lang)
-    except ValueError as exc:
+    except InvalidInput as exc:
         return make_error("INVALID_INPUT", str(exc), lang=lang)
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)
@@ -415,7 +416,7 @@ async def ircc_get_citizenship(
     """
     try:
         rows, cached = await fetch_citizenship(breakdown=breakdown, lang=lang)
-    except ValueError as exc:
+    except InvalidInput as exc:
         return make_error("INVALID_INPUT", str(exc), lang=lang)
     except httpx.HTTPStatusError as exc:
         return make_error("UPSTREAM_ERROR", f"IRCC returned HTTP {exc.response.status_code}.", lang=lang)

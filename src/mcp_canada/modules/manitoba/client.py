@@ -96,6 +96,7 @@ from .schemas import (  # noqa: F401 — re-exported for downstream plans
     ManitobaWaterbody,
     ManitobaWaterway,
 )
+from mcp_canada.shared.errors import InvalidInput, NotFound
 
 __all__ = [
     # Private helpers (fully implemented in Wave 0)
@@ -305,7 +306,7 @@ async def fetch_dataset_details(
             # Search-response shape — pick first matching feature
             features = result.get("features", [])
             if not features:
-                raise ValueError(f"Dataset not found: {item_id}")
+                raise NotFound(f"Dataset not found: {item_id}")
             raw = features[0]
         elif not isinstance(result, dict):
             raise httpx.HTTPStatusError(
@@ -314,7 +315,7 @@ async def fetch_dataset_details(
                 response=httpx.Response(500),
             )
         else:
-            raise ValueError(f"Dataset not found: {item_id}")
+            raise NotFound(f"Dataset not found: {item_id}")
 
         props = raw.get("properties") or {}
         svc_url = props.get("url", "")
@@ -561,7 +562,7 @@ async def fetch_provincial_waterways(
     if f_type is not None:
         f_type_lower = f_type.lower()
         if f_type_lower not in WATERWAY_TYPES:
-            raise ValueError(
+            raise InvalidInput(
                 f"Invalid f_type '{f_type}'. Must be one of: {', '.join(WATERWAY_TYPES)}"
             )
         # Map user-supplied lowercase value to title-case for WHERE clause
@@ -724,7 +725,7 @@ async def fetch_livestock_prices(
     """
     valid = {"cattle", "hog"}
     if livestock not in valid:
-        raise ValueError(
+        raise InvalidInput(
             f"Invalid livestock '{livestock}'. Must be one of: cattle, hog"
         )
 

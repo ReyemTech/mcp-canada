@@ -4,6 +4,8 @@ import functools
 import json
 import httpx
 import pydantic
+
+from mcp_canada.shared.errors import InvalidInput, NotFound, UpstreamData
 from collections.abc import Callable
 
 from datetime import datetime, timezone
@@ -111,6 +113,18 @@ def upstream_guard(api_name: str) -> Callable:
                     f"{api_name} request failed: {type(exc).__name__}: {exc}",
                     lang=lang,
                 )
+            except InvalidInput as exc:
+                # The ONLY path to INVALID_INPUT. Declared at the raise site, so
+                # no library's ValueError subclass can reach it by accident.
+                return make_error("INVALID_INPUT", str(exc), lang=lang)
+            except NotFound as exc:
+                return make_error("NOT_FOUND", str(exc), lang=lang)
+            except UpstreamData as exc:
+                return make_error(
+                    "UPSTREAM_ERROR",
+                    f"{api_name} returned unusable data: {exc}",
+                    lang=lang,
+                )
             except (json.JSONDecodeError, UnicodeDecodeError) as exc:
                 # Must precede the ValueError arm — both subclass it. An
                 # upstream HTML error page reaching httpx's .json() raises
@@ -133,10 +147,18 @@ def upstream_guard(api_name: str) -> Callable:
                     lang=lang,
                 )
             except ValueError as exc:
-                # Reached only by an explicit `raise ValueError` for a genuinely
-                # bad argument — the two upstream-shaped ValueError subclasses
-                # are intercepted above.
-                return make_error("INVALID_INPUT", str(exc), lang=lang)
+                # DEFAULT IS UPSTREAM (Phase 20.4). Previously this returned
+                # INVALID_INPUT, which quietly captured every ValueError subclass
+                # any library defines — JSONDecodeError, UnicodeDecodeError and
+                # pydantic.ValidationError each reached it in turn, and each was
+                # patched by adding one more arm above. That deny-list can never
+                # be complete. Caller error is now opt-in via InvalidInput, so an
+                # unrecognised subclass lands here and is classified safely.
+                return make_error(
+                    "UPSTREAM_ERROR",
+                    f"{api_name} raised an unclassified {type(exc).__name__}: {exc}",
+                    lang=lang,
+                )
             except Exception as exc:  # noqa: BLE001 — tools must never raise
                 # Real catch-all. Flattening code raises KeyError/TypeError/
                 # IndexError/AttributeError when an upstream returns valid JSON

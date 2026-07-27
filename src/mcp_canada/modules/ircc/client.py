@@ -7,6 +7,7 @@ valid options. Network and parsing errors propagate to the tool layer.
 
 from mcp_canada.modules.ircc.constants import DATASET_PARSE_CONFIG, DATASET_REGISTRY
 from mcp_canada.shared.parsers import fetch_and_parse
+from mcp_canada.shared.errors import InvalidInput
 
 
 async def _fetch_dataset(
@@ -30,13 +31,13 @@ async def _fetch_dataset(
     registry = DATASET_REGISTRY[dataset_key]
     if breakdown not in registry:
         valid = sorted(registry.keys())
-        raise ValueError(
+        raise InvalidInput(
             f"Unknown breakdown {breakdown!r} for {dataset_key}. Valid: {valid}"
         )
     urls = registry[breakdown]
     if lang not in urls:
         valid_langs = sorted(urls.keys())
-        raise ValueError(
+        raise InvalidInput(
             f"Language {lang!r} not available for {dataset_key}/{breakdown}. "
             f"Valid: {valid_langs}"
         )

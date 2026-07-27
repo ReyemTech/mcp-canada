@@ -6,15 +6,15 @@ current_phase: 20.2
 current_phase_name: Normalize tool error handling and guard malformed upstream JSON
 status: awaiting_merge
 stopped_at: "Phase 20.2 merged to main (PR #3); next is Phase 21 (New Brunswick)"
-last_updated: "2026-07-27T01:28:17.759Z"
+last_updated: "2026-07-27T02:44:42.107Z"
 last_activity: 2026-07-26
 last_activity_desc: Phase 20.2 executed and verified; 317 live tests green
 progress:
-  total_phases: 37
+  total_phases: 38
   completed_phases: 16
   total_plans: 78
   completed_plans: 77
-  percent: 43
+  percent: 42
 ---
 
 # Project State
@@ -414,6 +414,7 @@ Recent decisions affecting current work:
 - Phase 20.1 inserted after Phase 20: Remove UPSTREAM_ERROR escape-hatch pattern from all provincial integration tests (MB/SK/AB/QC/NS) and re-run live integration to surface masked upstream failures before pushing Phase 20 (URGENT)
 - Phase 20.2 inserted after Phase 20.1: Normalize tool error handling and guard malformed upstream JSON — root cause of a masking class surfaced by Codex review on PR #2; sequenced before Phase 21 so ~19 future modules inherit the correct handler shape
 - Phase 20.3 inserted after Phase 20.2: Route every shared portal client through the JSON decode guard — 20.2 fixed api_get only, leaving ArcGIS Hub, OGC WFS and Socrata exposed; 5 tools reproducibly returned INVALID_INPUT for an upstream outage
+- Phase 20.4 inserted after Phase 20.3: Invert the ValueError default — root cause of all four Codex findings across PRs 2/3/4; caller error becomes opt-in via shared/errors.py markers
 
 ### Pending Todos
 

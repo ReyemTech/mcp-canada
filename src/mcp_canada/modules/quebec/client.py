@@ -66,6 +66,7 @@ from .schemas import (
     QuebecRoadEvent,
     QuebecRoadWork,
 )
+from mcp_canada.shared.errors import UpstreamData
 
 __all__ = [
     "_api_get",
@@ -857,7 +858,7 @@ async def fetch_electricity_data(
                 file_url = r.url
                 break
         if file_url is None:
-            raise ValueError(
+            raise UpstreamData(
                 "No parseable CSV/XLSX/XLS resource found in "
                 "historique-production-consommation package"
             )

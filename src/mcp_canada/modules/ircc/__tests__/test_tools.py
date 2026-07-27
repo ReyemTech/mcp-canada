@@ -11,6 +11,7 @@ Tests verify:
 
 import httpx
 import pytest
+from mcp_canada.shared.errors import InvalidInput
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
@@ -74,7 +75,7 @@ class TestIrccGetPermanentResidents:
         with patch(
             "mcp_canada.modules.ircc.tools.fetch_permanent_residents",
             new_callable=AsyncMock,
-            side_effect=ValueError("Unknown breakdown 'nonexistent'"),
+            side_effect=InvalidInput("Unknown breakdown 'nonexistent'"),
         ):
             from mcp_canada.modules.ircc.tools import ircc_get_permanent_residents
             result = await ircc_get_permanent_residents(breakdown="nonexistent")  # type: ignore[arg-type]
@@ -160,7 +161,7 @@ class TestIrccGetStudyPermits:
         with patch(
             "mcp_canada.modules.ircc.tools.fetch_study_permits",
             new_callable=AsyncMock,
-            side_effect=ValueError("Unknown breakdown"),
+            side_effect=InvalidInput("Unknown breakdown"),
         ):
             from mcp_canada.modules.ircc.tools import ircc_get_study_permits
             result = await ircc_get_study_permits(breakdown="invalid")  # type: ignore[arg-type]
@@ -212,7 +213,7 @@ class TestIrccGetWorkPermits:
         with patch(
             "mcp_canada.modules.ircc.tools.fetch_work_permits_imp",
             new_callable=AsyncMock,
-            side_effect=ValueError("Unknown breakdown"),
+            side_effect=InvalidInput("Unknown breakdown"),
         ):
             from mcp_canada.modules.ircc.tools import ircc_get_work_permits
             result = await ircc_get_work_permits(permit_type="imp", breakdown="nonexistent")  # type: ignore[arg-type]
@@ -281,7 +282,7 @@ class TestIrccGetTrToPr:
         with patch(
             "mcp_canada.modules.ircc.tools.fetch_tr_to_pr",
             new_callable=AsyncMock,
-            side_effect=ValueError("Unknown breakdown"),
+            side_effect=InvalidInput("Unknown breakdown"),
         ):
             from mcp_canada.modules.ircc.tools import ircc_get_tr_to_pr
             result = await ircc_get_tr_to_pr(breakdown="bad")  # type: ignore[arg-type]
@@ -332,7 +333,7 @@ class TestIrccGetOps:
         with patch(
             "mcp_canada.modules.ircc.tools.fetch_ops",
             new_callable=AsyncMock,
-            side_effect=ValueError("Unknown breakdown"),
+            side_effect=InvalidInput("Unknown breakdown"),
         ):
             from mcp_canada.modules.ircc.tools import ircc_get_ops
             result = await ircc_get_ops(breakdown="bad")  # type: ignore[arg-type]
@@ -382,7 +383,7 @@ class TestIrccGetAdhocPr:
         with patch(
             "mcp_canada.modules.ircc.tools.fetch_adhoc_pr",
             new_callable=AsyncMock,
-            side_effect=ValueError("Language 'fr' not available"),
+            side_effect=InvalidInput("Language 'fr' not available"),
         ):
             from mcp_canada.modules.ircc.tools import ircc_get_adhoc_pr
             result = await ircc_get_adhoc_pr(breakdown="category_1980", lang="fr")

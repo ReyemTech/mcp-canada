@@ -117,6 +117,7 @@ from .schemas import (  # noqa: F401 — re-exported for downstream plans to imp
     AlbertaWaterAdvisory,
     AlbertaWellLicence,
 )
+from mcp_canada.shared.errors import InvalidInput
 
 __all__ = [
     # Private helpers (fully implemented in Wave 0)
@@ -735,7 +736,7 @@ async def fetch_production_volumes(
         ValueError: If `product` is not in `ST3_PRODUCTS` (includes hint).
     """
     if product not in ST3_PRODUCTS:
-        raise ValueError(
+        raise InvalidInput(
             f"Invalid product '{product}'. "
             f"Valid products: {list(ST3_PRODUCTS)}"
         )
@@ -816,7 +817,7 @@ async def fetch_fire_perimeters(
         url = EXTINGUISHED_PERIMETERS_FS_URL
         ttl = CACHE_TTL_STATIC
     else:
-        raise ValueError(
+        raise InvalidInput(
             f"status must be 'active' or 'extinguished', got '{status}'"
         )
 
@@ -890,7 +891,7 @@ async def fetch_fire_control_orders(
         "forest_area": (FOREST_AREA_FS_URL, CACHE_TTL_STATIC),
     }
     if category not in url_map:
-        raise ValueError(
+        raise InvalidInput(
             f"category must be one of {list(url_map)}, got '{category}'"
         )
     url, ttl = url_map[category]
@@ -1036,7 +1037,7 @@ async def fetch_health_facilities(
         "pcn_clinic": PCN_CLINICS_FS_URL,
     }
     if facility_type not in url_map:
-        raise ValueError(
+        raise InvalidInput(
             f"facility_type must be one of {list(url_map)}, got {facility_type!r}"
         )
     url = url_map[facility_type]
@@ -1229,7 +1230,7 @@ async def fetch_water_advisories(
         ValueError: When advisory_type is not one of the 5 supported values.
     """
     if advisory_type not in WATER_ADVISORY_LAYERS:
-        raise ValueError(
+        raise InvalidInput(
             f"advisory_type must be one of {list(WATER_ADVISORY_LAYERS)}, "
             f"got {advisory_type!r}"
         )
@@ -1317,7 +1318,7 @@ async def fetch_population_estimates(
         ValueError: When breakdown is not one of the 6 supported values.
     """
     if breakdown not in POPULATION_BREAKDOWN_HINTS:
-        raise ValueError(
+        raise InvalidInput(
             f"breakdown must be one of {list(POPULATION_BREAKDOWN_HINTS)}, "
             f"got {breakdown!r}"
         )

@@ -338,6 +338,17 @@ Plans:
 
 - [x] 20.2-01-PLAN.md — Catch-all coverage for every tool + decode guard in api_get
 
+### Phase 20.3: Route every shared portal client through the JSON decode guard (INSERTED)
+
+**Goal:** Finish what Phase 20.2 started. 20.2 added the decode guard to `shared/http.py:api_get` and stopped there, but three of the four portal technologies decode JSON themselves: ArcGIS Hub and Socrata called `response.json()` raw, OGC WFS called `json.loads(response.content)`, and the ArcGIS geojson hot path decoded via `arcgis_hub._parse_raw_json` + `parsers._parse_geojson`. Because `json.JSONDecodeError` subclasses `ValueError`, a malformed body from any of those still reached the `except ValueError -> INVALID_INPUT` arms in five tools (saskatchewan fire-bans / crop-yields / mineral-mines, manitoba livestock-prices / provincial-waterways) — reproduced before the fix, both probes returned `INVALID_INPUT` for an upstream outage. Adds `decode_json()` / `decode_json_bytes()` to `shared/http.py`, routes all 14 decode sites through them, and adds a structural test so a raw decode cannot be reintroduced.
+**Requirements**: ERR-05
+**Depends on:** Phase 20.2
+**Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 20.3-01 — decode_json helpers + route all 14 sites + structural guard
+
 ### Phase 21: New Brunswick Government Open Data
 
 **Goal:** [To be planned]

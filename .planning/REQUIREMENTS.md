@@ -187,6 +187,7 @@ Backfilled 2026-07-25 alongside the phase, which was inserted as urgent work wit
 - [x] **ERR-02**: Reintroducing an uncovered tool fails the DEFAULT unit suite (`tests/test_tool_error_handling.py`), and the detector carries a self-test so it cannot pass vacuously
 - [x] **ERR-03**: A malformed upstream body is classified as an upstream failure, never as caller error — `shared/http.py:api_get` raises `httpx.DecodingError` (an `HTTPError`, not a `ValueError`) so it bypasses `except ValueError -> INVALID_INPUT` arms
 - [x] **ERR-04**: Genuine argument-validation `ValueError`s still return `INVALID_INPUT` — the decode fix does not swallow real caller errors
+- [x] **ERR-05**: Every shared client decodes JSON through `decode_json()`/`decode_json_bytes()`, never raw — ArcGIS Hub, OGC WFS, Socrata and the geojson parsers were missed by ERR-03, which guarded only `api_get` (Phase 20.3)
 
 ### MCP Prompts and Resources
 
@@ -472,6 +473,7 @@ Primary portal is **data.novascotia.ca** — a **Socrata** (Tyler Technologies) 
 | ERR-02 | Phase 20.2 | Complete |
 | ERR-03 | Phase 20.2 | Complete |
 | ERR-04 | Phase 20.2 | Complete |
+| ERR-05 | Phase 20.3 | Complete |
 | PR-01 | Phase 40 | Complete |
 | PR-02 | Phase 40 | Complete |
 | PR-03 | Phase 40 | Complete |

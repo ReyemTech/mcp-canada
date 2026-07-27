@@ -2,6 +2,30 @@
 
 <!-- CHANGELOG -->
 
+## v0.10.4 (2026-07-27)
+
+### Bug Fixes
+
+- **errors**: Invert the ValueError default — caller error is now opt-in
+  ([`9a4952a`](https://github.com/ReyemTech/mcp-canada/commit/9a4952a591c038739b098fef1130e8eb030cd81c))
+
+- **york_region**: Honour the classified markers in _call_client
+  ([`777fa44`](https://github.com/ReyemTech/mcp-canada/commit/777fa44026d945d851346d5afe6ef6b006072a73))
+
+### Chores
+
+- Sync uv.lock after release
+  ([`d73c49a`](https://github.com/ReyemTech/mcp-canada/commit/d73c49a1d327a7d72833b011b9c4c6c836f26d34))
+
+### Documentation
+
+- **20.4**: Record live validation and the Codex york_region finding
+  ([`0ac161f`](https://github.com/ReyemTech/mcp-canada/commit/0ac161ffff71f59724ba61467f25b39999bd3c4a))
+
+- **20.4**: Roadmap, ERR-06/07, verification report, and the corrected rule
+  ([`5131cb5`](https://github.com/ReyemTech/mcp-canada/commit/5131cb5597a49870cb5756122db4af27fe34ef84))
+
+
 ## v0.10.3 (2026-07-27)
 
 ### Bug Fixes

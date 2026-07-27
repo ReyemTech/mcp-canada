@@ -2,6 +2,33 @@
 
 <!-- CHANGELOG -->
 
+## v0.10.3 (2026-07-27)
+
+### Bug Fixes
+
+- **errors**: Route every shared portal client through the decode guard
+  ([`74c5095`](https://github.com/ReyemTech/mcp-canada/commit/74c50951d9329c727c68214ecad2b1c109fd7256))
+
+- **errors**: Treat undecodable bytes as upstream failure, not caller error
+  ([`30352d4`](https://github.com/ReyemTech/mcp-canada/commit/30352d4cdf81837172c4e636c61db28b1bcb766e))
+
+### Chores
+
+- Sync uv.lock after release
+  ([`199c78e`](https://github.com/ReyemTech/mcp-canada/commit/199c78e1474f1f1d1707ce1db6478d15428e281e))
+
+### Documentation
+
+- **20.3**: Roadmap entry, ERR-05, and the corrected decode rule
+  ([`09b101a`](https://github.com/ReyemTech/mcp-canada/commit/09b101a5f749e6ef62da62dd08c6778a5c1e3aec))
+
+- **20.3**: Verification report; retire the stale Drug/Nutrient caveat
+  ([`bd8e9aa`](https://github.com/ReyemTech/mcp-canada/commit/bd8e9aae490fa39d5277be27e395983494762f9a))
+
+- **state**: Close Phase 20.2 — merged to main
+  ([`ad7c962`](https://github.com/ReyemTech/mcp-canada/commit/ad7c962d8fadc8d7018b62cc01099d6d65c617e8))
+
+
 ## v0.10.2 (2026-07-26)
 
 ### Bug Fixes

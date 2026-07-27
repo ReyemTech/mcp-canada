@@ -169,3 +169,46 @@ def test_invalid_input_is_a_valueerror_for_backwards_compatibility():
     from mcp_canada.shared.errors import InvalidInput
 
     assert issubclass(InvalidInput, ValueError)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("module", "client_attr", "tool_name", "kwargs", "marker", "expected"),
+    [
+        ("york_region", "fetch_get_dataset_details", "york_region_get_dataset_details",
+         {"dataset_id": "bogus"}, "NotFound", "NOT_FOUND"),
+        ("manitoba", "fetch_livestock_prices", "manitoba_get_livestock_prices",
+         {}, "InvalidInput", "INVALID_INPUT"),
+        ("saskatchewan", "fetch_fire_bans", "saskatchewan_get_fire_bans",
+         {"ban_scope": "urban"}, "InvalidInput", "INVALID_INPUT"),
+        ("ircc", "fetch_permanent_residents", "ircc_get_permanent_residents",
+         {}, "InvalidInput", "INVALID_INPUT"),
+    ],
+)
+async def test_markers_survive_the_module_handler(
+    module, client_attr, tool_name, kwargs, marker, expected
+):
+    """Classifying at the raise site is useless if the handler drops it.
+
+    york_region carries no @upstream_guard — its `_call_client` helper is the
+    catch-all — so a NotFound raised for an unknown dataset id fell into the
+    generic arm and a routine missing record was reported as an upstream
+    outage. Caught by Codex on PR #5. This covers each module whose own client
+    raises a marker.
+    """
+    import importlib
+    from unittest.mock import AsyncMock, patch
+
+    import mcp_canada.shared.errors as errors
+
+    tools = importlib.import_module(f"mcp_canada.modules.{module}.tools")
+    client = importlib.import_module(f"mcp_canada.modules.{module}.client")
+    target = tools if hasattr(tools, client_attr) else client
+    exc = getattr(errors, marker)("probe")
+
+    with patch.object(target, client_attr, new=AsyncMock(side_effect=exc)):
+        result = await getattr(tools, tool_name)(**kwargs)
+
+    assert result["error"]["code"] == expected, (
+        f"{module}.{tool_name} dropped a {marker} raised by its client"
+    )

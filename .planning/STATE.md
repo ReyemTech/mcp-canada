@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
-current_phase: 20.2
-current_phase_name: Normalize tool error handling and guard malformed upstream JSON
-status: awaiting_merge
-stopped_at: "Phase 20.2 merged to main (PR #3); next is Phase 21 (New Brunswick)"
+current_phase: "20.4"
+current_phase_name: Invert the ValueError default so caller error is opt-in
+status: planning
+stopped_at: "Phase 20.4 merged to main (PR #5); next is Phase 21 (New Brunswick)"
 last_updated: "2026-07-27T02:44:42.107Z"
-last_activity: 2026-07-26
-last_activity_desc: Phase 20.2 executed and verified; 317 live tests green
+last_activity: 2026-07-27
+last_activity_desc: Phases 20.2-20.4 merged; error classification hardened end to end
 progress:
   total_phases: 38
-  completed_phases: 16
-  total_plans: 78
-  completed_plans: 77
+  completed_phases: 19
+  total_plans: 80
+  completed_plans: 80
   percent: 42
 ---
 
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 ## Current Position
 
-Phase: 20.2 of 36 — COMPLETE and MERGED to main (PR #3, merge commit 87fd5ce)
+Phase: 20.4 of 38 — COMPLETE and MERGED to main (PR #5, merge commit caa4d66)
 Plan: 1 of 1 complete
 Status: next is Phase 21 (run /gsd-plan-phase 21)
-Last activity: 2026-07-26 — Phase 20.2 executed and verified; 317 live tests green
+Last activity: 2026-07-27 — Phase 20.4 merged; 3170 unit + 340 live tests green
 
 Phase 20.1 is COMPLETE and MERGED to main (PR #2, merge commit 98dee90).
 

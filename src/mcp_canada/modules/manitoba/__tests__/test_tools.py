@@ -12,6 +12,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from mcp_canada.shared.errors import InvalidInput, NotFound
 
 from mcp_canada.modules.manitoba.tools import (
     manitoba_get_dataset_details,
@@ -125,7 +126,7 @@ class TestManitobaGetDatasetDetails:
         with patch(
             "mcp_canada.modules.manitoba.tools._client.fetch_dataset_details",
             new_callable=AsyncMock,
-            side_effect=ValueError("Dataset not found: bogus-id"),
+            side_effect=NotFound("Dataset not found: bogus-id"),
         ):
             result = await manitoba_get_dataset_details(dataset_id="bogus-id")
         assert "error" in result
@@ -511,7 +512,7 @@ class TestManitobaGetProvincialWaterways:
         with patch(
             "mcp_canada.modules.manitoba.tools._client.fetch_provincial_waterways",
             new_callable=AsyncMock,
-            side_effect=ValueError("Invalid f_type 'swamp'. Must be one of: dike, floodway, dam, diversion, reservoir, waterway"),
+            side_effect=InvalidInput("Invalid f_type 'swamp'. Must be one of: dike, floodway, dam, diversion, reservoir, waterway"),
         ):
             result = await manitoba_get_provincial_waterways(f_type="swamp")
         assert "error" in result
@@ -747,7 +748,7 @@ class TestManitobaGetLivestockPrices:
         with patch(
             "mcp_canada.modules.manitoba.tools._client.fetch_livestock_prices",
             new_callable=AsyncMock,
-            side_effect=ValueError("Invalid livestock 'sheep'. Must be one of: cattle, hog"),
+            side_effect=InvalidInput("Invalid livestock 'sheep'. Must be one of: cattle, hog"),
         ):
             result = await manitoba_get_livestock_prices(livestock="sheep")
         assert "error" in result

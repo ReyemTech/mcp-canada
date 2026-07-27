@@ -15,6 +15,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from mcp_canada.shared.errors import InvalidInput, NotFound
 
 from mcp_canada.modules.saskatchewan import tools
 
@@ -131,7 +132,7 @@ class TestSaskGetDatasetDetailsTool:
         with patch(
             "mcp_canada.modules.saskatchewan.tools._client.fetch_dataset_details",
             new_callable=AsyncMock,
-            side_effect=ValueError("Dataset not found: nonexistent-id"),
+            side_effect=NotFound("Dataset not found: nonexistent-id"),
         ):
             result = await tools.saskatchewan_get_dataset_details(dataset_id="nonexistent-id")
         data = json.loads(result) if isinstance(result, str) else result
@@ -395,7 +396,7 @@ class TestSaskGetCropYieldsTool:
         with patch(
             "mcp_canada.modules.saskatchewan.tools._client.fetch_crop_yields",
             new_callable=AsyncMock,
-            side_effect=ValueError("Unknown region: 'bogus'. Valid: ['provincial', ...]"),
+            side_effect=InvalidInput("Unknown region: 'bogus'. Valid: ['provincial', ...]"),
         ):
             result = await tools.saskatchewan_get_crop_yields(region="bogus")
         data = json.loads(result) if isinstance(result, str) else result
@@ -575,7 +576,7 @@ class TestSaskGetMineralMinesTool:
         with patch(
             "mcp_canada.modules.saskatchewan.tools._client.fetch_mineral_mines",
             new_callable=AsyncMock,
-            side_effect=ValueError("Unknown mineral: 'gold'. Valid: ['potash', 'uranium', ...]"),
+            side_effect=InvalidInput("Unknown mineral: 'gold'. Valid: ['potash', 'uranium', ...]"),
         ):
             result = await tools.saskatchewan_get_mineral_mines(mineral="gold")
         data = json.loads(result) if isinstance(result, str) else result
@@ -628,7 +629,7 @@ class TestSaskGetMineralMinesTool:
         with patch(
             "mcp_canada.modules.saskatchewan.tools._client.fetch_mineral_mines",
             new_callable=AsyncMock,
-            side_effect=ValueError("Unknown mineral"),
+            side_effect=InvalidInput("Unknown mineral"),
         ):
             result = await tools.saskatchewan_get_mineral_mines(mineral="gold", lang="fr")
         data = json.loads(result) if isinstance(result, str) else result

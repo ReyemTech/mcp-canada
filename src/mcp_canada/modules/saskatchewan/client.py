@@ -87,6 +87,7 @@ from .schemas import (  # noqa: F401 — re-exported for downstream plans
     SaskatchewanWSAReservoir,
     SaskatchewanWSAStation,
 )
+from mcp_canada.shared.errors import InvalidInput, NotFound
 
 __all__ = [
     # Private helpers (fully implemented in Wave 0)
@@ -252,7 +253,7 @@ async def fetch_dataset_details(
             # Search-response shape — pick first matching feature
             features = result.get("features", [])
             if not features:
-                raise ValueError(f"Dataset not found: {dataset_id}")
+                raise NotFound(f"Dataset not found: {dataset_id}")
             raw = features[0]
         elif not isinstance(result, dict):
             raise httpx.HTTPStatusError(
@@ -261,7 +262,7 @@ async def fetch_dataset_details(
                 response=httpx.Response(500),
             )
         else:
-            raise ValueError(f"Dataset not found: {dataset_id}")
+            raise NotFound(f"Dataset not found: {dataset_id}")
 
         props = raw.get("properties") or {}
         svc_url = props.get("url", "")
@@ -446,7 +447,7 @@ async def fetch_crop_yields(
 
     region_lower = region.lower()
     if region_lower not in CROP_REGIONS:
-        raise ValueError(
+        raise InvalidInput(
             f"Unknown region: {region!r}. Valid: {list(CROP_REGIONS)}"
         )
 
@@ -533,7 +534,7 @@ async def fetch_mineral_mines(
     mineral_lower = mineral.lower()
     fs_url = MINERAL_MINES_FS_URLS.get(mineral_lower)
     if fs_url is None:
-        raise ValueError(
+        raise InvalidInput(
             f"Unknown mineral: {mineral!r}. Valid: {list(MINERAL_MINES_FS_URLS)}"
         )
 
@@ -579,7 +580,7 @@ async def fetch_fire_bans(
     Same pattern as Manitoba flood alerts (Phase 18).
     """
     if ban_scope not in FIRE_BAN_LAYERS:
-        raise ValueError(
+        raise InvalidInput(
             f"Unknown ban_scope: {ban_scope!r}. Valid: {list(FIRE_BAN_LAYERS)}"
         )
 

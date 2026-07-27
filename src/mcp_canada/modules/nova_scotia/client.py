@@ -73,6 +73,7 @@ from .constants import (
     RATE_GROUP,
     RATE_LIMIT,
 )
+from mcp_canada.shared.errors import InvalidInput
 
 # ---------------------------------------------------------------------------
 # Module-level setup
@@ -737,7 +738,7 @@ async def fetch_health_facilities(
     """
     _VALID_FACILITY_TYPES = {"hospital", "long_term_care"}
     if facility_type not in _VALID_FACILITY_TYPES:
-        raise ValueError(
+        raise InvalidInput(
             f"Invalid facility_type '{facility_type}'. Must be one of: {sorted(_VALID_FACILITY_TYPES)}"
         )
 
@@ -834,7 +835,7 @@ async def fetch_chronic_disease(
         ValueError: If disease is not a key in CHRONIC_DISEASE_DATASETS.
     """
     if disease not in CHRONIC_DISEASE_DATASETS:
-        raise ValueError(
+        raise InvalidInput(
             f"Invalid disease '{disease}'. Must be one of: {sorted(CHRONIC_DISEASE_DATASETS)}"
         )
 

@@ -13,6 +13,7 @@ from fastmcp.tools import tool
 
 from mcp_canada.modules.datastore import client
 from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.errors import InvalidInput
 
 _API_NAME = "datastore"
 _API_URL = ""
@@ -63,7 +64,7 @@ async def ds_create_table(
             cached=was_cached,
             lang=lang,
         )
-    except ValueError as exc:
+    except InvalidInput as exc:
         return make_error("INVALID_INPUT", str(exc), lang=lang)
     except Exception as exc:
         return make_error("DATASTORE_ERROR", str(exc), lang=lang)
@@ -95,7 +96,7 @@ async def ds_insert_data(
             cached=was_cached,
             lang=lang,
         )
-    except ValueError as exc:
+    except InvalidInput as exc:
         return make_error("INVALID_INPUT", str(exc), lang=lang)
     except Exception as exc:
         return make_error("DATASTORE_ERROR", str(exc), lang=lang)
@@ -132,7 +133,7 @@ async def ds_query(
             cached=was_cached,
             lang=lang,
         )
-    except ValueError as exc:
+    except InvalidInput as exc:
         return make_error("INVALID_INPUT", str(exc), lang=lang)
     except Exception as exc:
         return make_error("DATASTORE_ERROR", str(exc), lang=lang)
@@ -197,7 +198,7 @@ async def ds_get_schema(
             cached=was_cached,
             lang=lang,
         )
-    except ValueError as exc:
+    except InvalidInput as exc:
         return make_error("INVALID_INPUT", str(exc), lang=lang)
     except Exception as exc:
         return make_error("DATASTORE_ERROR", str(exc), lang=lang)
@@ -228,7 +229,7 @@ async def ds_drop_table(
             cached=was_cached,
             lang=lang,
         )
-    except ValueError as exc:
+    except InvalidInput as exc:
         return make_error("INVALID_INPUT", str(exc), lang=lang)
     except Exception as exc:
         return make_error("DATASTORE_ERROR", str(exc), lang=lang)

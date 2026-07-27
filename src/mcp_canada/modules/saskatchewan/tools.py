@@ -34,6 +34,7 @@ from .constants import (
     WSA_STATIONS_FS_URL,
     WSA_STATIONS_LAYER,
 )
+from mcp_canada.shared.errors import InvalidInput, NotFound
 
 # Source identifier for the _meta envelope (all discovery tools)
 _API_NAME_HUB = "saskatchewan-geohub"
@@ -123,7 +124,7 @@ async def saskatchewan_get_dataset_details(
     """
     try:
         payload, cached = await _client.fetch_dataset_details(dataset_id=dataset_id)
-    except ValueError:
+    except NotFound:
         msg = (
             f"Ensemble de données introuvable: {dataset_id}"
             if lang == "fr"
@@ -306,7 +307,7 @@ async def saskatchewan_get_crop_yields(
 
     try:
         payload, cached = await _client.fetch_crop_yields(region=region)
-    except ValueError as exc:
+    except InvalidInput as exc:
         msg = (
             f"Région invalide: {exc}"
             if lang == "fr"
@@ -396,7 +397,7 @@ async def saskatchewan_get_mineral_mines(
 
     try:
         payload, cached = await _client.fetch_mineral_mines(mineral=mineral)
-    except ValueError as exc:
+    except InvalidInput as exc:
         msg = (
             f"Minéral invalide: {exc}"
             if lang == "fr"
@@ -459,7 +460,7 @@ async def saskatchewan_get_fire_bans(
     from .constants import FIRE_BAN_FS_URL
     try:
         payload, cached = await _client.fetch_fire_bans(ban_scope=ban_scope)
-    except ValueError as exc:
+    except InvalidInput as exc:
         msg = (
             f"Portée invalide: {exc}"
             if lang == "fr"

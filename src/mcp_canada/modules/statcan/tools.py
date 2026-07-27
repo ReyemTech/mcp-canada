@@ -37,6 +37,7 @@ from mcp_canada.modules.statcan.client import (
 )
 from mcp_canada.modules.statcan.constants import BASE_URL, SDMX_BASE_URL, _API_NAME, _SDMX_API_NAME
 from mcp_canada.shared.envelope import make_error, make_response
+from mcp_canada.shared.errors import InvalidInput, NotFound
 
 _API_URL = BASE_URL
 
@@ -110,11 +111,10 @@ async def sc_get_cube_metadata(
         if exc.response.status_code == 409:
             return make_error("UPSTREAM_UNAVAILABLE", _MAINTENANCE_MSG, lang=lang)
         return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
-    except ValueError as exc:
-        # "No series exists for ..." means the request was valid but identifies
-        # nothing — that is NOT_FOUND, not a service fault (Phase 20.1).
-        code = "NOT_FOUND" if "No series exists" in str(exc) else "UPSTREAM_ERROR"
-        return make_error(code, str(exc), lang=lang)
+    except NotFound as exc:
+        # Classified at the raise site (Phase 20.4). Anything else upstream-shaped
+        # falls through to the catch-all below as UPSTREAM_ERROR.
+        return make_error("NOT_FOUND", str(exc), lang=lang)
     except Exception as exc:
         return make_error("UPSTREAM_ERROR", f"Unexpected error: {exc}", lang=lang)
 
@@ -180,11 +180,10 @@ async def sc_get_series_info_by_vector(
         if exc.response.status_code == 409:
             return make_error("UPSTREAM_UNAVAILABLE", _MAINTENANCE_MSG, lang=lang)
         return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
-    except ValueError as exc:
-        # "No series exists for ..." means the request was valid but identifies
-        # nothing — that is NOT_FOUND, not a service fault (Phase 20.1).
-        code = "NOT_FOUND" if "No series exists" in str(exc) else "UPSTREAM_ERROR"
-        return make_error(code, str(exc), lang=lang)
+    except NotFound as exc:
+        # Classified at the raise site (Phase 20.4). Anything else upstream-shaped
+        # falls through to the catch-all below as UPSTREAM_ERROR.
+        return make_error("NOT_FOUND", str(exc), lang=lang)
     except Exception as exc:
         return make_error("UPSTREAM_ERROR", f"Unexpected error: {exc}", lang=lang)
 
@@ -220,11 +219,10 @@ async def sc_get_series_info_by_coord(
         if exc.response.status_code == 409:
             return make_error("UPSTREAM_UNAVAILABLE", _MAINTENANCE_MSG, lang=lang)
         return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
-    except ValueError as exc:
-        # "No series exists for ..." means the request was valid but identifies
-        # nothing — that is NOT_FOUND, not a service fault (Phase 20.1).
-        code = "NOT_FOUND" if "No series exists" in str(exc) else "UPSTREAM_ERROR"
-        return make_error(code, str(exc), lang=lang)
+    except NotFound as exc:
+        # Classified at the raise site (Phase 20.4). Anything else upstream-shaped
+        # falls through to the catch-all below as UPSTREAM_ERROR.
+        return make_error("NOT_FOUND", str(exc), lang=lang)
     except Exception as exc:
         return make_error("UPSTREAM_ERROR", f"Unexpected error: {exc}", lang=lang)
 
@@ -259,11 +257,10 @@ async def sc_get_data_by_vector(
         if exc.response.status_code == 409:
             return make_error("UPSTREAM_UNAVAILABLE", _MAINTENANCE_MSG, lang=lang)
         return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
-    except ValueError as exc:
-        # "No series exists for ..." means the request was valid but identifies
-        # nothing — that is NOT_FOUND, not a service fault (Phase 20.1).
-        code = "NOT_FOUND" if "No series exists" in str(exc) else "UPSTREAM_ERROR"
-        return make_error(code, str(exc), lang=lang)
+    except NotFound as exc:
+        # Classified at the raise site (Phase 20.4). Anything else upstream-shaped
+        # falls through to the catch-all below as UPSTREAM_ERROR.
+        return make_error("NOT_FOUND", str(exc), lang=lang)
     except Exception as exc:
         return make_error("UPSTREAM_ERROR", f"Unexpected error: {exc}", lang=lang)
 
@@ -300,11 +297,10 @@ async def sc_get_data_by_coord(
         if exc.response.status_code == 409:
             return make_error("UPSTREAM_UNAVAILABLE", _MAINTENANCE_MSG, lang=lang)
         return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
-    except ValueError as exc:
-        # "No series exists for ..." means the request was valid but identifies
-        # nothing — that is NOT_FOUND, not a service fault (Phase 20.1).
-        code = "NOT_FOUND" if "No series exists" in str(exc) else "UPSTREAM_ERROR"
-        return make_error(code, str(exc), lang=lang)
+    except NotFound as exc:
+        # Classified at the raise site (Phase 20.4). Anything else upstream-shaped
+        # falls through to the catch-all below as UPSTREAM_ERROR.
+        return make_error("NOT_FOUND", str(exc), lang=lang)
     except Exception as exc:
         return make_error("UPSTREAM_ERROR", f"Unexpected error: {exc}", lang=lang)
 
@@ -341,11 +337,10 @@ async def sc_get_data_by_date_range(
         if exc.response.status_code == 409:
             return make_error("UPSTREAM_UNAVAILABLE", _MAINTENANCE_MSG, lang=lang)
         return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
-    except ValueError as exc:
-        # "No series exists for ..." means the request was valid but identifies
-        # nothing — that is NOT_FOUND, not a service fault (Phase 20.1).
-        code = "NOT_FOUND" if "No series exists" in str(exc) else "UPSTREAM_ERROR"
-        return make_error(code, str(exc), lang=lang)
+    except NotFound as exc:
+        # Classified at the raise site (Phase 20.4). Anything else upstream-shaped
+        # falls through to the catch-all below as UPSTREAM_ERROR.
+        return make_error("NOT_FOUND", str(exc), lang=lang)
     except Exception as exc:
         return make_error("UPSTREAM_ERROR", f"Unexpected error: {exc}", lang=lang)
 
@@ -501,11 +496,10 @@ async def sc_get_sdmx_structure(
         if exc.response.status_code == 409:
             return make_error("UPSTREAM_UNAVAILABLE", _MAINTENANCE_MSG, lang=lang)
         return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
-    except ValueError as exc:
-        # An unparseable upstream body is the service's fault, not the caller's
-        # — StatCan emits malformed JSON for empty SDMX results (Phase 20.1).
-        code = "UPSTREAM_ERROR" if "unparseable body" in str(exc) else "INVALID_INPUT"
-        return make_error(code, str(exc), lang=lang)
+    except InvalidInput as exc:
+        # Classified at the raise site (Phase 20.4). An unparseable upstream body
+        # is UpstreamData and falls through to the catch-all as UPSTREAM_ERROR.
+        return make_error("INVALID_INPUT", str(exc), lang=lang)
     except Exception as exc:
         return make_error("UPSTREAM_ERROR", f"Unexpected error: {exc}", lang=lang)
 
@@ -569,11 +563,10 @@ async def sc_get_sdmx_data(
         if exc.response.status_code == 409:
             return make_error("UPSTREAM_UNAVAILABLE", _MAINTENANCE_MSG, lang=lang)
         return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
-    except ValueError as exc:
-        # An unparseable upstream body is the service's fault, not the caller's
-        # — StatCan emits malformed JSON for empty SDMX results (Phase 20.1).
-        code = "UPSTREAM_ERROR" if "unparseable body" in str(exc) else "INVALID_INPUT"
-        return make_error(code, str(exc), lang=lang)
+    except InvalidInput as exc:
+        # Classified at the raise site (Phase 20.4). An unparseable upstream body
+        # is UpstreamData and falls through to the catch-all as UPSTREAM_ERROR.
+        return make_error("INVALID_INPUT", str(exc), lang=lang)
     except Exception as exc:
         return make_error("UPSTREAM_ERROR", f"Unexpected error: {exc}", lang=lang)
 
@@ -614,11 +607,10 @@ async def sc_get_sdmx_vector_data(
         if exc.response.status_code == 409:
             return make_error("UPSTREAM_UNAVAILABLE", _MAINTENANCE_MSG, lang=lang)
         return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
-    except ValueError as exc:
-        # An unparseable upstream body is the service's fault, not the caller's
-        # — StatCan emits malformed JSON for empty SDMX results (Phase 20.1).
-        code = "UPSTREAM_ERROR" if "unparseable body" in str(exc) else "INVALID_INPUT"
-        return make_error(code, str(exc), lang=lang)
+    except InvalidInput as exc:
+        # Classified at the raise site (Phase 20.4). An unparseable upstream body
+        # is UpstreamData and falls through to the catch-all as UPSTREAM_ERROR.
+        return make_error("INVALID_INPUT", str(exc), lang=lang)
     except Exception as exc:
         return make_error("UPSTREAM_ERROR", f"Unexpected error: {exc}", lang=lang)
 
@@ -704,10 +696,9 @@ async def sc_fetch_vectors_to_store(
         if exc.response.status_code == 409:
             return make_error("UPSTREAM_UNAVAILABLE", _MAINTENANCE_MSG, lang=lang)
         return make_error("UPSTREAM_ERROR", str(exc), lang=lang)
-    except ValueError as exc:
-        # An unparseable upstream body is the service's fault, not the caller's
-        # — StatCan emits malformed JSON for empty SDMX results (Phase 20.1).
-        code = "UPSTREAM_ERROR" if "unparseable body" in str(exc) else "INVALID_INPUT"
-        return make_error(code, str(exc), lang=lang)
+    except InvalidInput as exc:
+        # Classified at the raise site (Phase 20.4). An unparseable upstream body
+        # is UpstreamData and falls through to the catch-all as UPSTREAM_ERROR.
+        return make_error("INVALID_INPUT", str(exc), lang=lang)
     except Exception as exc:
         return make_error("UPSTREAM_ERROR", f"Unexpected error: {exc}", lang=lang)

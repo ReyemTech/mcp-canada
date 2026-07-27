@@ -149,17 +149,35 @@ class TestUpstreamGuard:
         assert "test-api" in result["error"]["message"]
 
     @pytest.mark.asyncio
-    async def test_genuine_value_error_is_still_invalid_input(self):
-        """The JSONDecodeError fix must not swallow real argument validation."""
+    async def test_declared_caller_error_is_invalid_input(self):
+        """The opt-in path: only InvalidInput blames the caller (Phase 20.4).
+
+        Rewritten from a bare `raise ValueError`. That assertion encoded the
+        deny-list contract this phase inverted — under it, every unrecognised
+        ValueError subclass was reported as the caller's mistake.
+        """
         from mcp_canada.shared.envelope import upstream_guard
+        from mcp_canada.shared.errors import InvalidInput
 
         @upstream_guard("test-api")
         async def boom(lang: str = "en") -> dict:
-            raise ValueError("din must be 8 digits")
+            raise InvalidInput("din must be 8 digits")
 
         result = await boom()
         assert result["error"]["code"] == "INVALID_INPUT"
         assert "din must be 8 digits" in result["error"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_undeclared_value_error_defaults_to_upstream(self):
+        """An unclassified ValueError must NOT be blamed on the caller."""
+        from mcp_canada.shared.envelope import upstream_guard
+
+        @upstream_guard("test-api")
+        async def boom(lang: str = "en") -> dict:
+            raise ValueError("something nobody classified")
+
+        result = await boom()
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
     @pytest.mark.asyncio

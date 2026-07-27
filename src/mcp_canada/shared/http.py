@@ -13,6 +13,40 @@ from tenacity import (
 )
 
 
+def decode_json(response: httpx.Response, url: str = "") -> Any:
+    """Parse a JSON body, raising ``httpx.DecodingError`` rather than a ValueError.
+
+    ``json.JSONDecodeError`` subclasses ``ValueError``, so an upstream that
+    answers HTTP 200 with an HTML error page would otherwise be caught by the
+    ``except ValueError -> INVALID_INPUT`` arms in saskatchewan and manitoba and
+    blamed on the caller. ``httpx.DecodingError`` is an ``httpx.HTTPError`` but
+    NOT a ``ValueError``, so it bypasses those arms and reaches the catch-all
+    every tool now has.
+
+    Every shared portal client must decode through this — Phase 20.2 guarded
+    only ``api_get``, which left the ArcGIS Hub, OGC WFS and Socrata paths
+    exposed (Phase 20.3).
+    """
+    try:
+        return response.json()
+    except json.JSONDecodeError as exc:
+        where = f" from {url}" if url else ""
+        raise httpx.DecodingError(
+            f"upstream returned a non-JSON body{where}: {exc}"
+        ) from exc
+
+
+def decode_json_bytes(content: bytes, url: str = "") -> Any:
+    """``decode_json`` for callers holding raw bytes (OGC WFS reads .content)."""
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError as exc:
+        where = f" from {url}" if url else ""
+        raise httpx.DecodingError(
+            f"upstream returned a non-JSON body{where}: {exc}"
+        ) from exc
+
+
 def is_retryable(exc: BaseException) -> bool:
     """Return True if the exception warrants a retry."""
     if isinstance(exc, httpx.HTTPStatusError):
@@ -54,20 +88,6 @@ async def api_get(
         async with httpx.AsyncClient(timeout=timeout) as http:
             response = await http.get(url, params=params, headers=headers)
             response.raise_for_status()
-            try:
-                return response.json()
-            except json.JSONDecodeError as exc:
-                # An upstream that answers 200 with an HTML error page is an
-                # upstream failure, but json.JSONDecodeError subclasses
-                # ValueError and would be caught by the
-                # `except ValueError -> INVALID_INPUT` arms in statcan, ircc,
-                # manitoba, saskatchewan, nova_scotia, british_columbia and
-                # datastore — blaming the caller for someone else's outage.
-                # httpx.DecodingError is an httpx.HTTPError but NOT a
-                # ValueError, so it bypasses those arms and lands in the
-                # catch-all every module now has.
-                raise httpx.DecodingError(
-                    f"upstream returned a non-JSON body from {url}: {exc}"
-                ) from exc
+            return decode_json(response, url)
 
     return await _fetch()

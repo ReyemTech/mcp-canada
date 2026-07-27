@@ -21,6 +21,8 @@ from typing import Any
 
 import httpx
 
+from mcp_canada.shared.http import decode_json_bytes
+
 # Imported at module level; defer inside function only if circular import arises.
 from mcp_canada.shared.parsers import _parse_geojson
 
@@ -129,9 +131,8 @@ async def wfs_get_features(
 
     # Use response.content (bytes) so _parse_geojson handles JSON parsing internally.
     # We also need numberReturned for the has_more flag — parse once via json module.
-    import json as _json  # noqa: PLC0415 — avoids shadowing top-level json if user imports this
 
-    body = _json.loads(response.content)
+    body = decode_json_bytes(response.content)
     features = _parse_geojson(response.content, include_geometry=include_geometry)
     has_more = body.get("numberReturned", 0) >= count
     return features, has_more
@@ -245,9 +246,8 @@ async def wfs_count(
 
     response.raise_for_status()
 
-    import json as _json  # noqa: PLC0415
 
-    body = _json.loads(response.content)
+    body = decode_json_bytes(response.content)
     return int(body.get("totalFeatures", 0))
 
 

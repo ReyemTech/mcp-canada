@@ -16,7 +16,8 @@ points at the upstream.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+import json
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -102,3 +103,110 @@ async def test_upstream_guard_preserves_lang_on_the_envelope():
         result = await ircc_get_permanent_residents(lang="fr")
 
     assert result["error"]["lang"] == "fr"
+
+
+# ---------------------------------------------------------------------------
+# Phase 20.3 — the decode guard must cover every portal client, not just CKAN
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("module", "tool_name", "client_fn", "kwargs"),
+    [
+        ("saskatchewan", "saskatchewan_get_fire_bans", "fetch_fire_bans", {"ban_scope": "urban"}),
+        ("saskatchewan", "saskatchewan_get_crop_yields", "fetch_crop_yields", {}),
+        ("saskatchewan", "saskatchewan_get_mineral_mines", "fetch_mineral_mines", {"mineral": "potash"}),
+        ("manitoba", "manitoba_get_livestock_prices", "fetch_livestock_prices", {}),
+        ("manitoba", "manitoba_get_provincial_waterways", "fetch_provincial_waterways", {}),
+    ],
+)
+async def test_arcgis_family_tools_report_decode_failure_as_upstream(
+    module, tool_name, client_fn, kwargs
+):
+    """These five have an `except ValueError -> INVALID_INPUT` arm before their catch-all.
+
+    They must classify a decode failure as upstream. This is the downstream half
+    of the Phase 20.3 fix: shared/arcgis_hub.py now raises httpx.DecodingError
+    (not a ValueError), so it flows past that arm into the catch-all.
+    """
+    import importlib
+
+    tools = importlib.import_module(f"mcp_canada.modules.{module}.tools")
+    tool = getattr(tools, tool_name)
+
+    with patch(
+        f"mcp_canada.modules.{module}.client.{client_fn}",
+        new=AsyncMock(side_effect=httpx.DecodingError("non-JSON body")),
+    ):
+        result = await tool(lang="en", **kwargs)
+
+    code = _envelope_code(result)
+    assert code != "INVALID_INPUT", (
+        f"{tool_name} blamed the caller for a malformed upstream body"
+    )
+    assert code in TRANSIENT
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("client_module", ["arcgis_hub", "socrata"])
+async def test_portal_clients_convert_bad_json_to_decoding_error(client_module):
+    """The upstream half: a 200 carrying HTML must not surface as a ValueError.
+
+    Phase 20.2 guarded shared/http.py only. ArcGIS Hub, OGC WFS and Socrata
+    still called response.json() raw, so json.JSONDecodeError -- a ValueError --
+    reached the tools' INVALID_INPUT arms.
+    """
+    import importlib
+
+    mod = importlib.import_module(f"mcp_canada.shared.{client_module}")
+    response = MagicMock(spec=httpx.Response)
+    response.raise_for_status = MagicMock()
+    response.json.side_effect = json.JSONDecodeError("Expecting value", "<html>", 0)
+
+    with pytest.raises(httpx.DecodingError):
+        mod.decode_json(response, "https://example.test")
+
+    try:
+        mod.decode_json(response, "https://example.test")
+    except Exception as exc:  # noqa: BLE001 — asserting the type
+        assert not isinstance(exc, ValueError), (
+            "a ValueError subclass is swallowed by `except ValueError` arms"
+        )
+
+
+def test_ogc_converts_bad_json_bytes_to_decoding_error():
+    """OGC WFS reads response.content, so it needs the bytes variant."""
+    from mcp_canada.shared.ogc import decode_json_bytes
+
+    with pytest.raises(httpx.DecodingError):
+        decode_json_bytes(b"<html>503 Service Unavailable</html>")
+
+    try:
+        decode_json_bytes(b"<html>")
+    except Exception as exc:  # noqa: BLE001 — asserting the type
+        assert not isinstance(exc, ValueError)
+
+
+def test_no_shared_portal_client_decodes_json_unguarded():
+    """Structural guard: every shared client must decode through the helper.
+
+    Phase 20.3 exists because shared/http.py was fixed and the other three
+    portal clients were not. This fails if a raw decode is reintroduced.
+    """
+    import pathlib
+    import re
+
+    shared = pathlib.Path(__file__).resolve().parents[1] / "src" / "mcp_canada" / "shared"
+    offenders = []
+    for path in sorted(shared.glob("*.py")):
+        if path.name == "http.py":  # defines the helpers
+            continue
+        for i, line in enumerate(path.read_text().splitlines(), 1):
+            code = line.split("#")[0]
+            if re.search(r"\bresponse\.json\(\)", code) or re.search(r"\bjson\.loads\(", code):
+                offenders.append(f"{path.name}:{i}")
+    assert offenders == [], (
+        "raw JSON decode outside decode_json/decode_json_bytes — a malformed "
+        f"upstream body will be reported as INVALID_INPUT: {offenders}"
+    )

@@ -9,7 +9,6 @@ Public API:
 from __future__ import annotations
 
 import csv
-import json
 import re
 import ssl
 import unicodedata
@@ -18,6 +17,8 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import httpx
+
+from mcp_canada.shared.http import decode_json_bytes
 
 from mcp_canada.shared.cache import cached_fetch
 
@@ -443,7 +444,7 @@ def _parse_geojson(
         List of dicts, one per Feature. Each dict contains the Feature's
         properties. If properties is None, returns an empty dict {}.
     """
-    data = json.loads(content)
+    data = decode_json_bytes(content)
     features = data.get("features", [])
     result: list[dict[str, Any]] = []
     for feature in features:
@@ -469,7 +470,7 @@ def _parse_json(content: bytes) -> list[dict[str, Any]]:
     Returns:
         List of dicts.
     """
-    data = json.loads(content)
+    data = decode_json_bytes(content)
     if isinstance(data, list):
         return data
     if isinstance(data, dict) and "features" in data:

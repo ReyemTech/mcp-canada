@@ -18,6 +18,7 @@ Plan 07 once every tool exists.
 from __future__ import annotations
 
 import json
+import re
 from unittest.mock import AsyncMock
 
 import httpx
@@ -57,6 +58,12 @@ from mcp_canada.modules.new_brunswick.tools import (
     nb_search_gnb_socrata_datasets,
 )
 from mcp_canada.shared.errors import InvalidInput, NotFound
+
+# WR-04: `nb_` followed by one or more lowercase-alphanumeric snake_case
+# segments — rejects double underscores, missing separators, uppercase, and
+# a trailing/dangling underscore, none of which a bare `.startswith("nb_")`
+# would catch.
+_NB_TOOL_NAME_RE = re.compile(r"nb_[a-z0-9]+(?:_[a-z0-9]+)*")
 
 
 class TestNbGetCrownLandTools:
@@ -176,8 +183,30 @@ class TestAllNbToolNamesManifest:
         assert "nb_get_mineral_occurrences" not in ALL_NB_TOOL_NAMES
 
     def test_every_tool_name_uses_nb_prefix(self):
+        # WR-04: a bare `.startswith("nb_")` would also accept "nb__get_x"
+        # (double underscore) or other typo-adjacent malformed names — the
+        # full pattern enforces `nb_` followed by lowercase snake_case
+        # segments, matching the module-prefix convention documented in
+        # .claude/rules/modules.md.
         for name in ALL_NB_TOOL_NAMES:
-            assert name.startswith("nb_"), name
+            assert _NB_TOOL_NAME_RE.fullmatch(name), name
+
+    @pytest.mark.parametrize(
+        "bad_name",
+        [
+            "nb__get_x",  # double underscore
+            "nbget_x",  # missing separator after prefix
+            "nb_Get_X",  # uppercase
+            "nb_get_x_",  # trailing underscore
+            "nb_",  # prefix alone, no segment
+            "on_get_x",  # wrong prefix entirely
+        ],
+    )
+    def test_prefix_pattern_rejects_malformed_names(self, bad_name):
+        # Proves the strengthened check in the test above is actually
+        # falsifiable — a bare `.startswith("nb_")` would have let every one
+        # of these through.
+        assert not _NB_TOOL_NAME_RE.fullmatch(bad_name), bad_name
 
 
 class TestManifestMatchesShippedSurface:

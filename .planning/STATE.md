@@ -4,17 +4,17 @@ milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 current_phase: 21
 current_phase_name: new-brunswick-government-open-data
-status: executing
-stopped_at: Completed 21-06-PLAN.md
-last_updated: "2026-07-30T17:59:54.169Z"
+status: verifying
+stopped_at: Completed 21-07-PLAN.md — Phase 21 (New Brunswick) complete
+last_updated: "2026-07-30T18:36:58.184Z"
 last_activity: 2026-07-30
 last_activity_desc: Phase 21 execution started
 progress:
   total_phases: 38
-  completed_phases: 19
+  completed_phases: 20
   total_plans: 87
-  completed_plans: 86
-  percent: 50
+  completed_plans: 87
+  percent: 53
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 Phase: 21 (new-brunswick-government-open-data) — EXECUTING
 Plan: 7 of 7
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-30 — Phase 21 execution started
 
 **Open decision before execution:** Plan 21-01 Task 2 carries a blocking `checkpoint:decision`.
@@ -43,7 +43,7 @@ Phase 20.4 is COMPLETE and MERGED to main (PR #5, merge commit caa4d66).
 
 Phase 20.1 is COMPLETE and MERGED to main (PR #2, merge commit 98dee90).
 
-Progress: [██████████] 99%
+Progress: [██████████] 100%
 
 **Executed and verified:** phases 07-20, 20.1, 20.2 and 40 (17 phases, 78 plans, all verification `passed`).
 Suite at merge: 3145 passed, 2 skipped, 97.09% coverage. Live: 317 integration tests green.
@@ -228,6 +228,7 @@ Remaining backlog (not defects):
 | Phase 21 P04 | 55min | 3 tasks | 4 files |
 | Phase 21 P05 | ~30min | 2 tasks | 4 files |
 | Phase 21 P06 | ~55min | 2 tasks | 5 files |
+| Phase 21 P07 | ~50min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -429,6 +430,9 @@ Recent decisions affecting current work:
 - [Phase ?]: CIVIC_NUM interpolated as unquoted Python int — quoting it would make ArcGIS compare a number to a string and silently return nothing
 - [Phase ?]: NB health facilities: live-verified the 6 GeoNB_Health_Facilities layers' real per-layer name field (Name_E/USER_Clini/Name/Name___Nom/Pharmacy_Name) since 21-SPIKE.md only named representative fields for the wide-schema layers 2-5; a hardcoded Name_E filter against layer 3 confirmed live to 400 upstream
 - [Phase ?]: Manifest integrity: replaced the tautological ALL_NB_TOOLS = ALL_NB_TOOL_NAMES framing with TestManifestMatchesShippedSurface, a bidirectional falsifiable check proven by injecting a decoy tool at runtime
+- [Phase ?]: [Phase 21-07]: CLAUDE.md corrected — gnb.socrata.com is a live, keyless Socrata portal (312 NB datasets), overturning the prior forward-looking reuse note and 21-CONTEXT.md's false 'no NB Socrata' claim
+- [Phase ?]: [Phase 21-07]: COVERAGE.md Surface 3 corrected — GeoNB_DNR_MineralOccurrences/GeoNB_DNR_ProvincialParks moved from curated (11) to long-tail (35) to match the actually-shipped 22-tool manifest post-21-01-checkpoint
+- [Phase ?]: [Phase 21-07]: NB-01..NB-25 backfilled into REQUIREMENTS.md; NB-15/NB-16 marked complete-but-superseded by NB-09 (nb_query_geonb_layer) rather than deleted or renumbered
 
 ### Roadmap Evolution
 
@@ -467,6 +471,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-07-30T17:59:54.120Z
-Stopped at: Completed 21-06-PLAN.md
+Last session: 2026-07-30T18:36:58.118Z
+Stopped at: Completed 21-07-PLAN.md — Phase 21 (New Brunswick) complete
 Resume file: None

@@ -365,7 +365,7 @@ Plans:
 **Goal:** Ship a `new_brunswick` module exposing NB provincial data as MCP tools — the 8th province in the rollout. 22 tools: 5 federal-CKAN discovery tools (`organization:nb`, 221 datasets — NB has no provincial CKAN), 3 GeoNB ArcGIS **Server** discovery tools (the ArcGIS Hub 401s, so the REST directory is enumerated instead), 11 curated geospatial tools across flood/water, Crown land/forestry, parcels/civic address and health/education, and 3 key-gated 511 transport stubs. Follows the 7-file module pattern; adds two additive bare-ArcGIS-Server enumerator functions to `shared/arcgis_hub.py`.
 **Requirements**: NB-01..NB-25, ERR-01..ERR-07
 **Depends on:** Phase 20
-**Plans:** 6/7 plans executed
+**Plans:** 7/7 plans executed
 
 Plans:
 
@@ -392,7 +392,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 21-07-PLAN.md — Live MCP-layer integration coverage for all 22 tools, catalogue/README/CLAUDE.md sync, NB-01..NB-25 backfill, COVERAGE.md finalization
+- [x] 21-07-PLAN.md — Live MCP-layer integration coverage for all 22 tools, catalogue/README/CLAUDE.md sync, NB-01..NB-25 backfill, COVERAGE.md finalization
 
 ### Phase 22: Newfoundland and Labrador Government Open Data
 

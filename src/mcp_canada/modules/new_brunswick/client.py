@@ -31,22 +31,26 @@ from __future__ import annotations
 import os
 from typing import Any
 
+import httpx
+
 from mcp_canada.shared import arcgis_hub
 from mcp_canada.shared.cache import cached_fetch
-from mcp_canada.shared.errors import UpstreamData
+from mcp_canada.shared.errors import InvalidInput, NotFound, UpstreamData
 from mcp_canada.shared.http import api_get
+from mcp_canada.shared.parsers import fetch_and_parse
 from mcp_canada.shared.rate_limiter import get_limiter
 
 from .constants import (
     CACHE_KEY_PREFIX,
     CACHE_TTL_META,
+    CACHE_TTL_SEARCH,
     CKAN_BASE_URL,
     CROWN_LAND_FIELDS,
     CROWN_LAND_LAYER,
     CROWN_LAND_SERVICE,
     FIVE11_BASE_URL,
     FIVE11_KEY_ENV,
-    GNB_SOCRATA_DOMAIN,  # noqa: F401 — used by Plan 02
+    GNB_SOCRATA_DOMAIN,  # noqa: F401 — used by Plan 02 Task 3
     MAX_RECORDS,
     NB_ORG_FQ,
     RATE_GROUP_511,
@@ -204,6 +208,12 @@ def _shape_dataset(raw: dict[str, Any], lang: str = "en") -> dict[str, Any]:
     else:
         description = raw.get("notes")
 
+    keywords_translated: dict[str, list[str]] | None = raw.get("keywords")
+    if keywords_translated:
+        keywords = keywords_translated.get(lang) or keywords_translated.get("en") or []
+    else:
+        keywords = []
+
     raw_resources: list[dict[str, Any]] = raw.get("resources") or []
 
     return {
@@ -214,6 +224,7 @@ def _shape_dataset(raw: dict[str, Any], lang: str = "en") -> dict[str, Any]:
         "organization": raw.get("organization"),
         "num_resources": len(raw_resources),
         "tags": [t.get("name") for t in (raw.get("tags") or []) if isinstance(t, dict)],
+        "keywords": keywords,
         "resources": raw_resources[:10],
         "metadata_modified": raw.get("metadata_modified"),
     }
@@ -332,12 +343,38 @@ async def fetch_search_datasets(
     limit: int = 10,
     offset: int = 0,
     lang: str = "en",
-) -> tuple[list[dict[str, Any]], bool]:
+) -> tuple[dict[str, Any], bool]:
     """Search federal CKAN datasets filtered to organization:nb.
 
-    Plan 02 implements. Locked signature — do not change.
+    `limit` is clamped to CKAN's 100-row maximum (floored at 1); `offset` is
+    floored at 0. `fq` is always `_build_fq(extra_fq)` — the NB organization
+    clause is first and is never caller-overridable (T-21-04).
+
+    Returns ({"results": [...], "total": N}, was_cached) with each result
+    shaped through `_shape_dataset(raw, lang)`.
     """
-    raise NotImplementedError("Plan 02 implements fetch_search_datasets")
+    clamped_limit = max(1, min(limit, 100))
+    clamped_offset = max(offset, 0)
+    fq = _build_fq(extra_fq)
+    cache_key = (
+        f"{CACHE_KEY_PREFIX}search:{query}:{fq}:{clamped_limit}:{clamped_offset}:{lang}"
+    )
+
+    async def _fetch() -> dict[str, Any]:
+        params = {
+            "q": query,
+            "rows": clamped_limit,
+            "start": clamped_offset,
+            "fq": fq,
+        }
+        result = await _api_get("package_search", params)
+        raw_results = result.get("results") or []
+        return {
+            "results": [_shape_dataset(r, lang=lang) for r in raw_results],
+            "total": int(result.get("count") or 0),
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_SEARCH, _fetch)
 
 
 async def fetch_dataset_details(
@@ -346,9 +383,42 @@ async def fetch_dataset_details(
 ) -> tuple[dict[str, Any], bool]:
     """Fetch full details for a single federal CKAN dataset.
 
-    Plan 02 implements. Locked signature — do not change.
+    Raises `NotFound` on an upstream 404 (package_show for an unknown id).
+    Shaped through `_shape_dataset` plus resources (flattened to format,
+    name, url, description), license_title, license_url, date_published,
+    maintainer, frequency and spatial.
     """
-    raise NotImplementedError("Plan 02 implements fetch_dataset_details")
+    cache_key = f"{CACHE_KEY_PREFIX}details:{dataset_id}:{lang}"
+
+    async def _fetch() -> dict[str, Any]:
+        try:
+            raw = await _api_get("package_show", {"id": dataset_id})
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                raise NotFound(f"NB dataset not found: {dataset_id}") from exc
+            raise
+        shaped = _shape_dataset(raw, lang=lang)
+        shaped["resources"] = [
+            {
+                "format": r.get("format"),
+                "name": r.get("name"),
+                "url": r.get("url"),
+                "description": r.get("description"),
+            }
+            for r in (raw.get("resources") or [])
+        ]
+        shaped["license_title"] = raw.get("license_title")
+        shaped["license_url"] = raw.get("license_url")
+        shaped["date_published"] = raw.get("date_published")
+        shaped["maintainer"] = raw.get("maintainer")
+        shaped["frequency"] = raw.get("frequency")
+        shaped["spatial"] = raw.get("spatial")
+        return shaped
+
+    return await cached_fetch(cache_key, CACHE_TTL_SEARCH, _fetch)
+
+
+_PARSEABLE_RESOURCE_FORMATS: frozenset[str] = frozenset({"CSV", "XLSX", "XLS", "JSON", "GEOJSON"})
 
 
 async def fetch_query_dataset(
@@ -359,9 +429,47 @@ async def fetch_query_dataset(
 ) -> tuple[dict[str, Any], bool]:
     """Query/parse a resource from a federal CKAN NB dataset.
 
-    Plan 02 implements. Locked signature — do not change.
+    Selects `resources[resource_index]` from `fetch_dataset_details` and
+    raises `InvalidInput` when the index is out of range. CSV / XLSX / XLS /
+    JSON / GEOJSON resources are routed through `fetch_and_parse` and
+    truncated to `limit` rows. Every other format returns a metadata-only
+    payload naming the download url — this NEVER raises for an unparseable
+    format, it is a normal, describable outcome.
     """
-    raise NotImplementedError("Plan 02 implements fetch_query_dataset")
+    details, _ = await fetch_dataset_details(dataset_id, lang=lang)
+    resources: list[dict[str, Any]] = details.get("resources") or []
+    if not (0 <= resource_index < len(resources)):
+        if resources:
+            valid_range = f"0-{len(resources) - 1}"
+        else:
+            valid_range = "no resources available"
+        raise InvalidInput(
+            f"resource_index {resource_index} out of range for dataset {dataset_id} "
+            f"(valid range: {valid_range})"
+        )
+    resource = resources[resource_index]
+    fmt = (resource.get("format") or "").upper()
+    url = resource.get("url") or ""
+    cache_key = f"{CACHE_KEY_PREFIX}query:{dataset_id}:{resource_index}:{limit}"
+
+    async def _fetch() -> dict[str, Any]:
+        if fmt in _PARSEABLE_RESOURCE_FORMATS and url:
+            rows, _cached = await fetch_and_parse(url, ttl=CACHE_TTL_SEARCH)
+            return {
+                "rows": rows[:limit],
+                "resource": resource,
+                "truncated": len(rows) > limit,
+            }
+        return {
+            "rows": [],
+            "resource": resource,
+            "note": (
+                f"Format '{fmt or 'unknown'}' is not machine-parseable by this server — "
+                f"download directly from {url or '(no url provided)'}"
+            ),
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_SEARCH, _fetch)
 
 
 async def fetch_organizations(
@@ -369,19 +477,97 @@ async def fetch_organizations(
 ) -> tuple[list[dict[str, Any]], bool]:
     """List organizations among NB federal CKAN datasets.
 
-    Plan 02 implements. Locked signature — do not change.
+    NB publishes under a single federal CKAN organization (organization:nb),
+    so the useful decomposition is the publishing section (`org_section`),
+    which is empty on most packages. One package_search call (rows=1000)
+    aggregates the parent `org_title_at_publication` and every distinct
+    non-empty `org_section` into `{name, name_fr, dataset_count}` entries.
     """
-    raise NotImplementedError("Plan 02 implements fetch_organizations")
+    cache_key = f"{CACHE_KEY_PREFIX}organizations:{lang}"
+
+    async def _fetch() -> list[dict[str, Any]]:
+        params = {"q": "", "rows": 1000, "start": 0, "fq": _build_fq(None)}
+        result = await _api_get("package_search", params)
+        raw_results = result.get("results") or []
+
+        parent_title_en: str | None = None
+        parent_title_fr: str | None = None
+        section_counts: dict[str, dict[str, Any]] = {}
+
+        for raw in raw_results:
+            org_pub = raw.get("org_title_at_publication") or {}
+            if isinstance(org_pub, dict):
+                parent_title_en = parent_title_en or org_pub.get("en")
+                parent_title_fr = parent_title_fr or org_pub.get("fr")
+
+            section = raw.get("org_section") or {}
+            if isinstance(section, dict):
+                section_en = section.get("en")
+                if section_en:
+                    entry = section_counts.setdefault(
+                        section_en,
+                        {"name": section_en, "name_fr": section.get("fr"), "dataset_count": 0},
+                    )
+                    entry["dataset_count"] += 1
+
+        organizations: list[dict[str, Any]] = [
+            {
+                "name": parent_title_en or "Government of New Brunswick",
+                "name_fr": parent_title_fr or "Gouvernement du Nouveau-Brunswick",
+                "dataset_count": len(raw_results),
+            }
+        ]
+        organizations.extend(
+            sorted(
+                section_counts.values(),
+                key=lambda e: (-int(e["dataset_count"]), str(e["name"])),
+            )
+        )
+        return organizations
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 async def fetch_categories(
     lang: str = "en",
-) -> tuple[list[dict[str, Any]], bool]:
+) -> tuple[dict[str, Any], bool]:
     """List categories/groups among NB federal CKAN datasets.
 
-    Plan 02 implements. Locked signature — do not change.
+    NB packages carry an empty CKAN `groups` array (do not build this on
+    group_list) — subject, topic_category and res_format facets stand in
+    instead. One package_search call with rows=0 and facet.field requesting
+    all three facets (facet.limit=50).
+
+    Returns {"subjects": [...], "topics": [...], "formats": [...]}, each a
+    list of {name, count} sorted by count descending.
     """
-    raise NotImplementedError("Plan 02 implements fetch_categories")
+    cache_key = f"{CACHE_KEY_PREFIX}categories"
+
+    async def _fetch() -> dict[str, Any]:
+        params = {
+            "q": "",
+            "rows": 0,
+            "fq": _build_fq(None),
+            "facet.field": '["subject", "topic_category", "res_format"]',
+            "facet.limit": 50,
+        }
+        result = await _api_get("package_search", params)
+        facets = result.get("facets") or {}
+
+        def _sorted_buckets(name: str) -> list[dict[str, Any]]:
+            buckets = facets.get(name)
+            if not isinstance(buckets, dict):
+                return []
+            pairs = sorted(buckets.items(), key=lambda kv: kv[1], reverse=True)
+            return [{"name": str(k), "count": int(v)} for k, v in pairs if k]
+
+        return {
+            "subjects": _sorted_buckets("subject"),
+            "topics": _sorted_buckets("topic_category"),
+            "formats": _sorted_buckets("res_format"),
+        }
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 # ---------------------------------------------------------------------------
@@ -396,10 +582,10 @@ async def fetch_gnb_socrata_search(
 ) -> tuple[list[dict[str, Any]], bool]:
     """Search gnb.socrata.com's catalog (keyless, 312 datasets).
 
-    Plan 02 implements via `shared/socrata.py:search_catalog` +
+    Plan 02 Task 3 implements via `shared/socrata.py:search_catalog` +
     `shape_catalog_result`. Locked signature — do not change.
     """
-    raise NotImplementedError("Plan 02 implements fetch_gnb_socrata_search")
+    raise NotImplementedError("Plan 02 Task 3 implements fetch_gnb_socrata_search")
 
 
 async def fetch_gnb_socrata_query(
@@ -410,10 +596,10 @@ async def fetch_gnb_socrata_query(
 ) -> tuple[list[dict[str, Any]], bool]:
     """Query a gnb.socrata.com dataset via SoQL.
 
-    Plan 02 implements via `shared/socrata.py:query_dataset`. Locked
+    Plan 02 Task 3 implements via `shared/socrata.py:query_dataset`. Locked
     signature — do not change.
     """
-    raise NotImplementedError("Plan 02 implements fetch_gnb_socrata_query")
+    raise NotImplementedError("Plan 02 Task 3 implements fetch_gnb_socrata_query")
 
 
 # ---------------------------------------------------------------------------

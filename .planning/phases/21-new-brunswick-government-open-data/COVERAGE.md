@@ -46,7 +46,15 @@ therefore *reachable at runtime*, not unreachable — it is un-**curated**, not 
 
 ## Surface 3 — GeoNB services (all 62, live-enumerated 2026-07-30)
 
-### Curated (11 INTEGRATE)
+### Curated (9 INTEGRATE)
+
+> **Updated 2026-07-30 (21-07, closing the phase):** the original 11-row curated list below
+> included `GeoNB_DNR_MineralOccurrences` and `GeoNB_DNR_ProvincialParks` as INTEGRATE. The
+> 21-01 Task 2 blocking checkpoint (option-a: `gnb.socrata.com` joins the discovery surface via
+> two new tools) required dropping two curated tools to hold the D-08 22-tool budget — both
+> moved here, and both are documented as such in `21-01-SUMMARY.md` and `21-05-SUMMARY.md`. See
+> the long-tail section below for their reclassification; both remain reachable via
+> `nb_query_geonb_layer`, never unreachable.
 
 | capability (service) | decision | reason |
 |---|---|---|
@@ -55,8 +63,6 @@ therefore *reachable at runtime*, not unreachable — it is un-**curated**, not 
 | `GeoNB_ENV_Wetlands` | INTEGRATE | `nb_get_wetlands` (NB-12) — layer 2, 163,206 polygons (filter-required, T-21-03) |
 | `GeoNB_ELG_Contaminated_Sites` | INTEGRATE | `nb_get_contaminated_sites` (NB-13) — layer 0, 9,736 points |
 | `GeoNB_DNR_Crown_Land` | INTEGRATE | `nb_get_crown_land` (NB-14) — layer **3** (not 0), 10,001 polygons; the phase tracer |
-| `GeoNB_DNR_MineralOccurrences` | INTEGRATE | `nb_get_mineral_occurrences` (NB-15) — layer 0, 1,611 points |
-| `GeoNB_DNR_ProvincialParks` | INTEGRATE | `nb_get_provincial_parks` (NB-16) — layer 0, 24 polygons |
 | `GeoNB_SNB_Parcels` | INTEGRATE | `nb_get_parcels` (NB-17) — layer 0, 604,520 polygons (filter-required, T-21-03) |
 | `GeoNB_DPS_Civic_Address` | INTEGRATE | `nb_get_civic_addresses` (NB-18) — layer 0, 373,172 points (filter-required, T-21-03) |
 | `GeoNB_Health_Facilities` | INTEGRATE | `nb_get_health_facilities` (NB-19) — layers 0-5 facility-type dispatch |
@@ -85,12 +91,14 @@ therefore *reachable at runtime*, not unreachable — it is un-**curated**, not 
 | `GeoNB_SNB_Server_Log_Metrics` | OPT-OUT | GeoNB server telemetry — operator diagnostics, not open data |
 | `GeoNB_ScriptedUpdateTrackingData` | OPT-OUT | GeoNB internal ETL update tracking — operator diagnostics, not open data |
 
-### Long tail — reachable, un-curated (33 OPT-OUT)
+### Long tail — reachable, un-curated (35 OPT-OUT)
 
 Every row below: **reason = reachable at runtime via `nb_list_geonb_services` → `nb_get_geonb_service_layers` → `nb_query_geonb_layer`; not individually curated per D-07 (highest-value service per sub-domain), tool budget at the D-08 ceiling of 22.** Each row adds its own specific note.
 
 | capability (service) | decision | reason |
 |---|---|---|
+| `GeoNB_DNR_MineralOccurrences` | OPT-OUT | long tail (moved from Curated 2026-07-30) — reachable via `nb_query_geonb_layer(service_name="GeoNB_DNR_MineralOccurrences", layer_id=0)`, layer 0, 1,611 points; dropped by the 21-01 Task 2 checkpoint (option-a) to hold the D-08 22-tool budget after adding the two `gnb.socrata.com` tools — NB-15 in REQUIREMENTS.md is marked superseded by NB-09 |
+| `GeoNB_DNR_ProvincialParks` | OPT-OUT | long tail (moved from Curated 2026-07-30) — reachable via `nb_query_geonb_layer(service_name="GeoNB_DNR_ProvincialParks", layer_id=0)`, layer 0, 24 polygons; same 21-01 checkpoint tradeoff as `GeoNB_DNR_MineralOccurrences` — NB-16 in REQUIREMENTS.md is marked superseded by NB-09 |
 | `GeoNB_DEM_Coastal_Erosion` | OPT-OUT | long tail — reachable via `nb_query_geonb_layer`; coastal erosion is covered thematically by `GeoNB_ELG_CoastalZones`, also un-curated |
 | `GeoNB_DNR_Forest` | OPT-OUT | long tail — reachable via `nb_query_geonb_layer`; 6 treatment/location tier layers need per-tier curation beyond the budget |
 | `GeoNB_DNR_ForestSoils` | OPT-OUT | long tail — reachable via `nb_query_geonb_layer`; soils are a specialist sub-domain below the D-07 bar |
@@ -142,23 +150,29 @@ tools (D-09).
 | `get/constructionprojects` | OPT-OUT | not needed yet — shape unverifiable without a key; overlaps `get/event` |
 | any further undocumented `get/*` paths | OPT-OUT | not enumerable — every path returns `Invalid Key` before revealing whether it exists. Revisit the whole surface when a key is obtained |
 
-## Surface 5 — `gnb.socrata.com` (NB provincial Socrata portal — **discovered at plan time**)
+## Surface 5 — `gnb.socrata.com` (NB provincial Socrata portal — **resolved 2026-07-30, option-a**)
 
-> ⚠ **This surface contradicts CONTEXT.md's core premise.** 21-CONTEXT.md states NB has no
-> provincial catalogue and that "there is no NB Socrata instance". Live-verified 2026-07-30:
-> `https://gnb.socrata.com` answers `/api/catalog/v1` (**312 datasets**, 674 assets),
+> **This surface contradicted CONTEXT.md's core premise, and the contradiction was resolved in
+> New Brunswick's favour.** 21-CONTEXT.md states NB has no provincial catalogue and that "there
+> is no NB Socrata instance" — that claim is FALSE and must not be repeated. Live-verified
+> 2026-07-30: `https://gnb.socrata.com` answers `/api/catalog/v1` (**312 datasets**, 674 assets),
 > `/resource/{id}.json` SoQL and `/api/views/{id}.json` — all HTTP 200, keyless. The federal-CKAN
 > NB resource URLs point *at it* (`gnb.socrata.com/api/views/4zbh-z2ij/rows.csv`). Categories are
 > populated (`GeoNB` 26, `Public Accounts` 24, `Senior Executive Expenses` 14, `Population and
 > Demographics` 7, `Health and Wellness` 5, …). `shared/socrata.py` from Phase 20 applies with
-> **zero new client code**. See the `checkpoint:decision` in `21-01-PLAN.md` Task 2.
+> **zero new client code**. The `checkpoint:decision` in `21-01-PLAN.md` Task 2 resolved
+> **option-a**: two new `nb_` tools join the discovery surface, reusing `shared/socrata.py`
+> verbatim; D-01's federal-CKAN discovery stays locked and untouched. To hold the D-08 22-tool
+> budget after adding these two tools, `nb_get_mineral_occurrences` and `nb_get_provincial_parks`
+> were dropped to the long tail (see Surface 3 above) — both remain reachable via
+> `nb_query_geonb_layer`.
 
 | capability | decision | reason |
 |---|---|---|
-| `/api/catalog/v1` discovery (312 datasets) | OPT-OUT | gated on the 21-01 Task 2 `checkpoint:decision`; default holds locked D-01 (federal CKAN is the discovery surface). Promoted to INTEGRATE (`nb_search_gnb_datasets`) if the checkpoint selects option-a |
-| `/resource/{id}.json` SoQL reads | OPT-OUT | same gate; promoted to INTEGRATE (`nb_query_gnb_dataset`) under option-a |
-| `/api/views/{id}.json` dataset metadata | OPT-OUT | same gate; folded into `nb_query_gnb_dataset` under option-a, never a standalone tool |
-| `domain_category` aggregation | OPT-OUT | same gate; `nb_list_categories` already covers categorisation from the federal CKAN `subject`/`topic_category` facets |
+| `/api/catalog/v1` discovery (312 datasets) | INTEGRATE | `nb_search_gnb_socrata_datasets` (NB-25) — resolved by the 21-01 Task 2 checkpoint, option-a |
+| `/resource/{id}.json` SoQL reads | INTEGRATE | `nb_query_gnb_socrata_dataset` (NB-25) — resolved by the 21-01 Task 2 checkpoint, option-a |
+| `/api/views/{id}.json` dataset metadata | INTEGRATE | folded into `nb_query_gnb_socrata_dataset`, never a standalone tool — resolved by the 21-01 Task 2 checkpoint, option-a |
+| `domain_category` aggregation | OPT-OUT | `nb_list_categories` already covers categorisation from the federal CKAN `subject`/`topic_category` facets — a redundant capability, not part of the checkpoint's promoted surface |
 | `X-App-Token` authenticated reads | OPT-OUT | not needed — keyless reads verified working; matches the Nova Scotia precedent where the token slot exists but is unset |
 
 ---

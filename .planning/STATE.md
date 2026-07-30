@@ -5,15 +5,15 @@ milestone_name: Statistics Canada + Datastore
 current_phase: 21
 current_phase_name: new-brunswick-government-open-data
 status: executing
-stopped_at: Completed 21-01-PLAN.md
-last_updated: "2026-07-30T16:04:54.714Z"
+stopped_at: Completed 21-02-PLAN.md
+last_updated: "2026-07-30T16:27:32.507Z"
 last_activity: 2026-07-30
 last_activity_desc: Phase 21 execution started
 progress:
   total_phases: 38
   completed_phases: 19
   total_plans: 87
-  completed_plans: 81
+  completed_plans: 82
   percent: 50
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 21 (new-brunswick-government-open-data) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Status: Ready to execute
 Last activity: 2026-07-30 — Phase 21 execution started
 
@@ -43,7 +43,7 @@ Phase 20.4 is COMPLETE and MERGED to main (PR #5, merge commit caa4d66).
 
 Phase 20.1 is COMPLETE and MERGED to main (PR #2, merge commit 98dee90).
 
-Progress: [█████████░] 93%
+Progress: [█████████░] 94%
 
 **Executed and verified:** phases 07-20, 20.1, 20.2 and 40 (17 phases, 78 plans, all verification `passed`).
 Suite at merge: 3145 passed, 2 skipped, 97.09% coverage. Live: 317 integration tests green.
@@ -223,6 +223,7 @@ Remaining backlog (not defects):
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 21 P01 | 24min | 4 tasks | 15 files |
+| Phase 21 P02 | 35min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -414,6 +415,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 21-01]: nb_get_provincial_parks and nb_get_mineral_occurrences dropped to the long tail (reachable via nb_query_geonb_layer) to hold the 22-tool budget after adding the two Socrata tools
 - [Phase ?]: [Phase 21-01]: All 11 curated GeoNB layer ids in 21-RESEARCH.md live-CONFIRMED in 21-SPIKE.md — zero constants.py corrections needed
 - [Phase ?]: [Phase 21-01]: Added a fourth module-level rate limiter (_socrata_limiter) since gnb.socrata.com is a fourth upstream surface introduced by the checkpoint decision
+- [Phase ?]: Checkpoint option-a (gnb.socrata.com) implemented in 21-02: two new nb_ tools reuse shared/socrata.py verbatim, zero new dependencies
+- [Phase ?]: tools.ALL_NB_TOOLS aliases constants.ALL_NB_TOOL_NAMES directly (not a manually-grown list) so the two files can never silently drift across Plans 02-06
 
 ### Roadmap Evolution
 
@@ -452,6 +455,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-07-30T16:04:54.676Z
-Stopped at: Completed 21-01-PLAN.md
+Last session: 2026-07-30T16:27:32.466Z
+Stopped at: Completed 21-02-PLAN.md
 Resume file: None

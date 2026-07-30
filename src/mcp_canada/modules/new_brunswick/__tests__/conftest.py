@@ -250,6 +250,46 @@ EMPTY_FEATURE_COLLECTION_GEOJSON: dict[str, Any] = {
     "features": [],
 }
 
+# Health facility fixture — layer 0 (Hospital/Horizon) compact schema,
+# live-verified field names (21-SPIKE.md §4 plus this plan's own probe).
+HEALTH_FACILITY_GEOJSON: dict[str, Any] = {
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "properties": {
+                "OBJECTID": 1,
+                "Hospital_N": "Dr. Everett Chalmers Regional Hospital",
+                "Hospital_O": "Regional Hospital Corporation",
+                "Name_E": "Dr. Everett Chalmers Regional Hospital",
+                "Name_F": "Hôpital régional Dr-Everett-Chalmers",
+                "Telephone_": "(506) 452-5400",
+            },
+            "geometry": None,
+        },
+    ],
+}
+
+# Public school fixture — layers 0/1 share one field schema (21-SPIKE.md §4).
+PUBLIC_SCHOOL_GEOJSON: dict[str, Any] = {
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "properties": {
+                "OBJECTID": 2,
+                "strID": "4010",
+                "strDST": "ASD-N",
+                "strNM": "Harcourt School",
+                "strAD1": "155 West Side Harcourt Rd",
+                "strGR": "Kindergarten, 1-5",
+                "strURL": "http://harcourtschool.nbed.nb.ca",
+            },
+            "geometry": None,
+        },
+    ],
+}
+
 
 # ---------------------------------------------------------------------------
 # NB 511 fixtures (key-gated — only exercised when NEW_BRUNSWICK_511_KEY is set)
@@ -368,3 +408,13 @@ def geonb_mapserver_layers_sample() -> dict[str, Any]:
 @pytest.fixture
 def five11_event_sample() -> list[dict[str, Any]]:
     return FIVE11_EVENT_SAMPLE
+
+
+@pytest.fixture
+def health_facility_geojson() -> dict[str, Any]:
+    return HEALTH_FACILITY_GEOJSON
+
+
+@pytest.fixture
+def public_school_geojson() -> dict[str, Any]:
+    return PUBLIC_SCHOOL_GEOJSON

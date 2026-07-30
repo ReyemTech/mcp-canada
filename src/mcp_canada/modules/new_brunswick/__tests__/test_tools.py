@@ -4,10 +4,11 @@ TestNbGetCrownLandTools is the Task 1 tracer, fully tested. Plan 02 Task 2
 implements + tests the five federal-CKAN discovery tools; Task 3 implements +
 tests the two gnb.socrata.com tools (checkpoint option-a). Plan 05 implements
 + tests nb_get_parcels / nb_get_civic_addresses — the two FILTER_REQUIRED_TOOLS
-large layers, each proven via a not-awaited guard test. Every remaining tool
-in constants.ALL_NB_TOOL_NAMES gets a placeholder class asserting membership
-in the locked manifest, until its owning plan implements the tool itself (at
-which point the placeholder is replaced with real behavior tests).
+large layers, each proven via a not-awaited guard test. Plan 06 Task 1
+implements + tests nb_get_health_facilities / nb_get_public_schools — the two
+dispatch tools. nb_get_road_events / nb_get_winter_road_conditions /
+nb_get_traffic_cameras remain placeholders until Plan 06 Task 2, which also
+adds TestManifestMatchesShippedSurface once the 22-tool manifest is complete.
 TestNbEnvelopes / TestNbLangParam are parametrized by Plan 07 once every tool
 exists.
 """
@@ -19,7 +20,13 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
-from mcp_canada.modules.new_brunswick.constants import ALL_NB_TOOL_NAMES, CROWN_LAND_SERVICE, MAX_RECORDS
+from mcp_canada.modules.new_brunswick.constants import (
+    ALL_NB_TOOL_NAMES,
+    CROWN_LAND_SERVICE,
+    HEALTH_FACILITY_LAYERS,
+    MAX_RECORDS,
+    SCHOOL_SECTOR_LAYERS,
+)
 from mcp_canada.modules.new_brunswick.tools import (
     nb_get_civic_addresses,
     nb_get_contaminated_sites,
@@ -27,8 +34,10 @@ from mcp_canada.modules.new_brunswick.tools import (
     nb_get_dataset_details,
     nb_get_flood_hazard_areas,
     nb_get_geonb_service_layers,
+    nb_get_health_facilities,
     nb_get_historical_floods,
     nb_get_parcels,
+    nb_get_public_schools,
     nb_get_wetlands,
     nb_list_categories,
     nb_list_geonb_services,
@@ -161,11 +170,6 @@ class TestAllNbToolNamesManifest:
     def test_every_tool_name_uses_nb_prefix(self):
         for name in ALL_NB_TOOL_NAMES:
             assert name.startswith("nb_"), name
-
-
-# ---------------------------------------------------------------------------
-# Placeholder classes — one per remaining tool (owning plan implements + tests)
-# ---------------------------------------------------------------------------
 
 
 class TestNbSearchDatasets:
@@ -946,11 +950,196 @@ class TestNbGetCivicAddresses:
 
 
 class TestNbGetHealthFacilities:
-    """Plan 06 implements + tests."""
+    @pytest.mark.asyncio
+    async def test_invalid_facility_type_returns_invalid_input_without_network_call(
+        self, monkeypatch
+    ):
+        mock_fetch = AsyncMock()
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_health_facilities",
+            mock_fetch,
+        )
+
+        result = await nb_get_health_facilities(facility_type="not-a-real-type", lang="en")
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        assert result["error"]["valid"] == sorted(HEALTH_FACILITY_LAYERS)
+        mock_fetch.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_happy_path_envelope(self, monkeypatch):
+        payload = {
+            "features": [{"Name_E": "Dr. Everett Chalmers Regional Hospital"}],
+            "count": 1,
+            "truncated": False,
+            "facility_type": "hospital_horizon",
+        }
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_health_facilities",
+            mock_fetch,
+        )
+
+        result = await nb_get_health_facilities(facility_type="hospital_horizon", lang="en")
+
+        assert "error" not in result
+        assert result["_meta"]["source"]["api"] == "new-brunswick-geonb"
+        assert result["data"]["count"] == 1
+        mock_fetch.assert_awaited_once_with(
+            facility_type="hospital_horizon", name=None, limit=MAX_RECORDS
+        )
+
+    @pytest.mark.asyncio
+    async def test_name_filter_passed_through(self, monkeypatch):
+        payload = {"features": [], "count": 0, "truncated": False}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_health_facilities",
+            mock_fetch,
+        )
+
+        await nb_get_health_facilities(facility_type="pharmacy", name="Shoppers", lang="en")
+
+        mock_fetch.assert_awaited_once_with(
+            facility_type="pharmacy", name="Shoppers", limit=MAX_RECORDS
+        )
+
+    @pytest.mark.asyncio
+    async def test_client_invalid_input_second_line_of_defence_also_returns_invalid_input(
+        self, monkeypatch
+    ):
+        mock_fetch = AsyncMock(
+            side_effect=InvalidInput("facility_type must be one of [...]")
+        )
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_health_facilities",
+            mock_fetch,
+        )
+
+        result = await nb_get_health_facilities(facility_type="hospital_horizon", lang="en")
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        mock_fetch.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_connect_error_returns_upstream_error_envelope(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=httpx.ConnectError("boom"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_health_facilities",
+            mock_fetch,
+        )
+
+        result = await nb_get_health_facilities(facility_type="hospital_horizon", lang="en")
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_fr_sets_meta_lang_and_distinct_invalid_message(self, monkeypatch):
+        en = await nb_get_health_facilities(facility_type="not-a-real-type", lang="en")
+        fr = await nb_get_health_facilities(facility_type="not-a-real-type", lang="fr")
+
+        assert en["error"]["message"] != fr["error"]["message"]
+        assert fr["error"]["lang"] == "fr"
 
 
 class TestNbGetPublicSchools:
-    """Plan 06 implements + tests."""
+    @pytest.mark.asyncio
+    async def test_invalid_sector_returns_invalid_input_without_network_call(
+        self, monkeypatch
+    ):
+        mock_fetch = AsyncMock()
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_public_schools",
+            mock_fetch,
+        )
+
+        result = await nb_get_public_schools(sector="not-a-real-sector", lang="en")
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        assert result["error"]["valid"] == sorted(SCHOOL_SECTOR_LAYERS)
+        mock_fetch.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_happy_path_default_sector_envelope(self, monkeypatch):
+        payload = {
+            "features": [{"strID": "4010", "strNM": "Harcourt School"}],
+            "count": 1,
+            "truncated": False,
+        }
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_public_schools",
+            mock_fetch,
+        )
+
+        result = await nb_get_public_schools(lang="en")
+
+        assert "error" not in result
+        assert result["_meta"]["source"]["api"] == "new-brunswick-geonb"
+        assert result["data"]["count"] == 1
+        mock_fetch.assert_awaited_once_with(
+            sector="anglophone", district=None, limit=MAX_RECORDS
+        )
+
+    @pytest.mark.asyncio
+    async def test_district_filter_passed_through(self, monkeypatch):
+        payload = {"features": [], "count": 0, "truncated": False}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_public_schools",
+            mock_fetch,
+        )
+
+        await nb_get_public_schools(sector="francophone", district="DSF-S", lang="en")
+
+        mock_fetch.assert_awaited_once_with(
+            sector="francophone", district="DSF-S", limit=MAX_RECORDS
+        )
+
+    @pytest.mark.asyncio
+    async def test_client_invalid_input_second_line_of_defence_also_returns_invalid_input(
+        self, monkeypatch
+    ):
+        mock_fetch = AsyncMock(side_effect=InvalidInput("sector must be one of [...]"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_public_schools",
+            mock_fetch,
+        )
+
+        result = await nb_get_public_schools(lang="en")
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        mock_fetch.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_timeout_returns_upstream_error_envelope(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=httpx.TimeoutException("boom"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_public_schools",
+            mock_fetch,
+        )
+
+        result = await nb_get_public_schools(lang="en")
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_lang_fr_sets_meta_lang(self, monkeypatch):
+        payload = {"features": [], "count": 0, "truncated": False}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_public_schools",
+            mock_fetch,
+        )
+
+        result = await nb_get_public_schools(lang="fr")
+
+        assert result["_meta"]["lang"] == "fr"
+
+
+# ---------------------------------------------------------------------------
+# NB 511 — three key-gated transport tools (Task 2, D-09/D-10)
+# ---------------------------------------------------------------------------
 
 
 class TestNbGetRoadEvents:

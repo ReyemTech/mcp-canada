@@ -35,9 +35,13 @@ from .constants import (
     FLOOD_HAZARD_SERVICE,
     GEONB_BASE_URL,
     GNB_SOCRATA_DOMAIN,
+    HEALTH_FACILITIES_SERVICE,
+    HEALTH_FACILITY_LAYERS,
     HISTORICAL_FLOODS_SERVICE,
     MAX_RECORDS,
     PARCELS_SERVICE,
+    PUBLIC_SCHOOLS_SERVICE,
+    SCHOOL_SECTOR_LAYERS,
     WETLANDS_SERVICE,
 )
 
@@ -72,6 +76,8 @@ __all__ = [
     "nb_get_contaminated_sites",
     "nb_get_parcels",
     "nb_get_civic_addresses",
+    "nb_get_health_facilities",
+    "nb_get_public_schools",
 ]
 
 
@@ -723,4 +729,107 @@ async def nb_get_civic_addresses(
         lang=lang,
     )
 
+
+# ---------------------------------------------------------------------------
+# Health / education — dispatch tools over locked constant layer maps (Task 1)
+# ---------------------------------------------------------------------------
+
+
+@tool
+@upstream_guard(_API_NAME_GEONB)
+async def nb_get_health_facilities(
+    facility_type: str,
+    name: str | None = None,
+    limit: int = MAX_RECORDS,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get New Brunswick health facilities from GeoNB (GeoNB_Health_Facilities),
+    dispatched by facility_type across 6 separate layers.
+
+    Use for: finding NB hospitals, after-hours clinics, adult residential
+    centres, nursing homes or pharmacies in one tool. facility_type is
+    REQUIRED and must be one of: hospital_horizon, hospital_vitalite,
+    after_hours_clinic, adult_residential_centre, nursing_home, pharmacy — an
+    unrecognized value returns INVALID_INPUT with the valid list before any
+    network call. New Brunswick's two regional health authorities (Horizon
+    and Vitalité) publish hospitals on SEPARATE layers, so an agent wanting
+    every hospital calls this tool once per authority. name AND-s a
+    case-insensitive containment filter on the live-verified name field for
+    the dispatched layer (Name_E for both hospital authorities, USER_Clini
+    for after-hours clinics, Name for adult residential centres, Name___Nom
+    for nursing homes, Pharmacy_Name for pharmacies) — never a hardcoded
+    Name_E, since most non-hospital layers do not carry that field.
+
+    Keywords: new brunswick health facilities hospital horizon vitalite after hours clinic nursing home pharmacy adult residential geonb health authority regional dispatch
+    """
+    if facility_type not in HEALTH_FACILITY_LAYERS:
+        valid = sorted(HEALTH_FACILITY_LAYERS)
+        msg = (
+            f"Type d'établissement invalide : {facility_type!r}. Valeurs valides : {valid}"
+            if lang == "fr"
+            else f"Invalid facility_type: {facility_type!r}. Valid values: {valid}"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=valid)
+    try:
+        payload, cached = await _client.fetch_health_facilities(
+            facility_type=facility_type, name=name, limit=limit
+        )
+    except InvalidInput as exc:
+        valid = sorted(HEALTH_FACILITY_LAYERS)
+        msg = f"Paramètre invalide : {exc}" if lang == "fr" else f"Invalid input: {exc}"
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=valid)
+    return make_response(
+        payload,
+        api_name=_API_NAME_GEONB,
+        api_url=HEALTH_FACILITIES_SERVICE,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+@upstream_guard(_API_NAME_GEONB)
+async def nb_get_public_schools(
+    sector: str = "anglophone",
+    district: str | None = None,
+    limit: int = MAX_RECORDS,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get New Brunswick public schools from GeoNB (GeoNB_EECD_PublicSchools),
+    dispatched by sector.
+
+    Use for: finding NB public schools in the anglophone (206 schools) or
+    francophone (89 schools) system. sector must be "anglophone" (default) or
+    "francophone" — New Brunswick runs two PARALLEL, separately-administered
+    school systems, so sector is a required dispatch, not an optional filter;
+    an unrecognized value returns INVALID_INPUT with the valid list before
+    any network call. district AND-s a case-insensitive containment filter on
+    the school district code (strDST) — live-verified codes: ASD-E, ASD-N,
+    ASD-S, ASD-W for anglophone; DSF-NE, DSF-NO, DSF-S for francophone.
+
+    Keywords: new brunswick public schools anglophone francophone school district education eecd grade level geonb bilingual sector dispatch
+    """
+    if sector not in SCHOOL_SECTOR_LAYERS:
+        valid = sorted(SCHOOL_SECTOR_LAYERS)
+        msg = (
+            f"Secteur invalide : {sector!r}. Valeurs valides : {valid}"
+            if lang == "fr"
+            else f"Invalid sector: {sector!r}. Valid values: {valid}"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=valid)
+    try:
+        payload, cached = await _client.fetch_public_schools(
+            sector=sector, district=district, limit=limit
+        )
+    except InvalidInput as exc:
+        valid = sorted(SCHOOL_SECTOR_LAYERS)
+        msg = f"Paramètre invalide : {exc}" if lang == "fr" else f"Invalid input: {exc}"
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=valid)
+    return make_response(
+        payload,
+        api_name=_API_NAME_GEONB,
+        api_url=PUBLIC_SCHOOLS_SERVICE,
+        cached=cached,
+        lang=lang,
+    )
 

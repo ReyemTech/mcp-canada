@@ -60,6 +60,8 @@ from .constants import (
     GEONB_BASE_URL,
     GEONB_EXCLUDED_SERVICES,
     GNB_SOCRATA_DOMAIN,
+    HEALTH_FACILITIES_SERVICE,
+    HEALTH_FACILITY_LAYERS,
     HISTORICAL_FLOODS_1973_LAYER,
     HISTORICAL_FLOODS_LAYER,
     HISTORICAL_FLOODS_SERVICE,
@@ -67,6 +69,7 @@ from .constants import (
     NB_ORG_FQ,
     PARCELS_LAYER,
     PARCELS_SERVICE,
+    PUBLIC_SCHOOLS_SERVICE,
     RATE_GROUP_511,
     RATE_GROUP_CKAN,
     RATE_GROUP_GEONB,
@@ -75,6 +78,7 @@ from .constants import (
     RATE_LIMIT_CKAN,
     RATE_LIMIT_GEONB,
     RATE_LIMIT_SOCRATA,
+    SCHOOL_SECTOR_LAYERS,
     USER_AGENT,
     WETLANDS_LAYER,
     WETLANDS_SERVICE,
@@ -1112,6 +1116,25 @@ async def fetch_civic_addresses(
 # Health / education + 511 — Plan 06 fills bodies
 # ---------------------------------------------------------------------------
 
+# GeoNB_Health_Facilities publishes two distinct raw schemas across its 6
+# layers (21-SPIKE.md §4): layers 0-1 (hospitals) are the compact
+# Name_E/Telephone_ shape, layers 2-5 are a wide Esri-geocoder-derived shape
+# that SPIKE names only representative fields for, not an exhaustive list.
+# Live-verified 2026-07-30 (this plan) against
+# https://geonb.snb.ca/arcgis/rest/services/GeoNB_Health_Facilities/MapServer/{0..5}?f=json
+# to find the real per-layer field that holds the facility name, so a `name`
+# containment filter never sends a WHERE clause referencing a field that
+# layer does not have (a bare Name_E filter against layer 3, for example,
+# returns an upstream HTTP 400 "Failed to execute query").
+_HEALTH_FACILITY_NAME_FIELD: dict[str, str] = {
+    "hospital_horizon": "Name_E",
+    "hospital_vitalite": "Name_E",
+    "after_hours_clinic": "USER_Clini",
+    "adult_residential_centre": "Name",
+    "nursing_home": "Name___Nom",
+    "pharmacy": "Pharmacy_Name",
+}
+
 
 async def fetch_health_facilities(
     facility_type: str,
@@ -1121,9 +1144,36 @@ async def fetch_health_facilities(
     """Fetch health facilities (GeoNB_Health_Facilities, HEALTH_FACILITY_LAYERS
     dispatch by facility_type).
 
-    Plan 06 implements. Locked signature — do not change.
+    `facility_type` must be a key of HEALTH_FACILITY_LAYERS — an unknown value
+    raises `InvalidInput` listing the sorted valid keys before any network
+    call. `out_fields` is always `"*"` because the 6 layers do not share one
+    field schema (see `_HEALTH_FACILITY_NAME_FIELD` above); `name` AND-s a
+    case-insensitive containment clause on the live-verified name field for
+    the dispatched layer rather than assuming `Name_E` exists everywhere.
     """
-    raise NotImplementedError("Plan 06 implements fetch_health_facilities")
+    if facility_type not in HEALTH_FACILITY_LAYERS:
+        valid = sorted(HEALTH_FACILITY_LAYERS)
+        raise InvalidInput(
+            f"facility_type must be one of {valid}, got {facility_type!r}"
+        )
+    layer_id = HEALTH_FACILITY_LAYERS[facility_type]
+    where: str | None = None
+    if name:
+        name_field = _HEALTH_FACILITY_NAME_FIELD[facility_type]
+        where = _upper_contains_clause(name_field, name)
+    cache_key = f"{CACHE_KEY_PREFIX}health_facilities:{facility_type}:{name}:{limit}"
+    payload, cached = await _geonb_query(
+        HEALTH_FACILITIES_SERVICE,
+        layer_id=layer_id,
+        where=where,
+        out_fields="*",
+        include_geometry=False,
+        limit=limit,
+        ttl=CACHE_TTL_META,
+        cache_key=cache_key,
+    )
+    payload["facility_type"] = facility_type
+    return payload, cached
 
 
 async def fetch_public_schools(
@@ -1134,9 +1184,29 @@ async def fetch_public_schools(
     """Fetch public schools (GeoNB_EECD_PublicSchools, SCHOOL_SECTOR_LAYERS
     dispatch by sector).
 
-    Plan 06 implements. Locked signature — do not change.
+    `sector` must be a key of SCHOOL_SECTOR_LAYERS ("anglophone" or
+    "francophone") — an unknown value raises `InvalidInput` listing the
+    sorted valid keys before any network call. `district` builds a
+    case-insensitive containment clause on `strDST` — live-verified 2026-07-30
+    short codes: ASD-E/ASD-N/ASD-S/ASD-W (anglophone), DSF-NE/DSF-NO/DSF-S
+    (francophone). Both layers share the same field schema (21-SPIKE.md §4).
     """
-    raise NotImplementedError("Plan 06 implements fetch_public_schools")
+    if sector not in SCHOOL_SECTOR_LAYERS:
+        valid = sorted(SCHOOL_SECTOR_LAYERS)
+        raise InvalidInput(f"sector must be one of {valid}, got {sector!r}")
+    layer_id = SCHOOL_SECTOR_LAYERS[sector]
+    where = _upper_contains_clause("strDST", district) if district else None
+    cache_key = f"{CACHE_KEY_PREFIX}public_schools:{sector}:{district}:{limit}"
+    return await _geonb_query(
+        PUBLIC_SCHOOLS_SERVICE,
+        layer_id=layer_id,
+        where=where,
+        out_fields="strID,strDST,strNM,strAD1,strGR,strURL",
+        include_geometry=False,
+        limit=limit,
+        ttl=CACHE_TTL_META,
+        cache_key=cache_key,
+    )
 
 
 async def fetch_road_events() -> tuple[list[dict[str, Any]], bool]:

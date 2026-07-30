@@ -9,9 +9,11 @@ and TestFetchGnbSocrataQuery. Plan 04 fills TestFetchGeonbServices,
 TestFetchGeonbServiceLayers, TestFetchGeonbLayerFeatures,
 TestFetchFloodHazardAreas, TestFetchHistoricalFloods, TestFetchWetlands and
 TestFetchContaminatedSites. Plan 05 fills TestFetchParcels and
-TestFetchCivicAddresses (the two FILTER_REQUIRED_TOOLS large layers). Every
-remaining `fetch_*` stub still gets a placeholder class asserting it raises
-NotImplementedError until its owning plan fills the body.
+TestFetchCivicAddresses (the two FILTER_REQUIRED_TOOLS large layers). Plan 06
+Task 1 fills TestFetchHealthFacilities and TestFetchPublicSchools (the two
+dispatch tools). TestFetchRoadEvents, TestFetchWinterRoadConditions and
+TestFetchTrafficCameras remain placeholders — Plan 06 Task 2 fills them,
+closing the 22-tool manifest.
 """
 
 from __future__ import annotations
@@ -22,7 +24,13 @@ import httpx
 import pytest
 
 from mcp_canada.modules.new_brunswick import client as nb_client
-from mcp_canada.modules.new_brunswick.constants import CROWN_LAND_LAYER, FIVE11_KEY_ENV, NB_ORG_FQ
+from mcp_canada.modules.new_brunswick.constants import (
+    CROWN_LAND_LAYER,
+    FIVE11_KEY_ENV,
+    HEALTH_FACILITY_LAYERS,
+    NB_ORG_FQ,
+    SCHOOL_SECTOR_LAYERS,
+)
 from mcp_canada.shared.errors import InvalidInput, NotFound
 
 
@@ -1071,11 +1079,170 @@ class TestFetchCivicAddresses:
 
 
 class TestFetchHealthFacilities:
-    """Plan 06 fills this."""
+    @pytest.mark.asyncio
+    async def test_invalid_facility_type_raises_invalid_input_before_any_network_call(
+        self, monkeypatch
+    ):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        with pytest.raises(InvalidInput) as exc_info:
+            await nb_client.fetch_health_facilities("not-a-real-type")
+
+        assert "hospital_horizon" in str(exc_info.value)
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("facility_type, layer_id", sorted(HEALTH_FACILITY_LAYERS.items()))
+    async def test_dispatches_correct_layer_id_for_every_key(
+        self, monkeypatch, facility_type, layer_id
+    ):
+        # This is the assertion that would have caught the Saskatchewan
+        # wrong-layer bug: read the dispatched layer id from call_args, not
+        # from the mocked return value.
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_health_facilities(facility_type)
+
+        assert mock_query.call_args.kwargs["layer_id"] == layer_id
+
+    @pytest.mark.asyncio
+    async def test_no_name_sends_falsy_where(self, monkeypatch, health_facility_geojson):
+        features = [f["properties"] for f in health_facility_geojson["features"]]
+        mock_query = AsyncMock(return_value=(features, False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, cached = await nb_client.fetch_health_facilities("hospital_horizon")
+
+        assert mock_query.call_args.kwargs["where"] is None
+        assert cached is False
+        assert payload["count"] == len(features)
+        assert payload["facility_type"] == "hospital_horizon"
+
+    @pytest.mark.asyncio
+    async def test_name_filter_uses_name_e_for_hospital_layers(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_health_facilities("hospital_horizon", name="Chalmers")
+
+        assert mock_query.call_args.kwargs["where"] == "UPPER(Name_E) LIKE '%CHALMERS%'"
+
+    @pytest.mark.asyncio
+    async def test_name_filter_dispatches_to_layer_specific_field(self, monkeypatch):
+        # Layer 3 (adult_residential_centre) does NOT carry Name_E — live-
+        # verified 2026-07-30, a WHERE clause referencing it 400s upstream.
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_health_facilities("pharmacy", name="Shoppers")
+
+        assert mock_query.call_args.kwargs["where"] == "UPPER(Pharmacy_Name) LIKE '%SHOPPERS%'"
+
+    @pytest.mark.asyncio
+    async def test_out_fields_is_wildcard_because_layers_do_not_share_a_schema(
+        self, monkeypatch
+    ):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_health_facilities("adult_residential_centre")
+
+        assert mock_query.call_args.kwargs["out_fields"] == "*"
+
+    @pytest.mark.asyncio
+    async def test_empty_result_is_success_not_error(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, _cached = await nb_client.fetch_health_facilities("hospital_vitalite")
+
+        assert payload["count"] == 0
+        assert payload["features"] == []
 
 
 class TestFetchPublicSchools:
-    """Plan 06 fills this."""
+    @pytest.mark.asyncio
+    async def test_invalid_sector_raises_invalid_input_before_any_network_call(
+        self, monkeypatch
+    ):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        with pytest.raises(InvalidInput) as exc_info:
+            await nb_client.fetch_public_schools(sector="not-a-real-sector")
+
+        assert "anglophone" in str(exc_info.value)
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("sector, layer_id", sorted(SCHOOL_SECTOR_LAYERS.items()))
+    async def test_dispatches_correct_layer_id_for_every_key(
+        self, monkeypatch, sector, layer_id
+    ):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_public_schools(sector=sector)
+
+        assert mock_query.call_args.kwargs["layer_id"] == layer_id
+
+    @pytest.mark.asyncio
+    async def test_default_sector_is_anglophone(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_public_schools()
+
+        assert mock_query.call_args.kwargs["layer_id"] == SCHOOL_SECTOR_LAYERS["anglophone"]
+
+    @pytest.mark.asyncio
+    async def test_district_builds_upper_containment_where(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_public_schools(district="ASD-N")
+
+        assert mock_query.call_args.kwargs["where"] == "UPPER(strDST) LIKE '%ASD-N%'"
+
+    @pytest.mark.asyncio
+    async def test_no_district_sends_falsy_where(self, monkeypatch, public_school_geojson):
+        features = [f["properties"] for f in public_school_geojson["features"]]
+        mock_query = AsyncMock(return_value=(features, False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, _cached = await nb_client.fetch_public_schools()
+
+        assert mock_query.call_args.kwargs["where"] is None
+        assert payload["count"] == len(features)
+
+    @pytest.mark.asyncio
+    async def test_features_carry_id_name_address_grade_url(
+        self, monkeypatch, public_school_geojson
+    ):
+        features = [f["properties"] for f in public_school_geojson["features"]]
+        mock_query = AsyncMock(return_value=(features, False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, _cached = await nb_client.fetch_public_schools()
+
+        feature = payload["features"][0]
+        assert feature["strID"] == "4010"
+        assert feature["strNM"] == "Harcourt School"
+        assert feature["strAD1"]
+        assert feature["strGR"]
+        assert feature["strURL"]
+
+    @pytest.mark.asyncio
+    async def test_empty_result_is_success_not_error(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, _cached = await nb_client.fetch_public_schools(sector="francophone")
+
+        assert payload["count"] == 0
+        assert payload["features"] == []
 
 
 class TestFetchRoadEvents:
@@ -1105,20 +1272,14 @@ class TestStubsRaiseNotImplementedError:
     are implemented by Plan 02, fetch_geonb_services,
     fetch_geonb_service_layers, fetch_geonb_layer_features,
     fetch_flood_hazard_areas, fetch_historical_floods, fetch_wetlands and
-    fetch_contaminated_sites by Plan 04, and fetch_parcels /
-    fetch_civic_addresses by Plan 05 — all removed from this contract, see
-    TestFetchSearchDatasets et al., TestFetchGeonbServices et al. and
-    TestFetchParcels / TestFetchCivicAddresses above."""
-
-    @pytest.mark.asyncio
-    async def test_fetch_health_facilities(self):
-        with pytest.raises(NotImplementedError):
-            await nb_client.fetch_health_facilities("hospital_horizon")
-
-    @pytest.mark.asyncio
-    async def test_fetch_public_schools(self):
-        with pytest.raises(NotImplementedError):
-            await nb_client.fetch_public_schools()
+    fetch_contaminated_sites by Plan 04, fetch_parcels / fetch_civic_addresses
+    by Plan 05, and fetch_health_facilities / fetch_public_schools by Plan 06
+    Task 1 — all removed from this contract, see TestFetchSearchDatasets et
+    al., TestFetchGeonbServices et al., TestFetchParcels /
+    TestFetchCivicAddresses and TestFetchHealthFacilities /
+    TestFetchPublicSchools above. fetch_road_events,
+    fetch_winter_road_conditions and fetch_traffic_cameras remain stubs until
+    Plan 06 Task 2."""
 
     @pytest.mark.asyncio
     async def test_fetch_road_events(self):

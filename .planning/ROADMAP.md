@@ -376,7 +376,7 @@ Plans:
 **Wave 1** *(blocked on Wave 0 completion; 21-02 and 21-03 run in parallel — disjoint files)*
 
 - [x] 21-02-PLAN.md — Federal CKAN discovery: 5 tools, bilingual `title_translated`/`notes_translated` resolution, outgoing-param contract test
-- [ ] 21-03-PLAN.md — 6 prompts + 7 zero-parameter resources (GeoNB catalogue, counties, health/school dispatch, portal guide, query guide, report template)
+- [x] 21-03-PLAN.md — 6 prompts + 7 zero-parameter resources (GeoNB catalogue, counties, health/school dispatch, portal guide, query guide, report template)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

@@ -234,7 +234,8 @@ async def nb_query_dataset(
     Use for: pulling actual rows out of a CSV, XLSX, XLS, JSON or GeoJSON NB resource.
     A resource in a format this server cannot parse (PDF, ZIP, KML, SHP, ...) returns a
     metadata-only success naming the download url — never an error. An out-of-range
-    resource_index returns INVALID_INPUT naming the valid range.
+    resource_index returns INVALID_INPUT naming the valid range. A limit <= 0 returns
+    INVALID_INPUT without a network call.
 
     Keywords: new brunswick nouveau-brunswick gnb query dataset resource csv xlsx json geojson download rows ckan federal
     """
@@ -243,19 +244,29 @@ async def nb_query_dataset(
             dataset_id, resource_index=resource_index, limit=limit, lang=lang
         )
     except InvalidInput as exc:
-        valid_range: str | None = None
-        try:
-            details_payload, _ = await _client.fetch_dataset_details(dataset_id, lang=lang)
-            num_resources = len(details_payload.get("resources") or [])
-            valid_range = f"0-{num_resources - 1}" if num_resources else "no resources available"
-        except Exception:
-            valid_range = None
-        msg = (
-            f"Index de ressource invalide : {exc}"
-            if lang == "fr"
-            else f"Invalid resource index: {exc}"
-        )
-        return make_error("INVALID_INPUT", msg, lang=lang, valid_range=valid_range)
+        # WR-03: `fetch_query_dataset` raises InvalidInput for two distinct
+        # reasons (out-of-range resource_index, or limit <= 0) — only the
+        # former warrants the extra fetch_dataset_details call to compute a
+        # valid_range, and mislabeling a bad `limit` as "Invalid resource
+        # index" would be actively misleading.
+        if "resource_index" in str(exc):
+            valid_range: str | None = None
+            try:
+                details_payload, _ = await _client.fetch_dataset_details(dataset_id, lang=lang)
+                num_resources = len(details_payload.get("resources") or [])
+                valid_range = (
+                    f"0-{num_resources - 1}" if num_resources else "no resources available"
+                )
+            except Exception:
+                valid_range = None
+            msg = (
+                f"Index de ressource invalide : {exc}"
+                if lang == "fr"
+                else f"Invalid resource index: {exc}"
+            )
+            return make_error("INVALID_INPUT", msg, lang=lang, valid_range=valid_range)
+        msg = f"Paramètre invalide : {exc}" if lang == "fr" else f"Invalid input: {exc}"
+        return make_error("INVALID_INPUT", msg, lang=lang)
     return make_response(
         payload,
         api_name=_API_NAME_CKAN,

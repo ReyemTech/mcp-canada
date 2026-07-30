@@ -513,6 +513,37 @@ class TestFetchQueryDataset:
             await nb_client.fetch_query_dataset("aa11bb22-nb-submerged-lands", resource_index=9)
 
     @pytest.mark.asyncio
+    async def test_negative_limit_raises_invalid_input_before_any_parsing(
+        self, monkeypatch, ckan_package_search_sample
+    ):
+        # WR-03: rows[:limit] with a negative limit silently drops the
+        # trailing abs(limit) rows instead of failing loudly, and
+        # `truncated: len(rows) > limit` is nonsensically always True.
+        # Must reject before fetch_dataset_details / fetch_and_parse run.
+        mock_api_get = AsyncMock()
+        monkeypatch.setattr(nb_client, "api_get", mock_api_get)
+        mock_parse = AsyncMock()
+        monkeypatch.setattr(nb_client, "fetch_and_parse", mock_parse)
+
+        with pytest.raises(InvalidInput):
+            await nb_client.fetch_query_dataset(
+                "aa11bb22-nb-submerged-lands", resource_index=0, limit=-1
+            )
+
+        mock_api_get.assert_not_awaited()
+        mock_parse.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_zero_limit_raises_invalid_input(self, monkeypatch):
+        mock_api_get = AsyncMock()
+        monkeypatch.setattr(nb_client, "api_get", mock_api_get)
+
+        with pytest.raises(InvalidInput):
+            await nb_client.fetch_query_dataset(
+                "aa11bb22-nb-submerged-lands", resource_index=0, limit=0
+            )
+
+    @pytest.mark.asyncio
     async def test_csv_resource_routes_to_fetch_and_parse(
         self, monkeypatch, ckan_package_search_sample
     ):

@@ -466,12 +466,20 @@ async def fetch_query_dataset(
     """Query/parse a resource from a federal CKAN NB dataset.
 
     Selects `resources[resource_index]` from `fetch_dataset_details` and
-    raises `InvalidInput` when the index is out of range. CSV / XLSX / XLS /
-    JSON / GEOJSON resources are routed through `fetch_and_parse` and
-    truncated to `limit` rows. Every other format returns a metadata-only
-    payload naming the download url — this NEVER raises for an unparseable
-    format, it is a normal, describable outcome.
+    raises `InvalidInput` when the index is out of range. `limit` is
+    rejected with `InvalidInput` when `<= 0` (WR-03), before any network
+    call — `rows[:limit]` with a negative limit would otherwise silently
+    drop the trailing `abs(limit)` rows instead of failing loudly, and
+    `truncated: len(rows) > limit` would be nonsensically always True.
+    CSV / XLSX / XLS / JSON / GEOJSON resources are routed through
+    `fetch_and_parse` and truncated to `limit` rows. Every other format
+    returns a metadata-only payload naming the download url — this NEVER
+    raises for an unparseable format, it is a normal, describable outcome.
     """
+    if limit <= 0:
+        raise InvalidInput(
+            f"nb_query_dataset limit must be greater than 0, got {limit}"
+        )
     details, _ = await fetch_dataset_details(dataset_id, lang=lang)
     resources: list[dict[str, Any]] = details.get("resources") or []
     if not (0 <= resource_index < len(resources)):

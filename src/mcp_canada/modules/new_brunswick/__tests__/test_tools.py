@@ -391,6 +391,31 @@ class TestNbQueryDataset:
         assert result["error"]["code"] == "INVALID_INPUT"
         assert "valid_range" in result["error"]
 
+    @pytest.mark.asyncio
+    async def test_negative_limit_returns_invalid_input_not_out_of_range_message(
+        self, monkeypatch
+    ):
+        # WR-03: a negative-limit InvalidInput is a distinct failure from an
+        # out-of-range resource_index — the tool must not mislabel it as
+        # "Invalid resource index" (which would also trigger an unnecessary
+        # fetch_dataset_details call to compute a meaningless valid_range).
+        mock_fetch = AsyncMock(
+            side_effect=InvalidInput("nb_query_dataset limit must be greater than 0, got -1")
+        )
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_query_dataset", mock_fetch
+        )
+        mock_details = AsyncMock()
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_dataset_details", mock_details
+        )
+
+        result = await nb_query_dataset("x", resource_index=0, limit=-1)
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        assert "resource index" not in result["error"]["message"].lower()
+        mock_details.assert_not_awaited()
+
 
 class TestNbListOrganizations:
     @pytest.mark.asyncio

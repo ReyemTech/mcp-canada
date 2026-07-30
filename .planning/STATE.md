@@ -24,7 +24,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** An agent can combine data from any Canadian government source in a single SQL query — turning isolated APIs into one queryable data platform.
-**Current focus:** Phase 21 — new-brunswick-government-open-data
+**Current focus:** Phase 21 complete — next phase not yet selected
 
 ## Current Position
 
@@ -33,11 +33,14 @@ Plan: Not started
 Status: Ready to plan
 Last activity: 2026-07-30 — Phase 21 complete, transitioned to Phase 40
 
-**Open decision before execution:** Plan 21-01 Task 2 carries a blocking `checkpoint:decision`.
-A live probe during planning found `https://gnb.socrata.com` DOES exist (HTTP 200, 312 datasets,
-keyless, already speakable by `shared/socrata.py`), contradicting CONTEXT.md D-01's "NB has no
-provincial catalogue" framing. D-01 was NOT overridden — the checkpoint decides whether to add
-Socrata tools, ship as locked, or repoint discovery. See COVERAGE.md Surface 5.
+**RESOLVED 2026-07-30 — Plan 21-01 Task 2 checkpoint:decision.** A live probe confirmed
+`https://gnb.socrata.com` DOES exist (HTTP 200, 312 datasets, keyless, already speakable by
+`shared/socrata.py`), disproving CONTEXT.md D-01's "NB has no provincial catalogue" framing.
+User chose **option-a**: two Socrata discovery tools (`nb_search_gnb_socrata_datasets`,
+`nb_query_gnb_socrata_dataset`) joined the surface; `nb_get_provincial_parks` and
+`nb_get_mineral_occurrences` traded to the long tail to hold the 22-tool budget (both still
+reachable via `nb_query_geonb_layer`). D-01 itself was not overridden — the federal-CKAN five are
+unchanged. CLAUDE.md was corrected by plan 21-07; CONTEXT.md's claim is stale, do not reuse it.
 
 Phase 20.4 is COMPLETE and MERGED to main (PR #5, merge commit caa4d66).
 

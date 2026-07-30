@@ -365,7 +365,7 @@ Plans:
 **Goal:** Ship a `new_brunswick` module exposing NB provincial data as MCP tools — the 8th province in the rollout. 22 tools: 5 federal-CKAN discovery tools (`organization:nb`, 221 datasets — NB has no provincial CKAN), 3 GeoNB ArcGIS **Server** discovery tools (the ArcGIS Hub 401s, so the REST directory is enumerated instead), 11 curated geospatial tools across flood/water, Crown land/forestry, parcels/civic address and health/education, and 3 key-gated 511 transport stubs. Follows the 7-file module pattern; adds two additive bare-ArcGIS-Server enumerator functions to `shared/arcgis_hub.py`.
 **Requirements**: NB-01..NB-25, ERR-01..ERR-07
 **Depends on:** Phase 20
-**Plans:** 2/7 plans executed
+**Plans:** 4/7 plans executed
 
 Plans:
 
@@ -380,7 +380,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 21-04-PLAN.md — GeoNB discovery (3 tools) + flood & water curated (flood hazard, historical floods, wetlands with pre-network guard, contaminated sites)
+- [x] 21-04-PLAN.md — GeoNB discovery (3 tools) + flood & water curated (flood hazard, historical floods, wetlands with pre-network guard, contaminated sites)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 

@@ -5,15 +5,15 @@ milestone_name: Statistics Canada + Datastore
 current_phase: 21
 current_phase_name: new-brunswick-government-open-data
 status: executing
-stopped_at: Completed 21-03-PLAN.md
-last_updated: "2026-07-30T16:45:16.575Z"
+stopped_at: Completed 21-04-PLAN.md
+last_updated: "2026-07-30T17:16:59.503Z"
 last_activity: 2026-07-30
 last_activity_desc: Phase 21 execution started
 progress:
   total_phases: 38
   completed_phases: 19
   total_plans: 87
-  completed_plans: 83
+  completed_plans: 84
   percent: 50
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 21 (new-brunswick-government-open-data) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Status: Ready to execute
 Last activity: 2026-07-30 — Phase 21 execution started
 
@@ -43,7 +43,7 @@ Phase 20.4 is COMPLETE and MERGED to main (PR #5, merge commit caa4d66).
 
 Phase 20.1 is COMPLETE and MERGED to main (PR #2, merge commit 98dee90).
 
-Progress: [██████████] 95%
+Progress: [██████████] 97%
 
 **Executed and verified:** phases 07-20, 20.1, 20.2 and 40 (17 phases, 78 plans, all verification `passed`).
 Suite at merge: 3145 passed, 2 skipped, 97.09% coverage. Live: 317 integration tests green.
@@ -225,6 +225,7 @@ Remaining backlog (not defects):
 | Phase 21 P01 | 24min | 4 tasks | 15 files |
 | Phase 21 P02 | 35min | 3 tasks | 4 files |
 | Phase 21-new-brunswick-government-open-data P03 | 45min | 2 tasks | 3 files |
+| Phase 21 P04 | 55min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -420,6 +421,7 @@ Recent decisions affecting current work:
 - [Phase ?]: tools.ALL_NB_TOOLS aliases constants.ALL_NB_TOOL_NAMES directly (not a manually-grown list) so the two files can never silently drift across Plans 02-06
 - [Phase ?]: 21-03: nb_crown_land_report routes checkpoint-dropped tools (mineral occurrences, provincial parks) exclusively through nb_get_geonb_service_layers + nb_query_geonb_layer, never as standalone tool names
 - [Phase ?]: 21-03: data://nb/geonb-services classifies all 62 GeoNB services as curated=9/excluded=18/long_tail=35 post-checkpoint (mineral occurrences and provincial parks moved from curated to long_tail)
+- [Phase ?]: 21-04: FILTER_REQUIRED_TOOLS guard implemented as a single reusable _require_any_filter client helper (not a wetlands-only inline check) so Plan 05's nb_get_parcels/nb_get_civic_addresses can reuse it directly
 
 ### Roadmap Evolution
 
@@ -458,6 +460,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-07-30T16:45:16.539Z
-Stopped at: Completed 21-03-PLAN.md
+Last session: 2026-07-30T17:16:59.442Z
+Stopped at: Completed 21-04-PLAN.md
 Resume file: None

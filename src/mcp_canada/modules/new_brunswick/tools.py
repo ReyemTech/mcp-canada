@@ -7,24 +7,46 @@ Every tool:
   - Has a docstring with a first line, `Use for:` and a single-line `Keywords:`
   - Uses the `nb_` prefix
 
-TRACER SUBSET (Task 1) — nb_get_crown_land only. Task 4 adds the remaining
-21 tools once the Task 2 checkpoint and Task 4 scaffold are in place.
+Task 1 tracer — nb_get_crown_land. Task 2 adds the five federal-CKAN discovery
+tools, scoped server-side to the NB organization (D-01). Task 3 adds the two
+gnb.socrata.com discovery tools (checkpoint option-a). Plans 04-06 add the
+remaining curated tools.
 """
 
 from __future__ import annotations
 
+import difflib
 from typing import Any, Literal
 
 from fastmcp.tools import tool
 
-from mcp_canada.shared.envelope import make_response, upstream_guard
+from mcp_canada.shared.envelope import make_error, make_response, upstream_guard
+from mcp_canada.shared.errors import InvalidInput, NotFound
 
 from . import client as _client
-from .constants import CROWN_LAND_SERVICE, MAX_RECORDS
+from .constants import ALL_NB_TOOL_NAMES, CKAN_BASE_URL, CROWN_LAND_SERVICE, MAX_RECORDS
 
 _API_NAME_GEONB = "new-brunswick-geonb"
+_API_NAME_CKAN = "new-brunswick-federal-ckan"
 
-__all__ = ["nb_get_crown_land"]
+_CKAN_SEARCH_URL = f"{CKAN_BASE_URL}/action/package_search"
+_CKAN_SHOW_URL = f"{CKAN_BASE_URL}/action/package_show"
+
+# The module's locked tool-name registry — always identical to
+# constants.ALL_NB_TOOL_NAMES (the single authoritative manifest, D-08/D-25).
+# Cross-checked against it in tests/test_all_nb_tool_names_manifest so the two
+# files can never silently drift as Plans 02 Task 3 and 04-06 add the
+# remaining tools.
+ALL_NB_TOOLS: tuple[str, ...] = ALL_NB_TOOL_NAMES
+
+__all__ = [
+    "nb_get_crown_land",
+    "nb_search_datasets",
+    "nb_get_dataset_details",
+    "nb_query_dataset",
+    "nb_list_organizations",
+    "nb_list_categories",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -58,3 +80,175 @@ async def nb_get_crown_land(
         cached=cached,
         lang=lang,
     )
+
+
+# ---------------------------------------------------------------------------
+# Federal CKAN discovery, scoped server-side to the NB organization — Task 2, D-01
+# ---------------------------------------------------------------------------
+
+
+@tool
+@upstream_guard(_API_NAME_CKAN)
+async def nb_search_datasets(
+    query: str = "",
+    extra_fq: str | None = None,
+    limit: int = 10,
+    offset: int = 0,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Search New Brunswick's federal-CKAN catalogue (open.canada.ca, 221 datasets).
+
+    Use for: discovering Government of New Brunswick open datasets by keyword. Results
+    are restricted server-side to the NB publishing organization and this CANNOT be
+    widened — there is no organization parameter to override the New Brunswick filter
+    (T-21-04). Optional
+    extra_fq ANDs an additional CKAN filter-query fragment onto the NB clause (e.g.
+    "res_format:CSV"); the NB clause always stays first.
+
+    Keywords: new brunswick nouveau-brunswick gnb open data catalogue dataset search discover ckan federal portal bilingual provincial
+    """
+    payload, cached = await _client.fetch_search_datasets(
+        query=query, extra_fq=extra_fq, limit=limit, offset=offset, lang=lang
+    )
+    return make_response(
+        {**payload, "limit": limit, "offset": offset},
+        api_name=_API_NAME_CKAN,
+        api_url=_CKAN_SEARCH_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+@upstream_guard(_API_NAME_CKAN)
+async def nb_get_dataset_details(
+    dataset_id: str,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get full metadata for a single New Brunswick federal-CKAN dataset by id or name slug.
+
+    Use for: retrieving complete metadata for a specific NB dataset — resources (format,
+    name, url), license, publication date, maintainer, frequency and spatial extent.
+    French titles and notes are returned when the CKAN record carries them (D-12); when
+    the id does not exist, close-name suggestions are included in the error.
+
+    Keywords: new brunswick nouveau-brunswick gnb dataset details metadata resources license bilingual ckan federal portal provincial
+    """
+    try:
+        payload, cached = await _client.fetch_dataset_details(dataset_id, lang=lang)
+    except NotFound:
+        suggestions: list[str] = []
+        try:
+            search_payload, _ = await _client.fetch_search_datasets(
+                query=dataset_id, limit=20, lang=lang
+            )
+            names = [
+                r.get("name") for r in search_payload.get("results", []) if r.get("name")
+            ]
+            suggestions = difflib.get_close_matches(dataset_id, names, n=5, cutoff=0.4)
+        except Exception:
+            suggestions = []
+        msg = (
+            f"Ensemble de données introuvable : {dataset_id}"
+            if lang == "fr"
+            else f"Dataset not found: {dataset_id}"
+        )
+        return make_error("NOT_FOUND", msg, lang=lang, suggestions=suggestions)
+    return make_response(
+        payload,
+        api_name=_API_NAME_CKAN,
+        api_url=_CKAN_SHOW_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+@upstream_guard(_API_NAME_CKAN)
+async def nb_query_dataset(
+    dataset_id: str,
+    resource_index: int = 0,
+    limit: int = 1000,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Query/parse a resource from a New Brunswick federal-CKAN dataset by resource index.
+
+    Use for: pulling actual rows out of a CSV, XLSX, XLS, JSON or GeoJSON NB resource.
+    A resource in a format this server cannot parse (PDF, ZIP, KML, SHP, ...) returns a
+    metadata-only success naming the download url — never an error. An out-of-range
+    resource_index returns INVALID_INPUT naming the valid range.
+
+    Keywords: new brunswick nouveau-brunswick gnb query dataset resource csv xlsx json geojson download rows ckan federal
+    """
+    try:
+        payload, cached = await _client.fetch_query_dataset(
+            dataset_id, resource_index=resource_index, limit=limit, lang=lang
+        )
+    except InvalidInput as exc:
+        valid_range: str | None = None
+        try:
+            details_payload, _ = await _client.fetch_dataset_details(dataset_id, lang=lang)
+            num_resources = len(details_payload.get("resources") or [])
+            valid_range = f"0-{num_resources - 1}" if num_resources else "no resources available"
+        except Exception:
+            valid_range = None
+        msg = (
+            f"Index de ressource invalide : {exc}"
+            if lang == "fr"
+            else f"Invalid resource index: {exc}"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid_range=valid_range)
+    return make_response(
+        payload,
+        api_name=_API_NAME_CKAN,
+        api_url=_CKAN_SHOW_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+@upstream_guard(_API_NAME_CKAN)
+async def nb_list_organizations(
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """List New Brunswick's publishing organization and sections on the federal-CKAN catalogue.
+
+    Use for: seeing how NB's catalogue is sliced by publishing department. NB publishes
+    under a single federal CKAN publishing organization — the useful decomposition
+    is the publishing section (org_section), which is empty on most packages.
+
+    Keywords: new brunswick nouveau-brunswick gnb organizations publishers departments sections ckan federal portal provincial catalogue
+    """
+    payload, cached = await _client.fetch_organizations(lang=lang)
+    return make_response(
+        {"organizations": payload},
+        api_name=_API_NAME_CKAN,
+        api_url=_CKAN_SEARCH_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+@upstream_guard(_API_NAME_CKAN)
+async def nb_list_categories(
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """List New Brunswick's dataset subject, topic and format facets on the federal-CKAN catalogue.
+
+    Use for: seeing how NB's catalogue is sliced by subject/topic/format. NB packages
+    carry an empty CKAN groups array — subject, topic_category and res_format facets are
+    returned instead of a group listing (do not expect a groups-based category tool).
+
+    Keywords: new brunswick nouveau-brunswick gnb categories subjects topics formats facets ckan federal portal provincial catalogue
+    """
+    payload, cached = await _client.fetch_categories(lang=lang)
+    return make_response(
+        payload,
+        api_name=_API_NAME_CKAN,
+        api_url=_CKAN_SEARCH_URL,
+        cached=cached,
+        lang=lang,
+    )
+

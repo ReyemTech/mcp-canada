@@ -1,6 +1,8 @@
 """Unit tests for new_brunswick/tools.py.
 
-TestNbGetCrownLandTools is the Task 1 tracer, fully tested. Every remaining
+TestNbGetCrownLandTools is the Task 1 tracer, fully tested. Plan 02 Task 2
+implements + tests the five federal-CKAN discovery tools; Task 3 implements +
+tests the two gnb.socrata.com tools (checkpoint option-a). Every remaining
 tool in constants.ALL_NB_TOOL_NAMES gets a placeholder class asserting
 membership in the locked manifest, until its owning plan implements the tool
 itself (at which point the placeholder is replaced with real behavior tests).
@@ -16,7 +18,15 @@ import httpx
 import pytest
 
 from mcp_canada.modules.new_brunswick.constants import ALL_NB_TOOL_NAMES, CROWN_LAND_SERVICE, MAX_RECORDS
-from mcp_canada.modules.new_brunswick.tools import nb_get_crown_land
+from mcp_canada.modules.new_brunswick.tools import (
+    nb_get_crown_land,
+    nb_get_dataset_details,
+    nb_list_categories,
+    nb_list_organizations,
+    nb_query_dataset,
+    nb_search_datasets,
+)
+from mcp_canada.shared.errors import InvalidInput, NotFound
 
 
 class TestNbGetCrownLandTools:
@@ -146,31 +156,214 @@ class TestAllNbToolNamesManifest:
 
 
 class TestNbSearchDatasets:
-    """Plan 02 implements + tests."""
+    @pytest.mark.asyncio
+    async def test_happy_path_envelope(self, monkeypatch):
+        payload = {"results": [{"id": "x"}], "total": 221}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_search_datasets", mock_fetch
+        )
+
+        result = await nb_search_datasets(query="flood", limit=5)
+
+        assert "error" not in result
+        assert result["_meta"]["source"]["api"] == "new-brunswick-federal-ckan"
+        assert result["data"]["total"] == 221
+        assert result["data"]["limit"] == 5
+        assert result["data"]["offset"] == 0
+
+    def test_no_organization_parameter_in_signature(self):
+        import inspect
+
+        sig = inspect.signature(nb_search_datasets)
+        assert "organization" not in sig.parameters
+        assert set(sig.parameters) == {"query", "extra_fq", "limit", "offset", "lang"}
+
+    @pytest.mark.asyncio
+    async def test_lang_fr_sets_meta_lang(self, monkeypatch):
+        payload = {"results": [], "total": 0}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_search_datasets", mock_fetch
+        )
+
+        result = await nb_search_datasets(lang="fr")
+
+        assert result["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_timeout_returns_upstream_error_envelope_not_exception(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=httpx.TimeoutException("boom"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_search_datasets", mock_fetch
+        )
+
+        result = await nb_search_datasets(query="flood")
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestNbGetDatasetDetails:
-    """Plan 02 implements + tests."""
+    @pytest.mark.asyncio
+    async def test_happy_path_envelope(self, monkeypatch):
+        payload = {"id": "x", "title": "T"}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_dataset_details", mock_fetch
+        )
+
+        result = await nb_get_dataset_details("x")
+
+        assert "error" not in result
+        assert result["data"]["id"] == "x"
+
+    @pytest.mark.asyncio
+    async def test_not_found_returns_not_found_with_suggestions(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=NotFound("NB dataset not found: bad-id"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_dataset_details", mock_fetch
+        )
+        mock_search = AsyncMock(
+            return_value=({"results": [{"name": "good-id"}], "total": 1}, False)
+        )
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_search_datasets", mock_search
+        )
+
+        result = await nb_get_dataset_details("bad-id")
+
+        assert result["error"]["code"] == "NOT_FOUND"
+        assert "suggestions" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_connect_error_returns_upstream_error_envelope(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=httpx.ConnectError("boom"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_dataset_details", mock_fetch
+        )
+
+        result = await nb_get_dataset_details("x")
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestNbQueryDataset:
-    """Plan 02 implements + tests."""
+    @pytest.mark.asyncio
+    async def test_happy_path_envelope(self, monkeypatch):
+        payload = {"rows": [{"a": 1}], "resource": {"format": "CSV"}, "truncated": False}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_query_dataset", mock_fetch
+        )
+
+        result = await nb_query_dataset("x", resource_index=0)
+
+        assert "error" not in result
+        assert result["data"]["rows"] == [{"a": 1}]
+
+    @pytest.mark.asyncio
+    async def test_pdf_resource_returns_success_with_note_not_error(self, monkeypatch):
+        payload = {
+            "rows": [],
+            "resource": {"format": "PDF", "url": "https://example.com/x.pdf"},
+            "note": "Format 'PDF' is not machine-parseable by this server — download directly from https://example.com/x.pdf",
+        }
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_query_dataset", mock_fetch
+        )
+
+        result = await nb_query_dataset("x", resource_index=0)
+
+        assert "error" not in result
+        assert result["data"]["rows"] == []
+        assert "note" in result["data"]
+
+    @pytest.mark.asyncio
+    async def test_out_of_range_resource_index_returns_invalid_input_with_range(
+        self, monkeypatch
+    ):
+        mock_fetch = AsyncMock(side_effect=InvalidInput("resource_index 9 out of range"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_query_dataset", mock_fetch
+        )
+        mock_details = AsyncMock(
+            return_value=({"resources": [{"format": "CSV"}]}, False)
+        )
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_dataset_details", mock_details
+        )
+
+        result = await nb_query_dataset("x", resource_index=9)
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        assert "valid_range" in result["error"]
 
 
 class TestNbListOrganizations:
-    """Plan 02 implements + tests."""
+    @pytest.mark.asyncio
+    async def test_happy_path_envelope(self, monkeypatch):
+        orgs = [{"name": "Government of New Brunswick", "dataset_count": 221}]
+        mock_fetch = AsyncMock(return_value=(orgs, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_organizations", mock_fetch
+        )
+
+        result = await nb_list_organizations()
+
+        assert "error" not in result
+        assert result["data"]["organizations"] == orgs
+
+    @pytest.mark.asyncio
+    async def test_http_status_error_returns_upstream_error_envelope(self, monkeypatch):
+        error = httpx.HTTPStatusError(
+            "boom",
+            request=httpx.Request("GET", "https://open.canada.ca"),
+            response=httpx.Response(500),
+        )
+        mock_fetch = AsyncMock(side_effect=error)
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_organizations", mock_fetch
+        )
+
+        result = await nb_list_organizations()
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestNbListCategories:
-    """Plan 02 implements + tests."""
+    @pytest.mark.asyncio
+    async def test_happy_path_envelope(self, monkeypatch):
+        payload = {"subjects": [{"name": "environment", "count": 120}], "topics": [], "formats": []}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_categories", mock_fetch
+        )
+
+        result = await nb_list_categories(lang="fr")
+
+        assert "error" not in result
+        assert result["_meta"]["lang"] == "fr"
+        assert result["data"]["subjects"][0]["name"] == "environment"
+
+    @pytest.mark.asyncio
+    async def test_key_error_returns_upstream_error_envelope(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=KeyError("facets"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_categories", mock_fetch
+        )
+
+        result = await nb_list_categories()
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestNbSearchGnbSocrataDatasets:
-    """Plan 02 implements + tests (checkpoint option-a)."""
+    """Plan 02 Task 3 implements + tests (checkpoint option-a)."""
 
 
 class TestNbQueryGnbSocrataDataset:
-    """Plan 02 implements + tests (checkpoint option-a)."""
+    """Plan 02 Task 3 implements + tests (checkpoint option-a)."""
 
 
 class TestNbListGeonbServices:

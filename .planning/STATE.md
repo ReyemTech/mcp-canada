@@ -5,15 +5,15 @@ milestone_name: Statistics Canada + Datastore
 current_phase: 21
 current_phase_name: new-brunswick-government-open-data
 status: executing
-stopped_at: Completed 21-05-PLAN.md
-last_updated: "2026-07-30T17:29:36.377Z"
+stopped_at: Completed 21-06-PLAN.md
+last_updated: "2026-07-30T17:59:54.169Z"
 last_activity: 2026-07-30
 last_activity_desc: Phase 21 execution started
 progress:
   total_phases: 38
   completed_phases: 19
   total_plans: 87
-  completed_plans: 85
+  completed_plans: 86
   percent: 50
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 21 (new-brunswick-government-open-data) — EXECUTING
-Plan: 6 of 7
+Plan: 7 of 7
 Status: Ready to execute
 Last activity: 2026-07-30 — Phase 21 execution started
 
@@ -43,7 +43,7 @@ Phase 20.4 is COMPLETE and MERGED to main (PR #5, merge commit caa4d66).
 
 Phase 20.1 is COMPLETE and MERGED to main (PR #2, merge commit 98dee90).
 
-Progress: [██████████] 98%
+Progress: [██████████] 99%
 
 **Executed and verified:** phases 07-20, 20.1, 20.2 and 40 (17 phases, 78 plans, all verification `passed`).
 Suite at merge: 3145 passed, 2 skipped, 97.09% coverage. Live: 317 integration tests green.
@@ -227,6 +227,7 @@ Remaining backlog (not defects):
 | Phase 21-new-brunswick-government-open-data P03 | 45min | 2 tasks | 3 files |
 | Phase 21 P04 | 55min | 3 tasks | 4 files |
 | Phase 21 P05 | ~30min | 2 tasks | 4 files |
+| Phase 21 P06 | ~55min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -426,6 +427,8 @@ Recent decisions affecting current work:
 - [Phase ?]: Task 1 (mineral occurrences / provincial parks) shipped no code — 21-01 checkpoint already swapped both to the long tail; confirmed via constants.ALL_NB_TOOL_NAMES
 - [Phase ?]: Added _upper_contains_clause shared helper (UPPER(field) LIKE '%VALUE%') for county/community/street containment matching, reused across nb_get_parcels and nb_get_civic_addresses
 - [Phase ?]: CIVIC_NUM interpolated as unquoted Python int — quoting it would make ArcGIS compare a number to a string and silently return nothing
+- [Phase ?]: NB health facilities: live-verified the 6 GeoNB_Health_Facilities layers' real per-layer name field (Name_E/USER_Clini/Name/Name___Nom/Pharmacy_Name) since 21-SPIKE.md only named representative fields for the wide-schema layers 2-5; a hardcoded Name_E filter against layer 3 confirmed live to 400 upstream
+- [Phase ?]: Manifest integrity: replaced the tautological ALL_NB_TOOLS = ALL_NB_TOOL_NAMES framing with TestManifestMatchesShippedSurface, a bidirectional falsifiable check proven by injecting a decoy tool at runtime
 
 ### Roadmap Evolution
 
@@ -464,6 +467,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-07-30T17:29:36.335Z
-Stopped at: Completed 21-05-PLAN.md
+Last session: 2026-07-30T17:59:54.120Z
+Stopped at: Completed 21-06-PLAN.md
 Resume file: None

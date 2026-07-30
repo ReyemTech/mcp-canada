@@ -362,14 +362,20 @@ Plans:
 
 ### Phase 21: New Brunswick Government Open Data
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Ship a `new_brunswick` module exposing NB provincial data as MCP tools — the 8th province in the rollout. 22 tools: 5 federal-CKAN discovery tools (`organization:nb`, 221 datasets — NB has no provincial CKAN), 3 GeoNB ArcGIS **Server** discovery tools (the ArcGIS Hub 401s, so the REST directory is enumerated instead), 11 curated geospatial tools across flood/water, Crown land/forestry, parcels/civic address and health/education, and 3 key-gated 511 transport stubs. Follows the 7-file module pattern; adds two additive bare-ArcGIS-Server enumerator functions to `shared/arcgis_hub.py`.
+**Requirements**: NB-01..NB-25, ERR-01..ERR-07
 **Depends on:** Phase 20
-**Plans:** 0 plans
+**Plans:** 7 plans
 
 Plans:
 
-- [ ] TBD (run /gsd:plan-phase 21 to break down)
+- [ ] 21-01-PLAN.md — Wave 0: Crown Land tracer end-to-end, gnb.socrata.com discovery-surface checkpoint, `shared/arcgis_hub.py` enumerator + live layer-id spike, full module scaffold
+- [ ] 21-02-PLAN.md — Federal CKAN discovery: 5 tools, bilingual `title_translated`/`notes_translated` resolution, outgoing-param contract test
+- [ ] 21-03-PLAN.md — 6 prompts + 7 zero-parameter resources (GeoNB catalogue, counties, health/school dispatch, portal guide, query guide, report template)
+- [ ] 21-04-PLAN.md — GeoNB discovery (3 tools) + flood & water curated (flood hazard, historical floods, wetlands with pre-network guard, contaminated sites)
+- [ ] 21-05-PLAN.md — Crown land/forestry completion (minerals, parks) + parcels & civic addresses, both guarded over 604K/373K layers
+- [ ] 21-06-PLAN.md — Health facilities & public schools layer-dispatch tools + 3 NB 511 `NOT_CONFIGURED` transport stubs
+- [ ] 21-07-PLAN.md — Live MCP-layer integration coverage for all 22 tools, catalogue/README/CLAUDE.md sync, NB-01..NB-25 backfill, COVERAGE.md finalization
 
 ### Phase 22: Newfoundland and Labrador Government Open Data
 

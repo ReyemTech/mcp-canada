@@ -263,6 +263,22 @@ class TestGeonbHelpers:
         reason = nb_client._geonb_exclusion_reason("GeoNB_Some_Other_Excluded_Service")
         assert reason == "excluded from the default listing"
 
+    def test_escape_sql_value_doubles_apostrophe(self):
+        assert nb_client._escape_sql_value("21G'15") == "21G''15"
+
+    def test_require_any_filter_noop_for_tool_not_in_filter_required(self):
+        # A tool name that is not in FILTER_REQUIRED_TOOLS is a no-op even
+        # with zero filters — the guard set is driven by the constant, not
+        # hardcoded per call site.
+        nb_client._require_any_filter("nb_get_crown_land", None, None, layer_record_count=1)
+
+    def test_require_any_filter_raises_when_registered_and_unfiltered(self):
+        with pytest.raises(InvalidInput):
+            nb_client._require_any_filter("nb_get_wetlands", None, None, layer_record_count=163_206)
+
+    def test_require_any_filter_passes_when_registered_and_filtered(self):
+        nb_client._require_any_filter("nb_get_wetlands", "Bog", None, layer_record_count=163_206)
+
 
 # ---------------------------------------------------------------------------
 # Task 1 tracer — fetch_crown_land, exercised directly at the client layer
@@ -809,11 +825,80 @@ class TestFetchHistoricalFloods:
 
 
 class TestFetchWetlands:
-    """Plan 04 Task 3 fills this."""
+    @pytest.mark.asyncio
+    async def test_no_filter_raises_invalid_input_before_any_network_call(self, monkeypatch):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        with pytest.raises(InvalidInput) as exc_info:
+            await nb_client.fetch_wetlands()
+
+        assert "163,206" in str(exc_info.value)
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_wetland_class_filter_returns_features(self, monkeypatch, wetlands_geojson):
+        features = [f["properties"] for f in wetlands_geojson["features"]]
+        mock_query = AsyncMock(return_value=(features, False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, cached = await nb_client.fetch_wetlands(wetland_class="Bog")
+
+        assert cached is False
+        assert payload["count"] == len(features)
+        assert mock_query.call_args.kwargs["where"] == "WETLAND_CLASS='Bog'"
+
+    @pytest.mark.asyncio
+    async def test_both_filters_anded(self, monkeypatch, wetlands_geojson):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_wetlands(wetland_class="Bog", status="Provincially Significant")
+
+        where = mock_query.call_args.kwargs["where"]
+        assert "WETLAND_CLASS='Bog'" in where
+        assert "STATUS='Provincially Significant'" in where
+        assert " AND " in where
 
 
 class TestFetchContaminatedSites:
-    """Plan 04 Task 3 fills this."""
+    @pytest.mark.asyncio
+    async def test_status_builds_escaped_english_status_clause(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([{"Status_E": "Active"}], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_contaminated_sites(status="Active")
+
+        assert mock_query.call_args.kwargs["where"] == "Status_E='Active'"
+
+    @pytest.mark.asyncio
+    async def test_no_status_sends_falsy_where(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, cached = await nb_client.fetch_contaminated_sites()
+
+        assert cached is False
+        assert not mock_query.call_args.kwargs["where"]
+        assert payload["count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_features_carry_bilingual_status_and_pidtype_fields(self, monkeypatch):
+        row = {
+            "Status_E": "Active",
+            "Status_F": "Actif",
+            "FileOpenDate": "2020-01-01",
+            "PidType_E": "PID",
+            "PidType_F": "NID",
+        }
+        mock_query = AsyncMock(return_value=([row], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, _cached = await nb_client.fetch_contaminated_sites(status="Active")
+
+        feature = payload["features"][0]
+        assert feature["Status_E"] == "Active"
+        assert feature["Status_F"] == "Actif"
 
 
 class TestFetchParcels:

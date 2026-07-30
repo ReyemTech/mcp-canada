@@ -28,12 +28,15 @@ from . import client as _client
 from .constants import (
     ALL_NB_TOOL_NAMES,
     CKAN_BASE_URL,
+    CONTAMINATED_SITES_SERVICE,
     CROWN_LAND_SERVICE,
+    FILTER_REQUIRED_TOOLS,
     FLOOD_HAZARD_SERVICE,
     GEONB_BASE_URL,
     GNB_SOCRATA_DOMAIN,
     HISTORICAL_FLOODS_SERVICE,
     MAX_RECORDS,
+    WETLANDS_SERVICE,
 )
 
 _API_NAME_GEONB = "new-brunswick-geonb"
@@ -63,6 +66,8 @@ __all__ = [
     "nb_query_geonb_layer",
     "nb_get_flood_hazard_areas",
     "nb_get_historical_floods",
+    "nb_get_wetlands",
+    "nb_get_contaminated_sites",
 ]
 
 
@@ -536,8 +541,76 @@ async def nb_get_historical_floods(
 
 
 # ---------------------------------------------------------------------------
-# Water — wetlands (filter-required) and contaminated sites (Task 3, next commit)
+# Water — wetlands (filter-required) and contaminated sites (Task 3)
 # ---------------------------------------------------------------------------
-# nb_get_wetlands and nb_get_contaminated_sites are implemented later in this plan.
+
+
+@tool
+@upstream_guard(_API_NAME_GEONB)
+async def nb_get_wetlands(
+    wetland_class: str | None = None,
+    status: str | None = None,
+    limit: int = MAX_RECORDS,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get New Brunswick wetland polygons from GeoNB (GeoNB_ENV_Wetlands, layer 2).
+
+    Use for: retrieving mapped wetlands (Provincially Significant Wetlands and
+    their 30m buffers) filtered by class or status. At least one of
+    wetland_class or status is REQUIRED — this layer holds 163,206 rows and an
+    unfiltered call is rejected with INVALID_INPUT before any network request.
+
+    Keywords: new brunswick wetlands psw provincially significant wetland bog marsh swamp fen environment geospatial buffer class status filter required
+    """
+    if "nb_get_wetlands" in FILTER_REQUIRED_TOOLS and not wetland_class and not status:
+        msg = (
+            "nb_get_wetlands exige au moins un des paramètres wetland_class ou "
+            "status (la couche compte 163 206 lignes)."
+            if lang == "fr"
+            else "nb_get_wetlands requires at least one of wetland_class or "
+            "status (the layer has 163,206 rows)."
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=["wetland_class", "status"])
+    try:
+        payload, cached = await _client.fetch_wetlands(
+            wetland_class=wetland_class, status=status, limit=limit
+        )
+    except InvalidInput as exc:
+        msg = f"Paramètre invalide : {exc}" if lang == "fr" else f"Invalid input: {exc}"
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=["wetland_class", "status"])
+    return make_response(
+        payload,
+        api_name=_API_NAME_GEONB,
+        api_url=WETLANDS_SERVICE,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+@upstream_guard(_API_NAME_GEONB)
+async def nb_get_contaminated_sites(
+    status: str | None = None,
+    limit: int = MAX_RECORDS,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get New Brunswick contaminated site points from GeoNB
+    (GeoNB_ELG_Contaminated_Sites, layer 0).
+
+    Use for: retrieving mapped contaminated site locations and their status.
+    Status text is published in both official languages: Status_E carries the
+    English status text and Status_F carries the French status text — both
+    are always returned regardless of which field status filters against.
+
+    Keywords: new brunswick contaminated sites environment remediation status bilingual elg property identifier file open date cleanup
+    """
+    payload, cached = await _client.fetch_contaminated_sites(status=status, limit=limit)
+    return make_response(
+        payload,
+        api_name=_API_NAME_GEONB,
+        api_url=CONTAMINATED_SITES_SERVICE,
+        cached=cached,
+        lang=lang,
+    )
 
 

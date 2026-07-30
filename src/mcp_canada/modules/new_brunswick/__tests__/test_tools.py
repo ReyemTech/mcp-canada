@@ -19,11 +19,13 @@ import pytest
 
 from mcp_canada.modules.new_brunswick.constants import ALL_NB_TOOL_NAMES, CROWN_LAND_SERVICE, MAX_RECORDS
 from mcp_canada.modules.new_brunswick.tools import (
+    nb_get_contaminated_sites,
     nb_get_crown_land,
     nb_get_dataset_details,
     nb_get_flood_hazard_areas,
     nb_get_geonb_service_layers,
     nb_get_historical_floods,
+    nb_get_wetlands,
     nb_list_categories,
     nb_list_geonb_services,
     nb_list_organizations,
@@ -660,11 +662,93 @@ class TestNbGetHistoricalFloods:
 
 
 class TestNbGetWetlands:
-    """Plan 04 Task 3 implements + tests. FILTER_REQUIRED — rejects unfiltered calls."""
+    @pytest.mark.asyncio
+    async def test_unfiltered_call_returns_invalid_input_without_network_call(
+        self, monkeypatch
+    ):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.client.arcgis_hub.query_feature_service",
+            mock_query,
+        )
+
+        result = await nb_get_wetlands(lang="en")
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_invalid_input_message_names_record_count_and_filters(self):
+        result = await nb_get_wetlands(lang="en")
+
+        assert "163,206" in result["error"]["message"]
+        assert result["error"]["valid"] == ["wetland_class", "status"]
+
+    @pytest.mark.asyncio
+    async def test_wetland_class_filter_returns_features(self, monkeypatch):
+        payload = {"features": [{"WETLAND_CLASS": "Bog"}], "count": 1, "truncated": False}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_wetlands", mock_fetch
+        )
+
+        result = await nb_get_wetlands(wetland_class="Bog")
+
+        assert "error" not in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_client_invalid_input_second_line_of_defence_also_returns_invalid_input(
+        self, monkeypatch
+    ):
+        # wetland_class="Bog" passes the tool's own pre-check; the client
+        # still raises — proves the second line of defence (double-guard) fires.
+        mock_fetch = AsyncMock(side_effect=InvalidInput("nb_get_wetlands requires at least one filter"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_wetlands", mock_fetch
+        )
+
+        result = await nb_get_wetlands(wetland_class="Bog")
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        mock_fetch.assert_awaited_once()
 
 
 class TestNbGetContaminatedSites:
-    """Plan 04 Task 3 implements + tests."""
+    @pytest.mark.asyncio
+    async def test_happy_path_envelope(self, monkeypatch):
+        payload = {
+            "features": [{"Status_E": "Active", "Status_F": "Actif"}],
+            "count": 1,
+            "truncated": False,
+        }
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_contaminated_sites",
+            mock_fetch,
+        )
+
+        result = await nb_get_contaminated_sites(limit=50, lang="en")
+
+        assert "error" not in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_bilingual_status_documented_in_docstring(self):
+        doc = nb_get_contaminated_sites.__doc__ or ""
+        assert "Status_E" in doc and "Status_F" in doc
+
+    @pytest.mark.asyncio
+    async def test_connect_error_returns_upstream_error(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=httpx.ConnectError("boom"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_contaminated_sites",
+            mock_fetch,
+        )
+
+        result = await nb_get_contaminated_sites()
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestNbGetParcels:

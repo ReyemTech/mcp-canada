@@ -45,9 +45,12 @@ from .constants import (
     CACHE_TTL_META,
     CACHE_TTL_SEARCH,
     CKAN_BASE_URL,
+    CONTAMINATED_SITES_LAYER,
+    CONTAMINATED_SITES_SERVICE,
     CROWN_LAND_FIELDS,
     CROWN_LAND_LAYER,
     CROWN_LAND_SERVICE,
+    FILTER_REQUIRED_TOOLS,
     FIVE11_BASE_URL,
     FIVE11_KEY_ENV,
     FLOOD_HAZARD_LAYER,
@@ -69,6 +72,8 @@ from .constants import (
     RATE_LIMIT_GEONB,
     RATE_LIMIT_SOCRATA,
     USER_AGENT,
+    WETLANDS_LAYER,
+    WETLANDS_SERVICE,
 )
 
 __all__ = [
@@ -917,17 +922,60 @@ async def fetch_historical_floods(
     )
 
 
+def _require_any_filter(
+    tool_name: str,
+    *filters: Any,
+    layer_record_count: int,
+) -> None:
+    """Raise InvalidInput before any network call when a FILTER_REQUIRED_TOOLS
+    entry receives no filter argument (T-21-03). Reused by every large-layer
+    curated fetcher so the guard set stays driven by
+    `constants.FILTER_REQUIRED_TOOLS` rather than scattered per-function
+    literals.
+    """
+    if tool_name not in FILTER_REQUIRED_TOOLS:
+        return
+    if any(filters):
+        return
+    raise InvalidInput(
+        f"{tool_name} requires at least one filter parameter "
+        f"(the layer has {layer_record_count:,} rows)"
+    )
+
+
 async def fetch_wetlands(
     wetland_class: str | None = None,
     status: str | None = None,
     limit: int = MAX_RECORDS,
 ) -> tuple[dict[str, Any], bool]:
     """Fetch wetland polygons (GeoNB_ENV_Wetlands layer 2). FILTER_REQUIRED —
-    163,206 rows; the tool layer rejects an unfiltered call (T-21-03).
+    163,206 rows; rejects an unfiltered call with `InvalidInput` before any
+    network call (T-21-03), enforced via `_require_any_filter` and
+    `constants.FILTER_REQUIRED_TOOLS`.
 
-    Plan 04 (Task 3) implements. Locked signature — do not change.
+    `wetland_class` and `status` each build a server-side, single-quote-
+    escaped equality clause; both together are AND-ed.
     """
-    raise NotImplementedError("Plan 04 (Task 3) implements fetch_wetlands")
+    _require_any_filter(
+        "nb_get_wetlands", wetland_class, status, layer_record_count=163_206
+    )
+    clauses: list[str] = []
+    if wetland_class:
+        clauses.append(f"WETLAND_CLASS='{_escape_sql_value(wetland_class)}'")
+    if status:
+        clauses.append(f"STATUS='{_escape_sql_value(status)}'")
+    where = " AND ".join(clauses)
+    cache_key = f"{CACHE_KEY_PREFIX}wetlands:{wetland_class}:{status}:{limit}"
+    return await _geonb_query(
+        WETLANDS_SERVICE,
+        layer_id=WETLANDS_LAYER,
+        where=where,
+        out_fields="ID,Hectares,WC,WETLAND_CLASS,STATUS",
+        include_geometry=False,
+        limit=limit,
+        ttl=CACHE_TTL_META,
+        cache_key=cache_key,
+    )
 
 
 async def fetch_contaminated_sites(
@@ -936,9 +984,23 @@ async def fetch_contaminated_sites(
 ) -> tuple[dict[str, Any], bool]:
     """Fetch contaminated site points (GeoNB_ELG_Contaminated_Sites layer 0).
 
-    Plan 04 (Task 3) implements. Locked signature — do not change.
+    `status` restricts on the English status field (`Status_E`) via a
+    server-built, single-quote-escaped equality clause; both `Status_E` and
+    `Status_F` (bilingual status text) are always returned regardless of
+    which field the filter matched on.
     """
-    raise NotImplementedError("Plan 04 (Task 3) implements fetch_contaminated_sites")
+    where = f"Status_E='{_escape_sql_value(status)}'" if status else None
+    cache_key = f"{CACHE_KEY_PREFIX}contaminated_sites:{status}:{limit}"
+    return await _geonb_query(
+        CONTAMINATED_SITES_SERVICE,
+        layer_id=CONTAMINATED_SITES_LAYER,
+        where=where,
+        out_fields="Status_E,Status_F,FileOpenDate,PidType_E,PidType_F",
+        include_geometry=False,
+        limit=limit,
+        ttl=CACHE_TTL_META,
+        cache_key=cache_key,
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -262,3 +262,8 @@ envelope) is the expected default behavior with no key set.
 ---
 *Phase: 21-new-brunswick-government-open-data*
 *Completed: 2026-07-30*
+
+## Self-Check: PASSED
+
+All 14 claimed files verified present on disk. All 6 claimed commit hashes verified present in
+git log (`95fd2ba`, `a206b9d`, `978aae1`, `52ce8b0`, `625f128`, `d6de3de`).

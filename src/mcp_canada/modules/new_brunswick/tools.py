@@ -29,6 +29,7 @@ from .constants import (
     ALL_NB_TOOL_NAMES,
     CKAN_BASE_URL,
     CROWN_LAND_SERVICE,
+    GEONB_BASE_URL,
     GNB_SOCRATA_DOMAIN,
     MAX_RECORDS,
 )
@@ -55,6 +56,9 @@ __all__ = [
     "nb_list_categories",
     "nb_search_gnb_socrata_datasets",
     "nb_query_gnb_socrata_dataset",
+    "nb_list_geonb_services",
+    "nb_get_geonb_service_layers",
+    "nb_query_geonb_layer",
 ]
 
 
@@ -327,3 +331,137 @@ async def nb_query_gnb_socrata_dataset(
         cached=cached,
         lang=lang,
     )
+
+
+# ---------------------------------------------------------------------------
+# GeoNB discovery — Task 1, D-06 (stands in for the 401-ing Hub Search API)
+# ---------------------------------------------------------------------------
+
+
+@tool
+@upstream_guard(_API_NAME_GEONB)
+async def nb_list_geonb_services(
+    query: str = "",
+    include_excluded: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """List GeoNB's ArcGIS Server services via a live REST-directory walk.
+
+    Use for: discovering which of GeoNB's ~62 map services exist before querying
+    a layer. GeoNB has no ArcGIS Hub Search API in front of it — the Hub at
+    geonb-snb.opendata.arcgis.com returns HTTP 401 — so this tool walks the bare
+    ArcGIS Server REST directory instead. The 5 basemap tile services and the
+    retired GeoNB_DNR_WildlifeRefuges placeholder are hidden by default; pass
+    include_excluded=True to see them, each carrying an exclusion_reason. Each
+    entry names its curated_tool when a dedicated nb_get_* tool already covers it.
+
+    Keywords: new brunswick geonb services directory discover list map arcgis server catalogue enumeration rest walk
+    """
+    services, cached = await _client.fetch_geonb_services(
+        query=query, include_excluded=include_excluded
+    )
+    return make_response(
+        {"services": services, "count": len(services)},
+        api_name=_API_NAME_GEONB,
+        api_url=GEONB_BASE_URL,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+@upstream_guard(_API_NAME_GEONB)
+async def nb_get_geonb_service_layers(
+    service_name: str,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get the layers/tables of a single GeoNB ArcGIS Server service, with
+    each layer's live record count and real field names.
+
+    Use for: finding a service's real layer ids before querying it — GeoNB
+    layer ids are NOT guessable and do not always start at 0. Worked example:
+    GeoNB_DNR_Crown_Land has exactly one layer and its id is 3, not 0 (layer 0
+    does not exist on that service). Find service_name via
+    nb_list_geonb_services first.
+
+    Keywords: new brunswick geonb service layers fields record count discover layer id mapserver arcgis metadata schema worked example
+    """
+    try:
+        payload, cached = await _client.fetch_geonb_service_layers(service_name)
+    except NotFound as exc:
+        msg = (
+            f"Service GeoNB introuvable : {exc}"
+            if lang == "fr"
+            else f"GeoNB service not found: {exc}"
+        )
+        return make_error("NOT_FOUND", msg, lang=lang)
+    return make_response(
+        payload,
+        api_name=_API_NAME_GEONB,
+        api_url=f"{GEONB_BASE_URL}/{service_name}/MapServer",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+@upstream_guard(_API_NAME_GEONB)
+async def nb_query_geonb_layer(
+    service_name: str,
+    layer_id: int,
+    where: str | None = None,
+    out_fields: str = "*",
+    limit: int = MAX_RECORDS,
+    include_geometry: bool = False,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Query any GeoNB layer by service name and layer id — the long-tail
+    escape hatch that keeps every un-curated GeoNB service reachable.
+
+    Use for: reaching any of GeoNB's un-curated services — including the
+    equivalents of nb_get_provincial_parks and nb_get_mineral_occurrences,
+    which are not dedicated tools. Find service_name via nb_list_geonb_services
+    and layer_id via nb_get_geonb_service_layers. The where argument reaches
+    ArcGIS's own SQL-92 parser directly — that parser is the trust boundary
+    for this tool, exactly as on every other ArcGIS-backed province (york_region,
+    alberta, manitoba, saskatchewan). This is a read-only public server with no
+    write surface.
+
+    Keywords: new brunswick geonb query layer where clause sql arcgis mapserver escape hatch generic feature service uncurated long tail
+    """
+    try:
+        payload, cached = await _client.fetch_geonb_layer_features(
+            service_name,
+            layer_id,
+            where=where,
+            out_fields=out_fields,
+            limit=limit,
+            include_geometry=include_geometry,
+        )
+    except NotFound as exc:
+        msg = (
+            f"Service GeoNB introuvable : {exc}"
+            if lang == "fr"
+            else f"GeoNB service not found: {exc}"
+        )
+        return make_error("NOT_FOUND", msg, lang=lang)
+    except InvalidInput as exc:
+        msg = f"Limite invalide : {exc}" if lang == "fr" else f"Invalid limit: {exc}"
+        return make_error("INVALID_INPUT", msg, lang=lang)
+    return make_response(
+        payload,
+        api_name=_API_NAME_GEONB,
+        api_url=f"{GEONB_BASE_URL}/{service_name}/MapServer/{layer_id}/query",
+        cached=cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Flood — hazard index and historical flood limits (Task 2, next commit)
+# Water — wetlands (filter-required) and contaminated sites (Task 3, next commit)
+# ---------------------------------------------------------------------------
+# nb_get_flood_hazard_areas, nb_get_historical_floods, nb_get_wetlands and
+# nb_get_contaminated_sites are implemented later in this plan.
+
+

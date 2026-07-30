@@ -50,6 +50,8 @@ from .constants import (
     CROWN_LAND_SERVICE,
     FIVE11_BASE_URL,
     FIVE11_KEY_ENV,
+    GEONB_BASE_URL,
+    GEONB_EXCLUDED_SERVICES,
     GNB_SOCRATA_DOMAIN,
     MAX_RECORDS,
     NB_ORG_FQ,
@@ -649,6 +651,49 @@ async def fetch_gnb_socrata_query(
 # GeoNB discovery + flood/water — Plan 04 fills bodies
 # ---------------------------------------------------------------------------
 
+# Services with a curated nb_get_* tool built on a locked *_SERVICE/*_LAYER
+# constant (D-07). GeoNB_DNR_ProvincialParks and GeoNB_DNR_MineralOccurrences
+# are deliberately absent — the checkpoint (21-01) dropped both to the long
+# tail, reachable only through nb_query_geonb_layer.
+_GEONB_CURATED_TOOL_BY_SERVICE: dict[str, str] = {
+    "GeoNB_DNR_Crown_Land": "nb_get_crown_land",
+    "GeoNB_ENV_FloodHazardIndex": "nb_get_flood_hazard_areas",
+    "GeoNB_ENV_Historical_Floods": "nb_get_historical_floods",
+    "GeoNB_ENV_Wetlands": "nb_get_wetlands",
+    "GeoNB_ELG_Contaminated_Sites": "nb_get_contaminated_sites",
+    "GeoNB_SNB_Parcels": "nb_get_parcels",
+    "GeoNB_DPS_Civic_Address": "nb_get_civic_addresses",
+    "GeoNB_Health_Facilities": "nb_get_health_facilities",
+    "GeoNB_EECD_PublicSchools": "nb_get_public_schools",
+}
+
+# Named exclusion reasons for GEONB_EXCLUDED_SERVICES entries that are not
+# self-evidently a basemap (21-SPIKE.md §3: WildlifeRefuges is a retired
+# 1-record placeholder, not live data).
+_GEONB_NAMED_EXCLUSION_REASONS: dict[str, str] = {
+    "GeoNB_DNR_WildlifeRefuges": (
+        "retired placeholder service — layer 0 is named 'Retired Map Service' "
+        "and holds 1 record (21-SPIKE.md section 3), not live wildlife refuge data"
+    ),
+}
+
+
+def _decode_geonb_department(service_name: str) -> str | None:
+    """Decode the department code from a `GeoNB_{DEPT}_...` service name."""
+    parts = service_name.split("_")
+    if len(parts) >= 2 and parts[0] == "GeoNB":
+        return parts[1]
+    return None
+
+
+def _geonb_exclusion_reason(service_name: str) -> str:
+    """Return why a service is hidden from the default nb_list_geonb_services listing."""
+    if service_name in _GEONB_NAMED_EXCLUSION_REASONS:
+        return _GEONB_NAMED_EXCLUSION_REASONS[service_name]
+    if service_name.startswith("GeoNB_Basemap_"):
+        return "basemap tile layer — imagery/reference tiles, not queryable feature data"
+    return "excluded from the default listing"
+
 
 async def fetch_geonb_services(
     query: str = "",
@@ -656,21 +701,93 @@ async def fetch_geonb_services(
 ) -> tuple[list[dict[str, Any]], bool]:
     """List GeoNB services via the live service-directory enumerator (D-06).
 
-    Plan 04 implements via `shared/arcgis_hub.py:list_arcgis_server_services`.
-    Locked signature — do not change.
+    Stands in for the Hub Search API, which returns HTTP 401 on GeoNB's Hub.
+    Every entry carries `name`, `type`, the department decoded from the
+    `GeoNB_{DEPT}_` prefix, and `curated_tool` (the nb_get_* tool name when
+    one exists, else None). By default the 5 basemap tile services and the
+    retired `GeoNB_DNR_WildlifeRefuges` placeholder are omitted; pass
+    `include_excluded=True` to see them, each carrying a non-empty
+    `exclusion_reason`. `query` filters by case-insensitive substring match
+    against the service name.
     """
-    raise NotImplementedError("Plan 04 implements fetch_geonb_services")
+    cache_key = f"{CACHE_KEY_PREFIX}geonb:services:{include_excluded}"
+
+    async def _fetch() -> list[dict[str, Any]]:
+        await _geonb_limiter.acquire()
+        raw_services = await arcgis_hub.list_arcgis_server_services(GEONB_BASE_URL)
+        entries: list[dict[str, Any]] = []
+        for svc in raw_services:
+            name = svc.get("name", "")
+            excluded = name in GEONB_EXCLUDED_SERVICES
+            if excluded and not include_excluded:
+                continue
+            entry: dict[str, Any] = {
+                "name": name,
+                "type": svc.get("type"),
+                "department": _decode_geonb_department(name),
+                "curated_tool": _GEONB_CURATED_TOOL_BY_SERVICE.get(name),
+            }
+            if excluded:
+                entry["excluded"] = True
+                entry["exclusion_reason"] = _geonb_exclusion_reason(name)
+            entries.append(entry)
+        return entries
+
+    services, cached = await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
+    if query:
+        q = query.lower()
+        services = [s for s in services if q in s["name"].lower()]
+    return services, cached
 
 
 async def fetch_geonb_service_layers(
     service_name: str,
 ) -> tuple[dict[str, Any], bool]:
-    """List the layers/tables of a single GeoNB service.
+    """List the layers/tables of a single GeoNB service, enriched with each
+    layer's live record count and real field names (D-06).
 
-    Plan 04 implements via `shared/arcgis_hub.py:get_arcgis_server_layers`.
-    Locked signature — do not change.
+    Raises `NotFound` naming `nb_list_geonb_services` when `service_name`
+    is not in the live directory. Fanning out to `get_count` and
+    `get_layer_metadata` per layer is what gives an agent the layer id, real
+    field names and scale in one call — the absence of exactly this
+    information caused the Saskatchewan wrong-layer bug (T-21-14 bounds the
+    fan-out: cached at CACHE_TTL_META, the GeoNB limiter serialises it, and
+    every GeoNB service has fewer than 10 layers).
     """
-    raise NotImplementedError("Plan 04 implements fetch_geonb_service_layers")
+    cache_key = f"{CACHE_KEY_PREFIX}geonb:service_layers:{service_name}"
+
+    async def _fetch() -> dict[str, Any]:
+        services, _ = await fetch_geonb_services(include_excluded=True)
+        valid_names = {s["name"] for s in services}
+        if service_name not in valid_names:
+            raise NotFound(
+                f"GeoNB service not found: {service_name!r} — "
+                "use nb_list_geonb_services to see valid service names"
+            )
+        service_root = f"{GEONB_BASE_URL}/{service_name}"
+        mapserver_url = f"{service_root}/MapServer"
+
+        await _geonb_limiter.acquire()
+        layer_data = await arcgis_hub.get_arcgis_server_layers(service_root)
+
+        enriched_layers: list[dict[str, Any]] = []
+        for layer in layer_data.get("layers", []):
+            layer_id = layer.get("id")
+            await _geonb_limiter.acquire()
+            count = await arcgis_hub.get_count(mapserver_url, layer_id)
+            await _geonb_limiter.acquire()
+            meta = await arcgis_hub.get_layer_metadata(mapserver_url, layer_id)
+            enriched_layers.append(
+                {
+                    "id": layer_id,
+                    "name": layer.get("name"),
+                    "record_count": count,
+                    "fields": [f.get("name") for f in meta.get("fields", [])],
+                }
+            )
+        return {"layers": enriched_layers, "tables": layer_data.get("tables", [])}
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)
 
 
 async def fetch_geonb_layer_features(
@@ -685,9 +802,38 @@ async def fetch_geonb_layer_features(
     hatch that keeps `nb_get_provincial_parks`/`nb_get_mineral_occurrences`
     reachable after the checkpoint option-a manifest change.
 
-    Plan 04 implements via `_geonb_query`. Locked signature — do not change.
+    Rejects `limit` above `MAX_RECORDS` with `InvalidInput`, and rejects a
+    `service_name` absent from the live directory with `NotFound`, both
+    before any feature request. `where` is passed straight through — a falsy
+    value is coalesced to the ArcGIS match-all form by `_geonb_query`/
+    `arcgis_hub.query_feature_service`.
     """
-    raise NotImplementedError("Plan 04 implements fetch_geonb_layer_features")
+    if limit > MAX_RECORDS:
+        raise InvalidInput(
+            f"limit must be at most {MAX_RECORDS} for nb_query_geonb_layer, got {limit}"
+        )
+    services, _ = await fetch_geonb_services(include_excluded=True)
+    valid_names = {s["name"] for s in services}
+    if service_name not in valid_names:
+        raise NotFound(
+            f"GeoNB service not found: {service_name!r} — "
+            "use nb_list_geonb_services to see valid service names"
+        )
+    service_url = f"{GEONB_BASE_URL}/{service_name}/MapServer"
+    cache_key = (
+        f"{CACHE_KEY_PREFIX}geonb:query:{service_name}:{layer_id}:{where}:"
+        f"{out_fields}:{limit}:{include_geometry}"
+    )
+    return await _geonb_query(
+        service_url,
+        layer_id=layer_id,
+        where=where,
+        out_fields=out_fields,
+        include_geometry=include_geometry,
+        limit=limit,
+        ttl=CACHE_TTL_META,
+        cache_key=cache_key,
+    )
 
 
 async def fetch_flood_hazard_areas(
@@ -696,9 +842,9 @@ async def fetch_flood_hazard_areas(
 ) -> tuple[dict[str, Any], bool]:
     """Fetch flood hazard index polygons (GeoNB_ENV_FloodHazardIndex layer 0).
 
-    Plan 04 implements. Locked signature — do not change.
+    Plan 04 (Task 2) implements. Locked signature — do not change.
     """
-    raise NotImplementedError("Plan 04 implements fetch_flood_hazard_areas")
+    raise NotImplementedError("Plan 04 (Task 2) implements fetch_flood_hazard_areas")
 
 
 async def fetch_historical_floods(
@@ -708,9 +854,9 @@ async def fetch_historical_floods(
     """Fetch historical flood limits/extents (GeoNB_ENV_Historical_Floods,
     layer 0 for 2008/2018 events, layer 8 for the 1973 event).
 
-    Plan 04 implements. Locked signature — do not change.
+    Plan 04 (Task 2) implements. Locked signature — do not change.
     """
-    raise NotImplementedError("Plan 04 implements fetch_historical_floods")
+    raise NotImplementedError("Plan 04 (Task 2) implements fetch_historical_floods")
 
 
 async def fetch_wetlands(
@@ -721,9 +867,9 @@ async def fetch_wetlands(
     """Fetch wetland polygons (GeoNB_ENV_Wetlands layer 2). FILTER_REQUIRED —
     163,206 rows; the tool layer rejects an unfiltered call (T-21-03).
 
-    Plan 04 implements. Locked signature — do not change.
+    Plan 04 (Task 3) implements. Locked signature — do not change.
     """
-    raise NotImplementedError("Plan 04 implements fetch_wetlands")
+    raise NotImplementedError("Plan 04 (Task 3) implements fetch_wetlands")
 
 
 async def fetch_contaminated_sites(
@@ -732,9 +878,9 @@ async def fetch_contaminated_sites(
 ) -> tuple[dict[str, Any], bool]:
     """Fetch contaminated site points (GeoNB_ELG_Contaminated_Sites layer 0).
 
-    Plan 04 implements. Locked signature — do not change.
+    Plan 04 (Task 3) implements. Locked signature — do not change.
     """
-    raise NotImplementedError("Plan 04 implements fetch_contaminated_sites")
+    raise NotImplementedError("Plan 04 (Task 3) implements fetch_contaminated_sites")
 
 
 # ---------------------------------------------------------------------------

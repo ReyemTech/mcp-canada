@@ -5,7 +5,10 @@ implemented Wave 0 private helpers (_build_fq, _geonb_query, _511_get,
 Five11NotConfigured). Plan 02 (Task 1) fills TestSharedApiGetContract and
 TestShapeDatasetBilingual, plus one class per federal-CKAN discovery
 function. Plan 02 (Task 3, checkpoint option-a) fills TestFetchGnbSocrataSearch
-and TestFetchGnbSocrataQuery. Every remaining `fetch_*` stub still gets a
+and TestFetchGnbSocrataQuery. Plan 04 fills TestFetchGeonbServices,
+TestFetchGeonbServiceLayers, TestFetchGeonbLayerFeatures,
+TestFetchFloodHazardAreas, TestFetchHistoricalFloods, TestFetchWetlands and
+TestFetchContaminatedSites. Every remaining `fetch_*` stub still gets a
 placeholder class asserting it raises NotImplementedError until its owning
 plan fills the body.
 """
@@ -234,6 +237,31 @@ class TestFive11Get:
         rows = await nb_client._511_get("event")
 
         assert rows == []
+
+
+# ---------------------------------------------------------------------------
+# GeoNB discovery private helpers — exercised directly (Task 1, Plan 04)
+# ---------------------------------------------------------------------------
+
+
+class TestGeonbHelpers:
+    def test_decode_department_from_geonb_prefix(self):
+        assert nb_client._decode_geonb_department("GeoNB_DNR_Crown_Land") == "DNR"
+
+    def test_decode_department_returns_none_for_non_geonb_name(self):
+        assert nb_client._decode_geonb_department("SomeOtherService") is None
+
+    def test_exclusion_reason_named_service(self):
+        reason = nb_client._geonb_exclusion_reason("GeoNB_DNR_WildlifeRefuges")
+        assert "retired" in reason.lower()
+
+    def test_exclusion_reason_basemap_prefix(self):
+        reason = nb_client._geonb_exclusion_reason("GeoNB_Basemap_Grey")
+        assert "basemap" in reason.lower()
+
+    def test_exclusion_reason_fallback_for_unnamed_exclusion(self):
+        reason = nb_client._geonb_exclusion_reason("GeoNB_Some_Other_Excluded_Service")
+        assert reason == "excluded from the default listing"
 
 
 # ---------------------------------------------------------------------------
@@ -535,32 +563,198 @@ class TestFetchGnbSocrataQuery:
         assert mock_query.call_args.kwargs.get("app_token") is None
 
 
+# ---------------------------------------------------------------------------
+# GeoNB discovery — Task 1, D-06 (Plan 04)
+# ---------------------------------------------------------------------------
+
+_GEONB_FULL_DIRECTORY: list[dict[str, str]] = [
+    {"name": "GeoNB_DNR_Crown_Land", "type": "MapServer"},
+    {"name": "GeoNB_ENV_FloodHazardIndex", "type": "MapServer"},
+    {"name": "GeoNB_ENV_Historical_Floods", "type": "MapServer"},
+    {"name": "GeoNB_ENV_Wetlands", "type": "MapServer"},
+    {"name": "GeoNB_ELG_Contaminated_Sites", "type": "MapServer"},
+    {"name": "GeoNB_Basemap_Grey", "type": "MapServer"},
+    {"name": "GeoNB_Basemap_Imagery", "type": "MapServer"},
+    {"name": "GeoNB_Basemap_NBRN", "type": "MapServer"},
+    {"name": "GeoNB_Basemap_Provinces_bare", "type": "MapServer"},
+    {"name": "GeoNB_Basemap_Topo", "type": "MapServer"},
+    {"name": "GeoNB_DNR_WildlifeRefuges", "type": "MapServer"},
+]
+
+
 class TestFetchGeonbServices:
-    """Plan 04 fills this."""
+    @pytest.mark.asyncio
+    async def test_default_listing_hides_basemaps_and_retired_service(self, monkeypatch):
+        mock_list = AsyncMock(return_value=_GEONB_FULL_DIRECTORY)
+        monkeypatch.setattr(nb_client.arcgis_hub, "list_arcgis_server_services", mock_list)
+
+        services, cached = await nb_client.fetch_geonb_services()
+
+        assert cached is False
+        names = [s["name"] for s in services]
+        assert not any(n.startswith("GeoNB_Basemap_") for n in names)
+        assert "GeoNB_DNR_WildlifeRefuges" not in names
+        assert "GeoNB_DNR_Crown_Land" in names
+
+    @pytest.mark.asyncio
+    async def test_include_excluded_returns_basemaps_with_reason(self, monkeypatch):
+        mock_list = AsyncMock(return_value=_GEONB_FULL_DIRECTORY)
+        monkeypatch.setattr(nb_client.arcgis_hub, "list_arcgis_server_services", mock_list)
+
+        services, _cached = await nb_client.fetch_geonb_services(include_excluded=True)
+
+        basemap = next(s for s in services if s["name"] == "GeoNB_Basemap_Grey")
+        assert basemap["excluded"] is True
+        assert basemap["exclusion_reason"]
+
+        retired = next(s for s in services if s["name"] == "GeoNB_DNR_WildlifeRefuges")
+        assert retired["excluded"] is True
+        assert "retired" in retired["exclusion_reason"].lower()
+
+    @pytest.mark.asyncio
+    async def test_query_filters_case_insensitively(self, monkeypatch):
+        mock_list = AsyncMock(return_value=_GEONB_FULL_DIRECTORY)
+        monkeypatch.setattr(nb_client.arcgis_hub, "list_arcgis_server_services", mock_list)
+
+        services, _cached = await nb_client.fetch_geonb_services(query="FLOOD")
+
+        names = [s["name"] for s in services]
+        assert names == ["GeoNB_ENV_FloodHazardIndex", "GeoNB_ENV_Historical_Floods"]
+
+    @pytest.mark.asyncio
+    async def test_department_decoded_from_prefix(self, monkeypatch):
+        mock_list = AsyncMock(return_value=_GEONB_FULL_DIRECTORY)
+        monkeypatch.setattr(nb_client.arcgis_hub, "list_arcgis_server_services", mock_list)
+
+        services, _cached = await nb_client.fetch_geonb_services()
+
+        crown_land = next(s for s in services if s["name"] == "GeoNB_DNR_Crown_Land")
+        assert crown_land["department"] == "DNR"
+
+    @pytest.mark.asyncio
+    async def test_curated_tool_name_surfaced_for_curated_service(self, monkeypatch):
+        mock_list = AsyncMock(return_value=_GEONB_FULL_DIRECTORY)
+        monkeypatch.setattr(nb_client.arcgis_hub, "list_arcgis_server_services", mock_list)
+
+        services, _cached = await nb_client.fetch_geonb_services()
+
+        crown_land = next(s for s in services if s["name"] == "GeoNB_DNR_Crown_Land")
+        assert crown_land["curated_tool"] == "nb_get_crown_land"
 
 
 class TestFetchGeonbServiceLayers:
-    """Plan 04 fills this."""
+    @pytest.mark.asyncio
+    async def test_returns_layers_containing_id_three(
+        self, monkeypatch, geonb_mapserver_layers_sample
+    ):
+        mock_list = AsyncMock(return_value=_GEONB_FULL_DIRECTORY)
+        monkeypatch.setattr(nb_client.arcgis_hub, "list_arcgis_server_services", mock_list)
+        mock_layers = AsyncMock(return_value=geonb_mapserver_layers_sample)
+        monkeypatch.setattr(nb_client.arcgis_hub, "get_arcgis_server_layers", mock_layers)
+        mock_count = AsyncMock(return_value=10001)
+        monkeypatch.setattr(nb_client.arcgis_hub, "get_count", mock_count)
+        mock_meta = AsyncMock(return_value={"fields": [{"name": "HOLDER", "type": "esriFieldTypeInteger"}]})
+        monkeypatch.setattr(nb_client.arcgis_hub, "get_layer_metadata", mock_meta)
+
+        payload, cached = await nb_client.fetch_geonb_service_layers("GeoNB_DNR_Crown_Land")
+
+        assert cached is False
+        assert any(layer["id"] == 3 for layer in payload["layers"])
+        assert payload["layers"][0]["record_count"] == 10001
+        assert "HOLDER" in payload["layers"][0]["fields"]
+        assert payload["tables"] == []
+
+    @pytest.mark.asyncio
+    async def test_unknown_service_raises_not_found_naming_listing_tool(self, monkeypatch):
+        mock_list = AsyncMock(return_value=_GEONB_FULL_DIRECTORY)
+        monkeypatch.setattr(nb_client.arcgis_hub, "list_arcgis_server_services", mock_list)
+
+        with pytest.raises(NotFound) as exc_info:
+            await nb_client.fetch_geonb_service_layers("GeoNB_Does_Not_Exist")
+
+        assert "nb_list_geonb_services" in str(exc_info.value)
 
 
 class TestFetchGeonbLayerFeatures:
-    """Plan 04 fills this."""
+    @pytest.mark.asyncio
+    async def test_where_none_passed_through_for_downstream_coalescing(self, monkeypatch):
+        mock_list = AsyncMock(return_value=_GEONB_FULL_DIRECTORY)
+        monkeypatch.setattr(nb_client.arcgis_hub, "list_arcgis_server_services", mock_list)
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_geonb_layer_features(
+            "GeoNB_ENV_FloodHazardIndex", 0, where=None
+        )
+
+        # where=None flows through unchanged; query_feature_service (and the
+        # httpx params dict beneath it) coalesce a falsy where to "1=1" —
+        # proven directly in shared/__tests__/test_arcgis_hub.py.
+        assert mock_query.call_args.kwargs["where"] is None
+        assert mock_query.call_args.args[0].endswith("GeoNB_ENV_FloodHazardIndex/MapServer")
+
+    @pytest.mark.asyncio
+    async def test_unknown_service_raises_not_found_before_any_feature_request(
+        self, monkeypatch
+    ):
+        mock_list = AsyncMock(return_value=_GEONB_FULL_DIRECTORY)
+        monkeypatch.setattr(nb_client.arcgis_hub, "list_arcgis_server_services", mock_list)
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        with pytest.raises(NotFound):
+            await nb_client.fetch_geonb_layer_features("GeoNB_Does_Not_Exist", 0)
+
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_limit_above_cap_raises_invalid_input_before_any_network_call(
+        self, monkeypatch
+    ):
+        mock_list = AsyncMock(return_value=_GEONB_FULL_DIRECTORY)
+        monkeypatch.setattr(nb_client.arcgis_hub, "list_arcgis_server_services", mock_list)
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        with pytest.raises(InvalidInput):
+            await nb_client.fetch_geonb_layer_features(
+                "GeoNB_DNR_Crown_Land", 3, limit=nb_client.MAX_RECORDS + 1
+            )
+
+        mock_list.assert_not_awaited()
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_empty_feature_collection_is_a_success_not_an_error(
+        self, monkeypatch, empty_feature_collection
+    ):
+        mock_list = AsyncMock(return_value=_GEONB_FULL_DIRECTORY)
+        monkeypatch.setattr(nb_client.arcgis_hub, "list_arcgis_server_services", mock_list)
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, _cached = await nb_client.fetch_geonb_layer_features(
+            "GeoNB_DNR_Crown_Land", 3
+        )
+
+        assert payload["count"] == 0
+        assert payload["features"] == []
 
 
 class TestFetchFloodHazardAreas:
-    """Plan 04 fills this."""
+    """Plan 04 Task 2 fills this."""
 
 
 class TestFetchHistoricalFloods:
-    """Plan 04 fills this."""
+    """Plan 04 Task 2 fills this."""
 
 
 class TestFetchWetlands:
-    """Plan 04 fills this."""
+    """Plan 04 Task 3 fills this."""
 
 
 class TestFetchContaminatedSites:
-    """Plan 04 fills this."""
+    """Plan 04 Task 3 fills this."""
 
 
 class TestFetchParcels:
@@ -603,43 +797,11 @@ class TestStubsRaiseNotImplementedError:
     fetch_search_datasets, fetch_dataset_details, fetch_query_dataset,
     fetch_organizations, fetch_categories (federal CKAN) and
     fetch_gnb_socrata_search / fetch_gnb_socrata_query (checkpoint option-a)
-    are implemented by Plan 02 and removed from this contract — see
-    TestFetchSearchDatasets et al. above."""
-
-    @pytest.mark.asyncio
-    async def test_fetch_geonb_services(self):
-        with pytest.raises(NotImplementedError):
-            await nb_client.fetch_geonb_services()
-
-    @pytest.mark.asyncio
-    async def test_fetch_geonb_service_layers(self):
-        with pytest.raises(NotImplementedError):
-            await nb_client.fetch_geonb_service_layers("GeoNB_DNR_Crown_Land")
-
-    @pytest.mark.asyncio
-    async def test_fetch_geonb_layer_features(self):
-        with pytest.raises(NotImplementedError):
-            await nb_client.fetch_geonb_layer_features("GeoNB_DNR_ProvincialParks", 0)
-
-    @pytest.mark.asyncio
-    async def test_fetch_flood_hazard_areas(self):
-        with pytest.raises(NotImplementedError):
-            await nb_client.fetch_flood_hazard_areas()
-
-    @pytest.mark.asyncio
-    async def test_fetch_historical_floods(self):
-        with pytest.raises(NotImplementedError):
-            await nb_client.fetch_historical_floods()
-
-    @pytest.mark.asyncio
-    async def test_fetch_wetlands(self):
-        with pytest.raises(NotImplementedError):
-            await nb_client.fetch_wetlands()
-
-    @pytest.mark.asyncio
-    async def test_fetch_contaminated_sites(self):
-        with pytest.raises(NotImplementedError):
-            await nb_client.fetch_contaminated_sites()
+    are implemented by Plan 02, and fetch_geonb_services,
+    fetch_geonb_service_layers, fetch_geonb_layer_features,
+    fetch_flood_hazard_areas, fetch_historical_floods, fetch_wetlands and
+    fetch_contaminated_sites by Plan 04 — all removed from this contract, see
+    TestFetchSearchDatasets et al. and TestFetchGeonbServices et al. above."""
 
     @pytest.mark.asyncio
     async def test_fetch_parcels(self):

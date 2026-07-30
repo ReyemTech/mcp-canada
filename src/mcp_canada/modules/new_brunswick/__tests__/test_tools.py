@@ -21,9 +21,12 @@ from mcp_canada.modules.new_brunswick.constants import ALL_NB_TOOL_NAMES, CROWN_
 from mcp_canada.modules.new_brunswick.tools import (
     nb_get_crown_land,
     nb_get_dataset_details,
+    nb_get_geonb_service_layers,
     nb_list_categories,
+    nb_list_geonb_services,
     nb_list_organizations,
     nb_query_dataset,
+    nb_query_geonb_layer,
     nb_query_gnb_socrata_dataset,
     nb_search_datasets,
     nb_search_gnb_socrata_datasets,
@@ -414,31 +417,155 @@ class TestNbQueryGnbSocrataDataset:
 
 
 class TestNbListGeonbServices:
-    """Plan 04 implements + tests."""
+    @pytest.mark.asyncio
+    async def test_happy_path_envelope(self, monkeypatch):
+        services = [
+            {"name": "GeoNB_DNR_Crown_Land", "type": "MapServer", "department": "DNR", "curated_tool": "nb_get_crown_land"},
+        ]
+        mock_fetch = AsyncMock(return_value=(services, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_geonb_services", mock_fetch
+        )
+
+        result = await nb_list_geonb_services()
+
+        assert "error" not in result
+        assert result["_meta"]["source"]["api"] == "new-brunswick-geonb"
+        assert result["data"]["count"] == 1
+        assert result["data"]["services"] == services
+
+    @pytest.mark.asyncio
+    async def test_no_hub_search_api_documented_in_docstring(self):
+        assert "Hub" in (nb_list_geonb_services.__doc__ or "")
+        assert "401" in (nb_list_geonb_services.__doc__ or "")
+
+    @pytest.mark.asyncio
+    async def test_timeout_returns_upstream_error_envelope(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=httpx.TimeoutException("boom"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_geonb_services", mock_fetch
+        )
+
+        result = await nb_list_geonb_services()
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestNbGetGeonbServiceLayers:
-    """Plan 04 implements + tests."""
+    @pytest.mark.asyncio
+    async def test_happy_path_layer_id_three(self, monkeypatch):
+        payload = {
+            "layers": [{"id": 3, "name": "Crown Land", "record_count": 10001, "fields": ["HOLDER"]}],
+            "tables": [],
+        }
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_geonb_service_layers",
+            mock_fetch,
+        )
+
+        result = await nb_get_geonb_service_layers(service_name="GeoNB_DNR_Crown_Land")
+
+        assert "error" not in result
+        assert any(layer["id"] == 3 for layer in result["data"]["layers"])
+
+    @pytest.mark.asyncio
+    async def test_layer_ids_not_guessable_documented_with_worked_example(self):
+        doc = nb_get_geonb_service_layers.__doc__ or ""
+        assert "not" in doc.lower() and "guessable" in doc.lower()
+        assert "Crown_Land" in doc
+
+    @pytest.mark.asyncio
+    async def test_unknown_service_returns_not_found(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=NotFound("GeoNB service not found: 'Bogus'"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_geonb_service_layers",
+            mock_fetch,
+        )
+
+        result = await nb_get_geonb_service_layers(service_name="Bogus")
+
+        assert result["error"]["code"] == "NOT_FOUND"
 
 
 class TestNbQueryGeonbLayer:
-    """Plan 04 implements + tests."""
+    @pytest.mark.asyncio
+    async def test_happy_path_envelope(self, monkeypatch):
+        payload = {"features": [{"NAME": "Mount Carleton"}], "count": 1, "truncated": False}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_geonb_layer_features",
+            mock_fetch,
+        )
+
+        result = await nb_query_geonb_layer(
+            service_name="GeoNB_DNR_ProvincialParks", layer_id=0
+        )
+
+        assert "error" not in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_where_passed_through_unchanged(self, monkeypatch):
+        payload = {"features": [], "count": 0, "truncated": False}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_geonb_layer_features",
+            mock_fetch,
+        )
+
+        await nb_query_geonb_layer(
+            service_name="GeoNB_DNR_ProvincialParks", layer_id=0, where="NAME='Mount Carleton'"
+        )
+
+        assert mock_fetch.call_args.kwargs["where"] == "NAME='Mount Carleton'"
+
+    @pytest.mark.asyncio
+    async def test_sql92_trust_boundary_documented_in_docstring(self):
+        doc = nb_query_geonb_layer.__doc__ or ""
+        assert "SQL-92" in doc
+
+    @pytest.mark.asyncio
+    async def test_unknown_service_returns_not_found(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=NotFound("GeoNB service not found: 'Bogus'"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_geonb_layer_features",
+            mock_fetch,
+        )
+
+        result = await nb_query_geonb_layer(service_name="Bogus", layer_id=0)
+
+        assert result["error"]["code"] == "NOT_FOUND"
+
+    @pytest.mark.asyncio
+    async def test_limit_above_cap_returns_invalid_input(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=InvalidInput("limit must be at most 5000"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_geonb_layer_features",
+            mock_fetch,
+        )
+
+        result = await nb_query_geonb_layer(
+            service_name="GeoNB_DNR_Crown_Land", layer_id=3, limit=999999
+        )
+
+        assert result["error"]["code"] == "INVALID_INPUT"
 
 
 class TestNbGetFloodHazardAreas:
-    """Plan 04 implements + tests."""
+    """Plan 04 Task 2 implements + tests."""
 
 
 class TestNbGetHistoricalFloods:
-    """Plan 04 implements + tests."""
+    """Plan 04 Task 2 implements + tests."""
 
 
 class TestNbGetWetlands:
-    """Plan 04 implements + tests. FILTER_REQUIRED — rejects unfiltered calls."""
+    """Plan 04 Task 3 implements + tests. FILTER_REQUIRED — rejects unfiltered calls."""
 
 
 class TestNbGetContaminatedSites:
-    """Plan 04 implements + tests."""
+    """Plan 04 Task 3 implements + tests."""
 
 
 class TestNbGetParcels:

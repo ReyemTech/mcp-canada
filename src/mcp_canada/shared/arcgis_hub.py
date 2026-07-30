@@ -10,6 +10,8 @@ Public functions:
     get_layer_metadata(service_url, layer_id) -> dict
     get_count(service_url, layer_id, where) -> int
     shape_hub_dataset(feature) -> dict
+    list_arcgis_server_services(base_url) -> list[dict]
+    get_arcgis_server_layers(service_url) -> dict
 """
 
 from __future__ import annotations
@@ -283,6 +285,95 @@ def shape_hub_dataset(feature: dict[str, Any]) -> dict[str, Any]:
         "categories": props.get("categories") or [],
         "created": props.get("created"),
         "modified": props.get("modified"),
+    }
+
+
+async def list_arcgis_server_services(
+    base_url: str,
+    *,
+    httpx_client: httpx.AsyncClient | None = None,
+) -> list[dict[str, Any]]:
+    """List the services published by a bare ArcGIS Server REST directory.
+
+    Stands in for the Hub Search API on portals that don't front their
+    services with ArcGIS Hub (Phase 21, D-06) — GeoNB is ArcGIS Server only,
+    and its Hub returns HTTP 401.
+
+    Args:
+        base_url: The `/arcgis/rest/services` directory root (a trailing
+            slash is stripped before the request).
+        httpx_client: Optional pre-built AsyncClient for dependency injection.
+
+    Returns:
+        The raw `services` array (each entry `{"name": ..., "type": ...}`).
+        Folders are NOT returned — only entries under the `services` key.
+        Returns [] when the response has no `services` key.
+
+    Raises:
+        httpx.HTTPStatusError: On 4xx/5xx responses.
+        httpx.DecodingError: On a malformed (non-JSON) response body.
+    """
+    url = base_url.rstrip("/")
+    params: dict[str, Any] = {"f": "json"}
+
+    if httpx_client is not None:
+        response = await httpx_client.get(url, params=params)
+        response.raise_for_status()
+        data = decode_json(response, url)
+    else:
+        async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            data = decode_json(response, url)
+
+    return data.get("services") or []
+
+
+async def get_arcgis_server_layers(
+    service_url: str,
+    *,
+    httpx_client: httpx.AsyncClient | None = None,
+) -> dict[str, Any]:
+    """List the layers and tables of a single ArcGIS Server MapServer service.
+
+    Args:
+        service_url: The service's REST directory URL WITHOUT the
+            `/MapServer` suffix (e.g.
+            `https://geonb.snb.ca/arcgis/rest/services/GeoNB_DNR_Crown_Land`).
+            A trailing slash is stripped before `/MapServer` is appended.
+        httpx_client: Optional pre-built AsyncClient for dependency injection.
+
+    Returns:
+        Dict with exactly the keys `layers` and `tables`, each a list of
+        `{"id": ..., "name": ...}` dicts. Missing arrays yield [], not a
+        KeyError.
+
+    Raises:
+        httpx.HTTPStatusError: On 4xx/5xx responses.
+        httpx.DecodingError: On a malformed (non-JSON) response body.
+    """
+    url = f"{service_url.rstrip('/')}/MapServer"
+    params: dict[str, Any] = {"f": "json"}
+
+    if httpx_client is not None:
+        response = await httpx_client.get(url, params=params)
+        response.raise_for_status()
+        data = decode_json(response, url)
+    else:
+        async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            data = decode_json(response, url)
+
+    return {
+        "layers": [
+            {"id": layer.get("id"), "name": layer.get("name")}
+            for layer in (data.get("layers") or [])
+        ],
+        "tables": [
+            {"id": table.get("id"), "name": table.get("name")}
+            for table in (data.get("tables") or [])
+        ],
     }
 
 

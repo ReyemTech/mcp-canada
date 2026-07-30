@@ -24,7 +24,9 @@ from mcp_canada.modules.new_brunswick.tools import (
     nb_list_categories,
     nb_list_organizations,
     nb_query_dataset,
+    nb_query_gnb_socrata_dataset,
     nb_search_datasets,
+    nb_search_gnb_socrata_datasets,
 )
 from mcp_canada.shared.errors import InvalidInput, NotFound
 
@@ -359,11 +361,56 @@ class TestNbListCategories:
 
 
 class TestNbSearchGnbSocrataDatasets:
-    """Plan 02 Task 3 implements + tests (checkpoint option-a)."""
+    @pytest.mark.asyncio
+    async def test_happy_path_envelope(self, monkeypatch):
+        payload = {"results": [{"id": "4zbh-z2ij"}], "total": 312}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_gnb_socrata_search", mock_fetch
+        )
+
+        result = await nb_search_gnb_socrata_datasets(query="childcare")
+
+        assert "error" not in result
+        assert result["_meta"]["source"]["api"] == "new-brunswick-gnb-socrata"
+        assert result["data"]["total"] == 312
+
+    @pytest.mark.asyncio
+    async def test_upstream_error_returns_envelope_not_exception(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=httpx.HTTPError("boom"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_gnb_socrata_search", mock_fetch
+        )
+
+        result = await nb_search_gnb_socrata_datasets()
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestNbQueryGnbSocrataDataset:
-    """Plan 02 Task 3 implements + tests (checkpoint option-a)."""
+    @pytest.mark.asyncio
+    async def test_happy_path_envelope(self, monkeypatch):
+        payload = {"rows": [{"facility_name": "Sunshine Daycare"}], "count": 1, "truncated": False}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_gnb_socrata_query", mock_fetch
+        )
+
+        result = await nb_query_gnb_socrata_dataset("4zbh-z2ij")
+
+        assert "error" not in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_limit_above_cap_returns_invalid_input(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=InvalidInput("limit must be at most 5000"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_gnb_socrata_query", mock_fetch
+        )
+
+        result = await nb_query_gnb_socrata_dataset("4zbh-z2ij", limit=999999)
+
+        assert result["error"]["code"] == "INVALID_INPUT"
 
 
 class TestNbListGeonbServices:

@@ -472,11 +472,67 @@ class TestFetchCategories:
 
 
 class TestFetchGnbSocrataSearch:
-    """Plan 02 Task 3 fills this (checkpoint option-a)."""
+    @pytest.mark.asyncio
+    async def test_returns_results_and_total(self, monkeypatch, gnb_socrata_catalog_sample):
+        mock_search = AsyncMock(return_value=gnb_socrata_catalog_sample)
+        monkeypatch.setattr(nb_client.socrata, "search_catalog", mock_search)
+
+        payload, cached = await nb_client.fetch_gnb_socrata_search(query="childcare")
+
+        assert cached is False
+        assert payload["total"] == 312
+        assert payload["results"][0]["id"] == "4zbh-z2ij"
+        assert mock_search.call_args.args[0] == "gnb.socrata.com"
+
+    @pytest.mark.asyncio
+    async def test_limit_clamped_to_100(self, monkeypatch, gnb_socrata_catalog_sample):
+        mock_search = AsyncMock(return_value=gnb_socrata_catalog_sample)
+        monkeypatch.setattr(nb_client.socrata, "search_catalog", mock_search)
+
+        await nb_client.fetch_gnb_socrata_search(limit=500)
+
+        assert mock_search.call_args.kwargs["limit"] == 100
+
+    @pytest.mark.asyncio
+    async def test_no_x_app_token_header_sent(self, monkeypatch, gnb_socrata_catalog_sample):
+        mock_search = AsyncMock(return_value=gnb_socrata_catalog_sample)
+        monkeypatch.setattr(nb_client.socrata, "search_catalog", mock_search)
+
+        await nb_client.fetch_gnb_socrata_search()
+
+        assert mock_search.call_args.kwargs.get("app_token") is None
 
 
 class TestFetchGnbSocrataQuery:
-    """Plan 02 Task 3 fills this (checkpoint option-a)."""
+    @pytest.mark.asyncio
+    async def test_returns_rows(self, monkeypatch, gnb_socrata_rows_sample):
+        mock_query = AsyncMock(return_value=gnb_socrata_rows_sample)
+        monkeypatch.setattr(nb_client.socrata, "query_dataset", mock_query)
+
+        payload, cached = await nb_client.fetch_gnb_socrata_query("4zbh-z2ij")
+
+        assert cached is False
+        assert payload["rows"] == gnb_socrata_rows_sample
+        assert payload["count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_limit_above_module_cap_raises_before_any_network_call(self, monkeypatch):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.socrata, "query_dataset", mock_query)
+
+        with pytest.raises(InvalidInput):
+            await nb_client.fetch_gnb_socrata_query("4zbh-z2ij", limit=nb_client.MAX_RECORDS + 1)
+
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_no_x_app_token_header_sent(self, monkeypatch, gnb_socrata_rows_sample):
+        mock_query = AsyncMock(return_value=gnb_socrata_rows_sample)
+        monkeypatch.setattr(nb_client.socrata, "query_dataset", mock_query)
+
+        await nb_client.fetch_gnb_socrata_query("4zbh-z2ij")
+
+        assert mock_query.call_args.kwargs.get("app_token") is None
 
 
 class TestFetchGeonbServices:
@@ -545,20 +601,10 @@ class TestStubsRaiseNotImplementedError:
     plan fills the body — pins the signature so Plans 02-06 never collide.
 
     fetch_search_datasets, fetch_dataset_details, fetch_query_dataset,
-    fetch_organizations, fetch_categories (federal CKAN) are implemented by
-    Plan 02 Task 1 and removed from this contract — see TestFetchSearchDatasets
-    et al. above. fetch_gnb_socrata_search / fetch_gnb_socrata_query
-    (checkpoint option-a) remain stubs until Plan 02 Task 3."""
-
-    @pytest.mark.asyncio
-    async def test_fetch_gnb_socrata_search(self):
-        with pytest.raises(NotImplementedError):
-            await nb_client.fetch_gnb_socrata_search()
-
-    @pytest.mark.asyncio
-    async def test_fetch_gnb_socrata_query(self):
-        with pytest.raises(NotImplementedError):
-            await nb_client.fetch_gnb_socrata_query("4zbh-z2ij")
+    fetch_organizations, fetch_categories (federal CKAN) and
+    fetch_gnb_socrata_search / fetch_gnb_socrata_query (checkpoint option-a)
+    are implemented by Plan 02 and removed from this contract — see
+    TestFetchSearchDatasets et al. above."""
 
     @pytest.mark.asyncio
     async def test_fetch_geonb_services(self):

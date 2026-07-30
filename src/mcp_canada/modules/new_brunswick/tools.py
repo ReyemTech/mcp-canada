@@ -20,14 +20,22 @@ from typing import Any, Literal
 
 from fastmcp.tools import tool
 
+from mcp_canada.shared import socrata  # noqa: F401 — used by nb_search_gnb_socrata_datasets
 from mcp_canada.shared.envelope import make_error, make_response, upstream_guard
 from mcp_canada.shared.errors import InvalidInput, NotFound
 
 from . import client as _client
-from .constants import ALL_NB_TOOL_NAMES, CKAN_BASE_URL, CROWN_LAND_SERVICE, MAX_RECORDS
+from .constants import (
+    ALL_NB_TOOL_NAMES,
+    CKAN_BASE_URL,
+    CROWN_LAND_SERVICE,
+    GNB_SOCRATA_DOMAIN,
+    MAX_RECORDS,
+)
 
 _API_NAME_GEONB = "new-brunswick-geonb"
 _API_NAME_CKAN = "new-brunswick-federal-ckan"
+_API_NAME_SOCRATA = "new-brunswick-gnb-socrata"
 
 _CKAN_SEARCH_URL = f"{CKAN_BASE_URL}/action/package_search"
 _CKAN_SHOW_URL = f"{CKAN_BASE_URL}/action/package_show"
@@ -35,8 +43,7 @@ _CKAN_SHOW_URL = f"{CKAN_BASE_URL}/action/package_show"
 # The module's locked tool-name registry — always identical to
 # constants.ALL_NB_TOOL_NAMES (the single authoritative manifest, D-08/D-25).
 # Cross-checked against it in tests/test_all_nb_tool_names_manifest so the two
-# files can never silently drift as Plans 02 Task 3 and 04-06 add the
-# remaining tools.
+# files can never silently drift as Plans 04-06 add the remaining tools.
 ALL_NB_TOOLS: tuple[str, ...] = ALL_NB_TOOL_NAMES
 
 __all__ = [
@@ -46,6 +53,8 @@ __all__ = [
     "nb_query_dataset",
     "nb_list_organizations",
     "nb_list_categories",
+    "nb_search_gnb_socrata_datasets",
+    "nb_query_gnb_socrata_dataset",
 ]
 
 
@@ -252,3 +261,69 @@ async def nb_list_categories(
         lang=lang,
     )
 
+
+# ---------------------------------------------------------------------------
+# gnb.socrata.com discovery — Task 3, checkpoint option-a
+# ---------------------------------------------------------------------------
+
+
+@tool
+@upstream_guard(_API_NAME_SOCRATA)
+async def nb_search_gnb_socrata_datasets(
+    query: str = "",
+    limit: int = 10,
+    offset: int = 0,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Search New Brunswick's provincial Socrata portal (gnb.socrata.com, 312 datasets, keyless).
+
+    Use for: discovering New Brunswick provincial open datasets published directly on
+    gnb.socrata.com — a separate catalogue from the federal-CKAN discovery tools
+    (nb_search_datasets). No X-App-Token is sent; keyless reads are verified working.
+
+    Keywords: new brunswick nouveau-brunswick gnb socrata provincial portal open data catalogue search discover keyless dataset
+    """
+    payload, cached = await _client.fetch_gnb_socrata_search(
+        query=query, limit=limit, offset=offset
+    )
+    return make_response(
+        payload,
+        api_name=_API_NAME_SOCRATA,
+        api_url=f"https://{GNB_SOCRATA_DOMAIN}/api/catalog/v1",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+@upstream_guard(_API_NAME_SOCRATA)
+async def nb_query_gnb_socrata_dataset(
+    dataset_id: str,
+    where: str | None = None,
+    select: str | None = None,
+    limit: int = 1000,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Query a New Brunswick gnb.socrata.com dataset via SoQL against /resource/{id}.json.
+
+    Use for: fetching actual rows from a gnb.socrata.com dataset (find dataset_id via
+    nb_search_gnb_socrata_datasets). A limit above this module's record cap returns
+    INVALID_INPUT before any network call. Geometry columns are stripped by default
+    when select is not provided (Nova Scotia precedent). No X-App-Token is sent.
+
+    Keywords: new brunswick nouveau-brunswick gnb socrata provincial soql query dataset resource where select filter portal
+    """
+    try:
+        payload, cached = await _client.fetch_gnb_socrata_query(
+            dataset_id, where=where, select=select, limit=limit
+        )
+    except InvalidInput as exc:
+        msg = f"Limite invalide : {exc}" if lang == "fr" else f"Invalid limit: {exc}"
+        return make_error("INVALID_INPUT", msg, lang=lang)
+    return make_response(
+        payload,
+        api_name=_API_NAME_SOCRATA,
+        api_url=f"https://{GNB_SOCRATA_DOMAIN}/resource/{dataset_id}.json",
+        cached=cached,
+        lang=lang,
+    )

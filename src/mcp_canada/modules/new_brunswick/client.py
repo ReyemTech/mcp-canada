@@ -33,7 +33,7 @@ from typing import Any
 
 import httpx
 
-from mcp_canada.shared import arcgis_hub
+from mcp_canada.shared import arcgis_hub, socrata
 from mcp_canada.shared.cache import cached_fetch
 from mcp_canada.shared.errors import InvalidInput, NotFound, UpstreamData
 from mcp_canada.shared.http import api_get
@@ -50,7 +50,7 @@ from .constants import (
     CROWN_LAND_SERVICE,
     FIVE11_BASE_URL,
     FIVE11_KEY_ENV,
-    GNB_SOCRATA_DOMAIN,  # noqa: F401 — used by Plan 02 Task 3
+    GNB_SOCRATA_DOMAIN,
     MAX_RECORDS,
     NB_ORG_FQ,
     RATE_GROUP_511,
@@ -579,13 +579,31 @@ async def fetch_gnb_socrata_search(
     query: str = "",
     limit: int = 10,
     offset: int = 0,
-) -> tuple[list[dict[str, Any]], bool]:
-    """Search gnb.socrata.com's catalog (keyless, 312 datasets).
+) -> tuple[dict[str, Any], bool]:
+    """Search gnb.socrata.com's catalog (keyless, 312 datasets — checkpoint option-a).
 
-    Plan 02 Task 3 implements via `shared/socrata.py:search_catalog` +
-    `shape_catalog_result`. Locked signature — do not change.
+    Keyless reads are verified working — no X-App-Token header is sent.
+    `limit` is clamped to [1, 100]; `offset` is floored at 0.
     """
-    raise NotImplementedError("Plan 02 Task 3 implements fetch_gnb_socrata_search")
+    clamped_limit = max(1, min(limit, 100))
+    clamped_offset = max(offset, 0)
+    cache_key = (
+        f"{CACHE_KEY_PREFIX}socrata:search:{query}:{clamped_limit}:{clamped_offset}"
+    )
+
+    async def _fetch() -> dict[str, Any]:
+        await _socrata_limiter.acquire()
+        raw = await socrata.search_catalog(
+            GNB_SOCRATA_DOMAIN,
+            q=query,
+            limit=clamped_limit,
+            offset=clamped_offset,
+            only="datasets",
+        )
+        results = [socrata.shape_catalog_result(r) for r in raw.get("results", [])]
+        return {"results": results, "total": raw.get("resultSetSize", 0)}
+
+    return await cached_fetch(cache_key, CACHE_TTL_SEARCH, _fetch)
 
 
 async def fetch_gnb_socrata_query(
@@ -593,13 +611,38 @@ async def fetch_gnb_socrata_query(
     where: str | None = None,
     select: str | None = None,
     limit: int = 1000,
-) -> tuple[list[dict[str, Any]], bool]:
-    """Query a gnb.socrata.com dataset via SoQL.
+) -> tuple[dict[str, Any], bool]:
+    """Query a gnb.socrata.com dataset via SoQL (checkpoint option-a).
 
-    Plan 02 Task 3 implements via `shared/socrata.py:query_dataset`. Locked
-    signature — do not change.
+    Rejects a `limit` above `MAX_RECORDS` with `InvalidInput` before any
+    network call. When the caller has not supplied an explicit `select`,
+    geometry-shaped columns (`the_geom*`) are stripped from the returned
+    rows after the fetch — the Nova Scotia precedent for excluding geometry
+    by default. No X-App-Token header is sent (keyless reads verified working).
     """
-    raise NotImplementedError("Plan 02 Task 3 implements fetch_gnb_socrata_query")
+    if limit > MAX_RECORDS:
+        raise InvalidInput(
+            f"limit must be at most {MAX_RECORDS} for gnb.socrata.com queries, got {limit}"
+        )
+    cache_key = f"{CACHE_KEY_PREFIX}socrata:query:{dataset_id}:{where}:{select}:{limit}"
+
+    async def _fetch() -> dict[str, Any]:
+        await _socrata_limiter.acquire()
+        rows = await socrata.query_dataset(
+            GNB_SOCRATA_DOMAIN,
+            dataset_id,
+            where=where,
+            select=select,
+            limit=limit,
+        )
+        if select is None:
+            rows = [
+                {k: v for k, v in row.items() if not k.lower().startswith("the_geom")}
+                for row in rows
+            ]
+        return {"rows": rows, "count": len(rows), "truncated": len(rows) >= limit}
+
+    return await cached_fetch(cache_key, CACHE_TTL_SEARCH, _fetch)
 
 
 # ---------------------------------------------------------------------------

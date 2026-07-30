@@ -362,10 +362,10 @@ Plans:
 
 ### Phase 21: New Brunswick Government Open Data
 
-**Goal:** Ship a `new_brunswick` module exposing NB provincial data as MCP tools — the 8th province in the rollout. 22 tools: 5 federal-CKAN discovery tools (`organization:nb`, 221 datasets — NB has no provincial CKAN), 3 GeoNB ArcGIS **Server** discovery tools (the ArcGIS Hub 401s, so the REST directory is enumerated instead), 11 curated geospatial tools across flood/water, Crown land/forestry, parcels/civic address and health/education, and 3 key-gated 511 transport stubs. Follows the 7-file module pattern; adds two additive bare-ArcGIS-Server enumerator functions to `shared/arcgis_hub.py`.
+**Goal:** Ship a `new_brunswick` module exposing NB provincial data as MCP tools — the 8th province in the rollout. 22 tools: 5 federal-CKAN discovery tools (`organization:nb`, 221 datasets — NB has no provincial CKAN), 2 `gnb.socrata.com` discovery tools (NB's provincial Socrata portal, 312 datasets, keyless — added by the 21-01 checkpoint, which live-disproved CONTEXT.md's "no provincial catalogue" claim), 3 GeoNB ArcGIS **Server** discovery tools (the ArcGIS Hub 401s, so the REST directory is enumerated instead), 9 curated geospatial tools across flood/water, Crown land/forestry, parcels/civic address and health/education, and 3 key-gated 511 transport stubs. `nb_get_provincial_parks` and `nb_get_mineral_occurrences` were traded to the long tail to hold the 22-tool budget; both stay reachable via `nb_query_geonb_layer`. Follows the 7-file module pattern; adds two additive bare-ArcGIS-Server enumerator functions to `shared/arcgis_hub.py`.
 **Requirements**: NB-01..NB-25, ERR-01..ERR-07
 **Depends on:** Phase 20
-**Plans:** 7/7 plans executed
+**Plans:** 7/7 plans complete
 
 Plans:
 

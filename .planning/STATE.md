@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
-current_phase: 21
-current_phase_name: new-brunswick-government-open-data
-status: verifying
+current_phase: 40
+current_phase_name: MCP Prompts and Resources
+status: planning
 stopped_at: Completed 21-07-PLAN.md — Phase 21 (New Brunswick) complete
-last_updated: "2026-07-30T18:36:58.184Z"
+last_updated: "2026-07-30T19:58:49.410Z"
 last_activity: 2026-07-30
-last_activity_desc: Phase 21 execution started
+last_activity_desc: Phase 21 complete, transitioned to Phase 40
 progress:
   total_phases: 38
   completed_phases: 20
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 ## Current Position
 
-Phase: 21 (new-brunswick-government-open-data) — EXECUTING
-Plan: 7 of 7
-Status: Phase complete — ready for verification
-Last activity: 2026-07-30 — Phase 21 execution started
+Phase: 40 — MCP Prompts and Resources
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-30 — Phase 21 complete, transitioned to Phase 40
 
 **Open decision before execution:** Plan 21-01 Task 2 carries a blocking `checkpoint:decision`.
 A live probe during planning found `https://gnb.socrata.com` DOES exist (HTTP 200, 312 datasets,
@@ -132,7 +132,7 @@ Remaining backlog (not defects):
 
 **Velocity:**
 
-- Total plans completed: 0
+- Total plans completed: 7
 - Average duration: -
 - Total execution time: -
 
@@ -140,7 +140,7 @@ Remaining backlog (not defects):
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 21 | 7 | - | - |
 
 **Recent Trend:**
 

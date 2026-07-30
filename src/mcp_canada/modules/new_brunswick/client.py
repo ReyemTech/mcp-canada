@@ -84,6 +84,33 @@ from .constants import (
     WETLANDS_LAYER,
     WETLANDS_SERVICE,
 )
+from .schemas import (  # noqa: F401 — re-exported for downstream plans, matching the
+    # saskatchewan/alberta/manitoba convention (IN-01): client.py builds and
+    # returns plain dicts throughout — these models document the live GeoNB
+    # field shapes (21-SPIKE.md §4) and federal-CKAN/gnb.socrata.com/511
+    # response shapes without enforcing them on the hot path.
+    NB511Camera,
+    NB511Event,
+    NB511WinterRoad,
+    NBCategory,
+    NBCivicAddress,
+    NBContaminatedSite,
+    NBCrownLandParcel,
+    NBDatasetDetails,
+    NBDatasetSummary,
+    NBFloodHazardArea,
+    NBGeoNBLayer,
+    NBGeoNBService,
+    NBHealthFacility,
+    NBHistoricalFlood,
+    NBMineralOccurrence,
+    NBOrganization,
+    NBParcel,
+    NBProvincialPark,
+    NBPublicSchool,
+    NBSocrataDatasetSummary,
+    NBWetland,
+)
 
 __all__ = [
     # Private helpers (fully implemented in Wave 0)

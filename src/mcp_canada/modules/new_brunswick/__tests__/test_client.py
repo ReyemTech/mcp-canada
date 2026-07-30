@@ -46,8 +46,37 @@ class TestBuildFq:
 
     def test_extra_fq_is_and_ed_after_nb_org_clause(self):
         result = nb_client._build_fq("res_format:CSV")
-        assert result == f"{NB_ORG_FQ} AND res_format:CSV"
-        assert result.startswith(NB_ORG_FQ)  # NB clause always first (T-21-04)
+        # WR-01: both clauses are explicitly parenthesized so Solr's Lucene
+        # query parser can't reinterpret operator precedence regardless of
+        # what the caller's fragment contains.
+        assert result == f"({NB_ORG_FQ}) AND (res_format:CSV)"
+        assert result.startswith(f"({NB_ORG_FQ})")  # NB clause always first (T-21-04)
+
+    def test_hostile_extra_fq_cannot_widen_result_past_nb_scope(self):
+        # WR-01: assert actual boolean SEMANTICS, not just string shape.
+        # Substitute the NB clause and the hostile fragment's leaf terms
+        # with Python booleans and evaluate the composed expression under
+        # standard `and`/`or` precedence (mirrors Lucene's) — a caller
+        # cannot construct a fragment that makes the whole fq true while
+        # the NB clause is false, which is exactly what an unparenthesized
+        # `A AND B OR C` would have allowed.
+        hostile = "*:* OR organization:xyz"
+        fq = nb_client._build_fq(hostile)
+        assert fq == f"({NB_ORG_FQ}) AND ({hostile})"
+
+        def evaluate(nb_is_true: bool, hostile_is_true: bool) -> bool:
+            expr = (
+                fq.replace(NB_ORG_FQ, str(nb_is_true))
+                .replace("*:*", str(hostile_is_true))
+                .replace("organization:xyz", str(hostile_is_true))
+                .replace("AND", "and")
+                .replace("OR", "or")
+            )
+            return eval(expr)  # noqa: S307 -- fixed test-only boolean expression
+
+        assert evaluate(nb_is_true=False, hostile_is_true=True) is False
+        assert evaluate(nb_is_true=True, hostile_is_true=True) is True
+        assert evaluate(nb_is_true=True, hostile_is_true=False) is False
 
 
 class TestShapeDatasetBilingual:
@@ -117,7 +146,7 @@ class TestSharedApiGetContract:
         await nb_client.fetch_search_datasets(extra_fq="res_format:CSV")
 
         params = mock_api_get.call_args.args[1]
-        assert params["fq"] == f"{NB_ORG_FQ} AND res_format:CSV"
+        assert params["fq"] == f"({NB_ORG_FQ}) AND (res_format:CSV)"
 
     @pytest.mark.asyncio
     async def test_search_hostile_fq_cannot_displace_nb_clause(
@@ -126,11 +155,27 @@ class TestSharedApiGetContract:
         mock_api_get = AsyncMock(return_value=ckan_package_search_sample)
         monkeypatch.setattr(nb_client, "api_get", mock_api_get)
 
-        await nb_client.fetch_search_datasets(extra_fq="organization:on")
+        await nb_client.fetch_search_datasets(extra_fq="*:* OR organization:on")
 
         params = mock_api_get.call_args.args[1]
-        assert params["fq"].startswith(NB_ORG_FQ)
-        assert "organization:on" in params["fq"]
+        fq = params["fq"]
+        assert fq == f"({NB_ORG_FQ}) AND (*:* OR organization:on)"
+
+        # WR-01: verify actual boolean semantics, not just string shape —
+        # the composed fq can never be true unless the NB clause is true,
+        # regardless of how the caller's fragment evaluates.
+        def evaluate(nb_is_true: bool, hostile_is_true: bool) -> bool:
+            expr = (
+                fq.replace(NB_ORG_FQ, str(nb_is_true))
+                .replace("*:*", str(hostile_is_true))
+                .replace("organization:on", str(hostile_is_true))
+                .replace("AND", "and")
+                .replace("OR", "or")
+            )
+            return eval(expr)  # noqa: S307 -- fixed test-only boolean expression
+
+        assert evaluate(nb_is_true=False, hostile_is_true=True) is False
+        assert evaluate(nb_is_true=True, hostile_is_true=True) is True
 
     @pytest.mark.asyncio
     async def test_search_limit_clamped_to_ckan_max(self, monkeypatch, ckan_package_search_sample):

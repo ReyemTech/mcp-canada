@@ -187,15 +187,24 @@ def _build_fq(extra_fq: str | None) -> str:
     The NB organization clause is always first and is NEVER caller-overridable
     (T-21-04) — no `organization` parameter is exposed to any discovery tool.
 
+    WR-01: both clauses are wrapped in explicit parentheses. CKAN forwards
+    `fq` straight to Solr's classic Lucene query parser, where mixing
+    `AND`/`OR` without explicit grouping is a well-documented source of
+    unintended operator precedence (`A AND B OR C` does not reliably parse
+    as `A AND (B OR C)`). A caller-supplied fragment containing its own
+    `OR` (e.g. `"*:* OR organization:xyz"`) could otherwise widen the
+    result past the NB scope. Explicit grouping makes the composed clause
+    require the NB clause regardless of what operators the fragment uses.
+
     Args:
         extra_fq: An optional caller-supplied fq fragment (e.g. a format or
             tag filter) to AND onto the NB clause.
 
     Returns:
-        `"organization:nb"` alone, or `"organization:nb AND {extra_fq}"`.
+        `"organization:nb"` alone, or `"(organization:nb) AND ({extra_fq})"`.
     """
     if extra_fq:
-        return f"{NB_ORG_FQ} AND {extra_fq}"
+        return f"({NB_ORG_FQ}) AND ({extra_fq})"
     return NB_ORG_FQ
 
 

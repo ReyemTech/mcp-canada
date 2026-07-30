@@ -4,22 +4,27 @@ TestNbGetCrownLandTools is the Task 1 tracer, fully tested. Plan 02 Task 2
 implements + tests the five federal-CKAN discovery tools; Task 3 implements +
 tests the two gnb.socrata.com tools (checkpoint option-a). Plan 05 implements
 + tests nb_get_parcels / nb_get_civic_addresses — the two FILTER_REQUIRED_TOOLS
-large layers, each proven via a not-awaited guard test. Plan 06 Task 1
-implements + tests nb_get_health_facilities / nb_get_public_schools — the two
-dispatch tools. nb_get_road_events / nb_get_winter_road_conditions /
-nb_get_traffic_cameras remain placeholders until Plan 06 Task 2, which also
-adds TestManifestMatchesShippedSurface once the 22-tool manifest is complete.
-TestNbEnvelopes / TestNbLangParam are parametrized by Plan 07 once every tool
-exists.
+large layers, each proven via a not-awaited guard test. Plan 06 implements +
+tests nb_get_health_facilities / nb_get_public_schools (the two dispatch
+tools) and nb_get_road_events / nb_get_winter_road_conditions /
+nb_get_traffic_cameras (the three key-gated 511 tools), plus
+TestManifestMatchesShippedSurface — a genuine, falsifiable bidirectional
+set-equality check between constants.ALL_NB_TOOL_NAMES and the @tool objects
+actually registered in this module (an orchestrator-directed addition; see
+21-06-SUMMARY.md). TestNbEnvelopes / TestNbLangParam are parametrized by
+Plan 07 once every tool exists.
 """
 
 from __future__ import annotations
 
+import json
 from unittest.mock import AsyncMock
 
 import httpx
 import pytest
 
+import mcp_canada.modules.new_brunswick.tools as nb_tools
+from mcp_canada.modules.new_brunswick.client import Five11NotConfigured
 from mcp_canada.modules.new_brunswick.constants import (
     ALL_NB_TOOL_NAMES,
     CROWN_LAND_SERVICE,
@@ -38,7 +43,10 @@ from mcp_canada.modules.new_brunswick.tools import (
     nb_get_historical_floods,
     nb_get_parcels,
     nb_get_public_schools,
+    nb_get_road_events,
+    nb_get_traffic_cameras,
     nb_get_wetlands,
+    nb_get_winter_road_conditions,
     nb_list_categories,
     nb_list_geonb_services,
     nb_list_organizations,
@@ -170,6 +178,57 @@ class TestAllNbToolNamesManifest:
     def test_every_tool_name_uses_nb_prefix(self):
         for name in ALL_NB_TOOL_NAMES:
             assert name.startswith("nb_"), name
+
+
+class TestManifestMatchesShippedSurface:
+    """Orchestrator-directed addition (not in the original plan text): the
+    manifest count/membership/prefix checks above are all necessary but not
+    sufficient — none of them proves a manifest name resolves to a real,
+    registered tool. `ALL_NB_TOOLS = ALL_NB_TOOL_NAMES` in tools.py is an
+    alias, not an independent value, so an equality assertion against it is
+    unfalsifiable (an alias can never differ from what it aliases). These
+    tests instead inspect the module's live attributes directly, in both
+    directions:
+
+      1. every name in the locked manifest resolves to a callable @tool
+         object in this module (not merely `hasattr` — but `__fastmcp__`
+         proof it went through the @tool decorator);
+      2. no nb_-prefixed @tool exists in this module OUTSIDE the manifest
+         (the direction membership tests above cannot catch — a stray
+         nb_get_* tool added without a matching manifest entry would pass
+         every existing check while still drifting from D-08/D-25's single
+         authoritative manifest).
+    """
+
+    def test_every_manifest_name_resolves_to_a_registered_tool(self):
+        for name in ALL_NB_TOOL_NAMES:
+            obj = getattr(nb_tools, name, None)
+            assert obj is not None, (
+                f"{name!r} is in constants.ALL_NB_TOOL_NAMES but tools.py has "
+                "no attribute of that name"
+            )
+            assert callable(obj), f"{name!r} exists in tools.py but is not callable"
+            assert getattr(obj, "__fastmcp__", None) is not None, (
+                f"{name!r} exists in tools.py but was never decorated with @tool "
+                "(no __fastmcp__ metadata)"
+            )
+
+    def test_no_nb_prefixed_tool_exists_outside_the_manifest(self):
+        shipped = {
+            name
+            for name, obj in vars(nb_tools).items()
+            if name.startswith("nb_") and getattr(obj, "__fastmcp__", None) is not None
+        }
+        assert shipped == set(ALL_NB_TOOL_NAMES), (
+            f"tools.py and constants.ALL_NB_TOOL_NAMES disagree — "
+            f"shipped-only: {shipped - set(ALL_NB_TOOL_NAMES)}, "
+            f"manifest-only: {set(ALL_NB_TOOL_NAMES) - shipped}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Placeholder classes — one per remaining tool (owning plan implements + tests)
+# ---------------------------------------------------------------------------
 
 
 class TestNbSearchDatasets:
@@ -1143,15 +1202,313 @@ class TestNbGetPublicSchools:
 
 
 class TestNbGetRoadEvents:
-    """Plan 06 implements + tests. NOT_CONFIGURED when 511 key absent."""
+    @pytest.mark.asyncio
+    async def test_key_absent_returns_not_configured_envelope_not_exception(
+        self, monkeypatch
+    ):
+        mock_fetch = AsyncMock(
+            side_effect=Five11NotConfigured("NEW_BRUNSWICK_511_KEY not set")
+        )
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_road_events", mock_fetch
+        )
+
+        result = await nb_get_road_events(lang="en")
+
+        assert result["error"]["code"] == "NOT_CONFIGURED"
+        assert "NEW_BRUNSWICK_511_KEY" in result["error"]["message"]
+        assert "511.gnb.ca" in result["error"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_not_configured_message_differs_by_language(self, monkeypatch):
+        mock_fetch = AsyncMock(
+            side_effect=Five11NotConfigured("NEW_BRUNSWICK_511_KEY not set")
+        )
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_road_events", mock_fetch
+        )
+
+        en = await nb_get_road_events(lang="en")
+        fr = await nb_get_road_events(lang="fr")
+
+        assert en["error"]["code"] == fr["error"]["code"] == "NOT_CONFIGURED"
+        assert en["error"]["message"] != fr["error"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_happy_path_envelope(self, monkeypatch, five11_event_sample):
+        mock_fetch = AsyncMock(return_value=(five11_event_sample, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_road_events", mock_fetch
+        )
+
+        result = await nb_get_road_events(lang="en")
+
+        assert "error" not in result
+        assert result["_meta"]["source"]["api"] == "new-brunswick-511"
+        assert result["data"] == five11_event_sample
+
+    @pytest.mark.asyncio
+    async def test_timeout_returns_upstream_error_envelope(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=httpx.TimeoutException("boom"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_road_events", mock_fetch
+        )
+
+        result = await nb_get_road_events(lang="en")
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_connect_error_returns_upstream_error_envelope(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=httpx.ConnectError("boom"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_road_events", mock_fetch
+        )
+
+        result = await nb_get_road_events(lang="en")
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_http_500_returns_upstream_error_envelope(self, monkeypatch):
+        error = httpx.HTTPStatusError(
+            "boom",
+            request=httpx.Request("GET", "https://511.gnb.ca/api/v2/get/event"),
+            response=httpx.Response(500),
+        )
+        mock_fetch = AsyncMock(side_effect=error)
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_road_events", mock_fetch
+        )
+
+        result = await nb_get_road_events(lang="en")
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_not_configured_never_leaks_sentinel_key_in_serialised_response(
+        self, monkeypatch
+    ):
+        mock_fetch = AsyncMock(
+            side_effect=Five11NotConfigured("NEW_BRUNSWICK_511_KEY not set")
+        )
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_road_events", mock_fetch
+        )
+
+        result = await nb_get_road_events(lang="en")
+
+        assert "SENTINEL" not in json.dumps(result)
 
 
 class TestNbGetWinterRoadConditions:
-    """Plan 06 implements + tests. NOT_CONFIGURED when 511 key absent."""
+    @pytest.mark.asyncio
+    async def test_key_absent_returns_not_configured_envelope_not_exception(
+        self, monkeypatch
+    ):
+        mock_fetch = AsyncMock(
+            side_effect=Five11NotConfigured("NEW_BRUNSWICK_511_KEY not set")
+        )
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_winter_road_conditions",
+            mock_fetch,
+        )
+
+        result = await nb_get_winter_road_conditions(lang="en")
+
+        assert result["error"]["code"] == "NOT_CONFIGURED"
+        assert "NEW_BRUNSWICK_511_KEY" in result["error"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_not_configured_message_differs_by_language(self, monkeypatch):
+        mock_fetch = AsyncMock(
+            side_effect=Five11NotConfigured("NEW_BRUNSWICK_511_KEY not set")
+        )
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_winter_road_conditions",
+            mock_fetch,
+        )
+
+        en = await nb_get_winter_road_conditions(lang="en")
+        fr = await nb_get_winter_road_conditions(lang="fr")
+
+        assert en["error"]["message"] != fr["error"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_happy_path_empty_list_outside_season_is_success(self, monkeypatch):
+        mock_fetch = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_winter_road_conditions",
+            mock_fetch,
+        )
+
+        result = await nb_get_winter_road_conditions(lang="en")
+
+        assert "error" not in result
+        assert result["data"] == []
+
+    @pytest.mark.asyncio
+    async def test_timeout_returns_upstream_error_envelope(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=httpx.TimeoutException("boom"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_winter_road_conditions",
+            mock_fetch,
+        )
+
+        result = await nb_get_winter_road_conditions(lang="en")
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_connect_error_returns_upstream_error_envelope(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=httpx.ConnectError("boom"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_winter_road_conditions",
+            mock_fetch,
+        )
+
+        result = await nb_get_winter_road_conditions(lang="en")
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_http_500_returns_upstream_error_envelope(self, monkeypatch):
+        error = httpx.HTTPStatusError(
+            "boom",
+            request=httpx.Request("GET", "https://511.gnb.ca/api/v2/get/winterroads"),
+            response=httpx.Response(500),
+        )
+        mock_fetch = AsyncMock(side_effect=error)
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_winter_road_conditions",
+            mock_fetch,
+        )
+
+        result = await nb_get_winter_road_conditions(lang="en")
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_not_configured_never_leaks_sentinel_key_in_serialised_response(
+        self, monkeypatch
+    ):
+        mock_fetch = AsyncMock(
+            side_effect=Five11NotConfigured("NEW_BRUNSWICK_511_KEY not set")
+        )
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_winter_road_conditions",
+            mock_fetch,
+        )
+
+        result = await nb_get_winter_road_conditions(lang="en")
+
+        assert "SENTINEL" not in json.dumps(result)
 
 
 class TestNbGetTrafficCameras:
-    """Plan 06 implements + tests. NOT_CONFIGURED when 511 key absent."""
+    @pytest.mark.asyncio
+    async def test_key_absent_returns_not_configured_envelope_not_exception(
+        self, monkeypatch
+    ):
+        mock_fetch = AsyncMock(
+            side_effect=Five11NotConfigured("NEW_BRUNSWICK_511_KEY not set")
+        )
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_traffic_cameras",
+            mock_fetch,
+        )
+
+        result = await nb_get_traffic_cameras(lang="en")
+
+        assert result["error"]["code"] == "NOT_CONFIGURED"
+        assert "NEW_BRUNSWICK_511_KEY" in result["error"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_not_configured_message_differs_by_language(self, monkeypatch):
+        mock_fetch = AsyncMock(
+            side_effect=Five11NotConfigured("NEW_BRUNSWICK_511_KEY not set")
+        )
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_traffic_cameras",
+            mock_fetch,
+        )
+
+        en = await nb_get_traffic_cameras(lang="en")
+        fr = await nb_get_traffic_cameras(lang="fr")
+
+        assert en["error"]["message"] != fr["error"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_happy_path_envelope(self, monkeypatch):
+        rows_sample = [{"Id": "cam-1", "Name": "Route 1 at Fredericton"}]
+        mock_fetch = AsyncMock(return_value=(rows_sample, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_traffic_cameras",
+            mock_fetch,
+        )
+
+        result = await nb_get_traffic_cameras(lang="en")
+
+        assert "error" not in result
+        assert result["_meta"]["source"]["api"] == "new-brunswick-511"
+        assert result["data"] == rows_sample
+
+    @pytest.mark.asyncio
+    async def test_timeout_returns_upstream_error_envelope(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=httpx.TimeoutException("boom"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_traffic_cameras",
+            mock_fetch,
+        )
+
+        result = await nb_get_traffic_cameras(lang="en")
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_connect_error_returns_upstream_error_envelope(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=httpx.ConnectError("boom"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_traffic_cameras",
+            mock_fetch,
+        )
+
+        result = await nb_get_traffic_cameras(lang="en")
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_http_500_returns_upstream_error_envelope(self, monkeypatch):
+        error = httpx.HTTPStatusError(
+            "boom",
+            request=httpx.Request("GET", "https://511.gnb.ca/api/v2/get/cameras"),
+            response=httpx.Response(500),
+        )
+        mock_fetch = AsyncMock(side_effect=error)
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_traffic_cameras",
+            mock_fetch,
+        )
+
+        result = await nb_get_traffic_cameras(lang="en")
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_not_configured_never_leaks_sentinel_key_in_serialised_response(
+        self, monkeypatch
+    ):
+        mock_fetch = AsyncMock(
+            side_effect=Five11NotConfigured("NEW_BRUNSWICK_511_KEY not set")
+        )
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_traffic_cameras",
+            mock_fetch,
+        )
+
+        result = await nb_get_traffic_cameras(lang="en")
+
+        assert "SENTINEL" not in json.dumps(result)
 
 
 # ---------------------------------------------------------------------------

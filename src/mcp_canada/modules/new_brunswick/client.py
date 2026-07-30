@@ -42,6 +42,7 @@ from mcp_canada.shared.rate_limiter import get_limiter
 
 from .constants import (
     CACHE_KEY_PREFIX,
+    CACHE_TTL_LIVE,
     CACHE_TTL_META,
     CACHE_TTL_SEARCH,
     CIVIC_ADDRESS_LAYER,
@@ -1212,22 +1213,50 @@ async def fetch_public_schools(
 async def fetch_road_events() -> tuple[list[dict[str, Any]], bool]:
     """Fetch current road events from NB 511 (key-gated).
 
-    Plan 06 implements via `_511_get`. Locked signature — do not change.
+    KEY REQUIRED: `_511_get` reads `NEW_BRUNSWICK_511_KEY` and raises
+    `Five11NotConfigured` before any network call when it is absent — the
+    tool layer maps that to a `NOT_CONFIGURED` envelope (D-10). Live-probed
+    endpoint: `511.gnb.ca/api/v2/get/event`. Cached at `CACHE_TTL_LIVE`
+    because road events change frequently.
     """
-    raise NotImplementedError("Plan 06 implements fetch_road_events")
+    cache_key = f"{CACHE_KEY_PREFIX}511:event"
+
+    async def _fetch() -> list[dict[str, Any]]:
+        await _511_limiter.acquire()
+        return await _511_get("event")
+
+    return await cached_fetch(cache_key, CACHE_TTL_LIVE, _fetch)
 
 
 async def fetch_winter_road_conditions() -> tuple[list[dict[str, Any]], bool]:
     """Fetch winter road conditions from NB 511 (key-gated).
 
-    Plan 06 implements via `_511_get`. Locked signature — do not change.
+    KEY REQUIRED: `_511_get` reads `NEW_BRUNSWICK_511_KEY` and raises
+    `Five11NotConfigured` before any network call when it is absent. Endpoint:
+    `511.gnb.ca/api/v2/get/winterroads`. Cached at `CACHE_TTL_LIVE` because
+    conditions change frequently through the winter season.
     """
-    raise NotImplementedError("Plan 06 implements fetch_winter_road_conditions")
+    cache_key = f"{CACHE_KEY_PREFIX}511:winterroads"
+
+    async def _fetch() -> list[dict[str, Any]]:
+        await _511_limiter.acquire()
+        return await _511_get("winterroads")
+
+    return await cached_fetch(cache_key, CACHE_TTL_LIVE, _fetch)
 
 
 async def fetch_traffic_cameras() -> tuple[list[dict[str, Any]], bool]:
     """Fetch traffic camera locations from NB 511 (key-gated).
 
-    Plan 06 implements via `_511_get`. Locked signature — do not change.
+    KEY REQUIRED: `_511_get` reads `NEW_BRUNSWICK_511_KEY` and raises
+    `Five11NotConfigured` before any network call when it is absent. Endpoint:
+    `511.gnb.ca/api/v2/get/cameras`. Cached at `CACHE_TTL_META` (24h) — unlike
+    events and winter roads, camera locations are stable infrastructure.
     """
-    raise NotImplementedError("Plan 06 implements fetch_traffic_cameras")
+    cache_key = f"{CACHE_KEY_PREFIX}511:cameras"
+
+    async def _fetch() -> list[dict[str, Any]]:
+        await _511_limiter.acquire()
+        return await _511_get("cameras")
+
+    return await cached_fetch(cache_key, CACHE_TTL_META, _fetch)

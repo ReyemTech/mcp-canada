@@ -10,14 +10,15 @@ TestFetchGeonbServiceLayers, TestFetchGeonbLayerFeatures,
 TestFetchFloodHazardAreas, TestFetchHistoricalFloods, TestFetchWetlands and
 TestFetchContaminatedSites. Plan 05 fills TestFetchParcels and
 TestFetchCivicAddresses (the two FILTER_REQUIRED_TOOLS large layers). Plan 06
-Task 1 fills TestFetchHealthFacilities and TestFetchPublicSchools (the two
-dispatch tools). TestFetchRoadEvents, TestFetchWinterRoadConditions and
-TestFetchTrafficCameras remain placeholders — Plan 06 Task 2 fills them,
-closing the 22-tool manifest.
+fills TestFetchHealthFacilities, TestFetchPublicSchools (the two dispatch
+tools) and TestFetchRoadEvents / TestFetchWinterRoadConditions /
+TestFetchTrafficCameras (the three key-gated 511 tools) — the last
+`fetch_*` stubs, closing the 22-tool manifest.
 """
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock
 
 import httpx
@@ -1246,52 +1247,157 @@ class TestFetchPublicSchools:
 
 
 class TestFetchRoadEvents:
-    """Plan 06 fills this."""
+    @pytest.mark.asyncio
+    async def test_key_absent_raises_five11_not_configured_before_any_network_call(
+        self, monkeypatch
+    ):
+        monkeypatch.delenv(FIVE11_KEY_ENV, raising=False)
+        mock_get = AsyncMock()
+        monkeypatch.setattr(nb_client, "api_get", mock_get)
+
+        with pytest.raises(nb_client.Five11NotConfigured):
+            await nb_client.fetch_road_events()
+
+        mock_get.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_key_set_returns_rows_from_event_endpoint(
+        self, monkeypatch, five11_event_sample
+    ):
+        monkeypatch.setenv(FIVE11_KEY_ENV, "test-key-value")
+        mock_511_get = AsyncMock(return_value=five11_event_sample)
+        monkeypatch.setattr(nb_client, "_511_get", mock_511_get)
+
+        rows, cached = await nb_client.fetch_road_events()
+
+        assert rows == five11_event_sample
+        assert cached is False
+        mock_511_get.assert_awaited_once_with("event")
+
+    @pytest.mark.asyncio
+    async def test_caches_at_live_ttl(self, monkeypatch, five11_event_sample):
+        monkeypatch.setenv(FIVE11_KEY_ENV, "test-key-value")
+        monkeypatch.setattr(
+            nb_client, "_511_get", AsyncMock(return_value=five11_event_sample)
+        )
+        captured: dict[str, Any] = {}
+
+        async def _spy_cached_fetch(key, ttl, fetcher):
+            captured["ttl"] = ttl
+            return await fetcher(), False
+
+        monkeypatch.setattr(nb_client, "cached_fetch", _spy_cached_fetch)
+
+        await nb_client.fetch_road_events()
+
+        assert captured["ttl"] == nb_client.CACHE_TTL_LIVE
+
+    @pytest.mark.asyncio
+    async def test_timeout_propagates_for_tool_layer_to_classify(self, monkeypatch):
+        monkeypatch.setenv(FIVE11_KEY_ENV, "test-key-value")
+        monkeypatch.setattr(
+            nb_client, "_511_get", AsyncMock(side_effect=httpx.TimeoutException("boom"))
+        )
+
+        with pytest.raises(httpx.TimeoutException):
+            await nb_client.fetch_road_events()
 
 
 class TestFetchWinterRoadConditions:
-    """Plan 06 fills this."""
+    @pytest.mark.asyncio
+    async def test_key_absent_raises_five11_not_configured_before_any_network_call(
+        self, monkeypatch
+    ):
+        monkeypatch.delenv(FIVE11_KEY_ENV, raising=False)
+        mock_get = AsyncMock()
+        monkeypatch.setattr(nb_client, "api_get", mock_get)
+
+        with pytest.raises(nb_client.Five11NotConfigured):
+            await nb_client.fetch_winter_road_conditions()
+
+        mock_get.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_key_set_returns_rows_from_winterroads_endpoint(self, monkeypatch):
+        monkeypatch.setenv(FIVE11_KEY_ENV, "test-key-value")
+        rows_sample = [{"AreaName": "Northern", "Condition": "Good"}]
+        mock_511_get = AsyncMock(return_value=rows_sample)
+        monkeypatch.setattr(nb_client, "_511_get", mock_511_get)
+
+        rows, cached = await nb_client.fetch_winter_road_conditions()
+
+        assert rows == rows_sample
+        assert cached is False
+        mock_511_get.assert_awaited_once_with("winterroads")
+
+    @pytest.mark.asyncio
+    async def test_caches_at_live_ttl(self, monkeypatch):
+        monkeypatch.setenv(FIVE11_KEY_ENV, "test-key-value")
+        monkeypatch.setattr(nb_client, "_511_get", AsyncMock(return_value=[]))
+        captured: dict[str, Any] = {}
+
+        async def _spy_cached_fetch(key, ttl, fetcher):
+            captured["ttl"] = ttl
+            return await fetcher(), False
+
+        monkeypatch.setattr(nb_client, "cached_fetch", _spy_cached_fetch)
+
+        await nb_client.fetch_winter_road_conditions()
+
+        assert captured["ttl"] == nb_client.CACHE_TTL_LIVE
+
+    @pytest.mark.asyncio
+    async def test_empty_list_outside_season_is_success_not_error(self, monkeypatch):
+        monkeypatch.setenv(FIVE11_KEY_ENV, "test-key-value")
+        monkeypatch.setattr(nb_client, "_511_get", AsyncMock(return_value=[]))
+
+        rows, _cached = await nb_client.fetch_winter_road_conditions()
+
+        assert rows == []
 
 
 class TestFetchTrafficCameras:
-    """Plan 06 fills this."""
-
-
-# ---------------------------------------------------------------------------
-# Locked-signature stub contract — every stub raises NotImplementedError today
-# ---------------------------------------------------------------------------
-
-
-class TestStubsRaiseNotImplementedError:
-    """Every locked-signature stub raises NotImplementedError until its owning
-    plan fills the body — pins the signature so Plans 02-06 never collide.
-
-    fetch_search_datasets, fetch_dataset_details, fetch_query_dataset,
-    fetch_organizations, fetch_categories (federal CKAN) and
-    fetch_gnb_socrata_search / fetch_gnb_socrata_query (checkpoint option-a)
-    are implemented by Plan 02, fetch_geonb_services,
-    fetch_geonb_service_layers, fetch_geonb_layer_features,
-    fetch_flood_hazard_areas, fetch_historical_floods, fetch_wetlands and
-    fetch_contaminated_sites by Plan 04, fetch_parcels / fetch_civic_addresses
-    by Plan 05, and fetch_health_facilities / fetch_public_schools by Plan 06
-    Task 1 — all removed from this contract, see TestFetchSearchDatasets et
-    al., TestFetchGeonbServices et al., TestFetchParcels /
-    TestFetchCivicAddresses and TestFetchHealthFacilities /
-    TestFetchPublicSchools above. fetch_road_events,
-    fetch_winter_road_conditions and fetch_traffic_cameras remain stubs until
-    Plan 06 Task 2."""
-
     @pytest.mark.asyncio
-    async def test_fetch_road_events(self):
-        with pytest.raises(NotImplementedError):
-            await nb_client.fetch_road_events()
+    async def test_key_absent_raises_five11_not_configured_before_any_network_call(
+        self, monkeypatch
+    ):
+        monkeypatch.delenv(FIVE11_KEY_ENV, raising=False)
+        mock_get = AsyncMock()
+        monkeypatch.setattr(nb_client, "api_get", mock_get)
 
-    @pytest.mark.asyncio
-    async def test_fetch_winter_road_conditions(self):
-        with pytest.raises(NotImplementedError):
-            await nb_client.fetch_winter_road_conditions()
-
-    @pytest.mark.asyncio
-    async def test_fetch_traffic_cameras(self):
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(nb_client.Five11NotConfigured):
             await nb_client.fetch_traffic_cameras()
+
+        mock_get.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_key_set_returns_rows_from_cameras_endpoint(self, monkeypatch):
+        monkeypatch.setenv(FIVE11_KEY_ENV, "test-key-value")
+        rows_sample = [{"Id": "cam-1", "Name": "Route 1 at Fredericton"}]
+        mock_511_get = AsyncMock(return_value=rows_sample)
+        monkeypatch.setattr(nb_client, "_511_get", mock_511_get)
+
+        rows, cached = await nb_client.fetch_traffic_cameras()
+
+        assert rows == rows_sample
+        assert cached is False
+        mock_511_get.assert_awaited_once_with("cameras")
+
+    @pytest.mark.asyncio
+    async def test_caches_at_meta_ttl_not_live_ttl(self, monkeypatch):
+        # Cameras are stable infrastructure — distinct from events/winter
+        # roads, both of which cache at CACHE_TTL_LIVE.
+        monkeypatch.setenv(FIVE11_KEY_ENV, "test-key-value")
+        monkeypatch.setattr(nb_client, "_511_get", AsyncMock(return_value=[]))
+        captured: dict[str, Any] = {}
+
+        async def _spy_cached_fetch(key, ttl, fetcher):
+            captured["ttl"] = ttl
+            return await fetcher(), False
+
+        monkeypatch.setattr(nb_client, "cached_fetch", _spy_cached_fetch)
+
+        await nb_client.fetch_traffic_cameras()
+
+        assert captured["ttl"] == nb_client.CACHE_TTL_META
+        assert captured["ttl"] != nb_client.CACHE_TTL_LIVE

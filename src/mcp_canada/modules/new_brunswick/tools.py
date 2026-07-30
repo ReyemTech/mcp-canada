@@ -25,6 +25,7 @@ from mcp_canada.shared.envelope import make_error, make_response, upstream_guard
 from mcp_canada.shared.errors import InvalidInput, NotFound
 
 from . import client as _client
+from .client import Five11NotConfigured
 from .constants import (
     ALL_NB_TOOL_NAMES,
     CIVIC_ADDRESS_SERVICE,
@@ -32,6 +33,7 @@ from .constants import (
     CONTAMINATED_SITES_SERVICE,
     CROWN_LAND_SERVICE,
     FILTER_REQUIRED_TOOLS,
+    FIVE11_BASE_URL,
     FLOOD_HAZARD_SERVICE,
     GEONB_BASE_URL,
     GNB_SOCRATA_DOMAIN,
@@ -48,14 +50,20 @@ from .constants import (
 _API_NAME_GEONB = "new-brunswick-geonb"
 _API_NAME_CKAN = "new-brunswick-federal-ckan"
 _API_NAME_SOCRATA = "new-brunswick-gnb-socrata"
+_API_NAME_511 = "new-brunswick-511"
 
 _CKAN_SEARCH_URL = f"{CKAN_BASE_URL}/action/package_search"
 _CKAN_SHOW_URL = f"{CKAN_BASE_URL}/action/package_show"
 
-# The module's locked tool-name registry — always identical to
-# constants.ALL_NB_TOOL_NAMES (the single authoritative manifest, D-08/D-25).
-# Cross-checked against it in tests/test_all_nb_tool_names_manifest so the two
-# files can never silently drift as Plans 04-06 add the remaining tools.
+# The module's locked tool-name registry. This is an ALIAS of
+# constants.ALL_NB_TOOL_NAMES, not an independent value — an alias can never
+# be unequal to the thing it aliases, so this assignment by itself proves
+# nothing about drift. The actual guarantee — that every name in
+# ALL_NB_TOOL_NAMES resolves to a real, registered @tool object in THIS
+# module, and that no nb_-prefixed @tool exists here outside that list — is
+# asserted by TestManifestMatchesShippedSurface in test_tools.py, which
+# inspects the module's live attributes rather than comparing this tuple to
+# its own source.
 ALL_NB_TOOLS: tuple[str, ...] = ALL_NB_TOOL_NAMES
 
 __all__ = [
@@ -78,6 +86,9 @@ __all__ = [
     "nb_get_civic_addresses",
     "nb_get_health_facilities",
     "nb_get_public_schools",
+    "nb_get_road_events",
+    "nb_get_winter_road_conditions",
+    "nb_get_traffic_cameras",
 ]
 
 
@@ -832,4 +843,122 @@ async def nb_get_public_schools(
         cached=cached,
         lang=lang,
     )
+
+
+# ---------------------------------------------------------------------------
+# Transport — three key-gated NB 511 tools (Task 2, D-09/D-10)
+# ---------------------------------------------------------------------------
+
+# An unconfigured 511 key is a NORMAL outcome, not an outage (D-10). Neither
+# message interpolates any value read from the environment — the environment
+# is read only inside client.py's _511_get (T-21-02); `grep -n "environ"` on
+# this file must return no lines.
+_NOT_CONFIGURED_MSG_EN = (
+    "New Brunswick 511 API key not set. NB 511 requires a developer key from "
+    "the NB Department of Transportation and Infrastructure — see "
+    "https://511.gnb.ca and set the NEW_BRUNSWICK_511_KEY environment variable. "
+    "No public self-serve registration page was found for NB 511."
+)
+_NOT_CONFIGURED_MSG_FR = (
+    "Clé API New Brunswick 511 non configurée. NB 511 nécessite une clé de "
+    "développeur du ministère des Transports et de l'Infrastructure du N.-B. "
+    "— consultez https://511.gnb.ca et définissez la variable d'environnement "
+    "NEW_BRUNSWICK_511_KEY. Aucune page d'inscription libre-service publique "
+    "n'a été trouvée pour NB 511."
+)
+
+
+@tool
+@upstream_guard(_API_NAME_511)
+async def nb_get_road_events(
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get current road events (closures, construction, incidents) from NB 511.
+
+    Use for: checking active road events on New Brunswick highways — closures,
+    construction zones, accidents and other incidents from the NB 511 Events
+    endpoint. Requires the NEW_BRUNSWICK_511_KEY environment variable (a
+    developer key from the NB Department of Transportation and
+    Infrastructure — see https://511.gnb.ca). Returns a NOT_CONFIGURED
+    envelope, not an exception, when the key is absent — this is a normal,
+    expected outcome (D-10), not an outage to retry. NOTE: Never calls an
+    ArcGIS FeatureServer — 511 is a separate, custom REST API.
+
+    Keywords: new brunswick road events closures construction incidents highway 511 transport traffic accidents real-time current conditions department transportation infrastructure
+    """
+    try:
+        rows, cached = await _client.fetch_road_events()
+    except Five11NotConfigured:
+        msg = _NOT_CONFIGURED_MSG_FR if lang == "fr" else _NOT_CONFIGURED_MSG_EN
+        return make_error("NOT_CONFIGURED", msg, lang=lang)
+    return make_response(
+        rows,
+        api_name=_API_NAME_511,
+        api_url=f"{FIVE11_BASE_URL}/event",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+@upstream_guard(_API_NAME_511)
+async def nb_get_winter_road_conditions(
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get winter road conditions on New Brunswick highways from NB 511 (seasonal).
+
+    Use for: checking current winter driving conditions on New Brunswick
+    highways — surface condition and visibility reports from the NB 511
+    winter roads endpoint. Requires the NEW_BRUNSWICK_511_KEY environment
+    variable (a developer key from the NB Department of Transportation and
+    Infrastructure — see https://511.gnb.ca). Returns a NOT_CONFIGURED
+    envelope, not an exception, when the key is absent (D-10). NOTE: Never
+    calls an ArcGIS FeatureServer — 511 is a separate, custom REST API.
+
+    Keywords: new brunswick winter road conditions highway 511 transport snow ice visibility seasonal driving department transportation infrastructure real-time
+    """
+    try:
+        rows, cached = await _client.fetch_winter_road_conditions()
+    except Five11NotConfigured:
+        msg = _NOT_CONFIGURED_MSG_FR if lang == "fr" else _NOT_CONFIGURED_MSG_EN
+        return make_error("NOT_CONFIGURED", msg, lang=lang)
+    return make_response(
+        rows,
+        api_name=_API_NAME_511,
+        api_url=f"{FIVE11_BASE_URL}/winterroads",
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+@upstream_guard(_API_NAME_511)
+async def nb_get_traffic_cameras(
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get New Brunswick highway traffic camera locations from NB 511.
+
+    Use for: retrieving NB 511 traffic camera locations along New Brunswick
+    highways. Camera locations are stable infrastructure — cached longer than
+    events or winter roads. Requires the NEW_BRUNSWICK_511_KEY environment
+    variable (a developer key from the NB Department of Transportation and
+    Infrastructure — see https://511.gnb.ca). Returns a NOT_CONFIGURED
+    envelope, not an exception, when the key is absent (D-10). NOTE: Never
+    calls an ArcGIS FeatureServer — 511 is a separate, custom REST API.
+
+    Keywords: new brunswick traffic cameras 511 highway webcam snapshot images live view road conditions visual department transportation infrastructure
+    """
+    try:
+        rows, cached = await _client.fetch_traffic_cameras()
+    except Five11NotConfigured:
+        msg = _NOT_CONFIGURED_MSG_FR if lang == "fr" else _NOT_CONFIGURED_MSG_EN
+        return make_error("NOT_CONFIGURED", msg, lang=lang)
+    return make_response(
+        rows,
+        api_name=_API_NAME_511,
+        api_url=f"{FIVE11_BASE_URL}/cameras",
+        cached=cached,
+        lang=lang,
+    )
+
 

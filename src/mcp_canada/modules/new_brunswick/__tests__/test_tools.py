@@ -21,7 +21,9 @@ from mcp_canada.modules.new_brunswick.constants import ALL_NB_TOOL_NAMES, CROWN_
 from mcp_canada.modules.new_brunswick.tools import (
     nb_get_crown_land,
     nb_get_dataset_details,
+    nb_get_flood_hazard_areas,
     nb_get_geonb_service_layers,
+    nb_get_historical_floods,
     nb_list_categories,
     nb_list_geonb_services,
     nb_list_organizations,
@@ -553,11 +555,108 @@ class TestNbQueryGeonbLayer:
 
 
 class TestNbGetFloodHazardAreas:
-    """Plan 04 Task 2 implements + tests."""
+    @pytest.mark.asyncio
+    async def test_happy_path_envelope(self, monkeypatch):
+        payload = {
+            "features": [{"Sheet_Numb": "21G01", "Flood_Haza": "High"}],
+            "count": 1,
+            "truncated": False,
+        }
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_flood_hazard_areas",
+            mock_fetch,
+        )
+
+        result = await nb_get_flood_hazard_areas(limit=50, lang="en")
+
+        assert "error" not in result
+        assert result["data"]["count"] == 1
+        assert result["_meta"]["source"]["api"] == "new-brunswick-geonb"
+
+    @pytest.mark.asyncio
+    async def test_sheet_parameter_passed_through(self, monkeypatch):
+        mock_fetch = AsyncMock(return_value=({"features": [], "count": 0, "truncated": False}, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_flood_hazard_areas",
+            mock_fetch,
+        )
+
+        await nb_get_flood_hazard_areas(sheet="21G01")
+
+        mock_fetch.assert_awaited_once_with(sheet="21G01", limit=MAX_RECORDS)
+
+    @pytest.mark.asyncio
+    async def test_empty_result_is_success_not_error(self, monkeypatch):
+        mock_fetch = AsyncMock(return_value=({"features": [], "count": 0, "truncated": False}, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_flood_hazard_areas",
+            mock_fetch,
+        )
+
+        result = await nb_get_flood_hazard_areas(sheet="99Z99")
+
+        assert "error" not in result
+        assert result["data"]["count"] == 0
 
 
 class TestNbGetHistoricalFloods:
-    """Plan 04 Task 2 implements + tests."""
+    @pytest.mark.asyncio
+    async def test_happy_path_envelope_fr_lang(self, monkeypatch):
+        payload = {"features": [{"ID": "x"}], "count": 1, "truncated": False}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_historical_floods",
+            mock_fetch,
+        )
+
+        result = await nb_get_historical_floods(limit=50, lang="fr")
+
+        assert "error" not in result
+        assert result["_meta"]["lang"] == "fr"
+
+    @pytest.mark.asyncio
+    async def test_1973_event_dispatches_through(self, monkeypatch):
+        mock_fetch = AsyncMock(return_value=({"features": [], "count": 0, "truncated": False}, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_historical_floods",
+            mock_fetch,
+        )
+
+        await nb_get_historical_floods(event="1973")
+
+        mock_fetch.assert_awaited_once_with(event="1973", limit=MAX_RECORDS)
+
+    @pytest.mark.asyncio
+    async def test_invalid_event_returns_invalid_input_pre_check(self, monkeypatch):
+        mock_fetch = AsyncMock()
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_historical_floods",
+            mock_fetch,
+        )
+
+        result = await nb_get_historical_floods(event="1950")
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        assert "1973" in str(result["error"]["valid"])
+        mock_fetch.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_client_invalid_input_second_line_of_defence_also_returns_invalid_input(
+        self, monkeypatch
+    ):
+        # event="1973" passes the tool's own pre-check; the client still
+        # raises — proves the second line of defence (double-guard) fires.
+        mock_fetch = AsyncMock(side_effect=InvalidInput("event must be one of ['1973', '2008', '2018']"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_historical_floods",
+            mock_fetch,
+        )
+
+        result = await nb_get_historical_floods(event="1973")
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        mock_fetch.assert_awaited_once()
 
 
 class TestNbGetWetlands:

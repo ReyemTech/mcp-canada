@@ -29,8 +29,10 @@ from .constants import (
     ALL_NB_TOOL_NAMES,
     CKAN_BASE_URL,
     CROWN_LAND_SERVICE,
+    FLOOD_HAZARD_SERVICE,
     GEONB_BASE_URL,
     GNB_SOCRATA_DOMAIN,
+    HISTORICAL_FLOODS_SERVICE,
     MAX_RECORDS,
 )
 
@@ -59,6 +61,8 @@ __all__ = [
     "nb_list_geonb_services",
     "nb_get_geonb_service_layers",
     "nb_query_geonb_layer",
+    "nb_get_flood_hazard_areas",
+    "nb_get_historical_floods",
 ]
 
 
@@ -458,10 +462,82 @@ async def nb_query_geonb_layer(
 
 
 # ---------------------------------------------------------------------------
-# Flood — hazard index and historical flood limits (Task 2, next commit)
+# Flood — hazard index and historical flood limits (Task 2)
+# ---------------------------------------------------------------------------
+
+
+@tool
+@upstream_guard(_API_NAME_GEONB)
+async def nb_get_flood_hazard_areas(
+    sheet: str | None = None,
+    limit: int = MAX_RECORDS,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get New Brunswick flood hazard index polygons from GeoNB
+    (GeoNB_ENV_FloodHazardIndex, layer 0).
+
+    Use for: New Brunswick's signature open-data domain — mapped flood hazard
+    classification along the Saint John River and other NB waterways. This is
+    a mapped hazard classification, NOT a live river gauge reading. The
+    technical and sheet fields identify the authoritative source map sheet an
+    agent should cite alongside any result.
+
+    Keywords: new brunswick flood hazard inundation saint john river historical high water geospatial risk mapping sheet classification
+    """
+    payload, cached = await _client.fetch_flood_hazard_areas(sheet=sheet, limit=limit)
+    return make_response(
+        payload,
+        api_name=_API_NAME_GEONB,
+        api_url=FLOOD_HAZARD_SERVICE,
+        cached=cached,
+        lang=lang,
+    )
+
+
+_HISTORICAL_FLOOD_EVENTS: tuple[str, ...] = ("2008", "2018", "1973")
+
+
+@tool
+@upstream_guard(_API_NAME_GEONB)
+async def nb_get_historical_floods(
+    event: str | None = None,
+    limit: int = MAX_RECORDS,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get New Brunswick's recorded historical flood limits from GeoNB
+    (GeoNB_ENV_Historical_Floods).
+
+    Use for: retrieving mapped historical high-water extents on the Saint John
+    River and other NB waterways — the 2008/2018 flood limits by default,
+    or the separately-mapped 1973 event via event="1973". event accepts
+    "2008", "2018" or "1973"; any other value is rejected.
+
+    Keywords: new brunswick historical flood limits saint john river high water 1973 2008 2018 inundation geospatial extent recorded
+    """
+    if event is not None and event not in _HISTORICAL_FLOOD_EVENTS:
+        msg = (
+            f"Événement invalide : {event!r}. Valeurs valides : {list(_HISTORICAL_FLOOD_EVENTS)}"
+            if lang == "fr"
+            else f"Invalid event: {event!r}. Valid values: {list(_HISTORICAL_FLOOD_EVENTS)}"
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=list(_HISTORICAL_FLOOD_EVENTS))
+    try:
+        payload, cached = await _client.fetch_historical_floods(event=event, limit=limit)
+    except InvalidInput as exc:
+        msg = f"Événement invalide : {exc}" if lang == "fr" else f"Invalid event: {exc}"
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=list(_HISTORICAL_FLOOD_EVENTS))
+    return make_response(
+        payload,
+        api_name=_API_NAME_GEONB,
+        api_url=HISTORICAL_FLOODS_SERVICE,
+        cached=cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Water — wetlands (filter-required) and contaminated sites (Task 3, next commit)
 # ---------------------------------------------------------------------------
-# nb_get_flood_hazard_areas, nb_get_historical_floods, nb_get_wetlands and
-# nb_get_contaminated_sites are implemented later in this plan.
+# nb_get_wetlands and nb_get_contaminated_sites are implemented later in this plan.
 
 

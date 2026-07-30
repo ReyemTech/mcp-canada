@@ -742,11 +742,70 @@ class TestFetchGeonbLayerFeatures:
 
 
 class TestFetchFloodHazardAreas:
-    """Plan 04 Task 2 fills this."""
+    @pytest.mark.asyncio
+    async def test_no_sheet_sends_falsy_where(self, monkeypatch, flood_hazard_geojson):
+        features = [f["properties"] for f in flood_hazard_geojson["features"]]
+        mock_query = AsyncMock(return_value=(features, False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, cached = await nb_client.fetch_flood_hazard_areas()
+
+        assert cached is False
+        assert not mock_query.call_args.kwargs["where"]
+        assert payload["count"] == len(features)
+
+    @pytest.mark.asyncio
+    async def test_sheet_builds_escaped_equality_where(self, monkeypatch, flood_hazard_geojson):
+        matching = [flood_hazard_geojson["features"][0]["properties"]]
+        mock_query = AsyncMock(return_value=(matching, False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_flood_hazard_areas(sheet="21G01")
+
+        assert mock_query.call_args.kwargs["where"] == "Sheet_Numb='21G01'"
+
+    @pytest.mark.asyncio
+    async def test_apostrophe_in_sheet_value_is_escaped(self, monkeypatch, flood_hazard_geojson):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_flood_hazard_areas(sheet="21G'15")
+
+        assert mock_query.call_args.kwargs["where"] == "Sheet_Numb='21G''15'"
 
 
 class TestFetchHistoricalFloods:
-    """Plan 04 Task 2 fills this."""
+    @pytest.mark.asyncio
+    async def test_no_event_uses_main_layer(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([{"ID": "x"}], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_historical_floods()
+
+        assert mock_query.call_args.kwargs["layer_id"] == nb_client.HISTORICAL_FLOODS_LAYER
+
+    @pytest.mark.asyncio
+    async def test_1973_event_uses_1973_layer(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([{"Id": 1}], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_historical_floods(event="1973")
+
+        assert (
+            mock_query.call_args.kwargs["layer_id"]
+            == nb_client.HISTORICAL_FLOODS_1973_LAYER
+        )
+
+    @pytest.mark.asyncio
+    async def test_unknown_event_raises_invalid_input_naming_valid_values(self, monkeypatch):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        with pytest.raises(InvalidInput) as exc_info:
+            await nb_client.fetch_historical_floods(event="1950")
+
+        assert "1973" in str(exc_info.value)
+        mock_query.assert_not_awaited()
 
 
 class TestFetchWetlands:

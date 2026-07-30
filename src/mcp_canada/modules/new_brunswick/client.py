@@ -50,9 +50,14 @@ from .constants import (
     CROWN_LAND_SERVICE,
     FIVE11_BASE_URL,
     FIVE11_KEY_ENV,
+    FLOOD_HAZARD_LAYER,
+    FLOOD_HAZARD_SERVICE,
     GEONB_BASE_URL,
     GEONB_EXCLUDED_SERVICES,
     GNB_SOCRATA_DOMAIN,
+    HISTORICAL_FLOODS_1973_LAYER,
+    HISTORICAL_FLOODS_LAYER,
+    HISTORICAL_FLOODS_SERVICE,
     MAX_RECORDS,
     NB_ORG_FQ,
     RATE_GROUP_511,
@@ -836,15 +841,49 @@ async def fetch_geonb_layer_features(
     )
 
 
+_HISTORICAL_FLOOD_LAYERS_BY_EVENT: dict[str | None, int] = {
+    None: HISTORICAL_FLOODS_LAYER,
+    "2008": HISTORICAL_FLOODS_LAYER,
+    "2018": HISTORICAL_FLOODS_LAYER,
+    "1973": HISTORICAL_FLOODS_1973_LAYER,
+}
+
+_HISTORICAL_FLOOD_FIELDS_BY_LAYER: dict[int, str] = {
+    HISTORICAL_FLOODS_LAYER: "ID,KEY,FEATURE,SOURCE,LIMIT",
+    HISTORICAL_FLOODS_1973_LAYER: "Id",
+}
+
+
+def _escape_sql_value(value: str) -> str:
+    """Single-quote-escape a string value before interpolating it into a
+    server-built WHERE clause (T-21-01). ArcGIS's SQL-92 dialect doubles a
+    literal apostrophe the same way standard SQL does.
+    """
+    return value.replace("'", "''")
+
+
 async def fetch_flood_hazard_areas(
     sheet: str | None = None,
     limit: int = MAX_RECORDS,
 ) -> tuple[dict[str, Any], bool]:
     """Fetch flood hazard index polygons (GeoNB_ENV_FloodHazardIndex layer 0).
 
-    Plan 04 (Task 2) implements. Locked signature — do not change.
+    `sheet` restricts to a single source map sheet via a server-built,
+    single-quote-escaped equality clause on `Sheet_Numb`; when omitted the
+    WHERE clause is the falsy form, coalesced to match-all downstream.
     """
-    raise NotImplementedError("Plan 04 (Task 2) implements fetch_flood_hazard_areas")
+    where = f"Sheet_Numb='{_escape_sql_value(sheet)}'" if sheet else None
+    cache_key = f"{CACHE_KEY_PREFIX}flood_hazard:{sheet}:{limit}"
+    return await _geonb_query(
+        FLOOD_HAZARD_SERVICE,
+        layer_id=FLOOD_HAZARD_LAYER,
+        where=where,
+        out_fields="Sheet_Numb,Technical_,Flood_Haza,Technical1",
+        include_geometry=False,
+        limit=limit,
+        ttl=CACHE_TTL_META,
+        cache_key=cache_key,
+    )
 
 
 async def fetch_historical_floods(
@@ -852,11 +891,30 @@ async def fetch_historical_floods(
     limit: int = MAX_RECORDS,
 ) -> tuple[dict[str, Any], bool]:
     """Fetch historical flood limits/extents (GeoNB_ENV_Historical_Floods,
-    layer 0 for 2008/2018 events, layer 8 for the 1973 event).
+    layer 0 for the 2008/2018 events, layer 8 for the separately-mapped 1973
+    event).
 
-    Plan 04 (Task 2) implements. Locked signature — do not change.
+    `event` dispatches through `_HISTORICAL_FLOOD_LAYERS_BY_EVENT`; None (the
+    default), "2008" and "2018" all resolve to the shared main layer, "1973"
+    resolves to the dedicated 1973 layer. Any other value raises
+    `InvalidInput` naming the accepted values before any network call — the
+    second line of defence behind the tool layer's own pre-check.
     """
-    raise NotImplementedError("Plan 04 (Task 2) implements fetch_historical_floods")
+    if event not in _HISTORICAL_FLOOD_LAYERS_BY_EVENT:
+        valid = sorted(k for k in _HISTORICAL_FLOOD_LAYERS_BY_EVENT if k)
+        raise InvalidInput(f"event must be one of {valid}, got {event!r}")
+    layer_id = _HISTORICAL_FLOOD_LAYERS_BY_EVENT[event]
+    cache_key = f"{CACHE_KEY_PREFIX}historical_floods:{event}:{limit}"
+    return await _geonb_query(
+        HISTORICAL_FLOODS_SERVICE,
+        layer_id=layer_id,
+        where=None,
+        out_fields=_HISTORICAL_FLOOD_FIELDS_BY_LAYER[layer_id],
+        include_geometry=False,
+        limit=limit,
+        ttl=CACHE_TTL_META,
+        cache_key=cache_key,
+    )
 
 
 async def fetch_wetlands(

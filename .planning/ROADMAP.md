@@ -369,12 +369,29 @@ Plans:
 
 Plans:
 
-- [ ] 21-01-PLAN.md — Wave 0: Crown Land tracer end-to-end, gnb.socrata.com discovery-surface checkpoint, `shared/arcgis_hub.py` enumerator + live layer-id spike, full module scaffold
+**Wave 0** *(tracer + blocking `checkpoint:decision` — must resolve before the tool manifest is locked)*
+
+- [ ] 21-01-PLAN.md — Crown Land tracer end-to-end, gnb.socrata.com discovery-surface checkpoint, `shared/arcgis_hub.py` enumerator + live layer-id spike, full module scaffold
+
+**Wave 1** *(blocked on Wave 0 completion; 21-02 and 21-03 run in parallel — disjoint files)*
+
 - [ ] 21-02-PLAN.md — Federal CKAN discovery: 5 tools, bilingual `title_translated`/`notes_translated` resolution, outgoing-param contract test
 - [ ] 21-03-PLAN.md — 6 prompts + 7 zero-parameter resources (GeoNB catalogue, counties, health/school dispatch, portal guide, query guide, report template)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 21-04-PLAN.md — GeoNB discovery (3 tools) + flood & water curated (flood hazard, historical floods, wetlands with pre-network guard, contaminated sites)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 21-05-PLAN.md — Crown land/forestry completion (minerals, parks) + parcels & civic addresses, both guarded over 604K/373K layers
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 21-06-PLAN.md — Health facilities & public schools layer-dispatch tools + 3 NB 511 `NOT_CONFIGURED` transport stubs
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 21-07-PLAN.md — Live MCP-layer integration coverage for all 22 tools, catalogue/README/CLAUDE.md sync, NB-01..NB-25 backfill, COVERAGE.md finalization
 
 ### Phase 22: Newfoundland and Labrador Government Open Data

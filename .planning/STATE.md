@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
-current_phase: "20.4"
-current_phase_name: Invert the ValueError default so caller error is opt-in
+current_phase: 21
+current_phase_name: New Brunswick Government Open Data
 status: planning
-stopped_at: "Phase 20.4 merged to main (PR #5); next is Phase 21 (New Brunswick)"
-last_updated: "2026-07-27T02:44:42.107Z"
-last_activity: 2026-07-27
-last_activity_desc: Phases 20.2-20.4 merged; error classification hardened end to end
+stopped_at: "Phase 21 planned (7 plans, waves 0-5); ready to execute"
+last_updated: "2026-07-30T15:27:30.666Z"
+last_activity: 2026-07-30
+last_activity_desc: Phase 21 planned — 7 plans, 22 tools; live probe found gnb.socrata.com exists (blocking checkpoint in 21-01)
 progress:
   total_phases: 38
   completed_phases: 19
-  total_plans: 80
+  total_plans: 87
   completed_plans: 80
   percent: 42
 ---
@@ -28,10 +28,18 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 ## Current Position
 
-Phase: 20.4 of 38 — COMPLETE and MERGED to main (PR #5, merge commit caa4d66)
-Plan: 1 of 1 complete
-Status: next is Phase 21 (run /gsd-plan-phase 21)
-Last activity: 2026-07-27 — Phase 20.4 merged; 3170 unit + 340 live tests green
+Phase: 21 of 38 — PLANNED, ready to execute (7 plans, waves 0-5)
+Plan: 0 of 7 complete
+Status: run /gsd-execute-phase 21
+Last activity: 2026-07-30 — Phase 21 planned; plan-checker PASSED (0 blockers, 2 advisory warnings)
+
+**Open decision before execution:** Plan 21-01 Task 2 carries a blocking `checkpoint:decision`.
+A live probe during planning found `https://gnb.socrata.com` DOES exist (HTTP 200, 312 datasets,
+keyless, already speakable by `shared/socrata.py`), contradicting CONTEXT.md D-01's "NB has no
+provincial catalogue" framing. D-01 was NOT overridden — the checkpoint decides whether to add
+Socrata tools, ship as locked, or repoint discovery. See COVERAGE.md Surface 5.
+
+Phase 20.4 is COMPLETE and MERGED to main (PR #5, merge commit caa4d66).
 
 Phase 20.1 is COMPLETE and MERGED to main (PR #2, merge commit 98dee90).
 

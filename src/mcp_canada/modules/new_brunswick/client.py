@@ -380,8 +380,12 @@ async def fetch_search_datasets(
     floored at 0. `fq` is always `_build_fq(extra_fq)` — the NB organization
     clause is first and is never caller-overridable (T-21-04).
 
-    Returns ({"results": [...], "total": N}, was_cached) with each result
-    shaped through `_shape_dataset(raw, lang)`.
+    Returns ({"results": [...], "total": N, "limit": clamped_limit,
+    "offset": clamped_offset}, was_cached) with each result shaped through
+    `_shape_dataset(raw, lang)`. WR-02: the payload echoes the CLAMPED
+    values actually sent upstream, not the caller's raw `limit`/`offset` —
+    an agent computing the next page's offset from the raw values would
+    otherwise be misled.
     """
     clamped_limit = max(1, min(limit, 100))
     clamped_offset = max(offset, 0)
@@ -402,6 +406,8 @@ async def fetch_search_datasets(
         return {
             "results": [_shape_dataset(r, lang=lang) for r in raw_results],
             "total": int(result.get("count") or 0),
+            "limit": clamped_limit,
+            "offset": clamped_offset,
         }
 
     return await cached_fetch(cache_key, CACHE_TTL_SEARCH, _fetch)

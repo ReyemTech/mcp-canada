@@ -165,8 +165,11 @@ async def nb_search_datasets(
     payload, cached = await _client.fetch_search_datasets(
         query=query, extra_fq=extra_fq, limit=limit, offset=offset, lang=lang
     )
+    # WR-02: payload already carries the CLAMPED limit/offset actually sent
+    # upstream (set in fetch_search_datasets) — echo those, not the
+    # caller's raw, unclamped parameters.
     return make_response(
-        {**payload, "limit": limit, "offset": offset},
+        payload,
         api_name=_API_NAME_CKAN,
         api_url=_CKAN_SEARCH_URL,
         cached=cached,

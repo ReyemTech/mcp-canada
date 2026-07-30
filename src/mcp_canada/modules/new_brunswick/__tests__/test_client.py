@@ -428,6 +428,25 @@ class TestFetchSearchDatasets:
         first = payload["results"][0]
         assert first["title"] == "Zones de gestion des terres submergées"
 
+    @pytest.mark.asyncio
+    async def test_payload_echoes_clamped_limit_and_offset_not_raw_caller_values(
+        self, monkeypatch, ckan_package_search_sample
+    ):
+        # WR-02: limit=500/offset=-5 sends rows=100/start=0 to CKAN (clamped
+        # in the params dict below); the returned payload must report what
+        # was actually sent upstream, not the caller's raw values — an agent
+        # computing the next page's offset from the raw values would be
+        # wrong.
+        mock_api_get = AsyncMock(return_value=ckan_package_search_sample)
+        monkeypatch.setattr(nb_client, "api_get", mock_api_get)
+
+        payload, _cached = await nb_client.fetch_search_datasets(limit=500, offset=-5)
+
+        assert mock_api_get.call_args.args[1]["rows"] == 100
+        assert mock_api_get.call_args.args[1]["start"] == 0
+        assert payload["limit"] == 100
+        assert payload["offset"] == 0
+
 
 class TestFetchDatasetDetails:
     @pytest.mark.asyncio

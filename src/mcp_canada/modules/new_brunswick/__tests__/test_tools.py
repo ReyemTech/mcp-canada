@@ -234,7 +234,7 @@ class TestManifestMatchesShippedSurface:
 class TestNbSearchDatasets:
     @pytest.mark.asyncio
     async def test_happy_path_envelope(self, monkeypatch):
-        payload = {"results": [{"id": "x"}], "total": 221}
+        payload = {"results": [{"id": "x"}], "total": 221, "limit": 5, "offset": 0}
         mock_fetch = AsyncMock(return_value=(payload, False))
         monkeypatch.setattr(
             "mcp_canada.modules.new_brunswick.tools._client.fetch_search_datasets", mock_fetch
@@ -246,6 +246,22 @@ class TestNbSearchDatasets:
         assert result["_meta"]["source"]["api"] == "new-brunswick-federal-ckan"
         assert result["data"]["total"] == 221
         assert result["data"]["limit"] == 5
+        assert result["data"]["offset"] == 0
+
+    @pytest.mark.asyncio
+    async def test_echoes_clamped_limit_and_offset_not_raw_caller_values(self, monkeypatch):
+        # WR-02: the client already clamps limit/offset before sending them
+        # upstream — the tool must echo what the client actually clamped to
+        # (carried in the payload), not its own raw, unclamped parameters.
+        payload = {"results": [], "total": 0, "limit": 100, "offset": 0}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_search_datasets", mock_fetch
+        )
+
+        result = await nb_search_datasets(query="flood", limit=500, offset=-5)
+
+        assert result["data"]["limit"] == 100
         assert result["data"]["offset"] == 0
 
     def test_no_organization_parameter_in_signature(self):

@@ -2,10 +2,12 @@
 
 TestNbGetCrownLandTools is the Task 1 tracer, fully tested. Plan 02 Task 2
 implements + tests the five federal-CKAN discovery tools; Task 3 implements +
-tests the two gnb.socrata.com tools (checkpoint option-a). Every remaining
-tool in constants.ALL_NB_TOOL_NAMES gets a placeholder class asserting
-membership in the locked manifest, until its owning plan implements the tool
-itself (at which point the placeholder is replaced with real behavior tests).
+tests the two gnb.socrata.com tools (checkpoint option-a). Plan 05 implements
++ tests nb_get_parcels / nb_get_civic_addresses — the two FILTER_REQUIRED_TOOLS
+large layers, each proven via a not-awaited guard test. Every remaining tool
+in constants.ALL_NB_TOOL_NAMES gets a placeholder class asserting membership
+in the locked manifest, until its owning plan implements the tool itself (at
+which point the placeholder is replaced with real behavior tests).
 TestNbEnvelopes / TestNbLangParam are parametrized by Plan 07 once every tool
 exists.
 """
@@ -19,12 +21,14 @@ import pytest
 
 from mcp_canada.modules.new_brunswick.constants import ALL_NB_TOOL_NAMES, CROWN_LAND_SERVICE, MAX_RECORDS
 from mcp_canada.modules.new_brunswick.tools import (
+    nb_get_civic_addresses,
     nb_get_contaminated_sites,
     nb_get_crown_land,
     nb_get_dataset_details,
     nb_get_flood_hazard_areas,
     nb_get_geonb_service_layers,
     nb_get_historical_floods,
+    nb_get_parcels,
     nb_get_wetlands,
     nb_list_categories,
     nb_list_geonb_services,
@@ -752,11 +756,193 @@ class TestNbGetContaminatedSites:
 
 
 class TestNbGetParcels:
-    """Plan 05 implements + tests. FILTER_REQUIRED — rejects unfiltered calls."""
+    @pytest.mark.asyncio
+    async def test_unfiltered_call_returns_invalid_input_without_network_call(
+        self, monkeypatch
+    ):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.client.arcgis_hub.query_feature_service",
+            mock_query,
+        )
+
+        result = await nb_get_parcels(lang="en")
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_invalid_input_message_names_record_count_and_filters(self):
+        result = await nb_get_parcels(lang="en")
+
+        assert "604,520" in result["error"]["message"]
+        assert result["error"]["valid"] == ["pid", "county"]
+
+    @pytest.mark.asyncio
+    async def test_pid_filter_returns_features(self, monkeypatch):
+        payload = {
+            "features": [
+                {
+                    "PID": "12345678",
+                    "COUNTY": "York",
+                    "Titles_Status": "Registered",
+                    "Gazette_Status": "Published",
+                }
+            ],
+            "count": 1,
+            "truncated": False,
+        }
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_parcels", mock_fetch
+        )
+
+        result = await nb_get_parcels(pid="12345678", lang="en")
+
+        assert "error" not in result
+        assert result["_meta"]["source"]["api"] == "new-brunswick-geonb"
+        assert result["data"]["count"] == 1
+        mock_fetch.assert_awaited_once_with(pid="12345678", county=None, limit=MAX_RECORDS)
+
+    @pytest.mark.asyncio
+    async def test_county_filter_returns_features(self, monkeypatch):
+        payload = {"features": [{"COUNTY": "York"}], "count": 1, "truncated": False}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_parcels", mock_fetch
+        )
+
+        result = await nb_get_parcels(county="York", lang="en")
+
+        assert "error" not in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_client_invalid_input_second_line_of_defence_also_returns_invalid_input(
+        self, monkeypatch
+    ):
+        mock_fetch = AsyncMock(
+            side_effect=InvalidInput("nb_get_parcels requires at least one filter")
+        )
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_parcels", mock_fetch
+        )
+
+        result = await nb_get_parcels(pid="12345678", lang="en")
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        mock_fetch.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_connect_error_returns_upstream_error_envelope(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=httpx.ConnectError("boom"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_parcels", mock_fetch
+        )
+
+        result = await nb_get_parcels(pid="12345678", lang="en")
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestNbGetCivicAddresses:
-    """Plan 05 implements + tests. FILTER_REQUIRED — rejects unfiltered calls."""
+    @pytest.mark.asyncio
+    async def test_unfiltered_call_returns_invalid_input_without_network_call(
+        self, monkeypatch
+    ):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.client.arcgis_hub.query_feature_service",
+            mock_query,
+        )
+
+        result = await nb_get_civic_addresses(lang="fr")
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_invalid_input_message_names_record_count_and_filters(self):
+        result = await nb_get_civic_addresses(lang="en")
+
+        assert "373,172" in result["error"]["message"]
+        assert result["error"]["valid"] == ["community", "street", "civic_number"]
+
+    @pytest.mark.asyncio
+    async def test_community_filter_returns_address_points(
+        self, monkeypatch, civic_address_geojson
+    ):
+        features = [f["properties"] for f in civic_address_geojson["features"]]
+        payload = {"features": features, "count": len(features), "truncated": False}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_civic_addresses", mock_fetch
+        )
+
+        result = await nb_get_civic_addresses(community="Fredericton", lang="en")
+
+        assert "error" not in result
+        assert result["data"]["count"] == len(features)
+        mock_fetch.assert_awaited_once_with(
+            community="Fredericton", street=None, civic_number=None, limit=MAX_RECORDS
+        )
+
+    @pytest.mark.asyncio
+    async def test_civic_number_filter_returns_envelope(self, monkeypatch):
+        payload = {"features": [{"CIVIC_NUM": 160}], "count": 1, "truncated": False}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_civic_addresses", mock_fetch
+        )
+
+        result = await nb_get_civic_addresses(civic_number=160, lang="en")
+
+        assert "error" not in result
+        assert result["data"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_features_carry_bilingual_street_type_fields(
+        self, monkeypatch, civic_address_geojson
+    ):
+        features = [f["properties"] for f in civic_address_geojson["features"]]
+        payload = {"features": features, "count": len(features), "truncated": False}
+        mock_fetch = AsyncMock(return_value=(payload, False))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_civic_addresses", mock_fetch
+        )
+
+        result = await nb_get_civic_addresses(community="Fredericton", lang="en")
+
+        feature = result["data"]["features"][0]
+        assert feature["ST_TYPE_E"] == "St"
+        assert feature["ST_TYPE_F"] == "Rue"
+
+    @pytest.mark.asyncio
+    async def test_client_invalid_input_second_line_of_defence_also_returns_invalid_input(
+        self, monkeypatch
+    ):
+        mock_fetch = AsyncMock(
+            side_effect=InvalidInput("nb_get_civic_addresses requires at least one filter")
+        )
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_civic_addresses", mock_fetch
+        )
+
+        result = await nb_get_civic_addresses(community="Fredericton", lang="en")
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        mock_fetch.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_timeout_returns_upstream_error_envelope(self, monkeypatch):
+        mock_fetch = AsyncMock(side_effect=httpx.TimeoutException("boom"))
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_civic_addresses", mock_fetch
+        )
+
+        result = await nb_get_civic_addresses(community="Fredericton", lang="en")
+
+        assert result["error"]["code"] == "UPSTREAM_ERROR"
 
 
 class TestNbGetHealthFacilities:

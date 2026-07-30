@@ -27,6 +27,7 @@ from mcp_canada.shared.errors import InvalidInput, NotFound
 from . import client as _client
 from .constants import (
     ALL_NB_TOOL_NAMES,
+    CIVIC_ADDRESS_SERVICE,
     CKAN_BASE_URL,
     CONTAMINATED_SITES_SERVICE,
     CROWN_LAND_SERVICE,
@@ -36,6 +37,7 @@ from .constants import (
     GNB_SOCRATA_DOMAIN,
     HISTORICAL_FLOODS_SERVICE,
     MAX_RECORDS,
+    PARCELS_SERVICE,
     WETLANDS_SERVICE,
 )
 
@@ -68,6 +70,8 @@ __all__ = [
     "nb_get_historical_floods",
     "nb_get_wetlands",
     "nb_get_contaminated_sites",
+    "nb_get_parcels",
+    "nb_get_civic_addresses",
 ]
 
 
@@ -609,6 +613,112 @@ async def nb_get_contaminated_sites(
         payload,
         api_name=_API_NAME_GEONB,
         api_url=CONTAMINATED_SITES_SERVICE,
+        cached=cached,
+        lang=lang,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Parcels and civic addresses — NB's geocoding pair, both filter-required (Task 2)
+# ---------------------------------------------------------------------------
+
+
+@tool
+@upstream_guard(_API_NAME_GEONB)
+async def nb_get_parcels(
+    pid: str | None = None,
+    county: str | None = None,
+    limit: int = MAX_RECORDS,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get New Brunswick land parcels from GeoNB (GeoNB_SNB_Parcels, layer 0).
+
+    Use for: resolving a specific New Brunswick property by its Parcel
+    Identifier (PID) or listing parcels within a county — returns each
+    parcel's PID, county, land titles status and gazette status. At least one
+    of pid or county is REQUIRED — this is the largest layer in the whole
+    GeoNB portal (604,520 rows) and an unfiltered call is rejected with
+    INVALID_INPUT before any network request. Geocoding workflow: use
+    nb_get_civic_addresses to resolve a street address to a point (and its
+    county), then call this tool with that county to find the surrounding
+    cadastre.
+
+    Keywords: new brunswick parcel pid cadastre land title gazette county property geonb snb parcels geocoding filter required
+    """
+    if "nb_get_parcels" in FILTER_REQUIRED_TOOLS and not pid and not county:
+        msg = (
+            "nb_get_parcels exige au moins un des paramètres pid ou county "
+            "(la couche compte 604 520 lignes)."
+            if lang == "fr"
+            else "nb_get_parcels requires at least one of pid or county "
+            "(the layer has 604,520 rows)."
+        )
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=["pid", "county"])
+    try:
+        payload, cached = await _client.fetch_parcels(pid=pid, county=county, limit=limit)
+    except InvalidInput as exc:
+        msg = f"Paramètre invalide : {exc}" if lang == "fr" else f"Invalid input: {exc}"
+        return make_error("INVALID_INPUT", msg, lang=lang, valid=["pid", "county"])
+    return make_response(
+        payload,
+        api_name=_API_NAME_GEONB,
+        api_url=PARCELS_SERVICE,
+        cached=cached,
+        lang=lang,
+    )
+
+
+@tool
+@upstream_guard(_API_NAME_GEONB)
+async def nb_get_civic_addresses(
+    community: str | None = None,
+    street: str | None = None,
+    civic_number: int | None = None,
+    limit: int = MAX_RECORDS,
+    lang: Literal["en", "fr"] = "en",
+) -> dict[str, Any]:
+    """Get New Brunswick civic addresses from GeoNB (GeoNB_DPS_Civic_Address, layer 0).
+
+    Use for: resolving a street address to a point — by community, street, or
+    civic number, individually or combined. At least one of community, street
+    or civic_number is REQUIRED — this is GeoNB's second-largest layer
+    (373,172 rows) and an unfiltered call is rejected with INVALID_INPUT
+    before any network request. The street-type field is published in both
+    official languages (ST_TYPE_E, ST_TYPE_F). Geocoding workflow: call this
+    tool first to resolve an address to a point and its county, then call
+    nb_get_parcels by county to find the surrounding cadastre.
+
+    Keywords: new brunswick civic address geocoding street community fredericton point location geonb dps address points filter required bilingual
+    """
+    if (
+        "nb_get_civic_addresses" in FILTER_REQUIRED_TOOLS
+        and not community
+        and not street
+        and civic_number is None
+    ):
+        msg = (
+            "nb_get_civic_addresses exige au moins un des paramètres community, "
+            "street ou civic_number (la couche compte 373 172 lignes)."
+            if lang == "fr"
+            else "nb_get_civic_addresses requires at least one of community, "
+            "street or civic_number (the layer has 373,172 rows)."
+        )
+        return make_error(
+            "INVALID_INPUT", msg, lang=lang, valid=["community", "street", "civic_number"]
+        )
+    try:
+        payload, cached = await _client.fetch_civic_addresses(
+            community=community, street=street, civic_number=civic_number, limit=limit
+        )
+    except InvalidInput as exc:
+        msg = f"Paramètre invalide : {exc}" if lang == "fr" else f"Invalid input: {exc}"
+        return make_error(
+            "INVALID_INPUT", msg, lang=lang, valid=["community", "street", "civic_number"]
+        )
+    return make_response(
+        payload,
+        api_name=_API_NAME_GEONB,
+        api_url=CIVIC_ADDRESS_SERVICE,
         cached=cached,
         lang=lang,
     )

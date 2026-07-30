@@ -44,6 +44,8 @@ from .constants import (
     CACHE_KEY_PREFIX,
     CACHE_TTL_META,
     CACHE_TTL_SEARCH,
+    CIVIC_ADDRESS_LAYER,
+    CIVIC_ADDRESS_SERVICE,
     CKAN_BASE_URL,
     CONTAMINATED_SITES_LAYER,
     CONTAMINATED_SITES_SERVICE,
@@ -63,6 +65,8 @@ from .constants import (
     HISTORICAL_FLOODS_SERVICE,
     MAX_RECORDS,
     NB_ORG_FQ,
+    PARCELS_LAYER,
+    PARCELS_SERVICE,
     RATE_GROUP_511,
     RATE_GROUP_CKAN,
     RATE_GROUP_GEONB,
@@ -867,6 +871,18 @@ def _escape_sql_value(value: str) -> str:
     return value.replace("'", "''")
 
 
+def _upper_contains_clause(field: str, value: str) -> str:
+    """Case-insensitive containment clause: `UPPER(field) LIKE '%VALUE%'`,
+    upper-casing both sides (T-21-01) and single-quote-escaping the value.
+
+    Used where the upstream field holds free text a caller would reasonably
+    substring-match (county, community, street) rather than an identifier a
+    caller would equality-match (PID) — an equality clause on a free-text
+    field would silently return nothing for a real, differently-cased value.
+    """
+    return f"UPPER({field}) LIKE '%{_escape_sql_value(value.upper())}%'"
+
+
 async def fetch_flood_hazard_areas(
     sheet: str | None = None,
     limit: int = MAX_RECORDS,
@@ -1014,11 +1030,34 @@ async def fetch_parcels(
     limit: int = MAX_RECORDS,
 ) -> tuple[dict[str, Any], bool]:
     """Fetch land parcels (GeoNB_SNB_Parcels layer 0). FILTER_REQUIRED —
-    604,520 rows; the tool layer rejects an unfiltered call (T-21-03).
+    604,520 rows; rejects an unfiltered call with `InvalidInput` before any
+    network call (T-21-03), enforced via `_require_any_filter` and
+    `constants.FILTER_REQUIRED_TOOLS` — the second line of defence behind the
+    tool layer's own pre-check.
 
-    Plan 05 implements. Locked signature — do not change.
+    `pid` builds a server-side, single-quote-escaped equality clause on `PID`
+    (an identifier — equality is correct here, unlike the free-text fields
+    below). `county` builds a case-insensitive containment clause via
+    `_upper_contains_clause`. Both together are AND-ed.
     """
-    raise NotImplementedError("Plan 05 implements fetch_parcels")
+    _require_any_filter("nb_get_parcels", pid, county, layer_record_count=604_520)
+    clauses: list[str] = []
+    if pid:
+        clauses.append(f"PID='{_escape_sql_value(pid)}'")
+    if county:
+        clauses.append(_upper_contains_clause("COUNTY", county))
+    where = " AND ".join(clauses)
+    cache_key = f"{CACHE_KEY_PREFIX}parcels:{pid}:{county}:{limit}"
+    return await _geonb_query(
+        PARCELS_SERVICE,
+        layer_id=PARCELS_LAYER,
+        where=where,
+        out_fields="PID,COUNTY,Titles_Status,Gazette_Status",
+        include_geometry=False,
+        limit=limit,
+        ttl=CACHE_TTL_META,
+        cache_key=cache_key,
+    )
 
 
 async def fetch_civic_addresses(
@@ -1028,11 +1067,45 @@ async def fetch_civic_addresses(
     limit: int = MAX_RECORDS,
 ) -> tuple[dict[str, Any], bool]:
     """Fetch civic addresses (GeoNB_DPS_Civic_Address layer 0). FILTER_REQUIRED
-    — 373,172 rows; the tool layer rejects an unfiltered call (T-21-03).
+    — 373,172 rows; rejects an unfiltered call with `InvalidInput` before any
+    network call (T-21-03), enforced via `_require_any_filter` and
+    `constants.FILTER_REQUIRED_TOOLS` — the second line of defence behind the
+    tool layer's own pre-check.
 
-    Plan 05 implements. Locked signature — do not change.
+    `community` and `street` each build a case-insensitive containment clause
+    via `_upper_contains_clause`. `civic_number` builds a numeric equality
+    clause on `CIVIC_NUM` with the integer interpolated UNQUOTED — quoting it
+    would make ArcGIS compare a number to a string and silently return
+    nothing. All supplied filters are AND-ed.
     """
-    raise NotImplementedError("Plan 05 implements fetch_civic_addresses")
+    _require_any_filter(
+        "nb_get_civic_addresses",
+        community,
+        street,
+        civic_number,
+        layer_record_count=373_172,
+    )
+    clauses: list[str] = []
+    if community:
+        clauses.append(_upper_contains_clause("COMMUNITY", community))
+    if street:
+        clauses.append(_upper_contains_clause("STREET", street))
+    if civic_number is not None:
+        clauses.append(f"CIVIC_NUM={int(civic_number)}")
+    where = " AND ".join(clauses)
+    cache_key = (
+        f"{CACHE_KEY_PREFIX}civic_addresses:{community}:{street}:{civic_number}:{limit}"
+    )
+    return await _geonb_query(
+        CIVIC_ADDRESS_SERVICE,
+        layer_id=CIVIC_ADDRESS_LAYER,
+        where=where,
+        out_fields="CIVIC_NUM,STREET,ST_TYPE_E,ST_TYPE_F,COMMUNITY",
+        include_geometry=False,
+        limit=limit,
+        ttl=CACHE_TTL_META,
+        cache_key=cache_key,
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -8,9 +8,10 @@ function. Plan 02 (Task 3, checkpoint option-a) fills TestFetchGnbSocrataSearch
 and TestFetchGnbSocrataQuery. Plan 04 fills TestFetchGeonbServices,
 TestFetchGeonbServiceLayers, TestFetchGeonbLayerFeatures,
 TestFetchFloodHazardAreas, TestFetchHistoricalFloods, TestFetchWetlands and
-TestFetchContaminatedSites. Every remaining `fetch_*` stub still gets a
-placeholder class asserting it raises NotImplementedError until its owning
-plan fills the body.
+TestFetchContaminatedSites. Plan 05 fills TestFetchParcels and
+TestFetchCivicAddresses (the two FILTER_REQUIRED_TOOLS large layers). Every
+remaining `fetch_*` stub still gets a placeholder class asserting it raises
+NotImplementedError until its owning plan fills the body.
 """
 
 from __future__ import annotations
@@ -902,11 +903,171 @@ class TestFetchContaminatedSites:
 
 
 class TestFetchParcels:
-    """Plan 05 fills this."""
+    @pytest.mark.asyncio
+    async def test_no_filter_raises_invalid_input_before_any_network_call(self, monkeypatch):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        with pytest.raises(InvalidInput) as exc_info:
+            await nb_client.fetch_parcels()
+
+        assert "604,520" in str(exc_info.value)
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_pid_builds_escaped_equality_where(self, monkeypatch):
+        mock_query = AsyncMock(
+            return_value=([{"PID": "12345678", "COUNTY": "York"}], False)
+        )
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, cached = await nb_client.fetch_parcels(pid="12345678")
+
+        assert cached is False
+        assert mock_query.call_args.kwargs["where"] == "PID='12345678'"
+        assert mock_query.call_args.kwargs["layer_id"] == nb_client.PARCELS_LAYER
+        assert payload["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_county_builds_upper_containment_where(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_parcels(county="York")
+
+        assert (
+            mock_query.call_args.kwargs["where"]
+            == "UPPER(COUNTY) LIKE '%YORK%'"
+        )
+
+    @pytest.mark.asyncio
+    async def test_apostrophe_in_county_is_escaped(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_parcels(county="Queen's")
+
+        assert (
+            mock_query.call_args.kwargs["where"]
+            == "UPPER(COUNTY) LIKE '%QUEEN''S%'"
+        )
+
+    @pytest.mark.asyncio
+    async def test_features_carry_pid_county_titles_and_gazette_status(self, monkeypatch):
+        row = {
+            "PID": "12345678",
+            "COUNTY": "York",
+            "Titles_Status": "Registered",
+            "Gazette_Status": "Published",
+        }
+        mock_query = AsyncMock(return_value=([row], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, _cached = await nb_client.fetch_parcels(pid="12345678")
+
+        feature = payload["features"][0]
+        assert feature["PID"] == "12345678"
+        assert feature["Titles_Status"] == "Registered"
+        assert feature["Gazette_Status"] == "Published"
+
+    @pytest.mark.asyncio
+    async def test_truncated_flag_passed_through(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([{"PID": "1"}], True))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, _cached = await nb_client.fetch_parcels(pid="1")
+
+        assert payload["truncated"] is True
 
 
 class TestFetchCivicAddresses:
-    """Plan 05 fills this."""
+    @pytest.mark.asyncio
+    async def test_no_filter_raises_invalid_input_before_any_network_call(self, monkeypatch):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        with pytest.raises(InvalidInput) as exc_info:
+            await nb_client.fetch_civic_addresses()
+
+        assert "373,172" in str(exc_info.value)
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_community_builds_upper_containment_where(
+        self, monkeypatch, civic_address_geojson
+    ):
+        features = [f["properties"] for f in civic_address_geojson["features"]]
+        mock_query = AsyncMock(return_value=(features, False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, cached = await nb_client.fetch_civic_addresses(community="Fredericton")
+
+        assert cached is False
+        assert (
+            mock_query.call_args.kwargs["where"]
+            == "UPPER(COMMUNITY) LIKE '%FREDERICTON%'"
+        )
+        assert mock_query.call_args.kwargs["layer_id"] == nb_client.CIVIC_ADDRESS_LAYER
+        assert payload["count"] == len(features)
+
+    @pytest.mark.asyncio
+    async def test_community_and_street_are_anded(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_civic_addresses(community="Fredericton", street="King")
+
+        where = mock_query.call_args.kwargs["where"]
+        assert "UPPER(COMMUNITY) LIKE '%FREDERICTON%'" in where
+        assert "UPPER(STREET) LIKE '%KING%'" in where
+        assert " AND " in where
+
+    @pytest.mark.asyncio
+    async def test_civic_number_sends_unquoted_numeric_comparison(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_civic_addresses(civic_number=160)
+
+        where = mock_query.call_args.kwargs["where"]
+        assert where == "CIVIC_NUM=160"
+        assert "'160'" not in where
+
+    @pytest.mark.asyncio
+    async def test_apostrophe_in_community_is_escaped(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_civic_addresses(community="St. Martin's")
+
+        where = mock_query.call_args.kwargs["where"]
+        assert "ST. MARTIN''S" in where
+
+    @pytest.mark.asyncio
+    async def test_features_carry_civic_number_street_bilingual_type_and_community(
+        self, monkeypatch, civic_address_geojson
+    ):
+        features = [f["properties"] for f in civic_address_geojson["features"]]
+        mock_query = AsyncMock(return_value=(features, False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, _cached = await nb_client.fetch_civic_addresses(community="Fredericton")
+
+        feature = payload["features"][0]
+        assert feature["CIVIC_NUM"] == "440"
+        assert feature["STREET"] == "King"
+        assert feature["ST_TYPE_E"] == "St"
+        assert feature["ST_TYPE_F"] == "Rue"
+        assert feature["COMMUNITY"] == "Fredericton"
+
+    @pytest.mark.asyncio
+    async def test_truncated_flag_passed_through(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([{"CIVIC_NUM": 1}], True))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, _cached = await nb_client.fetch_civic_addresses(civic_number=1)
+
+        assert payload["truncated"] is True
 
 
 class TestFetchHealthFacilities:
@@ -941,21 +1102,13 @@ class TestStubsRaiseNotImplementedError:
     fetch_search_datasets, fetch_dataset_details, fetch_query_dataset,
     fetch_organizations, fetch_categories (federal CKAN) and
     fetch_gnb_socrata_search / fetch_gnb_socrata_query (checkpoint option-a)
-    are implemented by Plan 02, and fetch_geonb_services,
+    are implemented by Plan 02, fetch_geonb_services,
     fetch_geonb_service_layers, fetch_geonb_layer_features,
     fetch_flood_hazard_areas, fetch_historical_floods, fetch_wetlands and
-    fetch_contaminated_sites by Plan 04 — all removed from this contract, see
-    TestFetchSearchDatasets et al. and TestFetchGeonbServices et al. above."""
-
-    @pytest.mark.asyncio
-    async def test_fetch_parcels(self):
-        with pytest.raises(NotImplementedError):
-            await nb_client.fetch_parcels()
-
-    @pytest.mark.asyncio
-    async def test_fetch_civic_addresses(self):
-        with pytest.raises(NotImplementedError):
-            await nb_client.fetch_civic_addresses()
+    fetch_contaminated_sites by Plan 04, and fetch_parcels /
+    fetch_civic_addresses by Plan 05 — all removed from this contract, see
+    TestFetchSearchDatasets et al., TestFetchGeonbServices et al. and
+    TestFetchParcels / TestFetchCivicAddresses above."""
 
     @pytest.mark.asyncio
     async def test_fetch_health_facilities(self):

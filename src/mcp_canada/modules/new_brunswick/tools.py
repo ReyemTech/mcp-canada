@@ -55,6 +55,18 @@ _API_NAME_511 = "new-brunswick-511"
 _CKAN_SEARCH_URL = f"{CKAN_BASE_URL}/action/package_search"
 _CKAN_SHOW_URL = f"{CKAN_BASE_URL}/action/package_show"
 
+
+def _is_blank(value: str | None) -> bool:
+    """True when `value` is None, empty, or whitespace-only (CR-01).
+
+    Used by the FILTER_REQUIRED_TOOLS fast-path pre-checks so they agree
+    with the client layer's `_require_any_filter` second line of defence —
+    a whitespace-only string (`" "`) is truthy in Python but is not a real
+    filter; without this the fast-path check would let it through only for
+    the client-layer guard to reject it one call later.
+    """
+    return value is None or not value.strip()
+
 # The module's locked tool-name registry. This is an ALIAS of
 # constants.ALL_NB_TOOL_NAMES, not an independent value — an alias can never
 # be unequal to the thing it aliases, so this assignment by itself proves
@@ -583,7 +595,11 @@ async def nb_get_wetlands(
 
     Keywords: new brunswick wetlands psw provincially significant wetland bog marsh swamp fen environment geospatial buffer class status filter required
     """
-    if "nb_get_wetlands" in FILTER_REQUIRED_TOOLS and not wetland_class and not status:
+    if (
+        "nb_get_wetlands" in FILTER_REQUIRED_TOOLS
+        and _is_blank(wetland_class)
+        and _is_blank(status)
+    ):
         msg = (
             "nb_get_wetlands exige au moins un des paramètres wetland_class ou "
             "status (la couche compte 163 206 lignes)."
@@ -662,7 +678,11 @@ async def nb_get_parcels(
 
     Keywords: new brunswick parcel pid cadastre land title gazette county property geonb snb parcels geocoding filter required
     """
-    if "nb_get_parcels" in FILTER_REQUIRED_TOOLS and not pid and not county:
+    if (
+        "nb_get_parcels" in FILTER_REQUIRED_TOOLS
+        and _is_blank(pid)
+        and _is_blank(county)
+    ):
         msg = (
             "nb_get_parcels exige au moins un des paramètres pid ou county "
             "(la couche compte 604 520 lignes)."
@@ -709,8 +729,8 @@ async def nb_get_civic_addresses(
     """
     if (
         "nb_get_civic_addresses" in FILTER_REQUIRED_TOOLS
-        and not community
-        and not street
+        and _is_blank(community)
+        and _is_blank(street)
         and civic_number is None
     ):
         msg = (

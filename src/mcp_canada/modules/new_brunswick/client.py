@@ -876,16 +876,38 @@ def _escape_sql_value(value: str) -> str:
     return value.replace("'", "''")
 
 
+def _escape_like_value(value: str) -> str:
+    r"""Escape SQL `LIKE` metacharacters (CR-01) before quote-doubling.
+
+    `_upper_contains_clause` wraps `value` in `%...%` wildcards — without
+    this, a caller-supplied `%` or `_` is interpreted by ArcGIS as a live
+    wildcard rather than a literal character. `county="%"` would otherwise
+    build `UPPER(COUNTY) LIKE '%%%'`, which matches every row in a
+    604,520-row layer. The literal backslash (the escape character itself)
+    is doubled first so a caller-supplied backslash can't be misread as
+    escaping the character that follows it; `_escape_sql_value` still
+    handles the trailing apostrophe-doubling pass. The companion
+    `_upper_contains_clause` declares `ESCAPE '\'` on the generated clause
+    so ArcGIS honours this escaping (live-verified against
+    GeoNB_SNB_Parcels 2026-07-30: an unescaped `LIKE '%%%'` matches all
+    604,520 rows; the escaped form with `ESCAPE '\'` matches 0 for a
+    literal `%` and the expected count for a real value).
+    """
+    escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return _escape_sql_value(escaped)
+
+
 def _upper_contains_clause(field: str, value: str) -> str:
     """Case-insensitive containment clause: `UPPER(field) LIKE '%VALUE%'`,
-    upper-casing both sides (T-21-01) and single-quote-escaping the value.
+    upper-casing both sides (T-21-01), escaping `LIKE` metacharacters
+    (CR-01, via `_escape_like_value`) and single-quote-escaping the value.
 
     Used where the upstream field holds free text a caller would reasonably
     substring-match (county, community, street) rather than an identifier a
     caller would equality-match (PID) — an equality clause on a free-text
     field would silently return nothing for a real, differently-cased value.
     """
-    return f"UPPER({field}) LIKE '%{_escape_sql_value(value.upper())}%'"
+    return f"UPPER({field}) LIKE '%{_escape_like_value(value.upper())}%' ESCAPE '\\'"
 
 
 async def fetch_flood_hazard_areas(
@@ -953,10 +975,18 @@ def _require_any_filter(
     curated fetcher so the guard set stays driven by
     `constants.FILTER_REQUIRED_TOOLS` rather than scattered per-function
     literals.
+
+    Tests on Python *truthiness* alone (CR-01: `any(filters)`) let a
+    whitespace-only string (`" "`) through — it's truthy but not a real
+    filter, and downstream builds a WHERE clause matching every row whose
+    value contains a space. String filters are `.strip()`ped before the
+    truthiness check; non-string filters (e.g. `civic_number: int | None`)
+    are tested with `is not None` so a real, meaningful `0` isn't mistaken
+    for "not provided".
     """
     if tool_name not in FILTER_REQUIRED_TOOLS:
         return
-    if any(filters):
+    if any(f.strip() if isinstance(f, str) else f is not None for f in filters):
         return
     raise InvalidInput(
         f"{tool_name} requires at least one filter parameter "

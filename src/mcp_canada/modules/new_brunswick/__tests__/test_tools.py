@@ -745,6 +745,23 @@ class TestNbGetWetlands:
         mock_query.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_whitespace_only_filter_returns_invalid_input_without_network_call(
+        self, monkeypatch
+    ):
+        # CR-01: the tool-layer pre-check must agree with the client-layer
+        # `_require_any_filter` — a whitespace-only value is not a real filter.
+        mock_query = AsyncMock()
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.client.arcgis_hub.query_feature_service",
+            mock_query,
+        )
+
+        result = await nb_get_wetlands(wetland_class=" ", lang="en")
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_invalid_input_message_names_record_count_and_filters(self):
         result = await nb_get_wetlands(lang="en")
 
@@ -835,6 +852,21 @@ class TestNbGetParcels:
         mock_query.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_whitespace_only_county_returns_invalid_input_without_network_call(
+        self, monkeypatch
+    ):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.client.arcgis_hub.query_feature_service",
+            mock_query,
+        )
+
+        result = await nb_get_parcels(county=" ", lang="en")
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_invalid_input_message_names_record_count_and_filters(self):
         result = await nb_get_parcels(lang="en")
 
@@ -920,6 +952,21 @@ class TestNbGetCivicAddresses:
         )
 
         result = await nb_get_civic_addresses(lang="fr")
+
+        assert result["error"]["code"] == "INVALID_INPUT"
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_whitespace_only_community_returns_invalid_input_without_network_call(
+        self, monkeypatch
+    ):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.client.arcgis_hub.query_feature_service",
+            mock_query,
+        )
+
+        result = await nb_get_civic_addresses(community=" ", lang="en")
 
         assert result["error"]["code"] == "INVALID_INPUT"
         mock_query.assert_not_awaited()

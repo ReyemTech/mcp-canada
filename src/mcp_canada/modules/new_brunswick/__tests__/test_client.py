@@ -289,6 +289,41 @@ class TestGeonbHelpers:
     def test_require_any_filter_passes_when_registered_and_filtered(self):
         nb_client._require_any_filter("nb_get_wetlands", "Bog", None, layer_record_count=163_206)
 
+    # -- CR-01: FILTER_REQUIRED guard must reject whitespace-only filters ----
+
+    def test_require_any_filter_raises_for_whitespace_only_string(self):
+        # " " is truthy in Python — the guard must strip() before testing,
+        # or a whitespace-only filter silently satisfies "a filter was given".
+        with pytest.raises(InvalidInput):
+            nb_client._require_any_filter("nb_get_wetlands", " ", None, layer_record_count=163_206)
+
+    def test_require_any_filter_passes_for_zero_int_filter(self):
+        # civic_number=0 is a real, meaningful filter value — falsy under
+        # bare `any()` but must NOT be treated as "no filter given".
+        nb_client._require_any_filter(
+            "nb_get_civic_addresses", None, None, 0, layer_record_count=373_172
+        )
+
+    # -- CR-01: LIKE metacharacters must be escaped, not just apostrophes ----
+
+    def test_upper_contains_clause_escapes_percent_wildcard(self):
+        # A bare '%' must become a literal-match clause, never a live SQL
+        # LIKE wildcard that matches every row.
+        clause = nb_client._upper_contains_clause("COUNTY", "%")
+        assert clause == r"UPPER(COUNTY) LIKE '%\%%' ESCAPE '\'"
+
+    def test_upper_contains_clause_escapes_underscore_wildcard(self):
+        clause = nb_client._upper_contains_clause("COUNTY", "_")
+        assert clause == r"UPPER(COUNTY) LIKE '%\_%' ESCAPE '\'"
+
+    def test_upper_contains_clause_escapes_literal_backslash(self):
+        clause = nb_client._upper_contains_clause("COUNTY", "\\")
+        assert clause == r"UPPER(COUNTY) LIKE '%\\%' ESCAPE '\'"
+
+    def test_upper_contains_clause_still_escapes_apostrophe(self):
+        clause = nb_client._upper_contains_clause("COUNTY", "Queen's")
+        assert clause == r"UPPER(COUNTY) LIKE '%QUEEN''S%' ESCAPE '\'"
+
 
 # ---------------------------------------------------------------------------
 # Task 1 tracer — fetch_crown_land, exercised directly at the client layer
@@ -847,6 +882,21 @@ class TestFetchWetlands:
         mock_query.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_whitespace_only_filter_raises_invalid_input_before_any_network_call(
+        self, monkeypatch
+    ):
+        # CR-01: " " is truthy, so a naive `any(filters)` guard would let this
+        # through and then build `UPPER(...) LIKE '% %'`, matching every
+        # multi-word value in the layer.
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        with pytest.raises(InvalidInput):
+            await nb_client.fetch_wetlands(wetland_class=" ")
+
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_wetland_class_filter_returns_features(self, monkeypatch, wetlands_geojson):
         features = [f["properties"] for f in wetlands_geojson["features"]]
         mock_query = AsyncMock(return_value=(features, False))
@@ -924,6 +974,31 @@ class TestFetchParcels:
         mock_query.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_whitespace_only_county_raises_invalid_input_before_any_network_call(
+        self, monkeypatch
+    ):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        with pytest.raises(InvalidInput):
+            await nb_client.fetch_parcels(county=" ")
+
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_percent_county_does_not_match_every_row(self, monkeypatch):
+        # CR-01 (the severe half): "%" is a completely ordinary truthy string
+        # that must NOT become a live SQL LIKE wildcard matching all 604,520
+        # rows once it clears the filter-required guard.
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_parcels(county="%")
+
+        where = mock_query.call_args.kwargs["where"]
+        assert where == r"UPPER(COUNTY) LIKE '%\%%' ESCAPE '\'"
+
+    @pytest.mark.asyncio
     async def test_pid_builds_escaped_equality_where(self, monkeypatch):
         mock_query = AsyncMock(
             return_value=([{"PID": "12345678", "COUNTY": "York"}], False)
@@ -946,7 +1021,7 @@ class TestFetchParcels:
 
         assert (
             mock_query.call_args.kwargs["where"]
-            == "UPPER(COUNTY) LIKE '%YORK%'"
+            == r"UPPER(COUNTY) LIKE '%YORK%' ESCAPE '\'"
         )
 
     @pytest.mark.asyncio
@@ -958,7 +1033,7 @@ class TestFetchParcels:
 
         assert (
             mock_query.call_args.kwargs["where"]
-            == "UPPER(COUNTY) LIKE '%QUEEN''S%'"
+            == r"UPPER(COUNTY) LIKE '%QUEEN''S%' ESCAPE '\'"
         )
 
     @pytest.mark.asyncio
@@ -1002,6 +1077,28 @@ class TestFetchCivicAddresses:
         mock_query.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_whitespace_only_community_raises_invalid_input_before_any_network_call(
+        self, monkeypatch
+    ):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        with pytest.raises(InvalidInput):
+            await nb_client.fetch_civic_addresses(community=" ")
+
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_percent_community_does_not_match_every_row(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_civic_addresses(community="%")
+
+        where = mock_query.call_args.kwargs["where"]
+        assert where == r"UPPER(COMMUNITY) LIKE '%\%%' ESCAPE '\'"
+
+    @pytest.mark.asyncio
     async def test_community_builds_upper_containment_where(
         self, monkeypatch, civic_address_geojson
     ):
@@ -1014,7 +1111,7 @@ class TestFetchCivicAddresses:
         assert cached is False
         assert (
             mock_query.call_args.kwargs["where"]
-            == "UPPER(COMMUNITY) LIKE '%FREDERICTON%'"
+            == r"UPPER(COMMUNITY) LIKE '%FREDERICTON%' ESCAPE '\'"
         )
         assert mock_query.call_args.kwargs["layer_id"] == nb_client.CIVIC_ADDRESS_LAYER
         assert payload["count"] == len(features)
@@ -1027,8 +1124,8 @@ class TestFetchCivicAddresses:
         await nb_client.fetch_civic_addresses(community="Fredericton", street="King")
 
         where = mock_query.call_args.kwargs["where"]
-        assert "UPPER(COMMUNITY) LIKE '%FREDERICTON%'" in where
-        assert "UPPER(STREET) LIKE '%KING%'" in where
+        assert r"UPPER(COMMUNITY) LIKE '%FREDERICTON%' ESCAPE '\'" in where
+        assert r"UPPER(STREET) LIKE '%KING%' ESCAPE '\'" in where
         assert " AND " in where
 
     @pytest.mark.asyncio
@@ -1128,7 +1225,7 @@ class TestFetchHealthFacilities:
 
         await nb_client.fetch_health_facilities("hospital_horizon", name="Chalmers")
 
-        assert mock_query.call_args.kwargs["where"] == "UPPER(Name_E) LIKE '%CHALMERS%'"
+        assert mock_query.call_args.kwargs["where"] == r"UPPER(Name_E) LIKE '%CHALMERS%' ESCAPE '\'"
 
     @pytest.mark.asyncio
     async def test_name_filter_dispatches_to_layer_specific_field(self, monkeypatch):
@@ -1139,7 +1236,7 @@ class TestFetchHealthFacilities:
 
         await nb_client.fetch_health_facilities("pharmacy", name="Shoppers")
 
-        assert mock_query.call_args.kwargs["where"] == "UPPER(Pharmacy_Name) LIKE '%SHOPPERS%'"
+        assert mock_query.call_args.kwargs["where"] == r"UPPER(Pharmacy_Name) LIKE '%SHOPPERS%' ESCAPE '\'"
 
     @pytest.mark.asyncio
     async def test_out_fields_is_wildcard_because_layers_do_not_share_a_schema(
@@ -1205,7 +1302,7 @@ class TestFetchPublicSchools:
 
         await nb_client.fetch_public_schools(district="ASD-N")
 
-        assert mock_query.call_args.kwargs["where"] == "UPPER(strDST) LIKE '%ASD-N%'"
+        assert mock_query.call_args.kwargs["where"] == r"UPPER(strDST) LIKE '%ASD-N%' ESCAPE '\'"
 
     @pytest.mark.asyncio
     async def test_no_district_sends_falsy_where(self, monkeypatch, public_school_geojson):

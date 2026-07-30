@@ -371,6 +371,12 @@ async def nb_query_gnb_socrata_dataset(
     INVALID_INPUT before any network call. Geometry columns are stripped by default
     when select is not provided (Nova Scotia precedent). No X-App-Token is sent.
 
+    Note: `where` and `select` are passed to Socrata's SoQL engine verbatim — this is
+    the deliberate escape hatch that makes the whole 312-dataset portal reachable
+    through two tools. Socrata's own SoQL parser is the trust boundary (T-21-20),
+    the same posture nb_query_geonb_layer takes toward ArcGIS SQL-92. The upstream is
+    a read-only, keyless public open-data server with no write surface.
+
     Keywords: new brunswick nouveau-brunswick gnb socrata provincial soql query dataset resource where select filter portal
     """
     try:

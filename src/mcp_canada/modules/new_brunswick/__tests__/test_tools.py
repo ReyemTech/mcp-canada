@@ -1515,10 +1515,290 @@ class TestNbGetTrafficCameras:
 # Cross-tool envelope / lang contract — Plan 07 parametrizes across every tool
 # ---------------------------------------------------------------------------
 
+# (tool_name, client_fn_attribute_on_client, sample_kwargs, sample_client_return, api_name)
+#
+# One entry per name in constants.ALL_NB_TOOL_NAMES (22) — mirrors the Nova
+# Scotia / Saskatchewan Plan 07 pattern. kwargs supply the minimum arguments a
+# tool needs to reach its success path (e.g. a filter for the three
+# FILTER_REQUIRED_TOOLS entries, a facility_type/dataset_id where required).
+ALL_NB_TOOLS: list[tuple[str, str, dict, tuple, str]] = [
+    # Crown land — Task 1 tracer
+    (
+        "nb_get_crown_land",
+        "fetch_crown_land",
+        {},
+        ({"features": [], "count": 0, "truncated": False}, False),
+        "new-brunswick-geonb",
+    ),
+    # Federal CKAN discovery (organization:nb) — D-01
+    (
+        "nb_search_datasets",
+        "fetch_search_datasets",
+        {},
+        ({"results": [], "total": 0}, False),
+        "new-brunswick-federal-ckan",
+    ),
+    (
+        "nb_get_dataset_details",
+        "fetch_dataset_details",
+        {"dataset_id": "flood-risk-areas"},
+        ({"id": "flood-risk-areas", "title": "Flood Risk Areas", "resources": []}, False),
+        "new-brunswick-federal-ckan",
+    ),
+    (
+        "nb_query_dataset",
+        "fetch_query_dataset",
+        {"dataset_id": "flood-risk-areas"},
+        ({"rows": [], "resource": {"format": "CSV"}, "truncated": False}, False),
+        "new-brunswick-federal-ckan",
+    ),
+    (
+        "nb_list_organizations",
+        "fetch_organizations",
+        {},
+        ([], False),
+        "new-brunswick-federal-ckan",
+    ),
+    (
+        "nb_list_categories",
+        "fetch_categories",
+        {},
+        ({"subjects": [], "topics": [], "formats": []}, False),
+        "new-brunswick-federal-ckan",
+    ),
+    # gnb.socrata.com discovery — checkpoint option-a
+    (
+        "nb_search_gnb_socrata_datasets",
+        "fetch_gnb_socrata_search",
+        {},
+        ({"results": [], "total": 0}, False),
+        "new-brunswick-gnb-socrata",
+    ),
+    (
+        "nb_query_gnb_socrata_dataset",
+        "fetch_gnb_socrata_query",
+        {"dataset_id": "abcd-1234"},
+        ({"rows": [], "count": 0, "truncated": False}, False),
+        "new-brunswick-gnb-socrata",
+    ),
+    # GeoNB discovery — D-06, stands in for the 401-ing Hub Search API
+    (
+        "nb_list_geonb_services",
+        "fetch_geonb_services",
+        {},
+        ([], False),
+        "new-brunswick-geonb",
+    ),
+    (
+        "nb_get_geonb_service_layers",
+        "fetch_geonb_service_layers",
+        {"service_name": "GeoNB_DNR_Crown_Land"},
+        ({"layers": [], "tables": []}, False),
+        "new-brunswick-geonb",
+    ),
+    (
+        "nb_query_geonb_layer",
+        "fetch_geonb_layer_features",
+        {"service_name": "GeoNB_DNR_Crown_Land", "layer_id": 3},
+        ({"features": [], "count": 0, "truncated": False}, False),
+        "new-brunswick-geonb",
+    ),
+    # Curated flood / water
+    (
+        "nb_get_flood_hazard_areas",
+        "fetch_flood_hazard_areas",
+        {},
+        ({"features": [], "count": 0, "truncated": False}, False),
+        "new-brunswick-geonb",
+    ),
+    (
+        "nb_get_historical_floods",
+        "fetch_historical_floods",
+        {},
+        ({"features": [], "count": 0, "truncated": False}, False),
+        "new-brunswick-geonb",
+    ),
+    (
+        "nb_get_wetlands",
+        "fetch_wetlands",
+        {"wetland_class": "Bog"},
+        ({"features": [], "count": 0, "truncated": False}, False),
+        "new-brunswick-geonb",
+    ),
+    (
+        "nb_get_contaminated_sites",
+        "fetch_contaminated_sites",
+        {},
+        ({"features": [], "count": 0, "truncated": False}, False),
+        "new-brunswick-geonb",
+    ),
+    # Parcels / civic address — both FILTER_REQUIRED_TOOLS
+    (
+        "nb_get_parcels",
+        "fetch_parcels",
+        {"county": "YORK"},
+        ({"features": [], "count": 0, "truncated": False}, False),
+        "new-brunswick-geonb",
+    ),
+    (
+        "nb_get_civic_addresses",
+        "fetch_civic_addresses",
+        {"community": "FREDERICTON"},
+        ({"features": [], "count": 0, "truncated": False}, False),
+        "new-brunswick-geonb",
+    ),
+    # Health / education dispatch tools
+    (
+        "nb_get_health_facilities",
+        "fetch_health_facilities",
+        {"facility_type": "hospital_horizon"},
+        ({"features": [], "count": 0, "truncated": False, "facility_type": "hospital_horizon"}, False),
+        "new-brunswick-geonb",
+    ),
+    (
+        "nb_get_public_schools",
+        "fetch_public_schools",
+        {},
+        ({"features": [], "count": 0, "truncated": False}, False),
+        "new-brunswick-geonb",
+    ),
+    # NB 511 — key-gated (envelope/lang tests exercise the CONFIGURED success
+    # path via a mocked fetch; the NOT_CONFIGURED path is covered per-tool above)
+    (
+        "nb_get_road_events",
+        "fetch_road_events",
+        {},
+        ([], False),
+        "new-brunswick-511",
+    ),
+    (
+        "nb_get_winter_road_conditions",
+        "fetch_winter_road_conditions",
+        {},
+        ([], False),
+        "new-brunswick-511",
+    ),
+    (
+        "nb_get_traffic_cameras",
+        "fetch_traffic_cameras",
+        {},
+        ([], False),
+        "new-brunswick-511",
+    ),
+]
+
+assert len(ALL_NB_TOOLS) == 22, (
+    f"ALL_NB_TOOLS must have 22 entries (matching ALL_NB_TOOL_NAMES), got {len(ALL_NB_TOOLS)}"
+)
+assert {t[0] for t in ALL_NB_TOOLS} == set(ALL_NB_TOOL_NAMES), (
+    f"ALL_NB_TOOLS tool names must exactly match constants.ALL_NB_TOOL_NAMES — "
+    f"only in ALL_NB_TOOLS: {set(t[0] for t in ALL_NB_TOOLS) - set(ALL_NB_TOOL_NAMES)}, "
+    f"only in ALL_NB_TOOL_NAMES: {set(ALL_NB_TOOL_NAMES) - set(t[0] for t in ALL_NB_TOOLS)}"
+)
+
 
 class TestNbEnvelopes:
-    """Plan 07 parametrizes: every tool returns make_response/make_error shape."""
+    """Parametrized: all 22 nb_ tools return _meta envelope on success (Plan 07).
+
+    Mirrors the Nova Scotia / Saskatchewan Plan 07 pattern. Each tool is called
+    with a mocked client function returning an empty-but-valid payload. Asserts
+    the full _meta envelope shape: source.api, source.url, cached, lang,
+    timestamp keys all present.
+    """
+
+    @pytest.mark.parametrize(
+        ("tool_name", "client_fn", "kwargs", "client_return", "api_name"),
+        ALL_NB_TOOLS,
+        ids=[t[0] for t in ALL_NB_TOOLS],
+    )
+    @pytest.mark.asyncio
+    async def test_envelope_structure(
+        self, tool_name: str, client_fn: str, kwargs: dict, client_return: tuple, api_name: str
+    ) -> None:
+        """Every nb_ tool returns _meta with {source.api, source.url, cached, lang, timestamp}."""
+        tool_fn = getattr(nb_tools, tool_name)
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(
+                f"mcp_canada.modules.new_brunswick.tools._client.{client_fn}",
+                AsyncMock(return_value=client_return),
+            )
+            result = await tool_fn(**kwargs, lang="en")
+
+        assert "_meta" in result, f"{tool_name} missing _meta envelope: {result}"
+        meta = result["_meta"]
+        for key in ("source", "cached", "lang", "timestamp"):
+            assert key in meta, f"{tool_name} _meta missing {key!r}"
+        assert "api" in meta["source"], f"{tool_name} _meta.source missing 'api'"
+        assert "url" in meta["source"], f"{tool_name} _meta.source missing 'url'"
+        assert meta["source"]["api"] == api_name, (
+            f"{tool_name} _meta.source.api must be {api_name!r}, got {meta['source']['api']!r}"
+        )
+        assert meta["lang"] == "en", (
+            f"{tool_name} should default _meta.lang to 'en', got {meta['lang']!r}"
+        )
 
 
 class TestNbLangParam:
-    """Plan 07 parametrizes: every tool accepts lang='en'/'fr' and sets _meta.lang."""
+    """Parametrized: all 22 nb_ tools accept lang='fr' and propagate to _meta.lang (Plan 07)."""
+
+    @pytest.mark.parametrize(
+        ("tool_name", "client_fn", "kwargs", "client_return", "api_name"),
+        ALL_NB_TOOLS,
+        ids=[t[0] for t in ALL_NB_TOOLS],
+    )
+    @pytest.mark.asyncio
+    async def test_lang_propagation(
+        self, tool_name: str, client_fn: str, kwargs: dict, client_return: tuple, api_name: str
+    ) -> None:
+        """Every tool propagates lang='fr' to the _meta.lang field on success."""
+        tool_fn = getattr(nb_tools, tool_name)
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(
+                f"mcp_canada.modules.new_brunswick.tools._client.{client_fn}",
+                AsyncMock(return_value=client_return),
+            )
+            result = await tool_fn(**kwargs, lang="fr")
+
+        assert result.get("_meta", {}).get("lang") == "fr", (
+            f"{tool_name} did not propagate lang='fr' to _meta.lang — got {result.get('_meta')}"
+        )
+
+
+class TestNbErrorPathLang:
+    """Parametrized: all 22 nb_ tools return a structured error envelope — never
+    raise — when the client raises an unclassified exception, and the error's
+    `lang` field carries the caller's requested language (Plan 07).
+
+    upstream_guard's generic-exception message text is English-only by design
+    (shared/envelope.py) — the localized text lives in each tool's own
+    InvalidInput/NotFound/Five11NotConfigured handling, already covered by the
+    per-tool test classes above (e.g. TestNbGetWetlands, TestNbGetParcels,
+    TestNbGetHealthFacilities, TestNbGetRoadEvents/WinterRoadConditions/
+    TrafficCameras). This class proves the one guarantee that holds for every
+    tool uniformly: the error envelope's `lang` field is never silently
+    dropped, regardless of which exception path fired.
+    """
+
+    @pytest.mark.parametrize(
+        ("tool_name", "client_fn", "kwargs", "client_return", "api_name"),
+        ALL_NB_TOOLS,
+        ids=[t[0] for t in ALL_NB_TOOLS],
+    )
+    @pytest.mark.asyncio
+    async def test_error_path_lang_field(
+        self, tool_name: str, client_fn: str, kwargs: dict, client_return: tuple, api_name: str
+    ) -> None:
+        """Every tool returns error.lang == 'fr' on an unclassified upstream failure."""
+        tool_fn = getattr(nb_tools, tool_name)
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(
+                f"mcp_canada.modules.new_brunswick.tools._client.{client_fn}",
+                AsyncMock(side_effect=RuntimeError("unclassified upstream failure")),
+            )
+            result = await tool_fn(**kwargs, lang="fr")
+
+        assert "error" in result, f"{tool_name} must return an error envelope, not raise: {result}"
+        assert result["error"].get("lang") == "fr", (
+            f"{tool_name} error envelope must carry lang='fr' — got {result['error']}"
+        )
+        assert result["error"].get("code"), f"{tool_name} error envelope missing 'code': {result['error']}"

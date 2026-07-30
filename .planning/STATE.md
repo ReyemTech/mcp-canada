@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
 current_phase: 21
-current_phase_name: New Brunswick Government Open Data
-status: planning
-stopped_at: "Phase 21 planned (7 plans, waves 0-5); ready to execute"
-last_updated: "2026-07-30T15:27:30.666Z"
+current_phase_name: new-brunswick-government-open-data
+status: executing
+stopped_at: Completed 21-01-PLAN.md
+last_updated: "2026-07-30T16:04:54.714Z"
 last_activity: 2026-07-30
-last_activity_desc: Phase 21 planned — 7 plans, 22 tools; live probe found gnb.socrata.com exists (blocking checkpoint in 21-01)
+last_activity_desc: Phase 21 execution started
 progress:
   total_phases: 38
   completed_phases: 19
   total_plans: 87
-  completed_plans: 80
-  percent: 42
+  completed_plans: 81
+  percent: 50
 ---
 
 # Project State
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** An agent can combine data from any Canadian government source in a single SQL query — turning isolated APIs into one queryable data platform.
-**Current focus:** Phase 20.1 complete (PR #2) — next is Phase 20.2 (normalize tool error handling), then Phase 21 (New Brunswick)
+**Current focus:** Phase 21 — new-brunswick-government-open-data
 
 ## Current Position
 
-Phase: 21 of 38 — PLANNED, ready to execute (7 plans, waves 0-5)
-Plan: 0 of 7 complete
-Status: run /gsd-execute-phase 21
-Last activity: 2026-07-30 — Phase 21 planned; plan-checker PASSED (0 blockers, 2 advisory warnings)
+Phase: 21 (new-brunswick-government-open-data) — EXECUTING
+Plan: 2 of 7
+Status: Ready to execute
+Last activity: 2026-07-30 — Phase 21 execution started
 
 **Open decision before execution:** Plan 21-01 Task 2 carries a blocking `checkpoint:decision`.
 A live probe during planning found `https://gnb.socrata.com` DOES exist (HTTP 200, 312 datasets,
@@ -43,7 +43,7 @@ Phase 20.4 is COMPLETE and MERGED to main (PR #5, merge commit caa4d66).
 
 Phase 20.1 is COMPLETE and MERGED to main (PR #2, merge commit 98dee90).
 
-Progress: [████░░░░░░] 44%
+Progress: [█████████░] 93%
 
 **Executed and verified:** phases 07-20, 20.1, 20.2 and 40 (17 phases, 78 plans, all verification `passed`).
 Suite at merge: 3145 passed, 2 skipped, 97.09% coverage. Live: 317 integration tests green.
@@ -218,6 +218,11 @@ Remaining backlog (not defects):
 | Phase 20-nova-scotia-government-open-data P06 | 8min | 2 tasks | 3 files |
 | Phase 20-nova-scotia-government-open-data P07 | 12min | 2 tasks | 7 files |
 | Phase 20-nova-scotia-government-open-data P20-08 | 5min | 3 tasks | 5 files |
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 21 P01 | 24min | 4 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -405,6 +410,10 @@ Recent decisions affecting current work:
 - [Phase 20-nova-scotia-government-open-data]: length_of_advisory_in_days is the actual Socrata column name (not length_of_advisory); live 400 unmasked by integration test
 - [Phase 20-nova-scotia-government-open-data]: Socrata added as 4th Portal Technology in CLAUDE.md; shared/socrata.py documented for reuse by future Socrata portals (PEI, NB)
 - [Phase 20-nova-scotia-government-open-data]: fetch_health_facilities: per-dataset SoQL (HOSPITAL_SELECT/LTC_SELECT) for incompatible raw Socrata schemas; county filter hospital-only; post-fetch normalization via _normalize_hospital_row/_normalize_ltc_row
+- [Phase ?]: [Phase 21-01]: Checkpoint option-a selected — gnb.socrata.com joins discovery via two new nb_ tools reusing shared/socrata.py; D-01 federal-CKAN discovery stays locked
+- [Phase ?]: [Phase 21-01]: nb_get_provincial_parks and nb_get_mineral_occurrences dropped to the long tail (reachable via nb_query_geonb_layer) to hold the 22-tool budget after adding the two Socrata tools
+- [Phase ?]: [Phase 21-01]: All 11 curated GeoNB layer ids in 21-RESEARCH.md live-CONFIRMED in 21-SPIKE.md — zero constants.py corrections needed
+- [Phase ?]: [Phase 21-01]: Added a fourth module-level rate limiter (_socrata_limiter) since gnb.socrata.com is a fourth upstream surface introduced by the checkpoint decision
 
 ### Roadmap Evolution
 
@@ -443,6 +452,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-07-26
-Stopped at: Phase 20.1 complete; PR #2 open with all four CI gates green
-Resume file: .planning/phases/20.1-remove-upstream-error-escape-hatch-pattern-from-all-provincial-integration-tests-mb-sk-ab-qc-ns-and-re-run-live-integration-to-surface-masked-upstream-failures-before-pushing-phase-20/20.1-CONTEXT.md
+Last session: 2026-07-30T16:04:54.676Z
+Stopped at: Completed 21-01-PLAN.md
+Resume file: None

@@ -365,13 +365,13 @@ Plans:
 **Goal:** Ship a `new_brunswick` module exposing NB provincial data as MCP tools — the 8th province in the rollout. 22 tools: 5 federal-CKAN discovery tools (`organization:nb`, 221 datasets — NB has no provincial CKAN), 3 GeoNB ArcGIS **Server** discovery tools (the ArcGIS Hub 401s, so the REST directory is enumerated instead), 11 curated geospatial tools across flood/water, Crown land/forestry, parcels/civic address and health/education, and 3 key-gated 511 transport stubs. Follows the 7-file module pattern; adds two additive bare-ArcGIS-Server enumerator functions to `shared/arcgis_hub.py`.
 **Requirements**: NB-01..NB-25, ERR-01..ERR-07
 **Depends on:** Phase 20
-**Plans:** 7 plans
+**Plans:** 1/7 plans executed
 
 Plans:
 
 **Wave 0** *(tracer + blocking `checkpoint:decision` — must resolve before the tool manifest is locked)*
 
-- [ ] 21-01-PLAN.md — Crown Land tracer end-to-end, gnb.socrata.com discovery-surface checkpoint, `shared/arcgis_hub.py` enumerator + live layer-id spike, full module scaffold
+- [x] 21-01-PLAN.md — Crown Land tracer end-to-end, gnb.socrata.com discovery-surface checkpoint, `shared/arcgis_hub.py` enumerator + live layer-id spike, full module scaffold
 
 **Wave 1** *(blocked on Wave 0 completion; 21-02 and 21-03 run in parallel — disjoint files)*
 

@@ -117,6 +117,35 @@ class TestNbPrompts:
         fr = await nb_flood_risk_assessment(location="Fredericton", lang="fr")
         assert _text(en[1].content) != _text(fr[1].content)
 
+    @pytest.mark.asyncio
+    async def test_flood_risk_assessment_does_not_invent_a_location_parameter(self) -> None:
+        # G4 (Codex round 2): none of nb_get_flood_hazard_areas,
+        # nb_get_historical_floods or nb_get_wetlands accept a location/place
+        # name — they're filtered by map sheet, event and wetland
+        # class/status respectively. The prompt must say so explicitly
+        # rather than implying a location can be passed to those tools, and
+        # must resolve the location via nb_get_civic_addresses BEFORE
+        # instructing the flood-layer calls (not after, as a final step).
+        from mcp_canada.modules.new_brunswick.prompts import nb_flood_risk_assessment
+        result = await nb_flood_risk_assessment(location="Fredericton", lang="en")
+        text = _text(result[1].content)
+        assert "accepts a place name" in text.lower()
+        civic_idx = text.index("nb_get_civic_addresses")
+        hazard_idx = text.index("nb_get_flood_hazard_areas")
+        assert civic_idx < hazard_idx, (
+            "location resolution via nb_get_civic_addresses must be "
+            "instructed before the flood-layer tool calls, not after"
+        )
+
+    @pytest.mark.asyncio
+    async def test_flood_risk_assessment_fr_does_not_invent_a_location_parameter(self) -> None:
+        from mcp_canada.modules.new_brunswick.prompts import nb_flood_risk_assessment
+        result = await nb_flood_risk_assessment(location="Fredericton", lang="fr")
+        text = _text(result[1].content)
+        civic_idx = text.index("nb_get_civic_addresses")
+        hazard_idx = text.index("nb_get_flood_hazard_areas")
+        assert civic_idx < hazard_idx
+
     # -----------------------------------------------------------------------
     # Guided workflow: nb_crown_land_report
     # -----------------------------------------------------------------------

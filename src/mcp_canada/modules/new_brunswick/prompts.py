@@ -13,7 +13,8 @@ under that checkpoint (option-a): they are reachable ONLY through
 prompt below names either as a standalone tool.
 
 Guided workflows (list[Message]) — multi-step tool chaining:
-  nb_flood_risk_assessment  — flood hazard index + historical floods + wetlands + civic addresses
+  nb_flood_risk_assessment  — civic addresses (location resolution, G4) + flood hazard index
+                              + historical floods + wetlands
   nb_crown_land_report      — Crown land + GeoNB layer discovery + long-tail forestry/mineral query
   nb_property_lookup        — parcels + civic addresses + NB911 community boundary via GeoNB
 
@@ -54,9 +55,11 @@ async def nb_flood_risk_assessment(
 ) -> list[Message]:
     """Guide an agent through a New Brunswick flood risk assessment (the province's signature domain).
 
-    Chains nb_get_flood_hazard_areas -> nb_get_historical_floods -> nb_get_wetlands ->
-    nb_get_civic_addresses for a comprehensive flood-risk picture along the Saint John
-    River and its tributaries. All data from geonb.snb.ca (bare ArcGIS Server).
+    Chains nb_get_civic_addresses (location -> point/county, G4) -> nb_get_flood_hazard_areas
+    -> nb_get_historical_floods -> nb_get_wetlands for a comprehensive flood-risk picture
+    along the Saint John River and its tributaries. No flood tool accepts a place name —
+    they are filtered by source map sheet, historical event and wetland class/status
+    respectively, never by location. All data from geonb.snb.ca (bare ArcGIS Server).
     """
     if lang == "fr":
         return [
@@ -68,26 +71,34 @@ async def nb_flood_risk_assessment(
             ),
             Message(
                 "Je vais vous guider à travers l'évaluation du risque d'inondation du "
-                "Nouveau-Brunswick en quatre étapes. **Passez la valeur de localisation "
+                "Nouveau-Brunswick en quatre étapes. **Aucun outil de couche d'inondation "
+                "n'accepte un nom de lieu comme argument** — les outils d'indice de risque "
+                "d'inondation, de limites historiques et de milieux humides ci-dessous sont "
+                "filtrés par feuille de carte source, événement historique et classe/statut "
+                "de milieu humide respectivement, jamais par emplacement. Résolvez d'abord "
+                "l'emplacement.\n\n"
+                "**Étape 1 — Résoudre l'emplacement en un point et un comté :**\n"
+                "Appelez `nb_get_civic_addresses` avec `community=` et/ou `street=` dérivés de "
+                f"« {location or '(non précisé)'} » — chaque résultat porte `LATITUDE`/"
+                "`LONGITUDE` (le point résolu) ainsi que `COUNTY` et `PID`. C'est le seul "
+                "chemin de géocodage offert par ce module ; passez la valeur de localisation "
                 "uniquement comme argument d'outil (jamais comme fragment de clause WHERE brut) "
-                "— les outils ci-dessous construisent le filtre côté serveur.**\n\n"
-                "**Étape 1 — Indice de risque d'inondation :**\n"
+                "— l'outil construit le filtre côté serveur.\n\n"
+                "**Étape 2 — Indice de risque d'inondation :**\n"
                 "Appelez `nb_get_flood_hazard_areas` (source : GeoNB_ENV_FloodHazardIndex, "
-                "couche 0, 269 polygones). Citez toujours les champs `Technical_` et "
-                "`Sheet_Numb` dans votre rapport — ils identifient la feuille de carte source "
-                "de l'organisme de réglementation, pas un simple attribut décoratif.\n\n"
-                "**Étape 2 — Limites historiques des inondations :**\n"
+                "couche 0, 269 polygones), en option avec `sheet=` si vous connaissez le "
+                "numéro de feuille de carte source pertinent. Citez toujours les champs "
+                "`Technical_` et `Sheet_Numb` dans votre rapport — ils identifient la feuille "
+                "de carte source de l'organisme de réglementation, pas un simple attribut "
+                "décoratif.\n\n"
+                "**Étape 3 — Limites historiques des inondations :**\n"
                 "Appelez `nb_get_historical_floods` (source : GeoNB_ENV_Historical_Floods — "
                 "couche 0 pour les événements de 2008/2018, couche 8 pour l'événement de 1973). "
                 "Retourne `ID`, `KEY`, `FEATURE`, `SOURCE`, `LIMIT`.\n\n"
-                "**Étape 3 — Milieux humides à proximité (filtre obligatoire) :**\n"
+                "**Étape 4 — Milieux humides à proximité (filtre obligatoire) :**\n"
                 "Appelez `nb_get_wetlands` avec un filtre `wetland_class=` ou `status=` — "
                 "cette couche compte 163 206 polygones et REJETTE un appel non filtré avant "
                 "tout appel réseau (T-21-03).\n\n"
-                "**Étape 4 — Adresses civiques touchées :**\n"
-                "Appelez `nb_get_civic_addresses` avec `community=` et/ou `street=` pour "
-                "résoudre les adresses spécifiques dans la zone touchée — cette couche compte "
-                "373 172 lignes et exige également au moins un filtre.\n\n"
                 "Conseil : Consultez `docs://nb/geonb-query-guide` pour la syntaxe WHERE et "
                 "`template://nb/flood-risk-report` pour structurer votre rapport final.",
                 role="assistant",
@@ -102,25 +113,30 @@ async def nb_flood_risk_assessment(
         ),
         Message(
             "I'll guide you through a New Brunswick flood risk assessment in four steps. "
-            "**Pass the location value only as a tool argument (never as a raw WHERE clause "
-            "fragment) — the tools below build the filter server-side.**\n\n"
-            "**Step 1 — Flood hazard index:**\n"
+            "**No flood-layer tool accepts a place name as an argument** — the flood hazard, "
+            "historical flood and wetland tools below are filtered by source map sheet, "
+            "historical event and wetland class/status respectively, never by location. "
+            "Resolve the location first.\n\n"
+            "**Step 1 — Resolve the location to a point and county:**\n"
+            "Call `nb_get_civic_addresses` with `community=` and/or `street=` derived from "
+            f"'{location or '(unspecified)'}' — each result carries `LATITUDE`/`LONGITUDE` "
+            "(the resolved point) plus `COUNTY` and `PID`. This is the only geocoding path "
+            "this module offers; pass the location value only as a tool argument (never as "
+            "a raw WHERE clause fragment) — the tool builds the filter server-side.\n\n"
+            "**Step 2 — Flood hazard index:**\n"
             "Call `nb_get_flood_hazard_areas` (source: GeoNB_ENV_FloodHazardIndex, layer 0, "
-            "269 polygons). Always cite the `Technical_` and `Sheet_Numb` fields in your "
+            "269 polygons), optionally with `sheet=` if you know the relevant source map "
+            "sheet number. Always cite the `Technical_` and `Sheet_Numb` fields in your "
             "report — they identify the regulator's source map sheet, not a decorative "
             "attribute.\n\n"
-            "**Step 2 — Historical flood limits:**\n"
+            "**Step 3 — Historical flood limits:**\n"
             "Call `nb_get_historical_floods` (source: GeoNB_ENV_Historical_Floods — layer 0 "
             "for the 2008/2018 events, layer 8 for the 1973 event). Returns `ID`, `KEY`, "
             "`FEATURE`, `SOURCE`, `LIMIT`.\n\n"
-            "**Step 3 — Nearby wetlands (filter required):**\n"
+            "**Step 4 — Nearby wetlands (filter required):**\n"
             "Call `nb_get_wetlands` with a `wetland_class=` or `status=` filter — this layer "
             "holds 163,206 polygons and REJECTS an unfiltered call before any network call "
             "(T-21-03).\n\n"
-            "**Step 4 — Affected civic addresses:**\n"
-            "Call `nb_get_civic_addresses` with `community=` and/or `street=` to resolve "
-            "specific addresses inside the affected area — this layer holds 373,172 rows and "
-            "likewise requires at least one filter.\n\n"
             "Tip: See `docs://nb/geonb-query-guide` for WHERE-clause syntax and "
             "`template://nb/flood-risk-report` to structure your final report.",
             role="assistant",

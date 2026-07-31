@@ -2,6 +2,208 @@
 
 <!-- CHANGELOG -->
 
+## v0.11.0 (2026-07-31)
+
+### Bug Fixes
+
+- **21**: CR-01 close FILTER_REQUIRED guard bypass (whitespace + LIKE wildcards)
+  ([`84192e3`](https://github.com/ReyemTech/mcp-canada/commit/84192e31cee532e1e3e75a50e67f2bc9af03211b))
+
+- **21**: F1 reject delimiter-breaking extra_fq in NB CKAN discovery
+  ([`264449c`](https://github.com/ReyemTech/mcp-canada/commit/264449c0fa62f739a06cf6cfce5ba727d8652d70))
+
+- **21**: F2 clamp limit to [1, MAX_RECORDS] centrally in _geonb_query
+  ([`3ecf46f`](https://github.com/ReyemTech/mcp-canada/commit/3ecf46f2dda7c4b85e4ec3728e390f2da9e9d84b))
+
+- **21**: F3 reject non-positive limit in NB gnb.socrata.com queries
+  ([`193c091`](https://github.com/ReyemTech/mcp-canada/commit/193c091b5d5ae37984a99e396053ed3f6f5b471d))
+
+- **21**: F4 include Latitude/Longitude in nb_get_contaminated_sites
+  ([`6e81ebe`](https://github.com/ReyemTech/mcp-canada/commit/6e81ebe7b1b5b3a6400ce2e6fad8bce785eafd6b))
+
+- **21**: F5 include LATITUDE/LONGITUDE/COUNTY/PID in nb_get_civic_addresses
+  ([`4964e77`](https://github.com/ReyemTech/mcp-canada/commit/4964e779329115da5fece5e372fabec5a4fe2b05))
+
+- **21**: G1 scope package_show to the NB organization
+  ([`b5120aa`](https://github.com/ReyemTech/mcp-canada/commit/b5120aa70a56440428a879eae3ec4c3103089a1e))
+
+- **21**: G2 cap fetch_query_dataset limit at MAX_RECORDS
+  ([`820855a`](https://github.com/ReyemTech/mcp-canada/commit/820855a795914b63b8d17dafaa13509eb54eedab))
+
+- **21**: G3 update stale MODULE_DESCRIPTION for four upstream surfaces
+  ([`af307ec`](https://github.com/ReyemTech/mcp-canada/commit/af307ec0a322ab2376e02a3f001e99df14690d52))
+
+- **21**: G4 correct nb_flood_risk_assessment's unexecutable workflow
+  ([`9c24fae`](https://github.com/ReyemTech/mcp-canada/commit/9c24faebdc689869483cdbf73d00fe68b3e57768))
+
+- **21**: IN-01 import schemas.py into client.py, matching sibling-module noqa convention
+  ([`734f54b`](https://github.com/ReyemTech/mcp-canada/commit/734f54b4873735b13e0e751b9fd4beadd7bb7d2a))
+
+- **21**: Make nb_crown_land_report's county argument executable
+  ([`533c69f`](https://github.com/ReyemTech/mcp-canada/commit/533c69f787d9d2ac32851a404886567be63fb06a))
+
+- **21**: Treat whitespace-only extra_fq as absent, not a malformed Lucene clause
+  ([`499a76c`](https://github.com/ReyemTech/mcp-canada/commit/499a76cc53dbcd1c303711b5376d213fd103a75f))
+
+- **21**: WR-01 parenthesize fq conjunction so NB org scope can't be escaped by operator precedence
+  ([`791f30b`](https://github.com/ReyemTech/mcp-canada/commit/791f30b52f9d6eabc063a9f7dfa8ebb04fd5c18a))
+
+- **21**: WR-02 echo clamped limit/offset actually sent upstream, not caller's raw values
+  ([`f9626dd`](https://github.com/ReyemTech/mcp-canada/commit/f9626ddff9e0f8f135c8480a6b3396ba388be7fa))
+
+- **21**: WR-03 reject non-positive limit in nb_query_dataset before any network call
+  ([`2ff6931`](https://github.com/ReyemTech/mcp-canada/commit/2ff69315489377e8cfe99d96dd2b1f32a47344e5))
+
+- **21**: WR-04 strengthen nb_ tool-name guard beyond bare startswith check
+  ([`a32b398`](https://github.com/ReyemTech/mcp-canada/commit/a32b39878947493430004802f78bc8bc391b3495))
+
+### Chores
+
+- Sync uv.lock after release
+  ([`d92c6a9`](https://github.com/ReyemTech/mcp-canada/commit/d92c6a9041ef447a4e679305452a8a72c1835dc3))
+
+### Documentation
+
+- **21**: Add code review fix report
+  ([`ba73712`](https://github.com/ReyemTech/mcp-canada/commit/ba7371231150f7b879446adfddf6ea9f7d420969))
+
+- **21**: Add code review report
+  ([`72e5c97`](https://github.com/ReyemTech/mcp-canada/commit/72e5c979cefb27f3e474d3f317bc833089ad7518))
+
+- **21**: Add round-2 code review fix report
+  ([`90434c1`](https://github.com/ReyemTech/mcp-canada/commit/90434c169b24d0d9590da78a8040c5e176295158))
+
+- **21**: Add validation strategy
+  ([`ddefa28`](https://github.com/ReyemTech/mcp-canada/commit/ddefa280b37ebd9bda8921608cc032aed547c25d))
+
+- **21**: Context for New Brunswick Government Open Data
+  ([`6aee36c`](https://github.com/ReyemTech/mcp-canada/commit/6aee36c97d31203c077febcb5b9d415fe78e5c68))
+
+- **21**: Create phase plan
+  ([`5c62b79`](https://github.com/ReyemTech/mcp-canada/commit/5c62b798d84ab5ac8c912a688c716553e454a963))
+
+- **21**: Plan New Brunswick phase — 7 plans, 6 waves, 22 tools
+  ([`71d8459`](https://github.com/ReyemTech/mcp-canada/commit/71d84594472cbc68319c544258b4d655cbd27e04))
+
+- **21**: Reopen and re-close T-21-03/T-21-04 after Codex review of PR #6
+  ([`5660496`](https://github.com/ReyemTech/mcp-canada/commit/5660496c88a57764b1431c09547e9b4729a94003))
+
+- **21**: Research New Brunswick Government Open Data
+  ([`e2d4dd9`](https://github.com/ReyemTech/mcp-canada/commit/e2d4dd93956fafc81cbf9b5c29171847127eabb7))
+
+- **21-01**: Add plan 01 summary
+  ([`d6de3de`](https://github.com/ReyemTech/mcp-canada/commit/d6de3de5d0fe4f1ad22fa25db28e30fb55d5c21b))
+
+- **21-01**: Append self-check results to plan 01 summary
+  ([`25c3ab9`](https://github.com/ReyemTech/mcp-canada/commit/25c3ab9dc4da146f4103b78323d66c142ca74810))
+
+- **21-01**: Complete New Brunswick wave 0 scaffold plan
+  ([`a7db209`](https://github.com/ReyemTech/mcp-canada/commit/a7db2093aad5026d115de5766675f07ec4b847cf))
+
+- **21-01**: Live-verify all 11 curated GeoNB layer ids in 21-SPIKE.md
+  ([`52ce8b0`](https://github.com/ReyemTech/mcp-canada/commit/52ce8b0ac42f96f2816aee5cb0b360b3b790fa0a))
+
+- **21-02**: Complete federal CKAN discovery plan
+  ([`2af864d`](https://github.com/ReyemTech/mcp-canada/commit/2af864d8f849671e6005eb5864e5b8c7324b28a4))
+
+- **21-03**: Complete New Brunswick prompts and resources plan
+  ([`def7e19`](https://github.com/ReyemTech/mcp-canada/commit/def7e19135853cf0de7cdcc51ac3004c89593ef1))
+
+- **21-04**: Complete GeoNB discovery + flood/water plan
+  ([`5ddd3ea`](https://github.com/ReyemTech/mcp-canada/commit/5ddd3eaa79a42435f02c2b106c71285bcbacf82e))
+
+- **21-05**: Complete parcels and civic addresses plan
+  ([`a3a5bc8`](https://github.com/ReyemTech/mcp-canada/commit/a3a5bc880be27701640dcdea1fae6a50935cd4e0))
+
+- **21-06**: Complete health/education/transport plan
+  ([`2c28893`](https://github.com/ReyemTech/mcp-canada/commit/2c2889344d52713ec9d9706da46fd6903dc8ea62))
+
+- **21-07**: Complete New Brunswick integration coverage and docs sync plan
+  ([`2e475fd`](https://github.com/ReyemTech/mcp-canada/commit/2e475fd7efaf3ae750a7cb4641d625b0d30ca212))
+
+- **21-07**: Register NB-01..NB-25 requirements and resolve COVERAGE.md Surface 5
+  ([`898a68e`](https://github.com/ReyemTech/mcp-canada/commit/898a68e34991615703a1be7a9b5de51407f1c849))
+
+- **21-07**: Sync catalogue and correct New Brunswick documentation
+  ([`bf2b9d5`](https://github.com/ReyemTech/mcp-canada/commit/bf2b9d5d6b50b7283d70259edd50ad0b64e9dde1))
+
+- **phase-21**: Add security threat verification
+  ([`5ffea24`](https://github.com/ReyemTech/mcp-canada/commit/5ffea247ea3e22d1c7eb8cb5abf9272e55e1157b))
+
+- **phase-21**: Complete phase execution
+  ([`a5bb452`](https://github.com/ReyemTech/mcp-canada/commit/a5bb45246638efd9650e966cf0a6f907e53d483c))
+
+- **phase-21**: Evolve PROJECT.md after phase completion
+  ([`5f52caa`](https://github.com/ReyemTech/mcp-canada/commit/5f52caa4be24572d75bc9caba8bd4462df958cbf))
+
+- **phase-21**: Resolve stale STATE.md checkpoint and focus entries
+  ([`60b4113`](https://github.com/ReyemTech/mcp-canada/commit/60b4113a474b3b12f240b6fc1812f88eef544f20))
+
+- **planning**: Backfill PLAN and SUMMARY for phases 20.2-20.4
+  ([`1217bd4`](https://github.com/ReyemTech/mcp-canada/commit/1217bd4dbd6d2bb8d55d5d85027ebc39a58c81a9))
+
+- **planning**: Re-stamp 20.2-20.4 verification dates
+  ([`6883130`](https://github.com/ReyemTech/mcp-canada/commit/6883130e18b4058638f9abd61eacd06672b82ab4))
+
+- **state**: Close Phase 20.4 — merged to main
+  ([`45871d7`](https://github.com/ReyemTech/mcp-canada/commit/45871d7ba7de9c478b43c7ee3678ab364d9508c4))
+
+### Features
+
+- **21-01**: Expand new_brunswick scaffold to full contract surface
+  ([`625f128`](https://github.com/ReyemTech/mcp-canada/commit/625f12832734086b8cda737f45f893e2b1f78a7e))
+
+- **21-01**: Extend shared/arcgis_hub.py with bare ArcGIS Server directory enumeration
+  ([`978aae1`](https://github.com/ReyemTech/mcp-canada/commit/978aae19b076a774082c9c224b75e8f90aa748d3))
+
+- **21-01**: Tracer — nb_get_crown_land end-to-end through GeoNB ArcGIS Server
+  ([`95fd2ba`](https://github.com/ReyemTech/mcp-canada/commit/95fd2bac90c20d54217fc573aeed9ccd39c8f85f))
+
+- **21-02**: Add five nb_ federal CKAN discovery tools (Task 2)
+  ([`ee218b5`](https://github.com/ReyemTech/mcp-canada/commit/ee218b5eef42fbdc5ce530c939c84a697673988a))
+
+- **21-02**: Add gnb.socrata.com discovery surface (Task 3, checkpoint option-a)
+  ([`d14de80`](https://github.com/ReyemTech/mcp-canada/commit/d14de80bb9a1b326d7ec11c462a5a5bec0d45d75))
+
+- **21-02**: Implement federal CKAN discovery client functions (Task 1)
+  ([`7da90e2`](https://github.com/ReyemTech/mcp-canada/commit/7da90e2fd3462e952457a8856051b3cf2a568306))
+
+- **21-03**: Add 6 bilingual nb_ prompts — 3 guided workflows + 3 quick lookups
+  ([`9baae12`](https://github.com/ReyemTech/mcp-canada/commit/9baae12fa03f295594a4c5bba2a99724b5d81762))
+
+- **21-03**: Add 7 zero-parameter nb_ resources — GeoNB catalogue, static data, guides
+  ([`3b70258`](https://github.com/ReyemTech/mcp-canada/commit/3b702580371b21dd6c198fcdf1f8795ed2cc884e))
+
+- **21-04**: Flood — hazard index and historical flood limits
+  ([`fa8ad43`](https://github.com/ReyemTech/mcp-canada/commit/fa8ad43c662682e4f918c15cd35c8059e52b7306))
+
+- **21-04**: GeoNB discovery trio — stands in for the 401-ing Hub Search API
+  ([`5c7e718`](https://github.com/ReyemTech/mcp-canada/commit/5c7e718042adbae3e24480e88cbe7f74a0f55e75))
+
+- **21-04**: Water — wetlands (filter-required) and contaminated sites
+  ([`9adaaf8`](https://github.com/ReyemTech/mcp-canada/commit/9adaaf895a62737b8bee33f986a6c42c86ae4c10))
+
+- **21-05**: Parcels and civic addresses — NB's geocoding pair, both filter-required
+  ([`910727b`](https://github.com/ReyemTech/mcp-canada/commit/910727b223d46f1fb1d458f6a5e167001a683c8c))
+
+- **21-06**: Health facilities and public schools — layer-dispatch tools
+  ([`29de32e`](https://github.com/ReyemTech/mcp-canada/commit/29de32eca75f291ad747e9e218c8cf6bb5a2e19b))
+
+- **21-06**: NB 511 — three key-gated transport tools + manifest integrity test
+  ([`dbd3b23`](https://github.com/ReyemTech/mcp-canada/commit/dbd3b23aaed86fa62128b554d136e69a111e7696))
+
+### Testing
+
+- **21**: Assert live field presence for F4/F5 out_fields widenings
+  ([`5edda91`](https://github.com/ReyemTech/mcp-canada/commit/5edda919e90051023fcd887a507e2b2ff1c3ddec))
+
+- **21-01**: Add failing tests for GeoNB ArcGIS Server directory enumeration
+  ([`a206b9d`](https://github.com/ReyemTech/mcp-canada/commit/a206b9d1857d34260939da193534822304c44ae1))
+
+- **21-07**: Live MCP-layer integration coverage for all 22 New Brunswick tools
+  ([`79729f1`](https://github.com/ReyemTech/mcp-canada/commit/79729f17f8bdac3f53212bd31e0fd334dcd74f35))
+
+
 ## v0.10.4 (2026-07-27)
 
 ### Bug Fixes

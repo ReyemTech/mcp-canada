@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Statistics Canada + Datastore
-current_phase: "20.4"
-current_phase_name: Invert the ValueError default so caller error is opt-in
+current_phase: 40
+current_phase_name: MCP Prompts and Resources
 status: planning
-stopped_at: "Phase 20.4 merged to main (PR #5); next is Phase 21 (New Brunswick)"
-last_updated: "2026-07-27T02:44:42.107Z"
-last_activity: 2026-07-27
-last_activity_desc: Phases 20.2-20.4 merged; error classification hardened end to end
+stopped_at: Completed 21-07-PLAN.md — Phase 21 (New Brunswick) complete
+last_updated: "2026-07-30T19:58:49.410Z"
+last_activity: 2026-07-30
+last_activity_desc: Phase 21 complete, transitioned to Phase 40
 progress:
   total_phases: 38
-  completed_phases: 19
-  total_plans: 80
-  completed_plans: 80
-  percent: 42
+  completed_phases: 20
+  total_plans: 87
+  completed_plans: 87
+  percent: 53
 ---
 
 # Project State
@@ -24,18 +24,29 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** An agent can combine data from any Canadian government source in a single SQL query — turning isolated APIs into one queryable data platform.
-**Current focus:** Phase 20.1 complete (PR #2) — next is Phase 20.2 (normalize tool error handling), then Phase 21 (New Brunswick)
+**Current focus:** Phase 21 complete — next phase not yet selected
 
 ## Current Position
 
-Phase: 20.4 of 38 — COMPLETE and MERGED to main (PR #5, merge commit caa4d66)
-Plan: 1 of 1 complete
-Status: next is Phase 21 (run /gsd-plan-phase 21)
-Last activity: 2026-07-27 — Phase 20.4 merged; 3170 unit + 340 live tests green
+Phase: 40 — MCP Prompts and Resources
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-30 — Phase 21 complete, transitioned to Phase 40
+
+**RESOLVED 2026-07-30 — Plan 21-01 Task 2 checkpoint:decision.** A live probe confirmed
+`https://gnb.socrata.com` DOES exist (HTTP 200, 312 datasets, keyless, already speakable by
+`shared/socrata.py`), disproving CONTEXT.md D-01's "NB has no provincial catalogue" framing.
+User chose **option-a**: two Socrata discovery tools (`nb_search_gnb_socrata_datasets`,
+`nb_query_gnb_socrata_dataset`) joined the surface; `nb_get_provincial_parks` and
+`nb_get_mineral_occurrences` traded to the long tail to hold the 22-tool budget (both still
+reachable via `nb_query_geonb_layer`). D-01 itself was not overridden — the federal-CKAN five are
+unchanged. CLAUDE.md was corrected by plan 21-07; CONTEXT.md's claim is stale, do not reuse it.
+
+Phase 20.4 is COMPLETE and MERGED to main (PR #5, merge commit caa4d66).
 
 Phase 20.1 is COMPLETE and MERGED to main (PR #2, merge commit 98dee90).
 
-Progress: [████░░░░░░] 44%
+Progress: [██████████] 100%
 
 **Executed and verified:** phases 07-20, 20.1, 20.2 and 40 (17 phases, 78 plans, all verification `passed`).
 Suite at merge: 3145 passed, 2 skipped, 97.09% coverage. Live: 317 integration tests green.
@@ -124,7 +135,7 @@ Remaining backlog (not defects):
 
 **Velocity:**
 
-- Total plans completed: 0
+- Total plans completed: 7
 - Average duration: -
 - Total execution time: -
 
@@ -132,7 +143,7 @@ Remaining backlog (not defects):
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 21 | 7 | - | - |
 
 **Recent Trend:**
 
@@ -210,6 +221,17 @@ Remaining backlog (not defects):
 | Phase 20-nova-scotia-government-open-data P06 | 8min | 2 tasks | 3 files |
 | Phase 20-nova-scotia-government-open-data P07 | 12min | 2 tasks | 7 files |
 | Phase 20-nova-scotia-government-open-data P20-08 | 5min | 3 tasks | 5 files |
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 21 P01 | 24min | 4 tasks | 15 files |
+| Phase 21 P02 | 35min | 3 tasks | 4 files |
+| Phase 21-new-brunswick-government-open-data P03 | 45min | 2 tasks | 3 files |
+| Phase 21 P04 | 55min | 3 tasks | 4 files |
+| Phase 21 P05 | ~30min | 2 tasks | 4 files |
+| Phase 21 P06 | ~55min | 2 tasks | 5 files |
+| Phase 21 P07 | ~50min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -397,6 +419,23 @@ Recent decisions affecting current work:
 - [Phase 20-nova-scotia-government-open-data]: length_of_advisory_in_days is the actual Socrata column name (not length_of_advisory); live 400 unmasked by integration test
 - [Phase 20-nova-scotia-government-open-data]: Socrata added as 4th Portal Technology in CLAUDE.md; shared/socrata.py documented for reuse by future Socrata portals (PEI, NB)
 - [Phase 20-nova-scotia-government-open-data]: fetch_health_facilities: per-dataset SoQL (HOSPITAL_SELECT/LTC_SELECT) for incompatible raw Socrata schemas; county filter hospital-only; post-fetch normalization via _normalize_hospital_row/_normalize_ltc_row
+- [Phase ?]: [Phase 21-01]: Checkpoint option-a selected — gnb.socrata.com joins discovery via two new nb_ tools reusing shared/socrata.py; D-01 federal-CKAN discovery stays locked
+- [Phase ?]: [Phase 21-01]: nb_get_provincial_parks and nb_get_mineral_occurrences dropped to the long tail (reachable via nb_query_geonb_layer) to hold the 22-tool budget after adding the two Socrata tools
+- [Phase ?]: [Phase 21-01]: All 11 curated GeoNB layer ids in 21-RESEARCH.md live-CONFIRMED in 21-SPIKE.md — zero constants.py corrections needed
+- [Phase ?]: [Phase 21-01]: Added a fourth module-level rate limiter (_socrata_limiter) since gnb.socrata.com is a fourth upstream surface introduced by the checkpoint decision
+- [Phase ?]: Checkpoint option-a (gnb.socrata.com) implemented in 21-02: two new nb_ tools reuse shared/socrata.py verbatim, zero new dependencies
+- [Phase ?]: tools.ALL_NB_TOOLS aliases constants.ALL_NB_TOOL_NAMES directly (not a manually-grown list) so the two files can never silently drift across Plans 02-06
+- [Phase ?]: 21-03: nb_crown_land_report routes checkpoint-dropped tools (mineral occurrences, provincial parks) exclusively through nb_get_geonb_service_layers + nb_query_geonb_layer, never as standalone tool names
+- [Phase ?]: 21-03: data://nb/geonb-services classifies all 62 GeoNB services as curated=9/excluded=18/long_tail=35 post-checkpoint (mineral occurrences and provincial parks moved from curated to long_tail)
+- [Phase ?]: 21-04: FILTER_REQUIRED_TOOLS guard implemented as a single reusable _require_any_filter client helper (not a wetlands-only inline check) so Plan 05's nb_get_parcels/nb_get_civic_addresses can reuse it directly
+- [Phase ?]: Task 1 (mineral occurrences / provincial parks) shipped no code — 21-01 checkpoint already swapped both to the long tail; confirmed via constants.ALL_NB_TOOL_NAMES
+- [Phase ?]: Added _upper_contains_clause shared helper (UPPER(field) LIKE '%VALUE%') for county/community/street containment matching, reused across nb_get_parcels and nb_get_civic_addresses
+- [Phase ?]: CIVIC_NUM interpolated as unquoted Python int — quoting it would make ArcGIS compare a number to a string and silently return nothing
+- [Phase ?]: NB health facilities: live-verified the 6 GeoNB_Health_Facilities layers' real per-layer name field (Name_E/USER_Clini/Name/Name___Nom/Pharmacy_Name) since 21-SPIKE.md only named representative fields for the wide-schema layers 2-5; a hardcoded Name_E filter against layer 3 confirmed live to 400 upstream
+- [Phase ?]: Manifest integrity: replaced the tautological ALL_NB_TOOLS = ALL_NB_TOOL_NAMES framing with TestManifestMatchesShippedSurface, a bidirectional falsifiable check proven by injecting a decoy tool at runtime
+- [Phase ?]: [Phase 21-07]: CLAUDE.md corrected — gnb.socrata.com is a live, keyless Socrata portal (312 NB datasets), overturning the prior forward-looking reuse note and 21-CONTEXT.md's false 'no NB Socrata' claim
+- [Phase ?]: [Phase 21-07]: COVERAGE.md Surface 3 corrected — GeoNB_DNR_MineralOccurrences/GeoNB_DNR_ProvincialParks moved from curated (11) to long-tail (35) to match the actually-shipped 22-tool manifest post-21-01-checkpoint
+- [Phase ?]: [Phase 21-07]: NB-01..NB-25 backfilled into REQUIREMENTS.md; NB-15/NB-16 marked complete-but-superseded by NB-09 (nb_query_geonb_layer) rather than deleted or renumbered
 
 ### Roadmap Evolution
 
@@ -435,6 +474,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-07-26
-Stopped at: Phase 20.1 complete; PR #2 open with all four CI gates green
-Resume file: .planning/phases/20.1-remove-upstream-error-escape-hatch-pattern-from-all-provincial-integration-tests-mb-sk-ab-qc-ns-and-re-run-live-integration-to-surface-masked-upstream-failures-before-pushing-phase-20/20.1-CONTEXT.md
+Last session: 2026-07-30T18:36:58.118Z
+Stopped at: Completed 21-07-PLAN.md — Phase 21 (New Brunswick) complete
+Resume file: None

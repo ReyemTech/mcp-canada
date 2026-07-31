@@ -310,6 +310,45 @@ Primary portal is **data.novascotia.ca** — a **Socrata** (Tyler Technologies) 
 - [x] **NS-17**: Agent can get Nova Scotia chronic disease prevalence dispatched by disease: Literal["ami","diabetes","copd","hypertension","asthma"] (`24qf-ntke`, `cumi-sw99`, `ua9e-4pss`, `sztc-sewr`, `2bih-5dgk`) with year, zone (normalized from health_zone/zone), sex, agegroup, population, crude_prevalence_rate; invalid disease returns INVALID_INPUT
 - [x] **NS-18**: All Nova Scotia tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, ns_ prefix), are discoverable via discover_tools, and 6 prompts + 7 resources are auto-discovered by FileSystemProvider
 
+### New Brunswick Government Open Data
+
+Backfilled 2026-07-30 alongside Phase 21's own closing plan (21-07) — the phase entered
+planning with `Requirements: TBD` and these IDs were registered here immediately after
+planning closed, matching the Alberta/Manitoba/Saskatchewan/Nova Scotia precedent. Three
+discovery surfaces: **federal CKAN** (`open.canada.ca`, filtered server-side to
+`organization:nb`, non-overridable — T-21-04), **GeoNB** (`geonb.snb.ca`, bare ArcGIS Server —
+no Hub Search API in front, HTTP 401 on the Hub), and **`gnb.socrata.com`** (NB's real
+provincial Socrata portal, 312 datasets, keyless — the 21-01 Task 2 blocking-checkpoint
+decision, option-a, which overturned 21-CONTEXT.md's "NB has no provincial catalogue"
+premise). Transport (511) is key-gated behind `NEW_BRUNSWICK_511_KEY`, mirroring the Manitoba
+`Five11NotConfigured` pattern. Module prefix `nb_`.
+
+- [x] **NB-01**: Agent can search New Brunswick's federal-CKAN catalogue (open.canada.ca, 221 datasets) by keyword, server-side scoped to `organization:nb` and never caller-overridable (T-21-04)
+- [x] **NB-02**: Agent can get full metadata for a single New Brunswick federal-CKAN dataset by id, with bilingual title/notes resolution correct for both a genuinely-bilingual record and NB's separately-published FR/EN duplicate-record pairs (D-12)
+- [x] **NB-03**: Agent can pull rows out of a New Brunswick federal-CKAN resource (CSV/XLSX/XLS/JSON/GEOJSON auto-routed through `fetch_and_parse`); an unparseable format (NB has 25 ZIP and 25 FGDB resources) returns a metadata-only success naming the download url, never an error
+- [x] **NB-04**: Agent can list New Brunswick's publishing organization and sections on the federal-CKAN catalogue
+- [x] **NB-05**: Agent can list New Brunswick's dataset subject, topic and format facets on the federal-CKAN catalogue (NB packages carry an empty CKAN `groups` array, so facets stand in)
+- [x] **NB-06**: Two additive bare-ArcGIS-Server enumeration functions (`list_arcgis_server_services`, `get_arcgis_server_layers`) added to the shared `shared/arcgis_hub.py` client, pinned by outgoing-param contract tests — reusable by any future province with a bare ArcGIS Server portal and no Hub Search API in front
+- [x] **NB-07**: Agent can list GeoNB's ~62 ArcGIS Server map services via a live REST-directory walk, standing in for the Hub Search API that returns HTTP 401 — 5 basemap tile services and the retired `GeoNB_DNR_WildlifeRefuges` placeholder hidden by default, each carrying an `exclusion_reason` when included
+- [x] **NB-08**: Agent can get the real layer ids, live record counts and field names of a single GeoNB service before querying it — GeoNB layer ids are non-guessable and do not always start at 0 (Crown Land's real layer id is 3, not 0)
+- [x] **NB-09**: Agent can query any GeoNB layer by service name and layer id — the long-tail escape hatch that keeps every un-curated GeoNB service reachable, including the equivalents of mineral occurrences (NB-15) and provincial parks (NB-16)
+- [x] **NB-10**: Agent can get New Brunswick flood hazard index polygons (`GeoNB_ENV_FloodHazardIndex`, layer 0) filterable by source map sheet
+- [x] **NB-11**: Agent can get New Brunswick's recorded historical flood limits (`GeoNB_ENV_Historical_Floods`), dispatched by event — 2008/2018 share the main layer (0), 1973 resolves to its own dedicated layer (8)
+- [x] **NB-12**: Agent can get New Brunswick wetland polygons (`GeoNB_ENV_Wetlands`, layer 2) filtered by class or status; an unfiltered call is rejected with `INVALID_INPUT` before any network request (the layer holds 163,206 rows — T-21-03)
+- [x] **NB-13**: Agent can get New Brunswick contaminated site points (`GeoNB_ELG_Contaminated_Sites`, layer 0) with both `Status_E` and `Status_F` (bilingual status text) always returned regardless of which field the filter matched
+- [x] **NB-14**: Agent can get New Brunswick Crown Land parcels (`GeoNB_DNR_Crown_Land`, layer 3, never layer 0) — the phase tracer, proving the bare-ArcGIS-Server pattern end to end before any other tool was written
+- [x] **NB-15**: Mineral occurrences (`GeoNB_DNR_MineralOccurrences`, layer 0) are reachable via `nb_query_geonb_layer` — superseded by NB-09; the 21-01 Task 2 checkpoint (option-a) dropped the standalone `nb_get_mineral_occurrences` tool to hold the 22-tool budget after adding the two `gnb.socrata.com` tools
+- [x] **NB-16**: Provincial parks (`GeoNB_DNR_ProvincialParks`, layer 0) are reachable via `nb_query_geonb_layer` — superseded by NB-09, the same checkpoint tradeoff as NB-15
+- [x] **NB-17**: Agent can resolve a New Brunswick property by PID or list parcels by county through `nb_get_parcels`, over the province's 604,520-parcel cadastre; an unfiltered call is rejected with `INVALID_INPUT` before any network request (T-21-03)
+- [x] **NB-18**: Agent can resolve a civic address by community, street or civic number through `nb_get_civic_addresses`, over 373,172 address points with the street-type field in both official languages (`ST_TYPE_E`/`ST_TYPE_F`); an unfiltered call is rejected with `INVALID_INPUT` before any network request (T-21-03)
+- [x] **NB-19**: Agent can find New Brunswick hospitals, after-hours clinics, adult residential centres, nursing homes and pharmacies through one `nb_get_health_facilities` call dispatched by `facility_type` across 6 separate GeoNB layers, each with its own live-verified name field
+- [x] **NB-20**: Agent can find New Brunswick public schools in the anglophone or francophone sector through `nb_get_public_schools`, dispatched by `sector`, filterable by district (live-verified `ASD-*`/`DSF-*` short codes)
+- [x] **NB-21**: Agent can get current New Brunswick road events (closures, construction, incidents) from NB 511; returns a bilingual `NOT_CONFIGURED` envelope — never a raised exception — when `NEW_BRUNSWICK_511_KEY` is absent (D-10)
+- [x] **NB-22**: Agent can get current New Brunswick winter road conditions from NB 511; same `NOT_CONFIGURED` behaviour when the key is absent
+- [x] **NB-23**: Agent can get New Brunswick traffic camera locations from NB 511; same `NOT_CONFIGURED` behaviour when the key is absent — none of the three 511 tools ever echoes the key's value into a response (T-21-02)
+- [x] **NB-24**: All New Brunswick tools follow mcp-canada conventions (standalone @tool, make_response/make_error envelope, Use-for + Keywords single-line docstrings, `nb_` prefix, bilingual `lang` argument), are discoverable via discover_tools, 6 prompts + 7 resources are auto-discovered by FileSystemProvider, the generated catalogue and README stay in sync, and coverage holds at or above 95%
+- [x] **NB-25**: `gnb.socrata.com` (312 New Brunswick datasets, keyless) is documented as a live provincial Socrata portal in the module's own portal guide, in CLAUDE.md, and in COVERAGE.md — the 21-01 Task 2 blocking-checkpoint decision (option-a: two new `nb_` discovery tools reusing `shared/socrata.py` verbatim) and its consequences for the curated tool manifest (NB-15/NB-16 dropped to the long tail) are recorded
+
 ## v2 Requirements
 
 ### Extended Datastore
@@ -576,11 +615,37 @@ Primary portal is **data.novascotia.ca** — a **Socrata** (Tyler Technologies) 
 | NS-16 | Phase 20 | Complete |
 | NS-17 | Phase 20 | Complete |
 | NS-18 | Phase 20 | Complete |
+| NB-01 | Phase 21 | Complete |
+| NB-02 | Phase 21 | Complete |
+| NB-03 | Phase 21 | Complete |
+| NB-04 | Phase 21 | Complete |
+| NB-05 | Phase 21 | Complete |
+| NB-06 | Phase 21 | Complete |
+| NB-07 | Phase 21 | Complete |
+| NB-08 | Phase 21 | Complete |
+| NB-09 | Phase 21 | Complete |
+| NB-10 | Phase 21 | Complete |
+| NB-11 | Phase 21 | Complete |
+| NB-12 | Phase 21 | Complete |
+| NB-13 | Phase 21 | Complete |
+| NB-14 | Phase 21 | Complete |
+| NB-15 | Phase 21 | Complete (superseded by NB-09 — reachable via nb_query_geonb_layer) |
+| NB-16 | Phase 21 | Complete (superseded by NB-09 — reachable via nb_query_geonb_layer) |
+| NB-17 | Phase 21 | Complete |
+| NB-18 | Phase 21 | Complete |
+| NB-19 | Phase 21 | Complete |
+| NB-20 | Phase 21 | Complete |
+| NB-21 | Phase 21 | Complete |
+| NB-22 | Phase 21 | Complete |
+| NB-23 | Phase 21 | Complete |
+| NB-24 | Phase 21 | Complete |
+| NB-25 | Phase 21 | Complete |
 
 **Coverage:**
 - v1 requirements: 73 total (added 27 Alberta requirements in Phase 17)
 - Mapped to phases: 73
 - Unmapped: 0
+- New Brunswick requirements: 25 total (Phase 21)
 - York Region requirements: 14 total (Phase 14)
 - IRCC requirements: 9 total (Phase 11)
 - Ontario requirements: 8 total (Phase 12)
@@ -593,4 +658,4 @@ Primary portal is **data.novascotia.ca** — a **Socrata** (Tyler Technologies) 
 
 ---
 *Requirements defined: 2026-04-07*
-*Last updated: 2026-06-15 after Phase 20 planning (added NS-01…NS-18)*
+*Last updated: 2026-07-30 after Phase 21 close (added NB-01…NB-25)*

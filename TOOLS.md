@@ -3,7 +3,7 @@
 Auto-generated from source. Do not edit manually.
 Run `uv run python scripts/generate_catalog.py` to regenerate.
 
-**273 tools** across 20 modules.
+**295 tools** across 21 modules.
 
 ## Module: Meta / Discovery (3 tools)
 
@@ -1750,6 +1750,234 @@ Get winter road conditions on Manitoba's remote winter road network (seasonal).
 ### `manitoba_get_traffic_cameras`
 
 Get Manitoba highway traffic camera locations and snapshot image URLs.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+## Module: new_brunswick (22 tools)
+
+New Brunswick provincial government open data across four upstream surfaces: the federal open.canada.ca CKAN catalogue filtered to organization:nb (dataset discovery — NOT a provincial CKAN; data.gnb.ca/opendata.gnb.ca/nbopendata.ca do not resolve), gnb.socrata.com (New Brunswick's real provincial Socrata portal, 312 datasets, keyless), GeoNB (geonb.snb.ca) ArcGIS Server MapServer services (bare ArcGIS Server REST, NOT ArcGIS Hub — the Hub returns HTTP 401) covering flood hazard, wetlands, contaminated sites, Crown land, parcels, civic addresses, health facilities and public schools — minerals and provincial parks are reachable only through the long-tail nb_query_geonb_layer tool, not a dedicated curated tool — and NB 511 (511.gnb.ca) key-gated live road events, winter road conditions and traffic cameras.
+
+### `nb_get_crown_land`
+
+Get New Brunswick Crown Land parcels from GeoNB (geonb.snb.ca), layer 3.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `holder` | `int | None` | `None` | — |
+| `limit` | `int` | `MAX_RECORDS` | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_search_datasets`
+
+Search New Brunswick's federal-CKAN catalogue (open.canada.ca, 221 datasets).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `query` | `str` | `''` | — |
+| `extra_fq` | `str | None` | `None` | — |
+| `limit` | `int` | `10` | — |
+| `offset` | `int` | `0` | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_get_dataset_details`
+
+Get full metadata for a single New Brunswick federal-CKAN dataset by id or name slug.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dataset_id` | `str` | — | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_query_dataset`
+
+Query/parse a resource from a New Brunswick federal-CKAN dataset by resource index.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dataset_id` | `str` | — | — |
+| `resource_index` | `int` | `0` | — |
+| `limit` | `int` | `1000` | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_list_organizations`
+
+List New Brunswick's publishing organization and sections on the federal-CKAN catalogue.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_list_categories`
+
+List New Brunswick's dataset subject, topic and format facets on the federal-CKAN catalogue.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_search_gnb_socrata_datasets`
+
+Search New Brunswick's provincial Socrata portal (gnb.socrata.com, 312 datasets, keyless).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `query` | `str` | `''` | — |
+| `limit` | `int` | `10` | — |
+| `offset` | `int` | `0` | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_query_gnb_socrata_dataset`
+
+Query a New Brunswick gnb.socrata.com dataset via SoQL against /resource/{id}.json.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dataset_id` | `str` | — | — |
+| `where` | `str | None` | `None` | — |
+| `select` | `str | None` | `None` | — |
+| `limit` | `int` | `1000` | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_list_geonb_services`
+
+List GeoNB's ArcGIS Server services via a live REST-directory walk.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `query` | `str` | `''` | — |
+| `include_excluded` | `bool` | `False` | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_get_geonb_service_layers`
+
+Get the layers/tables of a single GeoNB ArcGIS Server service, with
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `service_name` | `str` | — | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_query_geonb_layer`
+
+Query any GeoNB layer by service name and layer id — the long-tail
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `service_name` | `str` | — | — |
+| `layer_id` | `int` | — | — |
+| `where` | `str | None` | `None` | — |
+| `out_fields` | `str` | `'*'` | — |
+| `limit` | `int` | `MAX_RECORDS` | — |
+| `include_geometry` | `bool` | `False` | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_get_flood_hazard_areas`
+
+Get New Brunswick flood hazard index polygons from GeoNB
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `sheet` | `str | None` | `None` | — |
+| `limit` | `int` | `MAX_RECORDS` | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_get_historical_floods`
+
+Get New Brunswick's recorded historical flood limits from GeoNB
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `event` | `str | None` | `None` | — |
+| `limit` | `int` | `MAX_RECORDS` | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_get_wetlands`
+
+Get New Brunswick wetland polygons from GeoNB (GeoNB_ENV_Wetlands, layer 2).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `wetland_class` | `str | None` | `None` | — |
+| `status` | `str | None` | `None` | — |
+| `limit` | `int` | `MAX_RECORDS` | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_get_contaminated_sites`
+
+Get New Brunswick contaminated site points from GeoNB
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `status` | `str | None` | `None` | — |
+| `limit` | `int` | `MAX_RECORDS` | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_get_parcels`
+
+Get New Brunswick land parcels from GeoNB (GeoNB_SNB_Parcels, layer 0).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `pid` | `str | None` | `None` | — |
+| `county` | `str | None` | `None` | — |
+| `limit` | `int` | `MAX_RECORDS` | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_get_civic_addresses`
+
+Get New Brunswick civic addresses from GeoNB (GeoNB_DPS_Civic_Address, layer 0).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `community` | `str | None` | `None` | — |
+| `street` | `str | None` | `None` | — |
+| `civic_number` | `int | None` | `None` | — |
+| `limit` | `int` | `MAX_RECORDS` | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_get_health_facilities`
+
+Get New Brunswick health facilities from GeoNB (GeoNB_Health_Facilities),
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `facility_type` | `str` | — | — |
+| `name` | `str | None` | `None` | — |
+| `limit` | `int` | `MAX_RECORDS` | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_get_public_schools`
+
+Get New Brunswick public schools from GeoNB (GeoNB_EECD_PublicSchools),
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `sector` | `str` | `'anglophone'` | — |
+| `district` | `str | None` | `None` | — |
+| `limit` | `int` | `MAX_RECORDS` | — |
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_get_road_events`
+
+Get current road events (closures, construction, incidents) from NB 511.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_get_winter_road_conditions`
+
+Get winter road conditions on New Brunswick highways from NB 511 (seasonal).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `lang` | `Literal['en', 'fr']` | `'en'` | — |
+
+### `nb_get_traffic_cameras`
+
+Get New Brunswick highway traffic camera locations from NB 511.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|

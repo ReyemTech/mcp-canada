@@ -10,8 +10,10 @@ import httpx
 import pytest
 
 from mcp_canada.shared.arcgis_hub import (
+    get_arcgis_server_layers,
     get_count,
     get_layer_metadata,
+    list_arcgis_server_services,
     query_feature_service,
     search_hub_datasets,
     shape_hub_dataset,
@@ -128,6 +130,34 @@ LAYER_METADATA_SAMPLE = {
 }
 
 COUNT_SAMPLE = {"count": 4810}
+
+SERVICE_DIRECTORY_SAMPLE: dict[str, Any] = {
+    "currentVersion": 10.91,
+    "folders": ["Utilities", "SampleWorldCities"],
+    "services": [
+        {"name": "GeoNB_DNR_Crown_Land", "type": "MapServer"},
+        {"name": "GeoNB_ENV_Wetlands", "type": "MapServer"},
+        {"name": "GeoNB_Basemap_Color", "type": "MapServer"},
+    ],
+}
+
+SERVICE_DIRECTORY_NO_SERVICES_KEY: dict[str, Any] = {
+    "currentVersion": 10.91,
+    "folders": ["Utilities"],
+}
+
+MAPSERVER_LAYERS_SAMPLE: dict[str, Any] = {
+    "currentVersion": 10.91,
+    "layers": [
+        {"id": 0, "name": "Wetland Buffer"},
+        {"id": 2, "name": "Wetland"},
+    ],
+    "tables": [
+        {"id": 5, "name": "Wetland Lookup"},
+    ],
+}
+
+MAPSERVER_LAYERS_MISSING_KEYS: dict[str, Any] = {"currentVersion": 10.91}
 
 
 # ---------------------------------------------------------------------------
@@ -562,3 +592,249 @@ class TestEmptyQueryOmitsQParam:
         await search_hub_datasets("https://example.hub.arcgis.com", query="transit", httpx_client=client)
 
         assert client.get.await_args.kwargs["params"]["q"] == "transit"
+
+
+# ---------------------------------------------------------------------------
+# TestListArcgisServerServices (Phase 21 — bare ArcGIS Server directory
+# enumeration standing in for the unavailable Hub Search API, D-06)
+# ---------------------------------------------------------------------------
+
+
+class TestListArcgisServerServices:
+    @pytest.mark.asyncio
+    async def test_happy_path_returns_services_list(self):
+        """Returns the raw `services` array from the directory response."""
+        mock_client = _make_mock_client([SERVICE_DIRECTORY_SAMPLE])
+
+        result = await list_arcgis_server_services(
+            "https://geonb.snb.ca/arcgis/rest/services",
+            httpx_client=mock_client,
+        )
+
+        assert result == SERVICE_DIRECTORY_SAMPLE["services"]
+        assert len(result) == 3
+        assert result[0]["name"] == "GeoNB_DNR_Crown_Land"
+
+    @pytest.mark.asyncio
+    async def test_issues_one_get_with_f_json_param(self):
+        """Issues exactly one GET to base_url with params {'f': 'json'} — asserted
+        on the outgoing call_args dict, not just the URL."""
+        mock_client = _make_mock_client([SERVICE_DIRECTORY_SAMPLE])
+
+        await list_arcgis_server_services(
+            "https://geonb.snb.ca/arcgis/rest/services",
+            httpx_client=mock_client,
+        )
+
+        assert mock_client.get.await_count == 1
+        call_args = mock_client.get.call_args
+        assert call_args[0][0] == "https://geonb.snb.ca/arcgis/rest/services"
+        assert call_args[1]["params"] == {"f": "json"}
+
+    @pytest.mark.asyncio
+    async def test_trailing_slash_stripped(self):
+        """A trailing slash on base_url is stripped before the request."""
+        mock_client = _make_mock_client([SERVICE_DIRECTORY_SAMPLE])
+
+        await list_arcgis_server_services(
+            "https://geonb.snb.ca/arcgis/rest/services/",
+            httpx_client=mock_client,
+        )
+
+        call_args = mock_client.get.call_args
+        assert call_args[0][0] == "https://geonb.snb.ca/arcgis/rest/services"
+
+    @pytest.mark.asyncio
+    async def test_missing_services_key_returns_empty_list(self):
+        """No `services` key in the response yields [] rather than a KeyError."""
+        mock_client = _make_mock_client([SERVICE_DIRECTORY_NO_SERVICES_KEY])
+
+        result = await list_arcgis_server_services(
+            "https://geonb.snb.ca/arcgis/rest/services",
+            httpx_client=mock_client,
+        )
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_folders_never_included_in_return_value(self):
+        """The `folders` key is never surfaced in the return value."""
+        mock_client = _make_mock_client([SERVICE_DIRECTORY_SAMPLE])
+
+        result = await list_arcgis_server_services(
+            "https://geonb.snb.ca/arcgis/rest/services",
+            httpx_client=mock_client,
+        )
+
+        assert isinstance(result, list)
+        for entry in result:
+            assert "folders" not in entry
+
+    @pytest.mark.asyncio
+    async def test_raise_for_status_called_before_decode(self):
+        """response.raise_for_status() is called before decoding the body."""
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = SERVICE_DIRECTORY_SAMPLE
+        mock_client = MagicMock()
+        mock_client.get = AsyncMock(return_value=mock_resp)
+
+        await list_arcgis_server_services(
+            "https://geonb.snb.ca/arcgis/rest/services",
+            httpx_client=mock_client,
+        )
+
+        mock_resp.raise_for_status.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_malformed_body_raises_decoding_error_not_value_error(self):
+        """A body that is not valid JSON raises httpx.DecodingError, never a bare
+        ValueError subclass (ERR-05)."""
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.side_effect = json.JSONDecodeError("bad", "not json", 0)
+        mock_client = MagicMock()
+        mock_client.get = AsyncMock(return_value=mock_resp)
+
+        with pytest.raises(httpx.DecodingError):
+            await list_arcgis_server_services(
+                "https://geonb.snb.ca/arcgis/rest/services",
+                httpx_client=mock_client,
+            )
+
+    @pytest.mark.asyncio
+    async def test_opens_own_client_when_none_injected(self, monkeypatch):
+        """When no httpx_client is injected, a new AsyncClient is opened,
+        matching search_hub_datasets' dual-path structure."""
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = SERVICE_DIRECTORY_SAMPLE
+
+        opened_client = MagicMock()
+        opened_client.get = AsyncMock(return_value=mock_resp)
+        opened_client.__aenter__ = AsyncMock(return_value=opened_client)
+        opened_client.__aexit__ = AsyncMock(return_value=False)
+
+        def _fake_async_client(*args, **kwargs):
+            return opened_client
+
+        monkeypatch.setattr(httpx, "AsyncClient", _fake_async_client)
+
+        result = await list_arcgis_server_services(
+            "https://geonb.snb.ca/arcgis/rest/services",
+        )
+
+        assert result == SERVICE_DIRECTORY_SAMPLE["services"]
+        opened_client.get.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# TestGetArcgisServerLayers
+# ---------------------------------------------------------------------------
+
+
+class TestGetArcgisServerLayers:
+    @pytest.mark.asyncio
+    async def test_happy_path_returns_layers_and_tables(self):
+        """Returns a dict with exactly the keys `layers` and `tables`, each a
+        list of {id, name} dicts."""
+        mock_client = _make_mock_client([MAPSERVER_LAYERS_SAMPLE])
+
+        result = await get_arcgis_server_layers(
+            "https://geonb.snb.ca/arcgis/rest/services/GeoNB_DNR_Crown_Land",
+            httpx_client=mock_client,
+        )
+
+        assert set(result.keys()) == {"layers", "tables"}
+        assert result["layers"] == [
+            {"id": 0, "name": "Wetland Buffer"},
+            {"id": 2, "name": "Wetland"},
+        ]
+        assert result["tables"] == [{"id": 5, "name": "Wetland Lookup"}]
+
+    @pytest.mark.asyncio
+    async def test_appends_mapserver_and_sends_f_json(self):
+        """Issues one GET to `{service_url}/MapServer` with params {'f': 'json'}
+        — asserted on the outgoing call_args dict, not just the URL."""
+        mock_client = _make_mock_client([MAPSERVER_LAYERS_SAMPLE])
+
+        await get_arcgis_server_layers(
+            "https://geonb.snb.ca/arcgis/rest/services/GeoNB_DNR_Crown_Land",
+            httpx_client=mock_client,
+        )
+
+        assert mock_client.get.await_count == 1
+        call_args = mock_client.get.call_args
+        assert call_args[0][0] == (
+            "https://geonb.snb.ca/arcgis/rest/services/GeoNB_DNR_Crown_Land/MapServer"
+        )
+        assert call_args[1]["params"] == {"f": "json"}
+
+    @pytest.mark.asyncio
+    async def test_trailing_slash_stripped_before_mapserver_append(self):
+        """A trailing slash on service_url is stripped before `/MapServer` is
+        appended (so the result is never a double-slash URL)."""
+        mock_client = _make_mock_client([MAPSERVER_LAYERS_SAMPLE])
+
+        await get_arcgis_server_layers(
+            "https://geonb.snb.ca/arcgis/rest/services/GeoNB_DNR_Crown_Land/",
+            httpx_client=mock_client,
+        )
+
+        call_args = mock_client.get.call_args
+        assert call_args[0][0] == (
+            "https://geonb.snb.ca/arcgis/rest/services/GeoNB_DNR_Crown_Land/MapServer"
+        )
+
+    @pytest.mark.asyncio
+    async def test_missing_layers_and_tables_returns_empty_lists(self):
+        """Missing `layers`/`tables` arrays yield empty lists, not a KeyError."""
+        mock_client = _make_mock_client([MAPSERVER_LAYERS_MISSING_KEYS])
+
+        result = await get_arcgis_server_layers(
+            "https://geonb.snb.ca/arcgis/rest/services/GeoNB_DNR_WildlifeRefuges",
+            httpx_client=mock_client,
+        )
+
+        assert result == {"layers": [], "tables": []}
+
+    @pytest.mark.asyncio
+    async def test_malformed_body_raises_decoding_error_not_value_error(self):
+        """A body that is not valid JSON raises httpx.DecodingError, never a bare
+        ValueError subclass (ERR-05)."""
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.side_effect = json.JSONDecodeError("bad", "not json", 0)
+        mock_client = MagicMock()
+        mock_client.get = AsyncMock(return_value=mock_resp)
+
+        with pytest.raises(httpx.DecodingError):
+            await get_arcgis_server_layers(
+                "https://geonb.snb.ca/arcgis/rest/services/GeoNB_DNR_Crown_Land",
+                httpx_client=mock_client,
+            )
+
+    @pytest.mark.asyncio
+    async def test_opens_own_client_when_none_injected(self, monkeypatch):
+        """When no httpx_client is injected, a new AsyncClient is opened,
+        matching search_hub_datasets' dual-path structure."""
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = MAPSERVER_LAYERS_SAMPLE
+
+        opened_client = MagicMock()
+        opened_client.get = AsyncMock(return_value=mock_resp)
+        opened_client.__aenter__ = AsyncMock(return_value=opened_client)
+        opened_client.__aexit__ = AsyncMock(return_value=False)
+
+        def _fake_async_client(*args, **kwargs):
+            return opened_client
+
+        monkeypatch.setattr(httpx, "AsyncClient", _fake_async_client)
+
+        result = await get_arcgis_server_layers(
+            "https://geonb.snb.ca/arcgis/rest/services/GeoNB_DNR_Crown_Land",
+        )
+
+        assert result["layers"] == MAPSERVER_LAYERS_SAMPLE["layers"]
+        opened_client.get.assert_awaited_once()

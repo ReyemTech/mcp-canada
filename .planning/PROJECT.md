@@ -79,5 +79,16 @@ The shared datastore is a new architectural concept for mcp-canada. It adds a `d
 | "Inspired by" attribution | Credit Aryan Jhaveri without implying fork/derivation | — Pending |
 | Try to fix SSL (not disable) | Security-first; fall back to scoped disable if needed | — Pending |
 
+## Current State
+
+Phase 21 complete (2026-07-30) — `new_brunswick` module shipped, the 8th province in the
+provincial rollout: 22 tools, 6 prompts, 7 resources. Repo-wide totals now 295 tools across
+21 modules.
+
+> **Doc drift note:** this file is scoped to the v1.1 StatCan + Datastore milestone. The
+> provincial rollout (Phases 11–23) is tracked only in ROADMAP.md and is not represented in the
+> Requirements lists above, and the StatCan/datastore items still listed under **Active** were
+> delivered in Phases 7–10. Reconciling both is out of scope for Phase 21 and needs its own pass.
+
 ---
-*Last updated: 2026-04-07 after initialization*
+*Last updated: 2026-07-30 after Phase 21 (New Brunswick) completion*

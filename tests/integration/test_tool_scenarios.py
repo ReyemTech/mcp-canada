@@ -3042,6 +3042,586 @@ class TestNovaScotiaToolScenarios:
         )
 
 
+# ─── New Brunswick scenarios ─────────────────────────────────────────────────
+
+
+class TestNewBrunswickToolScenarios:
+    """Live geonb.snb.ca / open.canada.ca / gnb.socrata.com integration tests.
+
+    All 22 nb_ tools are exercised through the MCP Client layer, the way an
+    agent uses them — never a direct client-function import. A meta-test at
+    the bottom binds constants.ALL_NB_TOOL_NAMES to the tool names this class
+    actually invokes, so a future 23rd tool cannot ship untested.
+
+    Tests simulate what an agent would ask:
+    - 'What New Brunswick datasets are there about flooding?' — dataset search
+    - 'Show me the details of that New Brunswick dataset' — dataset details, FR title
+    - 'What data formats does New Brunswick publish?' — category listing
+    - 'What map services does GeoNB have?' — service listing, no basemap leaked
+    - 'Which layer of the Crown Land service holds the parcels?' — layer 3
+    - 'Where are New Brunswick's flood hazard areas?' — Flood_Haza field present
+    - 'Where did the Saint John River flood historically?' — historical floods
+    - 'What wetlands are classified as bog?' — wetlands with a filter
+    - 'Show me contaminated sites in New Brunswick' — bilingual status
+    - 'Who holds this Crown land?' — HOLDER + OBJECTID fields
+    - 'What parcels are in York County?' — parcels with a filter
+    - 'Show me every New Brunswick parcel' — parcels unfiltered, INVALID_INPUT
+    - 'What is the civic address for this street in Fredericton?' — civic addresses
+    - 'List every civic address in New Brunswick' — unfiltered, INVALID_INPUT
+    - 'Where are New Brunswick's hospitals?' — bilingual Name_E/Name_F
+    - 'What anglophone schools are in New Brunswick?' — public schools
+    - 'Are there road closures in New Brunswick?' — unconfigured envelope
+    - 'What are winter road conditions in New Brunswick?' — unconfigured
+    - 'Show me New Brunswick traffic cameras' — unconfigured
+    - 'Find me New Brunswick government data tools' — BM25 discovery
+    - a cross-module scenario pairing an nb_ tool with the federal ckan_ module
+    - the gnb.socrata.com discovery pair (checkpoint option-a)
+    - the long-tail escape hatch reaching mineral occurrences (dropped by the
+      21-01 checkpoint, still reachable via nb_query_geonb_layer)
+    """
+
+    # ------------------------------------------------------------------
+    # Federal CKAN discovery (organization:nb) — D-01
+    # ------------------------------------------------------------------
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_search_datasets_about_flooding(self, mcp_server):
+        """'What New Brunswick datasets are there about flooding?'"""
+        data = await call_tool(mcp_server, "nb_search_datasets", {"query": "flood", "limit": 5})
+        live = assert_live_or_transient(data, "nb_search_datasets", "new-brunswick-federal-ckan")
+        if live:
+            payload = data["data"]
+            assert "results" in payload and isinstance(payload["results"], list)
+            results = payload["results"]
+            assert results, f"nb_search_datasets('flood') must return at least 1 dataset, got: {payload}"
+            assert results[0].get("id") is not None, (
+                f"FIELD PRESENCE FAILED: 'id' must be non-null. Got: {results[0]}"
+            )
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_dataset_details_bilingual_title(self, mcp_server):
+        """'Show me the details of that New Brunswick dataset' — French title resolution."""
+        search = await call_tool(mcp_server, "nb_search_datasets", {"query": "flood", "limit": 5})
+        live = assert_live_or_transient(search, "nb_search_datasets", "new-brunswick-federal-ckan")
+        if live:
+            results = search["data"]["results"]
+            assert results, f"nb_search_datasets('flood') must return at least 1 dataset, got: {search['data']}"
+            dataset_id = results[0]["name"] or results[0]["id"]
+
+            data_en = await call_tool(
+                mcp_server, "nb_get_dataset_details", {"dataset_id": dataset_id, "lang": "en"}
+            )
+            live_en = assert_live_or_transient(data_en, "nb_get_dataset_details", "new-brunswick-federal-ckan")
+            assert live_en, (
+                f"nb_get_dataset_details must succeed for a dataset just returned by search: {data_en}"
+            )
+            assert data_en["data"].get("title") is not None, (
+                f"FIELD PRESENCE FAILED: 'title' must be non-null. Got: {data_en['data']}"
+            )
+
+            data_fr = await call_tool(
+                mcp_server, "nb_get_dataset_details", {"dataset_id": dataset_id, "lang": "fr"}
+            )
+            live_fr = assert_live_or_transient(data_fr, "nb_get_dataset_details", "new-brunswick-federal-ckan")
+            assert live_fr, f"nb_get_dataset_details (fr) must succeed for the same dataset: {data_fr}"
+            assert data_fr["_meta"]["lang"] == "fr"
+            assert data_fr["data"].get("title") is not None, (
+                f"FIELD PRESENCE FAILED (fr): 'title' must be non-null. Got: {data_fr['data']}"
+            )
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(60)
+    async def test_query_dataset_resource(self, mcp_server):
+        """'Pull the rows out of that New Brunswick resource' — auto-router, never an error."""
+        search = await call_tool(mcp_server, "nb_search_datasets", {"query": "flood", "limit": 5})
+        live = assert_live_or_transient(search, "nb_search_datasets", "new-brunswick-federal-ckan")
+        if live:
+            results = search["data"]["results"]
+            assert results, f"nb_search_datasets('flood') must return at least 1 dataset, got: {search['data']}"
+            dataset_id = next((r["name"] or r["id"] for r in results if r.get("num_resources")), None)
+            if dataset_id is None:
+                dataset_id = results[0]["name"] or results[0]["id"]
+
+            data = await call_tool(
+                mcp_server, "nb_query_dataset", {"dataset_id": dataset_id, "resource_index": 0}
+            )
+            live_q = assert_live_or_transient(data, "nb_query_dataset", "new-brunswick-federal-ckan")
+            if live_q:
+                payload = data["data"]
+                # Auto-router: either parsed rows, or a metadata-only note naming
+                # the download url — both are success outcomes, never an error.
+                assert "rows" in payload, f"nb_query_dataset payload missing 'rows': {payload}"
+                assert isinstance(payload["rows"], list)
+                assert "resource" in payload, f"nb_query_dataset payload missing 'resource': {payload}"
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_list_organizations(self, mcp_server):
+        """'Who publishes New Brunswick's federal CKAN data?'"""
+        data = await call_tool(mcp_server, "nb_list_organizations", {})
+        live = assert_live_or_transient(data, "nb_list_organizations", "new-brunswick-federal-ckan")
+        if live:
+            orgs = data["data"]["organizations"]
+            assert isinstance(orgs, list) and len(orgs) >= 1
+            assert orgs[0].get("name") is not None, (
+                f"FIELD PRESENCE FAILED: 'name' must be non-null. Got: {orgs[0]}"
+            )
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_list_categories_format_list(self, mcp_server):
+        """'What data formats does New Brunswick publish?'"""
+        data = await call_tool(mcp_server, "nb_list_categories", {})
+        live = assert_live_or_transient(data, "nb_list_categories", "new-brunswick-federal-ckan")
+        if live:
+            payload = data["data"]
+            assert "formats" in payload, f"nb_list_categories payload missing 'formats': {payload}"
+            formats = payload["formats"]
+            assert isinstance(formats, list) and len(formats) >= 1, (
+                f"FIELD PRESENCE FAILED: 'formats' must be a non-empty list. Got: {formats}"
+            )
+            assert formats[0].get("name") is not None
+
+    # ------------------------------------------------------------------
+    # gnb.socrata.com — checkpoint option-a
+    # ------------------------------------------------------------------
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_search_gnb_socrata_datasets(self, mcp_server):
+        """'Search New Brunswick's provincial Socrata portal' — gnb.socrata.com, keyless."""
+        data = await call_tool(mcp_server, "nb_search_gnb_socrata_datasets", {"query": "", "limit": 10})
+        live = assert_live_or_transient(data, "nb_search_gnb_socrata_datasets", "new-brunswick-gnb-socrata")
+        if live:
+            payload = data["data"]
+            assert "results" in payload and isinstance(payload["results"], list)
+            assert payload.get("total", 0) >= 1, (
+                f"FIELD PRESENCE FAILED: total must be >=1 across gnb.socrata.com's 312 datasets. Got: {payload}"
+            )
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_query_gnb_socrata_dataset(self, mcp_server):
+        """'Query a New Brunswick provincial Socrata dataset via SoQL.'"""
+        search = await call_tool(mcp_server, "nb_search_gnb_socrata_datasets", {"query": "", "limit": 10})
+        live = assert_live_or_transient(search, "nb_search_gnb_socrata_datasets", "new-brunswick-gnb-socrata")
+        if live:
+            results = search["data"]["results"]
+            assert results, "gnb.socrata.com must return at least one dataset for an empty query"
+            dataset_id = results[0]["id"]
+
+            data = await call_tool(
+                mcp_server, "nb_query_gnb_socrata_dataset", {"dataset_id": dataset_id, "limit": 5}
+            )
+            live_q = assert_live_or_transient(data, "nb_query_gnb_socrata_dataset", "new-brunswick-gnb-socrata")
+            if live_q:
+                payload = data["data"]
+                assert "rows" in payload and isinstance(payload["rows"], list)
+                for row in payload["rows"]:
+                    assert not any(k.lower().startswith("the_geom") for k in row), (
+                        f"GEOMETRY EXCLUSION FAILED: no the_geom* key expected by default. Got keys: {list(row)}"
+                    )
+
+    # ------------------------------------------------------------------
+    # GeoNB discovery — stands in for the 401-ing Hub Search API (D-06)
+    # ------------------------------------------------------------------
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_list_geonb_services_no_basemap_leaked(self, mcp_server):
+        """'What map services does GeoNB have?' — no basemap tile service by default."""
+        data = await call_tool(mcp_server, "nb_list_geonb_services", {})
+        assert "_meta" in data, f"Expected live success from nb_list_geonb_services, got: {data}"
+        assert data["_meta"]["source"]["api"] == "new-brunswick-geonb"
+        services = data["data"]["services"]
+        assert isinstance(services, list) and len(services) >= 1
+        names = [s["name"] for s in services]
+        assert not any("Basemap" in n for n in names), (
+            f"EXCLUSION FAILED: no basemap service should appear by default. Got: {names}"
+        )
+        assert "GeoNB_DNR_WildlifeRefuges" not in names, (
+            "EXCLUSION FAILED: the retired placeholder service must be hidden by default"
+        )
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_crown_land_service_layers_layer_3(self, mcp_server):
+        """'Which layer of the Crown Land service holds the parcels?' — layer 3, never 0."""
+        data = await call_tool(mcp_server, "nb_get_geonb_service_layers", {
+            "service_name": "GeoNB_DNR_Crown_Land",
+        })
+        assert "_meta" in data, f"Expected live success from nb_get_geonb_service_layers, got: {data}"
+        assert data["_meta"]["source"]["api"] == "new-brunswick-geonb"
+        layers = data["data"]["layers"]
+        assert isinstance(layers, list) and len(layers) >= 1
+        layer_ids = [layer["id"] for layer in layers]
+        assert 3 in layer_ids, (
+            f"LAYER ID PROOF FAILED: Crown Land's real layer id is 3 (layer 0 does not exist "
+            f"on this service). Got layer ids: {layer_ids}"
+        )
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_query_geonb_layer_reaches_mineral_occurrences(self, mcp_server):
+        """'Find New Brunswick mineral occurrences' — the long-tail escape hatch.
+
+        nb_get_mineral_occurrences was dropped to the long tail by the 21-01
+        checkpoint (option-a, tool-budget tradeoff) — this proves it stayed
+        reachable via nb_query_geonb_layer rather than becoming unreachable.
+        """
+        data = await call_tool(mcp_server, "nb_query_geonb_layer", {
+            "service_name": "GeoNB_DNR_MineralOccurrences",
+            "layer_id": 0,
+            "limit": 10,
+        })
+        live = assert_live_or_transient(data, "nb_query_geonb_layer", "new-brunswick-geonb")
+        if live:
+            payload = assert_feature_payload(data, "nb_query_geonb_layer")
+            assert len(payload["features"]) >= 1, (
+                "GeoNB_DNR_MineralOccurrences layer 0 must return at least 1 feature "
+                "(1,611 points recorded in COVERAGE.md)"
+            )
+
+    # ------------------------------------------------------------------
+    # Curated flood / water
+    # ------------------------------------------------------------------
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_flood_hazard_areas_field_present(self, mcp_server):
+        """'Where are New Brunswick's flood hazard areas?' — Flood_Haza field present."""
+        data = await call_tool(mcp_server, "nb_get_flood_hazard_areas", {"limit": 25})
+        live = assert_live_or_transient(data, "nb_get_flood_hazard_areas", "new-brunswick-geonb")
+        if live:
+            payload = assert_feature_payload(data, "nb_get_flood_hazard_areas")
+            assert len(payload["features"]) >= 1, "Flood hazard index must return at least 1 polygon"
+            hazard_rows = [f for f in payload["features"] if f.get("Flood_Haza") is not None]
+            assert len(hazard_rows) >= 1, (
+                f"FIELD PRESENCE FAILED: 'Flood_Haza' must be non-null in >=1 row. "
+                f"Keys in first row: {list(payload['features'][0].keys())}"
+            )
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_historical_floods_1973_event(self, mcp_server):
+        """'Where did the Saint John River flood historically?' — the 1973 event, layer 8."""
+        data = await call_tool(mcp_server, "nb_get_historical_floods", {"event": "1973", "limit": 25, "lang": "fr"})
+        live = assert_live_or_transient(data, "nb_get_historical_floods", "new-brunswick-geonb")
+        if live:
+            assert data["_meta"]["lang"] == "fr"
+            payload = assert_feature_payload(data, "nb_get_historical_floods")
+            assert len(payload["features"]) >= 1, "The 1973 historical flood layer must return >=1 feature"
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_wetlands_bog_filter(self, mcp_server):
+        """'What wetlands are classified as bog?' — wetlands with a filter."""
+        data = await call_tool(mcp_server, "nb_get_wetlands", {"wetland_class": "Bog", "limit": 10})
+        live = assert_live_or_transient(data, "nb_get_wetlands", "new-brunswick-geonb")
+        if live:
+            payload = assert_feature_payload(data, "nb_get_wetlands")
+            assert len(payload["features"]) >= 1, "wetland_class='Bog' must return at least 1 polygon"
+            assert all(f.get("WETLAND_CLASS") == "Bog" for f in payload["features"]), (
+                f"FILTER FAILED: every row must have WETLAND_CLASS=='Bog'. "
+                f"Got: {[f.get('WETLAND_CLASS') for f in payload['features']]}"
+            )
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_wetlands_unfiltered_returns_invalid_input(self, mcp_server):
+        """'Show me every New Brunswick wetland' — unfiltered call rejected (163,206 rows)."""
+        data = await call_tool(mcp_server, "nb_get_wetlands", {})
+        assert "error" in data, f"Unfiltered nb_get_wetlands must be rejected, got: {data}"
+        assert data["error"]["code"] == "INVALID_INPUT", (
+            f"Expected INVALID_INPUT for an unfiltered wetlands call, got {data['error']['code']}"
+        )
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_contaminated_sites_bilingual_status(self, mcp_server):
+        """'Show me contaminated sites in New Brunswick' — bilingual status fields."""
+        data = await call_tool(mcp_server, "nb_get_contaminated_sites", {"limit": 25})
+        live = assert_live_or_transient(data, "nb_get_contaminated_sites", "new-brunswick-geonb")
+        if live:
+            payload = assert_feature_payload(data, "nb_get_contaminated_sites")
+            assert len(payload["features"]) >= 1, "Contaminated sites must return at least 1 point"
+            first = payload["features"][0]
+            assert first.get("Status_E") is not None, (
+                f"FIELD PRESENCE FAILED: 'Status_E' must be non-null. Keys: {list(first.keys())}"
+            )
+            assert first.get("Status_F") is not None, (
+                f"FIELD PRESENCE FAILED: 'Status_F' must be non-null. Got: {first}"
+            )
+            # Code-review fix F4: Latitude/Longitude must be in the projection
+            # so a returned site can actually be located on a map.
+            assert "Latitude" in first, (
+                f"FIELD PRESENCE FAILED: 'Latitude' must be in the out_fields "
+                f"projection. Keys: {list(first.keys())}"
+            )
+            assert "Longitude" in first, (
+                f"FIELD PRESENCE FAILED: 'Longitude' must be in the out_fields "
+                f"projection. Keys: {list(first.keys())}"
+            )
+
+    # ------------------------------------------------------------------
+    # Crown land — the phase tracer
+    # ------------------------------------------------------------------
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_crown_land_holder_and_object_id(self, mcp_server):
+        """'Who holds this Crown land?' — HOLDER + OBJECTID fields, layer 3."""
+        data = await call_tool(mcp_server, "nb_get_crown_land", {"limit": 25})
+        assert "_meta" in data, f"Expected live success from nb_get_crown_land, got: {data}"
+        assert data["_meta"]["source"]["api"] == "new-brunswick-geonb"
+        payload = assert_feature_payload(data, "nb_get_crown_land")
+        assert len(payload["features"]) >= 1, "Crown Land layer 3 must return at least 1 parcel"
+        first = payload["features"][0]
+        assert first.get("OBJECTID") is not None, (
+            f"FIELD PRESENCE FAILED: 'OBJECTID' must be non-null. Keys: {list(first.keys())}"
+        )
+        assert first.get("HOLDER") is not None, (
+            f"FIELD PRESENCE FAILED: 'HOLDER' must be non-null. Got: {first}"
+        )
+
+    # ------------------------------------------------------------------
+    # Parcels / civic addresses — the geocoding pair, both filter-required
+    # ------------------------------------------------------------------
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_parcels_in_york_county(self, mcp_server):
+        """'What parcels are in York County?' — parcels with a filter."""
+        data = await call_tool(mcp_server, "nb_get_parcels", {"county": "YORK", "limit": 25})
+        live = assert_live_or_transient(data, "nb_get_parcels", "new-brunswick-geonb")
+        if live:
+            payload = assert_feature_payload(data, "nb_get_parcels")
+            assert len(payload["features"]) >= 1, "county='YORK' must return at least 1 parcel"
+            assert all("york" in (f.get("COUNTY") or "").lower() for f in payload["features"]), (
+                f"FILTER FAILED: every row's COUNTY must contain 'york'. "
+                f"Got: {[f.get('COUNTY') for f in payload['features']]}"
+            )
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_parcels_unfiltered_returns_invalid_input(self, mcp_server):
+        """'Show me every New Brunswick parcel' — unfiltered call rejected (604,520 rows)."""
+        data = await call_tool(mcp_server, "nb_get_parcels", {})
+        assert "error" in data, f"Unfiltered nb_get_parcels must be rejected, got: {data}"
+        assert data["error"]["code"] == "INVALID_INPUT", (
+            f"Expected INVALID_INPUT for an unfiltered parcels call, got {data['error']['code']}"
+        )
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_civic_address_in_fredericton(self, mcp_server):
+        """'What is the civic address for this street in Fredericton?' — bilingual street type."""
+        data = await call_tool(mcp_server, "nb_get_civic_addresses", {"community": "FREDERICTON", "limit": 25})
+        live = assert_live_or_transient(data, "nb_get_civic_addresses", "new-brunswick-geonb")
+        if live:
+            payload = assert_feature_payload(data, "nb_get_civic_addresses")
+            assert len(payload["features"]) >= 1, "community='FREDERICTON' must return at least 1 address"
+            first = payload["features"][0]
+            assert first.get("ST_TYPE_E") is not None, (
+                f"FIELD PRESENCE FAILED: 'ST_TYPE_E' must be non-null. Keys: {list(first.keys())}"
+            )
+            assert first.get("ST_TYPE_F") is not None, (
+                f"FIELD PRESENCE FAILED: 'ST_TYPE_F' must be non-null. Got: {first}"
+            )
+            # Code-review fix F5: LATITUDE/LONGITUDE/COUNTY/PID must be in the
+            # projection so the documented address -> point / address ->
+            # parcel geocoding workflow is actually completable.
+            for field in ("LATITUDE", "LONGITUDE", "COUNTY", "PID"):
+                assert field in first, (
+                    f"FIELD PRESENCE FAILED: '{field}' must be in the out_fields "
+                    f"projection. Keys: {list(first.keys())}"
+                )
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_civic_addresses_unfiltered_returns_invalid_input(self, mcp_server):
+        """'List every civic address in New Brunswick' — unfiltered call rejected (373,172 rows)."""
+        data = await call_tool(mcp_server, "nb_get_civic_addresses", {})
+        assert "error" in data, f"Unfiltered nb_get_civic_addresses must be rejected, got: {data}"
+        assert data["error"]["code"] == "INVALID_INPUT", (
+            f"Expected INVALID_INPUT for an unfiltered civic-address call, got {data['error']['code']}"
+        )
+
+    # ------------------------------------------------------------------
+    # Health / education dispatch tools
+    # ------------------------------------------------------------------
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_health_facilities_bilingual_hospital_names(self, mcp_server):
+        """'Where are New Brunswick's hospitals?' — both official-language name fields."""
+        data = await call_tool(mcp_server, "nb_get_health_facilities", {
+            "facility_type": "hospital_horizon",
+            "limit": 25,
+        })
+        live = assert_live_or_transient(data, "nb_get_health_facilities", "new-brunswick-geonb")
+        if live:
+            payload = assert_feature_payload(data, "nb_get_health_facilities")
+            assert len(payload["features"]) >= 1, "hospital_horizon must return at least 1 facility"
+            first = payload["features"][0]
+            assert first.get("Name_E") is not None, (
+                f"FIELD PRESENCE FAILED: 'Name_E' must be non-null. Keys: {list(first.keys())}"
+            )
+            assert first.get("Name_F") is not None, (
+                f"FIELD PRESENCE FAILED: 'Name_F' must be non-null. Got: {first}"
+            )
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_public_schools_anglophone(self, mcp_server):
+        """'What anglophone schools are in New Brunswick?'"""
+        data = await call_tool(mcp_server, "nb_get_public_schools", {"sector": "anglophone", "limit": 25})
+        live = assert_live_or_transient(data, "nb_get_public_schools", "new-brunswick-geonb")
+        if live:
+            payload = assert_feature_payload(data, "nb_get_public_schools")
+            assert len(payload["features"]) >= 1, "anglophone sector must return at least 1 school"
+            assert payload["features"][0].get("strNM") is not None, (
+                f"FIELD PRESENCE FAILED: 'strNM' must be non-null. Got: {payload['features'][0]}"
+            )
+
+    # ------------------------------------------------------------------
+    # NB 511 — key-gated, deterministic unconfigured envelope (never tolerated)
+    # ------------------------------------------------------------------
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_road_events_not_configured_without_key(self, mcp_server):
+        """'Are there road closures in New Brunswick?' — NOT_CONFIGURED when key absent.
+
+        Deterministic: an unset key is never an outage, so this is asserted by
+        exact shape and is never wrapped in assert_live_or_transient tolerance.
+        """
+        import os
+        key = os.environ.pop("NEW_BRUNSWICK_511_KEY", None)
+        try:
+            data = await call_tool(mcp_server, "nb_get_road_events", {})
+        finally:
+            if key is not None:
+                os.environ["NEW_BRUNSWICK_511_KEY"] = key
+
+        if key is None:
+            assert "error" in data, f"Expected NOT_CONFIGURED envelope, got: {data}"
+            assert data["error"]["code"] == "NOT_CONFIGURED", (
+                f"Expected NOT_CONFIGURED for missing 511 key, got: {data}"
+            )
+            assert "NEW_BRUNSWICK_511_KEY" in data["error"]["message"]
+            assert "SENTINEL" not in str(data)
+        else:
+            assert "_meta" in data or "error" in data
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_winter_road_conditions_not_configured_without_key(self, mcp_server):
+        """'What are winter road conditions in New Brunswick?' — NOT_CONFIGURED when key absent."""
+        import os
+        key = os.environ.pop("NEW_BRUNSWICK_511_KEY", None)
+        try:
+            data = await call_tool(mcp_server, "nb_get_winter_road_conditions", {})
+        finally:
+            if key is not None:
+                os.environ["NEW_BRUNSWICK_511_KEY"] = key
+
+        if key is None:
+            assert "error" in data, f"Expected NOT_CONFIGURED envelope, got: {data}"
+            assert data["error"]["code"] == "NOT_CONFIGURED", (
+                f"Expected NOT_CONFIGURED for missing 511 key, got: {data}"
+            )
+            assert "NEW_BRUNSWICK_511_KEY" in data["error"]["message"]
+        else:
+            assert "_meta" in data or "error" in data
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_traffic_cameras_not_configured_without_key(self, mcp_server):
+        """'Show me New Brunswick traffic cameras' — NOT_CONFIGURED when key absent."""
+        import os
+        key = os.environ.pop("NEW_BRUNSWICK_511_KEY", None)
+        try:
+            data = await call_tool(mcp_server, "nb_get_traffic_cameras", {})
+        finally:
+            if key is not None:
+                os.environ["NEW_BRUNSWICK_511_KEY"] = key
+
+        if key is None:
+            assert "error" in data, f"Expected NOT_CONFIGURED envelope, got: {data}"
+            assert data["error"]["code"] == "NOT_CONFIGURED", (
+                f"Expected NOT_CONFIGURED for missing 511 key, got: {data}"
+            )
+            assert "NEW_BRUNSWICK_511_KEY" in data["error"]["message"]
+        else:
+            assert "_meta" in data or "error" in data
+
+    # ------------------------------------------------------------------
+    # Discovery + cross-module
+    # ------------------------------------------------------------------
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_discover_tools_finds_nb_tool(self, mcp_server):
+        """'Find me New Brunswick government data tools' — BM25 discovery."""
+        results = await discover(mcp_server, "New Brunswick government open data")
+        names = [r["name"] for r in results]
+        assert any(n.startswith("nb_") for n in names), (
+            f"No nb_ tool found in BM25 discovery results for "
+            f"'New Brunswick government open data': {names}"
+        )
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_cross_module_nb_and_federal_ckan(self, mcp_server):
+        """A single agent turn combining nb_search_datasets with the federal ckan_ module."""
+        nb_data = await call_tool(mcp_server, "nb_search_datasets", {"query": "flood", "limit": 5})
+        live_nb = assert_live_or_transient(nb_data, "nb_search_datasets", "new-brunswick-federal-ckan")
+
+        ckan_data = await call_tool(mcp_server, "ckan_search_datasets", {"query": "flood", "rows": 5})
+        live_ckan = assert_live_or_transient(ckan_data, "ckan_search_datasets")
+
+        if live_nb:
+            nb_results = nb_data["data"]["results"]
+            assert isinstance(nb_results, list) and nb_results, (
+                f"nb_search_datasets('flood') must return at least 1 dataset, got: {nb_data['data']}"
+            )
+        if live_ckan:
+            assert_rows(ckan_data, "ckan_search_datasets")
+
+    @pytest.mark.integration
+    @pytest.mark.timeout(30)
+    async def test_french_language_propagates_on_live_call(self, mcp_server):
+        """An agent asking in French gets _meta.lang == 'fr' on a live GeoNB call."""
+        data = await call_tool(mcp_server, "nb_get_crown_land", {"limit": 5, "lang": "fr"})
+        live = assert_live_or_transient(data, "nb_get_crown_land", "new-brunswick-geonb")
+        if live:
+            assert data["_meta"]["lang"] == "fr"
+
+    # ------------------------------------------------------------------
+    # Manifest-coverage meta-test — every ALL_NB_TOOL_NAMES entry is invoked above
+    # ------------------------------------------------------------------
+
+    @pytest.mark.timeout(10)
+    def test_every_manifest_tool_is_covered_by_a_scenario(self):
+        """constants.ALL_NB_TOOL_NAMES must be a subset of the tool names this
+        class actually invokes through call_tool — enforced by the suite, not
+        by review, so a future 23rd tool cannot ship without a live scenario.
+        """
+        import inspect
+
+        from mcp_canada.modules.new_brunswick.constants import ALL_NB_TOOL_NAMES
+
+        source = inspect.getsource(TestNewBrunswickToolScenarios)
+        uncovered = [name for name in ALL_NB_TOOL_NAMES if f'"{name}"' not in source]
+        assert not uncovered, (
+            f"{len(uncovered)} nb_ tool(s) in constants.ALL_NB_TOOL_NAMES have no "
+            f"live scenario in TestNewBrunswickToolScenarios: {uncovered}"
+        )
+
+
 @pytest.mark.integration
 class TestStatCanCodeSetDrift:
     """Guard the hardcoded WDS decode maps against StatCan's live code set.

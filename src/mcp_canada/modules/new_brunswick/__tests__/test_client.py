@@ -44,6 +44,16 @@ class TestBuildFq:
     def test_no_extra_fq_returns_nb_org_clause_alone(self):
         assert nb_client._build_fq(None) == NB_ORG_FQ
 
+    def test_whitespace_only_extra_fq_is_treated_as_absent(self):
+        # A vacuous fragment must not compose into `... AND (   )`, which is
+        # not a valid Lucene clause: Solr answers it with HTTP 409, and the
+        # caller's malformed input then surfaces to the agent as
+        # UPSTREAM_ERROR — blaming the upstream for a caller mistake, the
+        # exact misclassification ERR-01..ERR-07 exist to prevent. `extra_fq`
+        # is optional, so a whitespace-only value means "no extra filter".
+        for vacuous in ("   ", "\t", "\n", ""):
+            assert nb_client._build_fq(vacuous) == NB_ORG_FQ
+
     def test_extra_fq_is_and_ed_after_nb_org_clause(self):
         result = nb_client._build_fq("res_format:CSV")
         # WR-01: both clauses are explicitly parenthesized so Solr's Lucene

@@ -280,13 +280,19 @@ def _build_fq(extra_fq: str | None) -> str:
         extra_fq: An optional caller-supplied fq fragment (e.g. a format or
             tag filter) to AND onto the NB clause.
 
+    A whitespace-only fragment is treated as absent rather than composed:
+    `"... AND (   )"` is not a valid Lucene clause and Solr answers it with
+    HTTP 409, which would surface a caller mistake to the agent as
+    `UPSTREAM_ERROR` — the misclassification ERR-01..ERR-07 exist to prevent.
+    `extra_fq` is optional, so "nothing meaningful" means "no extra filter".
+
     Returns:
         `"organization:nb"` alone, or `"(organization:nb) AND ({extra_fq})"`.
 
     Raises:
         InvalidInput: When `extra_fq` has unbalanced parentheses or quotes.
     """
-    if extra_fq:
+    if extra_fq and extra_fq.strip():
         _validate_extra_fq(extra_fq)
         return f"({NB_ORG_FQ}) AND ({extra_fq})"
     return NB_ORG_FQ

@@ -236,10 +236,10 @@ async def nb_query_dataset(
     Use for: pulling actual rows out of a CSV, XLSX, XLS, JSON or GeoJSON NB resource.
     A resource in a format this server cannot parse (PDF, ZIP, KML, SHP, ...) returns a
     metadata-only success naming the download url — never an error. An out-of-range
-    resource_index returns INVALID_INPUT naming the valid range. A limit <= 0 returns
-    INVALID_INPUT without a network call. A well-formed dataset_id belonging to a non-NB
-    organization returns NOT_FOUND (G1), inherited from the same underlying dataset
-    lookup nb_get_dataset_details uses.
+    resource_index returns INVALID_INPUT naming the valid range. A limit <= 0 or above
+    this module's record cap (G2) returns INVALID_INPUT without a network call. A
+    well-formed dataset_id belonging to a non-NB organization returns NOT_FOUND (G1),
+    inherited from the same underlying dataset lookup nb_get_dataset_details uses.
 
     Keywords: new brunswick nouveau-brunswick gnb query dataset resource csv xlsx json geojson download rows ckan federal
     """

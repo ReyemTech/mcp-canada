@@ -720,6 +720,50 @@ class TestFetchQueryDataset:
             )
 
     @pytest.mark.asyncio
+    async def test_limit_above_max_records_raises_invalid_input_before_any_parsing(
+        self, monkeypatch
+    ):
+        # G2 (Codex round 2): orchestrator-verified live that limit=10_000_000
+        # and limit=5001 were both accepted — nothing capped `limit` before
+        # rows[:limit] sliced a parsed resource, so a large resource landed
+        # entirely in one MCP response. Mirrors fetch_gnb_socrata_query's
+        # existing upper-bound check (F3).
+        mock_api_get = AsyncMock()
+        monkeypatch.setattr(nb_client, "api_get", mock_api_get)
+        mock_parse = AsyncMock()
+        monkeypatch.setattr(nb_client, "fetch_and_parse", mock_parse)
+
+        with pytest.raises(InvalidInput):
+            await nb_client.fetch_query_dataset(
+                "aa11bb22-nb-submerged-lands",
+                resource_index=0,
+                limit=nb_client.MAX_RECORDS + 1,
+            )
+
+        mock_api_get.assert_not_awaited()
+        mock_parse.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_limit_at_max_records_is_accepted(
+        self, monkeypatch, ckan_package_search_sample
+    ):
+        # The lower/upper bound checks must not reject the boundary value
+        # itself, only values strictly above it.
+        raw = ckan_package_search_sample["result"]["results"][0]
+        mock_api_get = AsyncMock(return_value={"success": True, "result": raw})
+        monkeypatch.setattr(nb_client, "api_get", mock_api_get)
+        mock_parse = AsyncMock(return_value=([{"a": 1}], False))
+        monkeypatch.setattr(nb_client, "fetch_and_parse", mock_parse)
+
+        payload, _cached = await nb_client.fetch_query_dataset(
+            "aa11bb22-nb-submerged-lands",
+            resource_index=0,
+            limit=nb_client.MAX_RECORDS,
+        )
+
+        assert payload["rows"] == [{"a": 1}]
+
+    @pytest.mark.asyncio
     async def test_non_nb_organization_propagates_not_found(self, monkeypatch):
         # G1: fetch_query_dataset delegates to fetch_dataset_details, so the
         # same NB-organization guard must reject a non-NB dataset id here too

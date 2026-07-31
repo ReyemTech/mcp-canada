@@ -208,6 +208,54 @@ async def _api_get(path: str, params: dict[str, Any] | None = None) -> Any:
     return envelope.get("result", {})
 
 
+def _validate_extra_fq(extra_fq: str) -> None:
+    """Reject a caller-supplied fq fragment that could break out of the
+    parentheses `_build_fq` wraps around it (F1/T-21-04).
+
+    WR-01's explicit parenthesization assumes `extra_fq` is a well-formed
+    Lucene atom. That assumption does not hold for a fragment carrying its
+    own unbalanced parenthesis: `"*:* ) OR (*:*"` composes into
+    `"(organization:nb) AND (*:* ) OR (*:*)"`, whose trailing `OR (*:*)`
+    matches every non-NB dataset regardless of the NB clause — the wrapping
+    parens themselves are broken out of, not merely reinterpreted. An
+    unbalanced double quote is rejected for the same reason: it changes how
+    Solr's Lucene parser tokenizes everything composed after it.
+
+    Args:
+        extra_fq: The caller-supplied fq fragment, already known truthy.
+
+    Raises:
+        InvalidInput: When parentheses or double quotes are unbalanced.
+    """
+    # A plain count comparison is not enough: "*:* ) OR (*:*" has one "("
+    # and one ")" — equal counts — but the ")" comes BEFORE the "(", so it
+    # still closes `_build_fq`'s own wrapping paren early. Track nesting
+    # depth left-to-right instead; depth must never go negative and must
+    # return to exactly 0.
+    depth = 0
+    for char in extra_fq:
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth < 0:
+                raise InvalidInput(
+                    f"extra_fq closes a parenthesis that was never opened "
+                    f"and cannot be safely composed into the NB-scoped "
+                    f"filter query: {extra_fq!r}"
+                )
+    if depth != 0:
+        raise InvalidInput(
+            f"extra_fq has unbalanced parentheses and cannot be safely "
+            f"composed into the NB-scoped filter query: {extra_fq!r}"
+        )
+    if extra_fq.count('"') % 2 != 0:
+        raise InvalidInput(
+            f"extra_fq has an unbalanced double quote and cannot be safely "
+            f"composed into the NB-scoped filter query: {extra_fq!r}"
+        )
+
+
 def _build_fq(extra_fq: str | None) -> str:
     """Compose the fq (filter query) clause for federal CKAN discovery calls.
 
@@ -223,14 +271,23 @@ def _build_fq(extra_fq: str | None) -> str:
     result past the NB scope. Explicit grouping makes the composed clause
     require the NB clause regardless of what operators the fragment uses.
 
+    F1: `_validate_extra_fq` rejects a fragment whose own unbalanced
+    parentheses or quotes would break OUT of that wrapping — the case the
+    WR-01 grouping alone does not cover, since it assumes `extra_fq` is a
+    well-formed atom in the first place.
+
     Args:
         extra_fq: An optional caller-supplied fq fragment (e.g. a format or
             tag filter) to AND onto the NB clause.
 
     Returns:
         `"organization:nb"` alone, or `"(organization:nb) AND ({extra_fq})"`.
+
+    Raises:
+        InvalidInput: When `extra_fq` has unbalanced parentheses or quotes.
     """
     if extra_fq:
+        _validate_extra_fq(extra_fq)
         return f"({NB_ORG_FQ}) AND ({extra_fq})"
     return NB_ORG_FQ
 

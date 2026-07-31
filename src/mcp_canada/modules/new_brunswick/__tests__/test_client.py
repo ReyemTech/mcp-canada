@@ -78,6 +78,33 @@ class TestBuildFq:
         assert evaluate(nb_is_true=True, hostile_is_true=True) is True
         assert evaluate(nb_is_true=True, hostile_is_true=False) is False
 
+    def test_delimiter_breaking_extra_fq_is_rejected_before_composition(self):
+        # F1: the truth-table evaluator above assumes `extra_fq` is a
+        # well-formed atom — that assumption is exactly what a delimiter-
+        # breaking fragment violates. An unbalanced closing paren escapes
+        # `_build_fq`'s own wrapping parens:
+        #   (organization:nb) AND (*:* ) OR (*:*)
+        # leaving a bare `OR (*:*)` that matches every non-NB dataset
+        # regardless of the NB clause. This must be rejected before the fq
+        # string is ever composed, not merely produce a syntactically valid
+        # but semantically widened clause.
+        hostile = "*:* ) OR (*:*"
+
+        with pytest.raises(InvalidInput):
+            nb_client._build_fq(hostile)
+
+    def test_unbalanced_double_quote_extra_fq_is_rejected(self):
+        # A stray unterminated quote can similarly change how Solr's Lucene
+        # parser tokenizes everything after it inside the composed fq.
+        with pytest.raises(InvalidInput):
+            nb_client._build_fq('title:"unterminated')
+
+    def test_balanced_extra_fq_with_nested_parens_still_composes(self):
+        # Balanced nesting is legitimate Lucene grouping and must still work.
+        balanced = "(res_format:CSV OR res_format:JSON)"
+        result = nb_client._build_fq(balanced)
+        assert result == f"({NB_ORG_FQ}) AND ({balanced})"
+
 
 class TestShapeDatasetBilingual:
     def test_lang_fr_distinct_title_translated_returns_fr(self, ckan_package_search_sample):

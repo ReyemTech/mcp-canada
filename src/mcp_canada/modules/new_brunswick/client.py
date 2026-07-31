@@ -68,6 +68,7 @@ from .constants import (
     HISTORICAL_FLOODS_SERVICE,
     MAX_RECORDS,
     NB_ORG_FQ,
+    NB_ORG_NAME,
     PARCELS_LAYER,
     PARCELS_SERVICE,
     PUBLIC_SCHOOLS_SERVICE,
@@ -526,7 +527,19 @@ async def fetch_dataset_details(
 ) -> tuple[dict[str, Any], bool]:
     """Fetch full details for a single federal CKAN dataset.
 
-    Raises `NotFound` on an upstream 404 (package_show for an unknown id).
+    Raises `NotFound` on an upstream 404 (package_show for an unknown id), OR
+    when `package_show` resolves to a package outside the NB organization
+    (G1). Unlike `package_search`, `package_show` takes a bare id/slug with
+    no `fq` scoping at all — the earlier `extra_fq` hardening
+    (`_build_fq`/`_validate_extra_fq`) protects only `package_search`, so a
+    non-NB id was otherwise returned in full: orchestrator-verified LIVE that
+    `dataset_id="6059da1d-e1da-4f2b-a420-b5c2a130eeaa"` returned an
+    Environment Canada ("ec") dataset through a tool whose docstring states
+    the NB filter "CANNOT be widened" (T-21-04). A missing or `None`
+    `organization` key fails closed — treated as non-NB, not as NB by
+    omission. `fetch_query_dataset` inherits this guard because it calls
+    this function.
+
     Shaped through `_shape_dataset` plus resources (flattened to format,
     name, url, description), license_title, license_url, date_published,
     maintainer, frequency and spatial.
@@ -540,6 +553,10 @@ async def fetch_dataset_details(
             if exc.response.status_code == 404:
                 raise NotFound(f"NB dataset not found: {dataset_id}") from exc
             raise
+        organization = raw.get("organization")
+        org_name = organization.get("name") if isinstance(organization, dict) else None
+        if org_name != NB_ORG_NAME:
+            raise NotFound(f"NB dataset not found: {dataset_id}")
         shaped = _shape_dataset(raw, lang=lang)
         shaped["resources"] = [
             {

@@ -622,6 +622,59 @@ class TestFetchDatasetDetails:
         with pytest.raises(httpx.HTTPStatusError):
             await nb_client.fetch_dataset_details("some-id")
 
+    @pytest.mark.asyncio
+    async def test_non_nb_organization_raises_not_found(self, monkeypatch):
+        # G1 (Codex round 2): package_show carries no fq scoping, unlike
+        # package_search — orchestrator-verified LIVE that an Environment
+        # Canada dataset (organization "ec") was returned successfully by
+        # this tool, escaping the NB boundary the module's own docstrings
+        # advertise as un-widenable (T-21-04).
+        raw = {
+            "id": "6059da1d-e1da-4f2b-a420-b5c2a130eeaa",
+            "title": "Weather Radar - DPQPE",
+            "organization": {"name": "ec", "title": "Environment Canada"},
+        }
+        mock_api_get = AsyncMock(return_value={"success": True, "result": raw})
+        monkeypatch.setattr(nb_client, "api_get", mock_api_get)
+
+        with pytest.raises(NotFound):
+            await nb_client.fetch_dataset_details("6059da1d-e1da-4f2b-a420-b5c2a130eeaa")
+
+    @pytest.mark.asyncio
+    async def test_missing_organization_key_fails_closed_as_not_found(self, monkeypatch):
+        # A malformed or unexpectedly-shaped upstream record must be rejected,
+        # not silently treated as NB-scoped.
+        raw = {"id": "no-org", "title": "No organization field"}
+        mock_api_get = AsyncMock(return_value={"success": True, "result": raw})
+        monkeypatch.setattr(nb_client, "api_get", mock_api_get)
+
+        with pytest.raises(NotFound):
+            await nb_client.fetch_dataset_details("no-org")
+
+    @pytest.mark.asyncio
+    async def test_none_organization_fails_closed_as_not_found(self, monkeypatch):
+        raw = {"id": "null-org", "title": "Null organization", "organization": None}
+        mock_api_get = AsyncMock(return_value={"success": True, "result": raw})
+        monkeypatch.setattr(nb_client, "api_get", mock_api_get)
+
+        with pytest.raises(NotFound):
+            await nb_client.fetch_dataset_details("null-org")
+
+    @pytest.mark.asyncio
+    async def test_nb_organization_still_resolves_successfully(
+        self, monkeypatch, ckan_package_search_sample
+    ):
+        # The fix must not reject every id — a genuine NB dataset (the
+        # fixture's organization.name == "nb") must still succeed.
+        raw = ckan_package_search_sample["result"]["results"][0]
+        mock_api_get = AsyncMock(return_value={"success": True, "result": raw})
+        monkeypatch.setattr(nb_client, "api_get", mock_api_get)
+
+        payload, cached = await nb_client.fetch_dataset_details("aa11bb22-nb-submerged-lands")
+
+        assert cached is False
+        assert payload["organization"]["name"] == "nb"
+
 
 class TestFetchQueryDataset:
     @pytest.mark.asyncio
@@ -665,6 +718,30 @@ class TestFetchQueryDataset:
             await nb_client.fetch_query_dataset(
                 "aa11bb22-nb-submerged-lands", resource_index=0, limit=0
             )
+
+    @pytest.mark.asyncio
+    async def test_non_nb_organization_propagates_not_found(self, monkeypatch):
+        # G1: fetch_query_dataset delegates to fetch_dataset_details, so the
+        # same NB-organization guard must reject a non-NB dataset id here too
+        # — nb_query_dataset must not become a second escape hatch past the
+        # boundary nb_get_dataset_details now enforces.
+        raw = {
+            "id": "6059da1d-e1da-4f2b-a420-b5c2a130eeaa",
+            "title": "Weather Radar - DPQPE",
+            "organization": {"name": "ec", "title": "Environment Canada"},
+            "resources": [{"format": "CSV", "url": "https://example.com/x.csv"}],
+        }
+        mock_api_get = AsyncMock(return_value={"success": True, "result": raw})
+        monkeypatch.setattr(nb_client, "api_get", mock_api_get)
+        mock_parse = AsyncMock(return_value=([{"a": 1}], False))
+        monkeypatch.setattr(nb_client, "fetch_and_parse", mock_parse)
+
+        with pytest.raises(NotFound):
+            await nb_client.fetch_query_dataset(
+                "6059da1d-e1da-4f2b-a420-b5c2a130eeaa", resource_index=0
+            )
+
+        mock_parse.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_csv_resource_routes_to_fetch_and_parse(

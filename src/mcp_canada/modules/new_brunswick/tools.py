@@ -188,7 +188,9 @@ async def nb_get_dataset_details(
     Use for: retrieving complete metadata for a specific NB dataset — resources (format,
     name, url), license, publication date, maintainer, frequency and spatial extent.
     French titles and notes are returned when the CKAN record carries them (D-12); when
-    the id does not exist, close-name suggestions are included in the error.
+    the id does not exist, close-name suggestions are included in the error. A well-formed
+    id belonging to a non-NB organization also returns NOT_FOUND (G1) — this tool never
+    returns another jurisdiction's dataset, matching nb_search_datasets' NB-only scope.
 
     Keywords: new brunswick nouveau-brunswick gnb dataset details metadata resources license bilingual ckan federal portal provincial
     """
@@ -235,7 +237,9 @@ async def nb_query_dataset(
     A resource in a format this server cannot parse (PDF, ZIP, KML, SHP, ...) returns a
     metadata-only success naming the download url — never an error. An out-of-range
     resource_index returns INVALID_INPUT naming the valid range. A limit <= 0 returns
-    INVALID_INPUT without a network call.
+    INVALID_INPUT without a network call. A well-formed dataset_id belonging to a non-NB
+    organization returns NOT_FOUND (G1), inherited from the same underlying dataset
+    lookup nb_get_dataset_details uses.
 
     Keywords: new brunswick nouveau-brunswick gnb query dataset resource csv xlsx json geojson download rows ckan federal
     """

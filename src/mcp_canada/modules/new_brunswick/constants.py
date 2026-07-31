@@ -38,7 +38,12 @@ from typing import Final
 
 CKAN_BASE_URL: Final[str] = "https://open.canada.ca/data/api/3"
 # Non-overridable — never expose an `organization` parameter to callers (T-21-04).
-NB_ORG_FQ: Final[str] = "organization:nb"
+# The single source of truth for "nb" — `_build_fq` composes NB_ORG_FQ from it,
+# and `fetch_dataset_details` compares a package_show result's own
+# `organization.name` against it directly (G1) rather than hardcoding a
+# second "nb" literal.
+NB_ORG_NAME: Final[str] = "nb"
+NB_ORG_FQ: Final[str] = f"organization:{NB_ORG_NAME}"
 
 RATE_GROUP_CKAN: Final[str] = "new_brunswick_ckan"
 RATE_LIMIT_CKAN: Final[float] = 5.0

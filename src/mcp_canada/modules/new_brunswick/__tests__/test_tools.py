@@ -445,6 +445,22 @@ class TestNbQueryDataset:
         assert "resource index" not in result["error"]["message"].lower()
         mock_details.assert_not_awaited()
 
+    @pytest.mark.asyncio
+    async def test_non_nb_organization_returns_not_found_envelope(self, monkeypatch):
+        # G1: nb_query_dataset does not catch NotFound itself — it must
+        # propagate up through @upstream_guard, which is the only path that
+        # turns it into a NOT_FOUND envelope rather than a raw ToolError.
+        mock_fetch = AsyncMock(
+            side_effect=NotFound("NB dataset not found: 6059da1d-e1da-4f2b-a420-b5c2a130eeaa")
+        )
+        monkeypatch.setattr(
+            "mcp_canada.modules.new_brunswick.tools._client.fetch_query_dataset", mock_fetch
+        )
+
+        result = await nb_query_dataset("6059da1d-e1da-4f2b-a420-b5c2a130eeaa", resource_index=0)
+
+        assert result["error"]["code"] == "NOT_FOUND"
+
 
 class TestNbListOrganizations:
     @pytest.mark.asyncio

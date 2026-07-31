@@ -739,15 +739,18 @@ async def nb_get_civic_addresses(
     """Get New Brunswick civic addresses from GeoNB (GeoNB_DPS_Civic_Address, layer 0).
 
     Use for: resolving a street address to a point — by community, street, or
-    civic number, individually or combined. At least one of community, street
-    or civic_number is REQUIRED — this is GeoNB's second-largest layer
-    (373,172 rows) and an unfiltered call is rejected with INVALID_INPUT
-    before any network request. The street-type field is published in both
-    official languages (ST_TYPE_E, ST_TYPE_F). Geocoding workflow: call this
-    tool first to resolve an address to a point and its county, then call
-    nb_get_parcels by county to find the surrounding cadastre.
+    civic number, individually or combined. Each result carries LATITUDE and
+    LONGITUDE (the resolved point), plus COUNTY and PID — the two fields that
+    make chaining into nb_get_parcels actually work. At least one of
+    community, street or civic_number is REQUIRED — this is GeoNB's
+    second-largest layer (373,172 rows) and an unfiltered call is rejected
+    with INVALID_INPUT before any network request. The street-type field is
+    published in both official languages (ST_TYPE_E, ST_TYPE_F). Geocoding
+    workflow: call this tool first to resolve an address to a point and its
+    county/PID, then call nb_get_parcels by county or pid to find the
+    surrounding cadastre.
 
-    Keywords: new brunswick civic address geocoding street community fredericton point location geonb dps address points filter required bilingual
+    Keywords: new brunswick civic address geocoding street community fredericton point location latitude longitude pid county geonb dps address points filter required bilingual
     """
     if (
         "nb_get_civic_addresses" in FILTER_REQUIRED_TOOLS

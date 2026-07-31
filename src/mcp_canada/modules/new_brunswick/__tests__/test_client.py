@@ -1410,6 +1410,23 @@ class TestFetchCivicAddresses:
         assert feature["ST_TYPE_F"] == "Rue"
         assert feature["COMMUNITY"] == "Fredericton"
 
+    # -- F5: the documented address -> point / address -> parcel workflow --
+    # -- needs LATITUDE/LONGITUDE (the point) and COUNTY/PID (what makes  --
+    # -- nb_get_parcels's county/pid filters reachable from a result).    --
+
+    @pytest.mark.asyncio
+    async def test_out_fields_include_location_and_parcel_linking_fields(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_civic_addresses(community="Fredericton")
+
+        out_fields = mock_query.call_args.kwargs["out_fields"].split(",")
+        assert "LATITUDE" in out_fields
+        assert "LONGITUDE" in out_fields
+        assert "COUNTY" in out_fields
+        assert "PID" in out_fields
+
     @pytest.mark.asyncio
     async def test_truncated_flag_passed_through(self, monkeypatch):
         mock_query = AsyncMock(return_value=([{"CIVIC_NUM": 1}], True))

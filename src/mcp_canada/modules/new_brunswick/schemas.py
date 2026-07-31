@@ -209,7 +209,12 @@ class NBParcel(BaseModel):
 
 
 class NBCivicAddress(BaseModel):
-    """Civic address point (GeoNB_DPS_Civic_Address layer 0). FILTER_REQUIRED."""
+    """Civic address point (GeoNB_DPS_Civic_Address layer 0). FILTER_REQUIRED.
+
+    LATITUDE/LONGITUDE/PID added alongside the pre-existing COUNTY (F5) so the
+    documented address -> point / address -> parcel geocoding workflow is
+    actually completable from a single result.
+    """
 
     OBJECTID: int | None = None
     CIVIC_NUM: str | None = None
@@ -218,6 +223,9 @@ class NBCivicAddress(BaseModel):
     ST_TYPE_F: str | None = None
     COMMUNITY: str | None = None
     COUNTY: str | None = None
+    PID: str | None = None
+    LATITUDE: float | None = None
+    LONGITUDE: float | None = None
 
 
 class NBHealthFacility(BaseModel):

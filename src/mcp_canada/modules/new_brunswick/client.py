@@ -1246,6 +1246,12 @@ async def fetch_civic_addresses(
     clause on `CIVIC_NUM` with the integer interpolated UNQUOTED — quoting it
     would make ArcGIS compare a number to a string and silently return
     nothing. All supplied filters are AND-ed.
+
+    F5: `LATITUDE`/`LONGITUDE` (the address -> point half of the documented
+    geocoding workflow) and `COUNTY`/`PID` (what makes chaining into
+    `nb_get_parcels`'s county/pid filters actually work) are included —
+    live-verified 2026-07-30 against GeoNB_DPS_Civic_Address/0, which
+    carries all four alongside the previously-projected fields.
     """
     _require_any_filter(
         "nb_get_civic_addresses",
@@ -1269,7 +1275,7 @@ async def fetch_civic_addresses(
         CIVIC_ADDRESS_SERVICE,
         layer_id=CIVIC_ADDRESS_LAYER,
         where=where,
-        out_fields="CIVIC_NUM,STREET,ST_TYPE_E,ST_TYPE_F,COMMUNITY",
+        out_fields="CIVIC_NUM,STREET,ST_TYPE_E,ST_TYPE_F,COMMUNITY,COUNTY,PID,LATITUDE,LONGITUDE",
         include_geometry=False,
         limit=limit,
         ttl=CACHE_TTL_META,

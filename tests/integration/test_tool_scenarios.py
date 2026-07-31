@@ -3354,6 +3354,16 @@ class TestNewBrunswickToolScenarios:
             assert first.get("Status_F") is not None, (
                 f"FIELD PRESENCE FAILED: 'Status_F' must be non-null. Got: {first}"
             )
+            # Code-review fix F4: Latitude/Longitude must be in the projection
+            # so a returned site can actually be located on a map.
+            assert "Latitude" in first, (
+                f"FIELD PRESENCE FAILED: 'Latitude' must be in the out_fields "
+                f"projection. Keys: {list(first.keys())}"
+            )
+            assert "Longitude" in first, (
+                f"FIELD PRESENCE FAILED: 'Longitude' must be in the out_fields "
+                f"projection. Keys: {list(first.keys())}"
+            )
 
     # ------------------------------------------------------------------
     # Crown land — the phase tracer
@@ -3420,6 +3430,14 @@ class TestNewBrunswickToolScenarios:
             assert first.get("ST_TYPE_F") is not None, (
                 f"FIELD PRESENCE FAILED: 'ST_TYPE_F' must be non-null. Got: {first}"
             )
+            # Code-review fix F5: LATITUDE/LONGITUDE/COUNTY/PID must be in the
+            # projection so the documented address -> point / address ->
+            # parcel geocoding workflow is actually completable.
+            for field in ("LATITUDE", "LONGITUDE", "COUNTY", "PID"):
+                assert field in first, (
+                    f"FIELD PRESENCE FAILED: '{field}' must be in the out_fields "
+                    f"projection. Keys: {list(first.keys())}"
+                )
 
     @pytest.mark.integration
     @pytest.mark.timeout(30)

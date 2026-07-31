@@ -822,6 +822,29 @@ class TestFetchGnbSocrataQuery:
 
         mock_query.assert_not_awaited()
 
+    # -- F3: only the upper bound was checked; match fetch_query_dataset's --
+    # -- lower-bound check (client.py ~line 506).                          --
+
+    @pytest.mark.asyncio
+    async def test_zero_limit_raises_before_any_network_call(self, monkeypatch):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.socrata, "query_dataset", mock_query)
+
+        with pytest.raises(InvalidInput):
+            await nb_client.fetch_gnb_socrata_query("4zbh-z2ij", limit=0)
+
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_negative_limit_raises_before_any_network_call(self, monkeypatch):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.socrata, "query_dataset", mock_query)
+
+        with pytest.raises(InvalidInput):
+            await nb_client.fetch_gnb_socrata_query("4zbh-z2ij", limit=-1)
+
+        mock_query.assert_not_awaited()
+
     @pytest.mark.asyncio
     async def test_no_x_app_token_header_sent(self, monkeypatch, gnb_socrata_rows_sample):
         mock_query = AsyncMock(return_value=gnb_socrata_rows_sample)

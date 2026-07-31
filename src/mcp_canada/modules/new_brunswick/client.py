@@ -759,12 +759,20 @@ async def fetch_gnb_socrata_query(
 ) -> tuple[dict[str, Any], bool]:
     """Query a gnb.socrata.com dataset via SoQL (checkpoint option-a).
 
-    Rejects a `limit` above `MAX_RECORDS` with `InvalidInput` before any
-    network call. When the caller has not supplied an explicit `select`,
-    geometry-shaped columns (`the_geom*`) are stripped from the returned
-    rows after the fetch — the Nova Scotia precedent for excluding geometry
-    by default. No X-App-Token header is sent (keyless reads verified working).
+    Rejects a `limit` above `MAX_RECORDS`, or `<= 0` (F3 — matching
+    `fetch_query_dataset`'s lower-bound check), with `InvalidInput` before
+    any network call. A non-positive limit sent upstream as `$limit` either
+    errors at Socrata or returns a misleading payload whose `truncated`
+    calculation is true with no rows. When the caller has not supplied an
+    explicit `select`, geometry-shaped columns (`the_geom*`) are stripped
+    from the returned rows after the fetch — the Nova Scotia precedent for
+    excluding geometry by default. No X-App-Token header is sent (keyless
+    reads verified working).
     """
+    if limit <= 0:
+        raise InvalidInput(
+            f"limit must be greater than 0 for gnb.socrata.com queries, got {limit}"
+        )
     if limit > MAX_RECORDS:
         raise InvalidInput(
             f"limit must be at most {MAX_RECORDS} for gnb.socrata.com queries, got {limit}"

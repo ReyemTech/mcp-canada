@@ -169,6 +169,23 @@ class TestNbPrompts:
         assert len(_nb_tool_tokens(text)) >= 3
 
     @pytest.mark.asyncio
+    async def test_crown_land_report_county_reaches_an_executable_step(self) -> None:
+        # The `county` argument must do more than appear in the user message.
+        # Crown Land layer 3 carries only OBJECTID/Shape/HOLDER/Shape_Length/
+        # Shape_Area and MineralOccurrences layer 0 only URN/LAT/LON/NAME/
+        # COMMODITIE — neither has a COUNTY attribute, so neither can be
+        # filtered by county. `nb_get_parcels` DOES take `county`, so the
+        # workflow must route the argument there and say plainly that the
+        # Crown-land and mineral layers are province-wide. Without this the
+        # prompt promises a county-scoped report the toolset cannot produce.
+        from mcp_canada.modules.new_brunswick.prompts import nb_crown_land_report
+        for lang in ("en", "fr"):
+            result = await nb_crown_land_report(county="York", lang=lang)
+            text = _text(result[1].content)
+            assert "nb_get_parcels" in text, lang
+            assert "county" in text.lower(), lang
+
+    @pytest.mark.asyncio
     async def test_crown_land_report_warns_holder_is_not_a_name(self) -> None:
         from mcp_canada.modules.new_brunswick.prompts import nb_crown_land_report
         result = await nb_crown_land_report(county="York", lang="en")

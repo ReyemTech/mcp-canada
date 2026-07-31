@@ -655,11 +655,13 @@ async def nb_get_contaminated_sites(
     (GeoNB_ELG_Contaminated_Sites, layer 0).
 
     Use for: retrieving mapped contaminated site locations and their status.
-    Status text is published in both official languages: Status_E carries the
-    English status text and Status_F carries the French status text — both
-    are always returned regardless of which field status filters against.
+    Each site carries Latitude/Longitude so a result can actually be placed
+    on a map. Status text is published in both official languages: Status_E
+    carries the English status text and Status_F carries the French status
+    text — both are always returned regardless of which field status
+    filters against.
 
-    Keywords: new brunswick contaminated sites environment remediation status bilingual elg property identifier file open date cleanup
+    Keywords: new brunswick contaminated sites environment remediation status bilingual elg property identifier file open date cleanup latitude longitude location
     """
     payload, cached = await _client.fetch_contaminated_sites(status=status, limit=limit)
     return make_response(

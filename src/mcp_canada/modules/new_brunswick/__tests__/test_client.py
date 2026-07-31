@@ -1191,6 +1191,19 @@ class TestFetchContaminatedSites:
         assert feature["Status_E"] == "Active"
         assert feature["Status_F"] == "Actif"
 
+    # -- F4: the layer advertises mapped site locations but returned none --
+
+    @pytest.mark.asyncio
+    async def test_out_fields_include_latitude_and_longitude(self, monkeypatch):
+        mock_query = AsyncMock(return_value=([], False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        await nb_client.fetch_contaminated_sites()
+
+        out_fields = mock_query.call_args.kwargs["out_fields"]
+        assert "Latitude" in out_fields.split(",")
+        assert "Longitude" in out_fields.split(",")
+
 
 class TestFetchParcels:
     @pytest.mark.asyncio

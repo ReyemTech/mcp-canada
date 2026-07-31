@@ -1170,7 +1170,9 @@ async def fetch_contaminated_sites(
     `status` restricts on the English status field (`Status_E`) via a
     server-built, single-quote-escaped equality clause; both `Status_E` and
     `Status_F` (bilingual status text) are always returned regardless of
-    which field the filter matched on.
+    which field the filter matched on. F4: `Latitude`/`Longitude` are
+    included so a caller can actually locate a returned site — live-verified
+    2026-07-30 against GeoNB_ELG_Contaminated_Sites/0, which carries both.
     """
     where = f"Status_E='{_escape_sql_value(status)}'" if status else None
     cache_key = f"{CACHE_KEY_PREFIX}contaminated_sites:{status}:{limit}"
@@ -1178,7 +1180,7 @@ async def fetch_contaminated_sites(
         CONTAMINATED_SITES_SERVICE,
         layer_id=CONTAMINATED_SITES_LAYER,
         where=where,
-        out_fields="Status_E,Status_F,FileOpenDate,PidType_E,PidType_F",
+        out_fields="Status_E,Status_F,FileOpenDate,PidType_E,PidType_F,Latitude,Longitude",
         include_geometry=False,
         limit=limit,
         ttl=CACHE_TTL_META,

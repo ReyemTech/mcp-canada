@@ -47,8 +47,8 @@ presence.
 |-----------|----------|-----------|----------|-------------|------------|--------|
 | T-21-01 | Tampering | WHERE clauses sent to GeoNB `/query` by all curated tools | high | mitigate | No curated tool accepts a raw clause. `client.py:921-960` builds every clause server-side from typed params via `_escape_sql_value` / `_escape_like_value` / `_upper_contains_clause`. **Post-CR-01** the helper escapes `%`, `_` and `\` and emits `ESCAPE '\'`. Applied at all 9 clause-building sites. `civic_number`/`holder` are typed `int`, interpolated unquoted. | closed |
 | T-21-02 | Information Disclosure | `Five11NotConfigured` message and the three 511 error envelopes | medium | mitigate | `tools.py` reads no environment at all (zero `os.environ`/`os.getenv` matches); the env is read only in `client.py:348`. `upstream_guard` traced: the `HTTPStatusError` arm echoes only `status_code`, and httpx's `HTTPError.__str__` returns the constructor message without request URL/params, so a key passed as a query param cannot leak. Sentinel-key non-leakage tests in `test_tools.py` and `test_client.py`. | closed |
-| T-21-03 | Denial of Service | Unbounded GeoNB queries over Parcels (604,520), Civic_Address (373,172), Wetlands (163,206) | high | mitigate | `FILTER_REQUIRED_TOOLS` drives `_require_any_filter` (`client.py:1018-1044`) plus a `_is_blank` tool-layer pre-check. **Post-CR-01** strings are `.strip()`ped and non-strings tested `is not None`, closing both the whitespace and wildcard bypass. Guard order verified by reading control flow: pre-check → early return, *then* the client call. `assert_not_awaited` tests prove no network I/O precedes rejection. `MAX_RECORDS=5000` + `truncated` flag bound all other paths. | closed |
-| T-21-04 | Tampering | `fq` composition on the five federal CKAN discovery tools | high | mitigate | **Post-WR-01** `_build_fq` emits `f"({NB_ORG_FQ}) AND ({extra_fq})"` with explicit parens. `TestBuildFq.test_hostile_extra_fq_cannot_widen_result_past_nb_scope` proves boolean *semantics* via a truth-table evaluator, not string shape. No `organization` parameter is exposed to callers. | closed |
+| T-21-03 | Denial of Service | Unbounded GeoNB queries over Parcels (604,520), Civic_Address (373,172), Wetlands (163,206) | high | mitigate | `FILTER_REQUIRED_TOOLS` drives `_require_any_filter` plus a `_is_blank` tool-layer pre-check. **Post-CR-01** strings are `.strip()`ped and non-strings tested `is not None`, closing the whitespace and wildcard bypass. **Post-F2** (see Audit Notes — this was reopened) `_geonb_query` enforces `1 <= limit <= MAX_RECORDS` centrally, so every curated GeoNB tool inherits a real bound. `assert_not_awaited` tests prove no network I/O precedes rejection. | closed |
+| T-21-04 | Tampering | `fq` composition on the five federal CKAN discovery tools | high | mitigate | `_build_fq` emits `f"({NB_ORG_FQ}) AND ({extra_fq})"` with explicit parens (WR-01, operator precedence). **Post-F1** (see Audit Notes — this was reopened) `_validate_extra_fq` rejects a fragment whose own unbalanced parentheses or quotes would break *out* of that wrapping, tracking nesting depth left-to-right rather than comparing counts. Whitespace-only fragments are treated as absent. No `organization` parameter is exposed to callers. | closed |
 | T-21-05 | Information Disclosure | Cache keys shared across modules in the process-wide aiocache | low | accept | All NB data is public open data; every key is prefixed `new_brunswick:` (`constants.py:139`, applied at all 24 cache-key sites). A collision would be a correctness bug, not a disclosure. | closed |
 | T-21-06 | Tampering | `q` passed through to Solr | low | accept | Solr escapes query terms server-side — the posture every prior CKAN-backed module ships. `q` and `fq` are separate params; `q` is never spliced into `fq`. | closed |
 | T-21-07 | Denial of Service | `fetch_and_parse` on an arbitrary CKAN resource URL | medium | mitigate | `_PARSEABLE_RESOURCE_FORMATS` frozenset routes only CSV/XLSX/XLS/JSON/GEOJSON to the parser; archives and binaries return metadata-only. **Post-WR-03** a `limit <= 0` guard precedes any network call. Rows truncated to caller `limit` with a `truncated` flag. | closed |
@@ -109,6 +109,45 @@ during the audit; 371 module + quality tests and `ruff` remain green.
 surface added by a mid-phase checkpoint decision. Any future phase whose checkpoint changes the tool
 manifest should re-check its register against the shipped surface, not the planned one.
 
+**T-21-03 and T-21-04 were reopened after this audit signed them off. Both are now genuinely closed.**
+
+Codex's automated review of PR #6 found two P1 defects that this audit had passed. Both were
+independently verified against the code and the live upstream before being accepted, and both are
+real:
+
+- **T-21-04 (F1).** This audit closed the threat citing
+  `TestBuildFq.test_hostile_extra_fq_cannot_widen_result_past_nb_scope` as proof of "boolean
+  semantics, not string shape". That test only ever fed a *balanced* fragment, and its truth-table
+  evaluator assumes `extra_fq` is a well-formed Lucene atom — precisely the assumption the attack
+  breaks. `extra_fq = "*:* ) OR (*:*"` (a live `@tool` parameter) composes to
+  `(organization:nb) AND (*:* ) OR (*:*)`, whose trailing `OR` branch matches every non-NB dataset.
+  The caller's own parenthesis broke *out* of the wrapper rather than being reinterpreted inside it.
+  Fixed in `264449c`. Note the subtlety the fix had to handle: the attack string has *equal* counts
+  of `(` and `)`, so a count comparison would have passed it — the validator tracks nesting depth
+  left-to-right instead.
+
+- **T-21-03 (F2).** This audit closed the threat partly on "`MAX_RECORDS=5000` + `truncated` flag
+  bound all other paths". That was false. `MAX_RECORDS` appeared only as the *default value* of each
+  tool's `limit` parameter, and `_geonb_query` forwarded `max_records=limit` directly, replacing
+  `query_feature_service`'s own default rather than being bounded by it. Verified empirically:
+  `fetch_crown_land(limit=10_000_000)` forwarded `max_records=10000000`, and `limit=0` forwarded `0`.
+  A caller could paginate an entire layer — the exact DoS T-21-03 exists to prevent. Fixed in
+  `3ecf46f`, centrally in `_geonb_query` so every curated tool inherits the bound. (The raw escape
+  hatch `fetch_geonb_layer_features` had been clamping correctly all along; only the *curated* tools
+  were unbounded.)
+
+**The pattern to take away.** Both of these — and CR-01 before them — are the same failure: *a test
+that appears to prove a guarantee while testing the wrong thing.* CR-01's guard was greppable but
+tested truthiness; WR-01's test evaluated boolean semantics but assumed a well-formed atom; T-21-03's
+bound was a default value mistaken for a clamp. This audit explicitly overrode the L1 grep
+short-circuit because of CR-01, and then reproduced the same class of error one level up. The
+durable lesson is not "grep is insufficient" but "state the adversary's move, then check the test
+actually makes that move." An external reviewer with no stake in the prior conclusions caught what
+three internal passes (code review, verification, this audit) did not.
+
+Three further P2 usability/correctness defects from the same review were fixed alongside
+(`193c091`, `6e81ebe`, `4964e77`) and are not threat-register items.
+
 **T-21-08 evidence caveat (non-blocking).** The disposition text claims the cache-key prefix is
 "asserted in unit tests". No test directly asserts the prefix on `cached_fetch`'s `key` argument —
 the autouse test fixture bypasses caching and ignores `key`. The code mitigation is genuinely and
@@ -129,6 +168,7 @@ for this phase.
 | Audit Date | Threats Total | Closed | Open | Run By |
 |------------|---------------|--------|------|--------|
 | 2026-07-30 | 21 | 21 | 0 | gsd-security-auditor (ASVS L1, with L2/L3 tracing on T-21-01/02/03/04/16) |
+| 2026-07-31 | 21 | 21 | 0 | Codex review of PR #6 reopened T-21-03 + T-21-04; both re-closed after fix and live re-verification |
 
 ---
 

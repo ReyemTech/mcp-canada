@@ -282,6 +282,70 @@ class TestGeonbQueryHelper:
         assert cached is False
         assert mock_query.call_args.kwargs["layer_id"] == CROWN_LAND_LAYER
 
+    # -- F2: limit must be clamped centrally, not passed straight through ----
+
+    @pytest.mark.asyncio
+    async def test_limit_far_above_max_records_is_rejected_before_any_network_call(
+        self, monkeypatch
+    ):
+        # arcgis_hub.query_feature_service takes max_records as a REPLACEMENT
+        # for its own MAX_RECORDS default, not a value it clamps against —
+        # so passing a caller-supplied limit straight through lets a caller
+        # paginate an entire layer.
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        with pytest.raises(InvalidInput):
+            await nb_client._geonb_query(
+                "https://geonb.snb.ca/arcgis/rest/services/GeoNB_DNR_Crown_Land/MapServer",
+                layer_id=CROWN_LAND_LAYER,
+                limit=10_000_000,
+            )
+
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_zero_limit_is_rejected_before_any_network_call(self, monkeypatch):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        with pytest.raises(InvalidInput):
+            await nb_client._geonb_query(
+                "https://geonb.snb.ca/arcgis/rest/services/GeoNB_DNR_Crown_Land/MapServer",
+                layer_id=CROWN_LAND_LAYER,
+                limit=0,
+            )
+
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_negative_limit_is_rejected_before_any_network_call(self, monkeypatch):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        with pytest.raises(InvalidInput):
+            await nb_client._geonb_query(
+                "https://geonb.snb.ca/arcgis/rest/services/GeoNB_DNR_Crown_Land/MapServer",
+                layer_id=CROWN_LAND_LAYER,
+                limit=-5,
+            )
+
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_limit_at_max_records_is_accepted(self, monkeypatch, crown_land_geojson):
+        features = [f["properties"] for f in crown_land_geojson["features"]]
+        mock_query = AsyncMock(return_value=(features, False))
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        payload, _cached = await nb_client._geonb_query(
+            "https://geonb.snb.ca/arcgis/rest/services/GeoNB_DNR_Crown_Land/MapServer",
+            layer_id=CROWN_LAND_LAYER,
+            limit=nb_client.MAX_RECORDS,
+        )
+
+        assert payload["count"] == len(features)
+
 
 class TestFive11Get:
     @pytest.mark.asyncio
@@ -423,6 +487,28 @@ class TestFetchCrownLand:
         await nb_client.fetch_crown_land(holder=2)
 
         assert mock_query.call_args.kwargs["where"] == "HOLDER=2"
+
+    # -- F2: every curated GeoNB tool inherits _geonb_query's limit guard ----
+
+    @pytest.mark.asyncio
+    async def test_huge_limit_is_rejected_before_any_network_call(self, monkeypatch):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        with pytest.raises(InvalidInput):
+            await nb_client.fetch_crown_land(limit=10_000_000)
+
+        mock_query.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_zero_limit_is_rejected_before_any_network_call(self, monkeypatch):
+        mock_query = AsyncMock()
+        monkeypatch.setattr(nb_client.arcgis_hub, "query_feature_service", mock_query)
+
+        with pytest.raises(InvalidInput):
+            await nb_client.fetch_crown_land(limit=0)
+
+        mock_query.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------

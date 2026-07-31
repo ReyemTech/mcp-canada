@@ -362,8 +362,25 @@ async def _geonb_query(
     calling `arcgis_hub.query_feature_service` directly, so the limiter
     acquisition and cache-key convention live in one place.
 
+    F2: `limit` is `query_feature_service`'s `max_records` argument, which
+    REPLACES that function's own MAX_RECORDS default rather than being
+    bounded by it — `MAX_RECORDS` otherwise only ever appears as a curated
+    tool's `limit` *default*, never as an enforced cap. `1 <= limit <=
+    MAX_RECORDS` is validated here, centrally, before any network call, so
+    every curated GeoNB tool inherits the bound without repeating it —
+    including `fetch_geonb_layer_features`'s own upper-bound pre-check,
+    which is now a redundant (harmless) first line of defence rather than
+    the only one.
+
+    Raises:
+        InvalidInput: When `limit` is not in `[1, MAX_RECORDS]`.
+
     Returns ({"features": [...], "count": N, "truncated": bool}, was_cached).
     """
+    if not (1 <= limit <= MAX_RECORDS):
+        raise InvalidInput(
+            f"limit must be between 1 and {MAX_RECORDS}, got {limit}"
+        )
     key = cache_key or f"{CACHE_KEY_PREFIX}geonb:{service_url}:{layer_id}:{where}:{out_fields}:{limit}"
 
     async def _fetch() -> dict[str, Any]:

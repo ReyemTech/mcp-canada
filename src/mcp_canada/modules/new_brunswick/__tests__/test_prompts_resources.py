@@ -26,6 +26,36 @@ def test_resources_module_imports_cleanly():
     from mcp_canada.modules.new_brunswick import resources  # noqa: F401
 
 
+class TestModuleDescription:
+    """G3 (Codex round 2): MODULE_DESCRIPTION is stale in two ways — it omits
+    gnb.socrata.com (a fourth upstream surface added at the Wave 0 checkpoint)
+    and still advertises minerals/parks as curated GeoNB coverage even though
+    the same checkpoint dropped both to the long tail (reachable only via
+    nb_query_geonb_layer). meta/list_modules.py returns MODULE_DESCRIPTION
+    verbatim and the generated catalogue repeats it, so both errors are
+    agent-visible.
+    """
+
+    def test_describes_four_upstream_surfaces_including_gnb_socrata(self):
+        from mcp_canada.modules.new_brunswick import MODULE_DESCRIPTION
+
+        assert "gnb.socrata.com" in MODULE_DESCRIPTION
+        assert "four upstream surfaces" in MODULE_DESCRIPTION
+
+    def test_fr_description_also_names_gnb_socrata(self):
+        from mcp_canada.modules.new_brunswick import MODULE_DESCRIPTION_FR
+
+        assert "gnb.socrata.com" in MODULE_DESCRIPTION_FR
+
+    def test_minerals_and_parks_not_advertised_as_curated_coverage(self):
+        # Dropped to the long tail at the 21-01 checkpoint (option-a) — no
+        # dedicated nb_get_* tool exists for either, so the description must
+        # not list them alongside genuinely curated GeoNB layers.
+        from mcp_canada.modules.new_brunswick import MODULE_DESCRIPTION
+
+        assert "minerals, parks" not in MODULE_DESCRIPTION
+
+
 def _text(content) -> str:
     return content.text if hasattr(content, "text") else str(content)
 

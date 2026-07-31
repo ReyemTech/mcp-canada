@@ -1757,7 +1757,7 @@ Get Manitoba highway traffic camera locations and snapshot image URLs.
 
 ## Module: new_brunswick (22 tools)
 
-New Brunswick provincial government open data across three upstream surfaces: the federal open.canada.ca CKAN catalogue filtered to organization:nb (dataset discovery — NOT a provincial CKAN; data.gnb.ca/opendata.gnb.ca/nbopendata.ca do not resolve), GeoNB (geonb.snb.ca) ArcGIS Server MapServer services (bare ArcGIS Server REST, NOT ArcGIS Hub — the Hub returns HTTP 401) covering flood hazard, wetlands, contaminated sites, Crown land, minerals, parks, parcels, civic addresses, health facilities and public schools, and NB 511 (511.gnb.ca) key-gated live road events, winter road conditions and traffic cameras.
+New Brunswick provincial government open data across four upstream surfaces: the federal open.canada.ca CKAN catalogue filtered to organization:nb (dataset discovery — NOT a provincial CKAN; data.gnb.ca/opendata.gnb.ca/nbopendata.ca do not resolve), gnb.socrata.com (New Brunswick's real provincial Socrata portal, 312 datasets, keyless), GeoNB (geonb.snb.ca) ArcGIS Server MapServer services (bare ArcGIS Server REST, NOT ArcGIS Hub — the Hub returns HTTP 401) covering flood hazard, wetlands, contaminated sites, Crown land, parcels, civic addresses, health facilities and public schools — minerals and provincial parks are reachable only through the long-tail nb_query_geonb_layer tool, not a dedicated curated tool — and NB 511 (511.gnb.ca) key-gated live road events, winter road conditions and traffic cameras.
 
 ### `nb_get_crown_land`
 

@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** An agent can combine data from any Canadian government source in a single SQL query — turning isolated APIs into one queryable data platform.
-**Current focus:** Phase 21 complete — next phase not yet selected
+**Current focus:** Phase 21 shipped and released (v0.11.0) — next phase not yet selected
 
 ## Current Position
 
 Phase: 40 — MCP Prompts and Resources
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-07-30 — Phase 21 complete, transitioned to Phase 40
+Last activity: 2026-07-31 — Phase 21 merged (PR #6) and released as v0.11.0
 
 **RESOLVED 2026-07-30 — Plan 21-01 Task 2 checkpoint:decision.** A live probe confirmed
 `https://gnb.socrata.com` DOES exist (HTTP 200, 312 datasets, keyless, already speakable by
@@ -41,6 +41,24 @@ User chose **option-a**: two Socrata discovery tools (`nb_search_gnb_socrata_dat
 `nb_get_mineral_occurrences` traded to the long tail to hold the 22-tool budget (both still
 reachable via `nb_query_geonb_layer`). D-01 itself was not overridden — the federal-CKAN five are
 unchanged. CLAUDE.md was corrected by plan 21-07; CONTEXT.md's claim is stale, do not reuse it.
+
+Phase 21 is COMPLETE and MERGED to main (PR #6, merge commit 51404ce), released as **v0.11.0**
+(tag commit 36dd1d4). Verification 30/30 must-haves; `threats_open: 0`; full live integration
+suite 369/369.
+
+> Phase 21 took three rounds of external (Codex) review after the phase's own gates passed —
+> 10 findings, 4 of them P1, including a scope escape that returned non-NB federal datasets and
+> an unbounded query over a 604,520-row layer. The internal code review, goal verification and
+> security audit passed all of them. Three defect classes were ultimately closed by sweeping the
+> whole surface rather than patching named instances: limit bounds (14 client functions), CKAN
+> organization scope (4 call sites), and prompt-parameter executability (6 prompts). See
+> `21-REVIEW.md`, `21-CODEX-FIX.md`, `21-CODEX-FIX-2.md` and the Audit Notes in `21-SECURITY.md`.
+
+> Known pre-existing repo bug, unrelated to Phase 21 and still open: the live integration suite
+> deadlocks in **teardown** after all tests pass (`futex_do_wait`, zero open sockets). All 369
+> tests pass in ~2m27s, then the process hangs indefinitely. Per-test `--timeout` cannot preempt
+> it because no test is running by then; `--timeout-method=thread` plus a wall-clock `timeout`
+> is the workaround. One run sat for two days looking "slow" when it had already succeeded.
 
 Phase 20.4 is COMPLETE and MERGED to main (PR #5, merge commit caa4d66).
 

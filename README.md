@@ -1,3 +1,5 @@
+[![MCP Toplist](https://mcptoplist.com/badge/glama%2FReyemTech%2Fmcp-canada.svg)](https://mcptoplist.com/server/glama%2FReyemTech%2Fmcp-canada)
+
 <p align="center">
   <h1 align="center">🍁 mcp-canada</h1>
   <p align="center">

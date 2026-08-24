@@ -2,6 +2,24 @@
 
 <!-- CHANGELOG -->
 
+## v0.12.0 (2026-08-24)
+
+### Chores
+
+- Sync uv.lock after release
+  ([`bd47070`](https://github.com/ReyemTech/mcp-canada/commit/bd47070e2a7cbc9e149bd71b22a0d966a66755ba))
+
+### Documentation
+
+- **21**: Record PR #6 merge and v0.11.0 release in STATE.md
+  ([`415e6ad`](https://github.com/ReyemTech/mcp-canada/commit/415e6ad2d27eec3cb2b4fd2d50600ef67a007689))
+
+### Features
+
+- Add static documentation site
+  ([`29d6492`](https://github.com/ReyemTech/mcp-canada/commit/29d64921b8c1633d181697401a14491948fd8976))
+
+
 ## v0.11.0 (2026-07-31)
 
 ### Bug Fixes

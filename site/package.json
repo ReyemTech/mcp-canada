@@ -1,0 +1,18 @@
+{
+  "name": "mcp-canada-docs",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run catalog && astro dev",
+    "catalog": "uv run python ../scripts/generate_catalog.py --json > src/data/tool-catalog.json",
+    "build": "npm run catalog && astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "^3.2.1",
+    "astro": "^5.13.7",
+    "marked": "^15.0.12"
+  },
+  "devDependencies": {}
+}

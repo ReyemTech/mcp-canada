@@ -1,0 +1,22 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import catalog from "../../data/tool-catalog.json";
+const toolCount = catalog.reduce((total, module) => total + module.tools.length, 0);
+const base = `${import.meta.env.BASE_URL}/`;
+const humanize = (value: string) => value.replaceAll("_", " ");
+---
+
+<BaseLayout title="Tool atlas | mcp-canada" description="Browsable reference for every mcp-canada tool.">
+  <header class="atlas-header"><h1>A tool atlas for Canadian public data.</h1><p>{toolCount} tools. Search the full catalog, then open any source page for a JavaScript-free reference with exact parameters.</p></header>
+  <div class="search"><label for="tool-search">What are you trying to find?</label><input id="tool-search" type="search" placeholder="Weather alerts, currency, recalls..." /><span>Searches tool names, descriptions, and keywords.</span></div><div id="no-results" hidden>No matching tools. Try a broader term or a province.</div>
+  <div class="modules">{catalog.map((module, index) => (<section class="module" data-module={`${module.display_name} ${module.description}`}><div class="module-index">{String(index + 1).padStart(2, "0")}</div><div><h2><a href={`${base}tools/${module.module_name}/`}>{humanize(module.display_name)}</a></h2><p>{module.description}</p></div><div class="tool-list">{module.tools.map((tool) => (<a data-tool={`${tool.name} ${tool.description} ${tool.use_for} ${tool.keywords}`} href={`${base}tools/${module.module_name}/#${tool.name}`}><code>{tool.name}</code><span>{tool.description}</span></a>))}</div><b class="count">{module.tools.length} tools</b></section>))}</div>
+</BaseLayout>
+
+<script>
+  const input = document.querySelector<HTMLInputElement>("#tool-search"); const modules = [...document.querySelectorAll<HTMLElement>(".module")]; const noResults = document.querySelector<HTMLElement>("#no-results");
+  input?.addEventListener("input", () => { const query = input.value.trim().toLowerCase(); let visible = 0; for (const module of modules) { const moduleMatch = module.dataset.module?.toLowerCase().includes(query) ?? false; for (const tool of module.querySelectorAll<HTMLElement>("[data-tool]")) { const matches = moduleMatch || tool.dataset.tool?.toLowerCase().includes(query); tool.hidden = !matches; if (matches) visible++; } module.hidden = !moduleMatch && ![...module.querySelectorAll<HTMLElement>("[data-tool]")].some((tool) => !tool.hidden); } if (noResults) noResults.hidden = visible !== 0; });
+</script>
+
+<style>
+  .atlas-header { max-width:850px; }.atlas-header p { font-size:1.2rem; margin-top:1.5rem; }.search { background:#132c56; color:#f4f2e9; margin:3rem 0 4rem; padding:1.5rem; }.search label { display:block; font-size:1.15rem; font-weight:800; }.search input { border:0; display:block; font:inherit; margin:.8rem 0 .5rem; padding:.85rem; width:min(100%,680px); }.search span { color:#b9dcd8; font-size:.85rem; }.modules { border-top:2px solid #132c56; }.module { align-items:start; border-bottom:1px solid #aebfc3; display:grid; gap:1.25rem; grid-template-columns:50px minmax(230px,.8fr) minmax(340px,1.5fr) 75px; padding:1.5rem 0; }.module-index { color:#f04f31; font-size:.8rem; font-weight:800; padding-top:.5rem; }.module h2 { font-size:1.5rem; text-transform:capitalize; }.module h2 a { color:#132c56; }.module p { color:#4a6173; font-size:.9rem; margin:.6rem 0 0; }.tool-list { columns:2; column-gap:1.5rem; }.tool-list a { break-inside:avoid; color:#132c56; display:block; font-size:.85rem; margin-bottom:.7rem; text-decoration:none; }.tool-list a code { color:#0c5d8d; font-weight:800; }.tool-list a span { color:#4a6173; display:block; font-size:.8rem; margin-top:.1rem; }.tool-list a:hover code { color:#f04f31; text-decoration:underline; }.count { color:#f04f31; font-size:.75rem; padding-top:.5rem; text-align:right; text-transform:uppercase; } @media(max-width:800px){.module{grid-template-columns:35px 1fr}.tool-list{columns:1;grid-column:2}.count{display:none}}
+</style>

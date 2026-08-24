@@ -1,0 +1,29 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const base = `${import.meta.env.BASE_URL}/`;
+---
+
+<BaseLayout title="Getting started | mcp-canada">
+  <h1>Connect Canadian public data to your agent.</h1>
+  <p>Install with <a href="https://docs.astral.sh/uv/">uv</a>, then let the installer configure your MCP client.</p>
+  <pre><code>uvx mcp-canada install
+
+# Or configure named clients
+uvx mcp-canada install claude-desktop cursor vscode</code></pre>
+  <h2>Manual setup</h2>
+  <p>For Claude Desktop, add the server to <code>claude_desktop_config.json</code>:</p>
+  <pre><code>{`{
+  "mcpServers": {
+    "mcp-canada": {
+      "command": "uvx",
+      "args": ["mcp-canada"]
+    }
+  }
+}`}</code></pre>
+  <h2>Find a tool</h2>
+  <p>Use <code>discover_tools</code> with a natural-language query, then call a matching tool. All data tools accept <code>lang: "en"</code> or <code>lang: "fr"</code>.</p>
+  <pre><code>discover_tools("exchange rate CAD")
+call_tool("boc_get_exchange_rates", {`{ currency: "USD", recent: 3 }`})</code></pre>
+  <p>See the <a href={`${base}tools/`}>tool reference</a> for parameters and source APIs.</p>
+</BaseLayout>

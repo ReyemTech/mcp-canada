@@ -10,3 +10,8 @@ build/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+site/dist/
+site/node_modules/
+site/.astro/
+.claude/
+.planning/

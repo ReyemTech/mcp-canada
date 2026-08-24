@@ -1,0 +1,23 @@
+---
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { marked } from "marked";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import WorkflowDiagram from "../components/WorkflowDiagram.astro";
+const source = fileURLToPath(new URL("../../../EXAMPLES.md", import.meta.url));
+const examples = marked.parse(readFileSync(source, "utf8"));
+---
+
+<BaseLayout title="Examples | mcp-canada" description="Cross-API examples for mcp-canada.">
+  <header class="examples-header"><h1>Follow the evidence across systems.</h1><p>These workflows show how a question moves through Canada’s public-data infrastructure. The diagrams are reading aids; each example below retains its exact prompt and tool sequence.</p></header>
+  <section class="diagram-grid" aria-label="Example workflow diagrams">
+    <WorkflowDiagram title="Economic accountability brief" summary="Trace a policy question from a measured change to the parliamentary record." steps={["CPI", "Policy rate", "Bills", "Ballots"]} />
+    <WorkflowDiagram title="Flood intelligence brief" summary="Build a local, live risk picture from connected weather and hydrology tools." steps={["Station", "Flood risk", "Alerts", "Radar"]} />
+    <WorkflowDiagram title="Cross-module SQL analysis" summary="Persist observations from distinct sources, then query the relationship directly." steps={["Fetch", "Store", "Join", "Analyze"]} />
+  </section>
+  <article class="examples-content" set:html={examples} />
+</BaseLayout>
+
+<style>
+  .examples-header { border-bottom:2px solid #132c56; padding-bottom:2.5rem; }.examples-header p { font-size:1.2rem; margin:1.5rem 0 0; }.diagram-grid { margin:3.5rem 0 5rem; }.examples-content { max-width:860px; }.examples-content :global(h1) { font-size:3rem; margin-top:4rem; }.examples-content :global(h2) { font-size:2rem; margin-top:3.5rem; }.examples-content :global(h3) { margin-top:2.5rem; }.examples-content :global(blockquote) { border-left:2px solid #f04f31; color:#254158; font-size:1.12rem; margin:1.5rem 0; padding-left:1rem; }.examples-content :global(hr) { border:0; border-top:1px solid #aebfc3; margin:3rem 0; }
+</style>

@@ -1,0 +1,18 @@
+---
+interface Props { title: string; summary: string; steps: string[]; }
+const { title, summary, steps } = Astro.props;
+const ids = title.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-");
+---
+
+<figure class="workflow" aria-labelledby={`${ids}-title`}>
+  <svg viewBox="0 0 900 220" role="img" aria-labelledby={`${ids}-title ${ids}-description`}>
+    <title id={`${ids}-title`}>{title}</title><desc id={`${ids}-description`}>{summary}</desc>
+    <path class="route" d="M155 110 H292 M382 110 H519 M609 110 H746" />
+    {steps.map((step, index) => <g transform={`translate(${20 + index * 227} 54)`}><rect width="135" height="112" /><text x="16" y="36">0{index + 1}</text><text class="label" x="16" y="71">{step}</text></g>)}
+  </svg>
+  <figcaption><strong>{title}</strong><span>{summary}</span></figcaption>
+</figure>
+
+<style>
+  .workflow { background:#fff; border-top:4px solid #132c56; margin:2rem 0; padding:1rem; } svg { display:block; height:auto; max-width:100%; } .route { fill:none; stroke:#f04f31; stroke-width:3; } rect { fill:#f4f2e9; stroke:#132c56; stroke-width:2; } text { fill:#f04f31; font-family:"Avenir Next",Avenir,"Segoe UI",sans-serif; font-size:13px; font-weight:800; } text.label { fill:#132c56; font-size:15px; } figcaption { display:flex; gap:1rem; justify-content:space-between; margin:.5rem 0 0; } figcaption span { color:#4a6173; max-width:62ch; } @media(max-width:600px){svg{min-width:700px}.workflow{overflow-x:auto}figcaption{display:block}figcaption span{display:block;margin-top:.35rem}}
+</style>

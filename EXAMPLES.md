@@ -1,5 +1,7 @@
 # Examples: Cross-API Intelligence with mcp-canada
 
+> Browse these examples on the [documentation site](https://reyemtech.github.io/mcp-canada/examples/) for a navigation-friendly reading experience.
+
 > Canadian government data becomes dramatically more powerful when you can query multiple APIs in a single conversation.
 
 These examples show what happens when an AI agent can reach across **federal + provincial APIs + a shared datastore** simultaneously — producing insights that no single database can surface alone. Each example is a real prompt you can give your agent today.

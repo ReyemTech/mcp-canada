@@ -1,0 +1,18 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import catalog from "../../data/tool-catalog.json";
+export function getStaticPaths() { return catalog.map((module) => ({ params: { module: module.module_name }, props: { module } })); }
+const { module } = Astro.props;
+const base = `${import.meta.env.BASE_URL}/`;
+const title = module.display_name.replaceAll("_", " ");
+---
+
+<BaseLayout title={`${title} tools | mcp-canada`} description={module.description}>
+  <header class="module-header"><a href={`${base}tools/`}>← Return to tool atlas</a><div><h1>{title}</h1><p>{module.description}</p></div><span>{module.tools.length}<small>tools</small></span></header>
+  <div class="language-note">All tools accept <code>lang: "en" | "fr"</code>. Open each tool below for its source-derived parameters.</div>
+  {module.tools.map((tool, index) => (<section id={tool.name} class="tool"><div class="tool-number">{String(index + 1).padStart(2, "0")}</div><div class="tool-main"><h2><code>{tool.name}</code></h2><p>{tool.description}</p>{tool.use_for && <p class="use"><strong>Use for</strong>{tool.use_for}</p>}{tool.keywords && <p class="keywords">{tool.keywords}</p>}</div>{tool.params.length > 0 ? (<table><thead><tr><th>Parameter</th><th>Type</th><th>Default</th></tr></thead><tbody>{tool.params.map((param) => <tr><td><code>{param.name}</code></td><td><code>{param.annotation || "-"}</code></td><td><code>{param.default ?? "required"}</code></td></tr>)}</tbody></table>) : <p class="no-params">No parameters</p>}</section>))}
+</BaseLayout>
+
+<style>
+  .module-header > a { font-weight:800; }.module-header > div { align-items:end; border-bottom:2px solid #132c56; display:grid; gap:2rem; grid-template-columns:1fr minmax(230px,400px); margin-top:2.5rem; padding-bottom:2rem; }.module-header p { font-size:1.05rem; margin:0; }.module-header > span { color:#f04f31; display:block; font-size:4rem; font-weight:800; letter-spacing:-.06em; margin-top:1rem; }.module-header small { color:#132c56; font-size:.85rem; letter-spacing:0; margin-left:.4rem; text-transform:uppercase; }.language-note { background:#bb9cff; color:#132c56; font-weight:700; margin:2rem 0 3rem; padding:.8rem 1rem; }.tool { border-top:1px solid #aebfc3; display:grid; gap:1.5rem; grid-template-columns:45px minmax(260px,1fr) minmax(340px,.95fr); padding:1.75rem 0; scroll-margin-top:1rem; }.tool-number { color:#f04f31; font-size:.8rem; font-weight:800; padding-top:.45rem; }.tool h2 { font-size:1.45rem; margin:0; }.tool h2 code { color:#132c56; }.tool p { margin:.7rem 0; }.use { color:#254158; }.use strong { color:#f04f31; display:block; font-size:.72rem; letter-spacing:.06em; text-transform:uppercase; }.keywords { color:#607889; font-size:.78rem; }.tool table { font-size:.8rem; }.tool th,.tool td { padding:.45rem .55rem; }.no-params { color:#607889; font-size:.85rem; } @media(max-width:800px){.module-header>div,.tool{grid-template-columns:1fr}.module-header>span{font-size:3rem}.tool-number{display:none}}
+</style>

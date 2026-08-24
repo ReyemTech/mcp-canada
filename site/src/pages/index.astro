@@ -1,0 +1,25 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import catalog from "../data/tool-catalog.json";
+const base = `${import.meta.env.BASE_URL}/`;
+const toolCount = catalog.reduce((total, module) => total + module.tools.length, 0);
+---
+
+<BaseLayout title="mcp-canada documentation">
+  <section class="hero">
+    <div class="hero-copy"><h1>Find the public data behind the question.</h1><p>mcp-canada gives MCP clients a direct route into {toolCount} bilingual tools across Canadian public-data systems.</p><div class="hero-actions"><a class="primary" href={`${base}getting-started/`}>Install mcp-canada</a><a href={`${base}tools/`}>Open the tool atlas</a></div></div>
+    <div class="map" role="img" aria-label="A map-like diagram connecting federal, provincial, municipal, and local data sources to mcp-canada.">
+      <svg viewBox="0 0 560 420" aria-hidden="true"><path d="M32 82 C120 60 144 154 216 146 S305 62 374 94 S458 164 528 116"/><path d="M48 302 C123 219 185 302 248 250 S387 192 512 284"/><path d="M214 146 C212 202 248 216 248 250"/><path d="M374 94 C391 160 383 173 405 218"/><circle cx="32" cy="82" r="16"/><circle cx="216" cy="146" r="24"/><circle cx="374" cy="94" r="17"/><circle cx="528" cy="116" r="28"/><circle cx="48" cy="302" r="17"/><circle cx="248" cy="250" r="33"/><circle cx="405" cy="218" r="18"/><circle cx="512" cy="284" r="25"/></svg>
+      <span class="federal">Federal<br /><b>9 sources</b></span><span class="provincial">Provincial<br /><b>9 sources</b></span><span class="municipal">Municipal<br /><b>2 sources</b></span><span class="local">Local<br /><b>1 source</b></span><strong>mcp<br />canada</strong>
+    </div>
+  </section>
+  <section class="path"><div><span>01</span><h2>Install</h2><p>Use the guided installer or add one MCP server configuration.</p></div><div><span>02</span><h2>Orient</h2><p>Search by question, source, or tool name across the complete reference.</p></div><div><span>03</span><h2>Query</h2><p>Call a bilingual data tool with parameters you can inspect in plain HTML.</p></div></section>
+  <section class="source-strip"><p>Start with the system you need</p><div>{catalog.slice(0, 8).map((module) => <a href={`${base}tools/${module.module_name}/`}>{module.display_name.replaceAll("_", " ")} <b>{module.tools.length}</b></a>)}</div></section>
+</BaseLayout>
+
+<style>
+  .hero { align-items:center; display:grid; gap:3rem; grid-template-columns:minmax(0,1fr) minmax(360px,.9fr); min-height:570px; }.hero-copy > p { font-size:1.25rem; margin:1.8rem 0 2rem; }.hero-actions { align-items:center; display:flex; flex-wrap:wrap; font-weight:800; gap:1.25rem; }.primary { background:#f04f31; color:#fff; padding:.85rem 1.1rem; text-decoration:none; }.map { aspect-ratio:4/3; background:#132c56; color:#f4f2e9; overflow:hidden; position:relative; }.map svg { height:100%; inset:0; position:absolute; width:100%; }.map path { fill:none; stroke:#8debd8; stroke-width:3; }.map circle { fill:#ffbd2e; stroke:#132c56; stroke-width:9; }.map circle:nth-of-type(2),.map circle:nth-of-type(6){fill:#f04f31}.map circle:nth-of-type(4),.map circle:nth-of-type(8){fill:#bb9cff}.map span,.map strong { position:absolute; }.map span { font-size:.78rem; font-weight:700; line-height:1.15; }.map span b { color:#8debd8; font-size:.68rem; text-transform:uppercase; }.federal{left:7%;top:8%}.provincial{right:7%;top:10%}.municipal{right:8%;bottom:11%}.local{left:9%;bottom:11%}.map strong { background:#f4f2e9; color:#132c56; font-size:1.25rem; left:42%; line-height:.9; padding:.7rem; text-transform:uppercase; top:48%; }
+  .path { border-top:2px solid #132c56; display:grid; grid-template-columns:repeat(3,1fr); margin-top:4rem; }.path > div { border-right:1px solid #9aabb3; padding:1.25rem 2rem 1rem 0; }.path > div + div { padding-left:2rem; }.path > div:last-child { border:0; }.path span { color:#f04f31; font-size:.8rem; font-weight:800; }.path h2 { font-size:1.8rem; margin:.35rem 0; }.path p { color:#4a6173; font-size:.95rem; margin:0; }
+  .source-strip { background:#ffbd2e; margin:5rem -2rem -5rem; padding:2.5rem 2rem; }.source-strip p { font-size:.85rem; font-weight:800; margin:0 0 1rem; text-transform:uppercase; }.source-strip div { display:flex; flex-wrap:wrap; gap:.7rem; }.source-strip a { border:1px solid #132c56; color:#132c56; font-weight:700; padding:.55rem .7rem; text-decoration:none; text-transform:capitalize; }.source-strip a:hover { background:#132c56; color:#f4f2e9; }.source-strip b { color:#f04f31; }
+  @media(max-width:820px){.hero{grid-template-columns:1fr}.map{max-width:560px;width:100%}.path{grid-template-columns:1fr}.path>div,.path>div+div{border-bottom:1px solid #9aabb3;border-right:0;padding:1.25rem 0}.source-strip{margin-left:-1.15rem;margin-right:-1.15rem;padding-left:1.15rem;padding-right:1.15rem}}
+</style>

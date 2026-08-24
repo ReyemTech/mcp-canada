@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import ast
 import difflib
+import json
 import re
 import sys
 from dataclasses import dataclass, field
@@ -376,6 +377,7 @@ def generate_tools_md(module_infos: list[ModuleInfo]) -> str:
         "",
         "Auto-generated from source. Do not edit manually.",
         "Run `uv run python scripts/generate_catalog.py` to regenerate.",
+        "Browse the [documentation site](https://reyemtech.github.io/mcp-canada/tools/) for searchable navigation.",
         "",
     ]
 
@@ -541,11 +543,18 @@ def main() -> None:
         action="store_true",
         help="Verify files are up to date and exit 1 if stale (CI mode).",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Write the source-derived catalog as JSON for the documentation site.",
+    )
     args = parser.parse_args()
 
     module_infos = _build_module_infos()
 
-    if args.check:
+    if args.json:
+        print(json.dumps(module_infos, default=lambda value: value.__dict__, indent=2))
+    elif args.check:
         sys.exit(check_mode(module_infos))
     else:
         # Write TOOLS.md

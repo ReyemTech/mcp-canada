@@ -2,6 +2,7 @@
 
 Auto-generated from source. Do not edit manually.
 Run `uv run python scripts/generate_catalog.py` to regenerate.
+Browse the [documentation site](https://reyemtech.github.io/mcp-canada/tools/) for searchable navigation.
 
 **295 tools** across 21 modules.
 

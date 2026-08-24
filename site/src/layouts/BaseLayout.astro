@@ -1,0 +1,42 @@
+---
+interface Props { title: string; description?: string; }
+const { title, description = "Documentation for mcp-canada, the MCP server for Canadian government data." } = Astro.props;
+const base = `${import.meta.env.BASE_URL}/`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+  </head>
+  <body>
+    <!-- THESIS: a public-data atlas, not a generic documentation portal. OWN-WORLD: midnight blue terrain, bright jurisdiction routes, crisp editorial data marks. STORY: install, orient across sources, then inspect an exact tool. FIRST VIEWPORT: source map occupies the right half while a direct installation path holds the left. FORM: public-data atlas, Impeccable pick, seed d4ce36c5. FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md. -->
+    <header class="site-header">
+      <nav aria-label="Primary navigation">
+        <a class="brand" href={base}><span aria-hidden="true">CA</span> mcp-canada</a>
+        <div class="nav-links">
+          <a href={`${base}getting-started/`}>Install</a>
+          <a href={`${base}tools/`}>Tool atlas</a>
+          <a href={`${base}examples/`}>Examples</a>
+          <a href="https://github.com/ReyemTech/mcp-canada">GitHub ↗</a>
+        </div>
+      </nav>
+    </header>
+    <main><slot /></main>
+    <footer><span>mcp-canada</span><span>Canadian public data for MCP clients</span><span>Built by <a href="https://reyem.tech">Reyem Technologies</a></span></footer>
+  </body>
+</html>
+
+<style is:global>
+  :root { background:#f4f2e9; color:#132238; font-family:"Avenir Next",Avenir,"Segoe UI",sans-serif; line-height:1.52; text-rendering:optimizeLegibility; }
+  * { box-sizing:border-box; } body { margin:0; } ::selection { background:#ffbd2e; color:#132238; } :focus-visible { outline:3px solid #f04f31; outline-offset:3px; }
+  .site-header { background:#132c56; border-bottom:4px solid #ffbd2e; color:#f4f2e9; } nav, main, footer { margin:auto; max-width:1240px; padding-left:2rem; padding-right:2rem; } nav { align-items:center; display:flex; justify-content:space-between; min-height:5rem; }
+  a { color:#0c5d8d; text-decoration-thickness:1.5px; text-underline-offset:3px; } .site-header a { color:#f4f2e9; text-decoration:none; } .brand { align-items:center; display:flex; font-size:1.1rem; font-weight:800; gap:.65rem; letter-spacing:-.03em; } .brand span { background:#ffbd2e; color:#132c56; display:inline-grid; font-family:"Avenir Next",Avenir,"Segoe UI",sans-serif; font-size:.68rem; font-weight:900; height:1.8rem; letter-spacing:0; place-items:center; width:1.8rem; }
+  .nav-links { display:flex; flex-wrap:wrap; font-size:.9rem; font-weight:700; gap:1.3rem; } .nav-links a:hover { color:#ffbd2e; } main { min-height:calc(100vh - 10rem); padding-bottom:5rem; padding-top:3.5rem; }
+  footer { border-top:1px solid #9aabb3; color:#4a6173; display:flex; flex-wrap:wrap; font-size:.82rem; gap:1.2rem 3rem; justify-content:space-between; padding-bottom:2rem; padding-top:1.25rem; } footer span:first-child { color:#132c56; font-weight:800; }
+  h1,h2,h3 { color:#132c56; line-height:.94; letter-spacing:-.045em; } h1 { font-size:clamp(3.2rem,7vw,6.8rem); margin:0; max-width:12ch; } h2 { font-size:clamp(2rem,4vw,3.5rem); margin:0; } h3 { font-size:1.25rem; letter-spacing:-.025em; } p { max-width:72ch; } code,pre { font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace; } code { font-size:.9em; } pre { background:#132c56; color:#f4f2e9; overflow-x:auto; padding:1.2rem; } table { border-collapse:collapse; display:block; max-width:100%; overflow-x:auto; } th,td { border-bottom:1px solid #b3c1c4; padding:.75rem; text-align:left; vertical-align:top; } th { color:#132c56; font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; }
+  @media(max-width:720px) { nav,main,footer { padding-left:1.15rem; padding-right:1.15rem; } nav { align-items:flex-start; flex-direction:column; gap:.8rem; padding-bottom:1rem; padding-top:1rem; } .nav-links { gap:.75rem 1rem; } main { padding-top:2rem; } h1 { font-size:clamp(2.8rem,14vw,4.5rem); } }
+</style>

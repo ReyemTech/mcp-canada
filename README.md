@@ -87,7 +87,7 @@ Environment variable: `MCP_CANADA_MODULES=bank_of_canada,recalls`
 
 ## Examples
 
-See **[EXAMPLES.md](EXAMPLES.md)** for 25 cross-API intelligence scenarios — from tracing prairie drought to the Canadian dollar, to building pharmaceutical safety audits, to assembling MP accountability briefs, to joining data from multiple APIs in a single SQL query. Each example includes the exact prompt and tool chain you can run today.
+See the **[documentation site](https://reyemtech.github.io/mcp-canada/examples/)** for cross-API intelligence scenarios — from tracing prairie drought to the Canadian dollar, to building pharmaceutical safety audits, to assembling MP accountability briefs, to joining data from multiple APIs in a single SQL query. Each example includes the exact prompt and tool chain you can run today. The source remains in [EXAMPLES.md](EXAMPLES.md).
 
 ## How Discovery Works
 
@@ -117,7 +117,7 @@ Agents see **5 always-visible tools**:
 
 ## Modules
 
-All tools accept `lang: "en" | "fr"` for bilingual support. Responses include a `_meta` envelope with source attribution and cache status. Click a module for its full tool, prompt, and resource catalog.
+All tools accept `lang: "en" | "fr"` for bilingual support. Responses include a `_meta` envelope with source attribution and cache status. Browse the complete, searchable **[tool reference](https://reyemtech.github.io/mcp-canada/tools/)** for current tool parameters and source APIs.
 
 | Module | Level | Tools | Prompts | Resources | Description |
 |--------|-------|------:|--------:|----------:|-------------|

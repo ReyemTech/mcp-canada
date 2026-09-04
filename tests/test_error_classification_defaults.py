@@ -38,7 +38,7 @@ def _raises_bare_valueerror() -> list[str]:
     offenders: list[str] = []
     for path in _source_files():
         try:
-            tree = ast.parse(path.read_text())
+            tree = ast.parse(path.read_text(encoding="utf-8"))
         except SyntaxError:  # pragma: no cover - source must always parse
             continue
         for node in ast.walk(tree):
@@ -57,7 +57,7 @@ def _valueerror_arms_returning_invalid_input() -> list[str]:
     offenders: list[str] = []
     for path in _source_files():
         try:
-            tree = ast.parse(path.read_text())
+            tree = ast.parse(path.read_text(encoding="utf-8"))
         except SyntaxError:  # pragma: no cover
             continue
         for node in ast.walk(tree):

@@ -65,7 +65,7 @@ def _iter_test_functions():
     for path in sorted(INTEGRATION_DIR.glob("*.py")):
         if path.name == "__init__.py":
             continue
-        tree = ast.parse(path.read_text(), filename=str(path))
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_"):
                 yield path, node

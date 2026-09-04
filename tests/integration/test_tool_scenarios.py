@@ -3622,6 +3622,112 @@ class TestNewBrunswickToolScenarios:
         )
 
 
+# ─── Calgary scenarios ────────────────────────────────────────────────────
+
+
+class TestCalgaryToolScenarios:
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
+    async def test_discover_tools_finds_calgary_search_datasets(self, mcp_server):
+        """'Calgary open data' — BM25 must surface calgary_search_datasets."""
+        results = await discover(mcp_server, "Calgary open data traffic")
+        names = [r["name"] for r in results]
+        assert any(n.startswith("calgary_") for n in names), (
+            f"No calgary_ tool found in BM25 discovery results: {names}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
+    async def test_search_datasets_returns_live_results(self, mcp_server):
+        """'Search Calgary datasets for traffic' — proves the Socrata catalog works."""
+        data = await call_tool(mcp_server, "calgary_search_datasets", {
+            "query": "traffic",
+            "limit": 10,
+        })
+        live = assert_live_or_transient(data, "calgary_search_datasets", "calgary-socrata")
+        if live:
+            results = data["data"]["results"]
+            total = data["data"]["total"]
+            assert isinstance(results, list)
+            assert total >= 1, f"Expected at least 1 traffic dataset on Calgary Socrata, got {total}"
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
+    async def test_list_categories_returns_transportation(self, mcp_server):
+        """Calgary's live catalog must include a Transportation/Transit-shaped category."""
+        data = await call_tool(mcp_server, "calgary_list_categories", {})
+        live = assert_live_or_transient(data, "calgary_list_categories", "calgary-socrata")
+        if live:
+            categories = data["data"]["categories"]
+            names = [c["name"] for c in categories]
+            assert any("Transportation" in n for n in names), (
+                f"Expected a Transportation-shaped category. Got: {sorted(names)}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
+    async def test_french_language_propagates_on_live_call(self, mcp_server):
+        """An agent asking in French gets _meta.lang == 'fr' on a live Calgary call."""
+        data = await call_tool(mcp_server, "calgary_search_datasets", {"limit": 5, "lang": "fr"})
+        live = assert_live_or_transient(data, "calgary_search_datasets", "calgary-socrata")
+        if live:
+            assert data["_meta"]["lang"] == "fr"
+
+
+# ─── Edmonton scenarios ───────────────────────────────────────────────────
+
+
+class TestEdmontonToolScenarios:
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
+    async def test_discover_tools_finds_edmonton_search_datasets(self, mcp_server):
+        """'Edmonton open data' — BM25 must surface edmonton_search_datasets."""
+        results = await discover(mcp_server, "Edmonton open data building permits")
+        names = [r["name"] for r in results]
+        assert any(n.startswith("edmonton_") for n in names), (
+            f"No edmonton_ tool found in BM25 discovery results: {names}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
+    async def test_search_datasets_returns_live_results(self, mcp_server):
+        """'Search Edmonton datasets for permits' — proves the Socrata catalog works."""
+        data = await call_tool(mcp_server, "edmonton_search_datasets", {
+            "query": "permits",
+            "limit": 10,
+        })
+        live = assert_live_or_transient(data, "edmonton_search_datasets", "edmonton-socrata")
+        if live:
+            results = data["data"]["results"]
+            total = data["data"]["total"]
+            assert isinstance(results, list)
+            assert total >= 1, f"Expected at least 1 permits dataset on Edmonton Socrata, got {total}"
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
+    async def test_list_categories_returns_urban_planning(self, mcp_server):
+        """Edmonton's live catalog must include an Urban Planning & Economy-shaped category."""
+        data = await call_tool(mcp_server, "edmonton_list_categories", {})
+        live = assert_live_or_transient(data, "edmonton_list_categories", "edmonton-socrata")
+        if live:
+            categories = data["data"]["categories"]
+            names = [c["name"] for c in categories]
+            assert any("Urban Planning" in n for n in names), (
+                f"Expected an Urban Planning-shaped category. Got: {sorted(names)}"
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
+    async def test_french_language_propagates_on_live_call(self, mcp_server):
+        """An agent asking in French gets _meta.lang == 'fr' on a live Edmonton call."""
+        data = await call_tool(mcp_server, "edmonton_search_datasets", {"limit": 5, "lang": "fr"})
+        live = assert_live_or_transient(data, "edmonton_search_datasets", "edmonton-socrata")
+        if live:
+            assert data["_meta"]["lang"] == "fr"
+
+
 @pytest.mark.integration
 class TestStatCanCodeSetDrift:
     """Guard the hardcoded WDS decode maps against StatCan's live code set.

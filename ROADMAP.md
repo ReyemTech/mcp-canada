@@ -25,6 +25,13 @@ Public roadmap for mcp-canada — the MCP server for Canadian government data.
 |--------|-------|------------|
 | Ontario | 6 | 3,000+ provincial datasets via data.ontario.ca |
 
+### Municipal Government Data
+
+| Module | Tools | Data Source |
+|--------|-------|------------|
+| Calgary | 5 | Open Calgary catalogue via data.calgary.ca (Socrata SODA API — not CKAN) |
+| Edmonton | 5 | Edmonton Open Data Portal via data.edmonton.ca (Socrata SODA API — not CKAN) |
+
 ---
 
 ## In Progress
@@ -57,9 +64,9 @@ Major Canadian cities with established open data portals.
 |------|--------|--------|
 | Toronto | open.toronto.ca | Planned |
 | Montreal | donnees.montreal.ca | Planned |
-| Vancouver | opendata.vancouver.ca | Planned |
-| Calgary | data.calgary.ca | Planned |
-| Edmonton | data.edmonton.ca | Planned |
+| Vancouver | opendata.vancouver.ca | Planned — Socrata, not CKAN (confirmed live) |
+| Calgary | data.calgary.ca | Shipped — Socrata, not CKAN (confirmed live) |
+| Edmonton | data.edmonton.ca | Shipped — Socrata, not CKAN (confirmed live) |
 | Ottawa | open.ottawa.ca | Planned |
 | Winnipeg | data.winnipeg.ca | Planned |
 | Halifax | catalogue.open.halifax.ca | Planned |

@@ -204,7 +204,7 @@ def test_no_shared_portal_client_decodes_json_unguarded():
     for path in sorted(shared.glob("*.py")):
         if path.name == "http.py":  # defines the helpers
             continue
-        for i, line in enumerate(path.read_text().splitlines(), 1):
+        for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             code = line.split("#")[0]
             if re.search(r"\bresponse\.json\(\)", code) or re.search(r"\bjson\.loads\(", code):
                 offenders.append(f"{path.name}:{i}")

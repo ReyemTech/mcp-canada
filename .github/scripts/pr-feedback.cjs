@@ -19,9 +19,46 @@ function isCurrent(pr, sha, repository, allowDraft = false) {
     && pr.head.sha === sha && pr.base.repo.full_name === repository;
 }
 
-function renderChecks(run, jobs) {
-  const passed = run.conclusion === 'success' && jobs.some(job => job.conclusion === 'success')
+const REQUIRED_JOBS = ['3.12', '3.13', '3.14'].map(version => `Test (Python ${version})`);
+
+function ciStatus(run, jobs, sha) {
+  if (!run || run.head_sha !== sha) return { state: 'unavailable' };
+  const url = run.html_url;
+  if (run.status !== 'completed') return { state: 'pending', url };
+  const passed = run.conclusion === 'success'
+    && REQUIRED_JOBS.every(name => jobs.some(job => job.name === name && job.conclusion === 'success'))
     && jobs.every(job => job.conclusion === 'success' || job.conclusion === 'skipped');
+  const failed = run.conclusion === 'failure' || jobs.some(job => job.conclusion === 'failure');
+  return { state: passed ? 'passed' : failed ? 'failed' : 'unavailable', url };
+}
+
+async function latestCI(github, repo, pr) {
+  const sha = pr.head.sha;
+  const runs = await github.paginate(github.rest.actions.listWorkflowRuns,
+    { ...repo, workflow_id: 'ci.yml', event: 'pull_request', head_sha: sha, per_page: 100 });
+  const candidates = runs.filter(item => item.head_sha === sha && item.head_branch === pr.head.ref
+    && item.head_repository?.full_name === pr.head.repo?.full_name).sort((a, b) => b.id - a.id);
+  let run;
+  for (const candidate of candidates) {
+    if (candidate.pull_requests?.length) {
+      if (!candidate.pull_requests.some(item => item.number === pr.number && item.base?.ref === pr.base.ref)) continue;
+    } else {
+      // A current commit-to-PR match cannot establish which historical PR/base
+      // triggered a run. Never infer a positive merge signal from a missing link.
+      return { state: 'unavailable', url: candidate.html_url };
+    }
+    run = candidate;
+    break;
+  }
+  if (!run) return { state: 'unavailable' };
+  if (run.status !== 'completed') return { state: 'pending', url: run.html_url };
+  const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun,
+    { ...repo, run_id: run.id, filter: 'latest', per_page: 100 });
+  return ciStatus(run, jobs, sha);
+}
+
+function renderChecks(run, jobs) {
+  const passed = ciStatus(run, jobs, run.head_sha).state === 'passed';
   const lines = ['## PR Checks', '', `**${passed ? 'All checks passed' : 'Changes needed or checks incomplete'}**`,
     '', `Revision: \`${run.head_sha.slice(0, 7)}\` · [CI run](${run.html_url})`, ''];
   if (!jobs.length) {
@@ -35,44 +72,66 @@ function renderChecks(run, jobs) {
       if (COMMANDS[step.name]) lines.push(`    Reproduce/fix: \`${COMMANDS[step.name]}\``);
     }
   }
+  const missing = REQUIRED_JOBS.filter(name => !jobs.some(job => job.name === name && job.conclusion === 'success'));
+  if (missing.length) lines.push('', `Required jobs not passing: ${missing.map(text).join(', ')}.`);
   if (!passed && jobs.length) lines.push('', 'Please fix the failed checks and push an update. A new run will update this comment.');
   lines.push('', 'Merge decisions remain with the maintainer.');
   return lines.join('\n');
 }
 
-function renderReview(report, repository, sha, files) {
-  const verdicts = { ready: 'Ready for maintainer review', changes_requested: 'Changes requested',
-    needs_human_review: 'Human review needed' };
-  if (!report || !Object.hasOwn(verdicts, report.verdict)
-    || typeof report.summary !== 'string' || !report.summary.trim() || report.summary.length > 3000
+function renderReview(report, repository, sha, files, ci = { state: 'unavailable' }) {
+  const validText = (value, limit) => typeof value === 'string' && value.trim() && value.length <= limit;
+  const textList = (value, count, length) => Array.isArray(value) && value.length <= count
+    && value.every(item => validText(item, length));
+  const location = item => item && ['title', 'body', 'path'].every(key => validText(item[key], key === 'title' ? 200 : 3000))
+    && files.includes(item.path) && !/[\x00-\x1f]/.test(item.path)
+    && Number.isSafeInteger(item.line) && item.line > 0;
+  if (!report || !['ready', 'changes_requested', 'needs_human_review'].includes(report.verdict)
+    || !validText(report.summary, 3000) || !textList(report.strengths, 6, 2000)
+    || !textList(report.limitations, 10, 2000)
     || !Array.isArray(report.findings) || report.findings.length > 10
-    || !Array.isArray(report.limitations) || report.limitations.length > 10
-    || report.limitations.some(item => typeof item !== 'string' || item.length > 2000)) {
+    || !report.findings.every(item => location(item) && ['P0', 'P1', 'P2'].includes(item.priority))
+    || !Array.isArray(report.suggestions) || report.suggestions.length > 5 || !report.suggestions.every(location)
+    || !Array.isArray(report.checklist) || !report.checklist.length || report.checklist.length > 10
+    || !report.checklist.every(item => item && validText(item.label, 200) && validText(item.evidence, 2000)
+      && ['passed', 'failed', 'not_verified', 'not_applicable'].includes(item.status))
+    || (report.verdict === 'changes_requested' && !report.findings.length)
+    || (report.verdict === 'ready' && report.checklist.some(item => item.status === 'failed'))) {
     throw new Error('Invalid review report');
   }
-  for (const finding of report.findings) {
-    if (!['P0', 'P1', 'P2'].includes(finding.priority)
-      || !['title', 'body', 'path'].every(key => typeof finding[key] === 'string' && finding[key].trim())
-      || finding.title.length > 200 || finding.body.length > 3000
-      || !files.includes(finding.path) || /[\x00-\x1f]/.test(finding.path)
-      || !Number.isSafeInteger(finding.line) || finding.line < 1) {
-      throw new Error('Invalid review finding');
-    }
-  }
-  const verdict = report.findings.length ? 'Changes requested' : verdicts[report.verdict];
+  const blocked = report.findings.length > 0 || ci.state === 'failed';
+  const ready = !blocked && report.verdict === 'ready' && ci.state === 'passed';
+  const verdict = blocked ? '🔴 Changes requested' : ready ? '🟢 Merge recommended' : '🟠 Manual review required';
   const lines = ['## PR Review', '', `**${verdict}** · Revision \`${sha.slice(0, 7)}\``, '', text(report.summary)];
+  const ciLabels = { passed: 'All three CI jobs passed for this revision.', failed: 'CI failed or required jobs did not pass.',
+    pending: 'CI is still running for this revision.', unavailable: 'Passing CI could not be verified for this revision.' };
+  lines.push('', `**CI:** ${ciLabels[ci.state] || ciLabels.unavailable}${ci.url ? ` [View CI](${ci.url})` : ''}`);
+  if (ready) lines.push('', 'No blocking findings. Merge recommended; optional suggestions can follow separately.');
+  else if (blocked) lines.push('', 'Resolve the blocking findings or CI failures and push an update before merging.');
+  else lines.push('', 'A merge recommendation is withheld until CI and the outstanding review questions are resolved.');
+  if (report.strengths.length) lines.push('', "### What's solid", '', ...report.strengths.map(item => `- ${text(item)}`));
+  lines.push('', '### Blocking issues', '');
+  const link = item => `[${text(item.path)}:${item.line}](https://github.com/${repository}/blob/${sha}/${item.path.split('/').map(encodeURIComponent).join('/')}#L${item.line})`;
+  if (!report.findings.length) lines.push(ci.state === 'failed' ? 'No blocking code findings; fix the CI failures above.' : 'No blocking code findings.');
   for (const finding of [...report.findings].sort((a, b) => a.priority.localeCompare(b.priority))) {
-    const path = finding.path.split('/').map(encodeURIComponent).join('/');
-    const url = `https://github.com/${repository}/blob/${sha}/${path}#L${finding.line}`;
-    lines.push('', `### ${finding.priority}: ${text(finding.title)}`, '',
-      `[${text(finding.path)}:${finding.line}](${url})`, '', text(finding.body));
+    lines.push(`#### ${finding.priority}: ${text(finding.title)}`, '', link(finding), '', text(finding.body), '');
   }
-  if (report.limitations.length) {
-    lines.push('', '**Verification limits**', ...report.limitations.map(item => `- ${text(item)}`));
+  if (report.suggestions.length) {
+    lines.push('', '### 🟢 Suggestions (non-blocking)', '');
+    report.suggestions.forEach((item, index) => lines.push('<details>', `<summary>Suggestion ${index + 1}</summary>`, '',
+      `**${text(item.title)}**`, '', link(item), '', text(item.body), '', '</details>', ''));
   }
-  lines.push('', report.findings.length ? 'Please address these findings and push an update.' : 'Check the PR Checks comment before merging.',
-    'This review is advisory; the maintainer makes the merge decision.');
-  return lines.join('\n');
+  lines.push('', '### Checklist', '', `- [${ci.state === 'passed' ? 'x' : ' '}] CI for this revision — ${ciLabels[ci.state] || ciLabels.unavailable}`);
+  const labels = { passed: 'Verified', failed: 'Failed', not_verified: 'Not verified', not_applicable: 'Not applicable' };
+  for (const item of report.checklist) {
+    lines.push(`- [${item.status === 'passed' || item.status === 'not_applicable' ? 'x' : ' '}] ${text(item.label)} — **${labels[item.status]}:** ${text(item.evidence)}`);
+  }
+  if (report.limitations.length) lines.push('', '### Verification limits', '', ...report.limitations.map(item => `- ${text(item)}`));
+  lines.push('', 'The maintainer makes the final merge decision.');
+  const body = lines.join('\n');
+  // Leave room for the marker/run stamp below GitHub's 65,536-character limit.
+  if (body.length > 60000) throw new Error('Rendered review exceeds the comment limit');
+  return body;
 }
 
 function renderUnavailable(reason, sha, url) {
@@ -163,7 +222,14 @@ async function publish({ github, context, core }, { number, sha, raw, reason }) 
   if (raw && !reason) {
     try {
       const files = await github.paginate(github.rest.pulls.listFiles, { ...context.repo, pull_number: pr.number, per_page: 100 });
-      body = renderReview(JSON.parse(raw), repository, sha, files.map(file => file.filename));
+      let ci;
+      try {
+        ci = await latestCI(github, context.repo, pr);
+      } catch (error) {
+        core.warning('Current CI status could not be verified');
+        ci = { state: 'unavailable' };
+      }
+      body = renderReview(JSON.parse(raw), repository, sha, files.map(file => file.filename), ci);
     } catch (error) {
       core.warning(`Review report rejected: ${error.message}`);
     }
@@ -174,5 +240,5 @@ async function publish({ github, context, core }, { number, sha, raw, reason }) 
   await upsertComment(github, context.repo, pr.number, '<!-- pr-review -->', body, context.runId);
 }
 
-module.exports = { isCurrent, renderChecks, renderReview, renderUnavailable, upsertComment,
+module.exports = { ciStatus, latestCI, isCurrent, renderChecks, renderReview, renderUnavailable, upsertComment,
   resolvePull, prepare, prepareReview, publish };

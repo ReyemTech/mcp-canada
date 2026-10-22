@@ -6,6 +6,23 @@ The public comment names are **PR Checks** and **PR Review**, posted by
 footers, model names, or connector attribution. Workflow source and action logs
 still identify the dependencies used; this is not a mechanism for hiding provenance.
 
+The review comment opens with one of three recommendations:
+
+- **Merge recommended:** no blocking findings, sufficient review evidence, and all
+  three required CI jobs passed for the exact reviewed revision.
+- **Changes requested:** blocking code findings or CI failures need a new revision.
+- **Manual review required:** the assessment or current CI could not be verified,
+  CI is still running, or significant correctness questions remain unresolved.
+
+Each completed review explains what is solid with specific evidence, separates
+blocking issues from expandable non-blocking suggestions, and includes a checklist
+with evidence and explicit verification limits. Optional suggestions do not prevent
+a merge recommendation. Unverified checklist items stay unchecked; source inspection
+is distinguished from executing tests. The publisher independently reads the newest
+CI run for the same PR and head commit rather than relying on the review's test
+claims. If GitHub omits the run's PR association, the review is still published,
+but a positive merge recommendation is withheld because its target cannot be proven.
+
 ## Maintainer setup
 
 1. Merge the contributor docs and workflows into the default branch. `workflow_run`
@@ -78,7 +95,7 @@ Billing and can take time to appear; project separation is not a spending cap.
 | `CI` | PR checkout; lint/type/unit/catalog checks | `contents: read`, no secrets |
 | `PR Feedback / Publish CI feedback` | Current GitHub run/job metadata | Read actions/content; write PR comments |
 | `PR Feedback / Assess PR changes` | Trusted default-branch prompt plus PR diff and git objects | Read content/PR; OIDC; inference in one Mantle project |
-| `PR Feedback / Publish review` | Validated JSON report or failure status | Read content; write PR comments; no provider secret |
+| `PR Feedback / Publish review` | Validated JSON report plus current CI status | Read content/actions; write PR comments; no provider secret |
 
 CI runs once per pull-request event, not on branch pushes separately. A push to an
 open PR triggers its `synchronize` event and runs the three Python versions once.

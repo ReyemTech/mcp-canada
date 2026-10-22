@@ -2,6 +2,64 @@
 
 <!-- CHANGELOG -->
 
+## v0.13.0 (2026-10-22)
+
+### Bug Fixes
+
+- Bind PR feedback to the tested head and base revision
+  ([`8934f1c`](https://github.com/ReyemTech/mcp-canada/commit/8934f1cb37559e4a09e0df3ea49676681b82ddd1))
+
+- Discard obsolete feedback before requesting review
+  ([`8a24294`](https://github.com/ReyemTech/mcp-canada/commit/8a242946f6cfd7175010a3527616e48f06709a92))
+
+- Isolate feedback runs across pull requests
+  ([`ee29c34`](https://github.com/ReyemTech/mcp-canada/commit/ee29c3472563dbf6e1f4d9fba945baa5a67aef43))
+
+- Request fresh maintainer review after base changes
+  ([`89ac70d`](https://github.com/ReyemTech/mcp-canada/commit/89ac70d7e3a293d07828b320da775c88b17fdb48))
+
+- Validate and serialize PR feedback publishing
+  ([`0dc1121`](https://github.com/ReyemTech/mcp-canada/commit/0dc112133d596d236fedd300c8b6e660c61d9b88))
+
+### Chores
+
+- Sync uv.lock after release
+  ([`3add201`](https://github.com/ReyemTech/mcp-canada/commit/3add2018f1ffa1f364bfafe7c7cc8adbad83015a))
+
+### Continuous Integration
+
+- Allow isolated reviewer to traverse runner workspace
+  ([`9ff5d44`](https://github.com/ReyemTech/mcp-canada/commit/9ff5d44dc7eb28c7f6301f5b52d1e814c2b510df))
+
+- Finish Mantle verification and tighten review evidence requirements
+  ([`0f0c8dc`](https://github.com/ReyemTech/mcp-canada/commit/0f0c8dc6b7a55ee40c2a98739df21dab89718650))
+
+- Preserve repository context during review verification
+  ([`0eb9a29`](https://github.com/ReyemTech/mcp-canada/commit/0eb9a2908bfe37860efd7173a283ed47f6bcd01a))
+
+- Run the test matrix once per PR revision
+  ([`150c1c0`](https://github.com/ReyemTech/mcp-canada/commit/150c1c056c58fa885106be69a03c30f35bc97939))
+
+### Features
+
+- Add evidence-backed PR summaries and explicit merge recommendations
+  ([`fc4d5ad`](https://github.com/ReyemTech/mcp-canada/commit/fc4d5adc0180cf54e5574d25608c24aef4794d13))
+
+- Document contributions and automate PR feedback
+  ([`b63a688`](https://github.com/ReyemTech/mcp-canada/commit/b63a688fbf9b1b6d5b4f59e1c097fad5fa63769c))
+
+- Route PR feedback and request maintainer review when ready
+  ([`3b779d9`](https://github.com/ReyemTech/mcp-canada/commit/3b779d946f1d2531e32638d4c07d108c73ff4613))
+
+- Run PR reviews in a dedicated Mantle project with OIDC
+  ([`9a09830`](https://github.com/ReyemTech/mcp-canada/commit/9a098304c7e81e52efc76d1701e328311234c82e))
+
+### Testing
+
+- Isolate Manitoba drought checks from the network
+  ([`031c408`](https://github.com/ReyemTech/mcp-canada/commit/031c408714bc37110ecf3f22a134dfc2032baeb6))
+
+
 ## v0.12.0 (2026-08-24)
 
 ### Chores

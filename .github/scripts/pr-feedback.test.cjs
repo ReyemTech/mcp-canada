@@ -438,3 +438,20 @@ test('comparison operators and ampersands are escaped once without changing thei
   assert.match(body, /a &lt; b &amp; c &gt; d/);
   assert.doesNotMatch(body, /&amp;lt;|&amp;gt;|&amp;amp;/);
 });
+
+test('a completed review for an older base does not suppress a fresh request', async () => {
+  const fixture = apiFixture({ comments: [{ user: { login: 'github-actions[bot]' },
+    body: `<!-- pr-review -->\n<!-- reviewed-base: ${'d'.repeat(40)}:main -->` }] });
+  fixture.github.rest.actions.listWorkflowRuns = async () => [{ id: 21, head_sha: sha,
+    head_branch: pr.head.ref, head_repository: pr.head.repo, display_title: `CI PR#9 BASE:${pr.base.sha} REF:main`,
+    status: 'completed', conclusion: 'success', html_url: 'run' }];
+  fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
+  fixture.github.rest.pulls.listReviews = async () => [{ user: { login: 'mariomeyer' }, commit_id: sha, state: 'APPROVED' }];
+  fixture.github.rest.issues.updateComment = async ({ body }) => { fixture.store.comments[0].body = body; };
+  const requested = [];
+  fixture.github.rest.pulls.requestReviewers = async args => { requested.push(args); };
+  await feedback.publish({ ...fixture, core: { warning() {} } }, { number: 9, sha,
+    base: { sha: pr.base.sha, ref: pr.base.ref }, raw: JSON.stringify(report()), maintainer: 'mariomeyer' });
+  assert.equal(requested.length, 1);
+  assert.match(fixture.store.comments[0].body, new RegExp(`reviewed-base: ${pr.base.sha}:main`));
+});

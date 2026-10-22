@@ -19,7 +19,8 @@ blocking issues from expandable non-blocking suggestions, and includes a checkli
 with evidence and explicit verification limits. Optional suggestions do not prevent
 a merge recommendation. Blocking comments tag the PR author; merge recommendations
 tag the configured maintainer and request their review. Existing requests and
-completed reviews for the same revision are not requested again. GitHub forbids
+completed reviews for the same reviewed head/base pair are not requested again.
+A changed base requests a fresh review even if the head commit is unchanged. GitHub forbids
 self-review requests, and requests for drafts are deferred until ready for review.
 If the request API fails, the comment explains that a manual request is needed.
 Unverified checklist items stay unchecked; source inspection is distinguished from

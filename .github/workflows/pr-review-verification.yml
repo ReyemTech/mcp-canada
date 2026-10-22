@@ -37,7 +37,7 @@ jobs:
             core.setOutput('head_sha', pr.head.sha);
             core.setOutput('base_sha', pr.base.sha);
             await require('./.github/scripts/pr-feedback.cjs').prepareReview(
-              { github, context: { ...context, eventName: 'workflow_dispatch' }, core },
+              { github, context: { ...context, repo: context.repo, eventName: 'workflow_dispatch' }, core },
               10, pr.head.sha, 'review-input');
       - name: Prepare review diff
         env:
@@ -91,7 +91,7 @@ jobs:
         with:
           script: |
             await require('./.github/scripts/pr-feedback.cjs').publish(
-              { github, context: { ...context, eventName: 'workflow_dispatch' }, core }, {
+              { github, context: { ...context, repo: context.repo, eventName: 'workflow_dispatch' }, core }, {
                 number: 10, sha: process.env.HEAD_SHA, raw: process.env.REVIEW_REPORT,
                 reason: process.env.REVIEW_RESULT === 'success' ? undefined : 'failed',
               });

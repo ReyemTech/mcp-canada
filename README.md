@@ -254,14 +254,14 @@ uv run pytest --cov=src/mcp_canada --cov-fail-under=95
 
 ## Contributing
 
-Each module is self-contained. To add a new API:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, required checks, the module pattern,
+MCP integration tests, pagination and parameter contracts, and generated catalog
+updates. Every PR includes a checklist and receives check results and advisory
+review feedback; the maintainer decides what to merge.
 
-1. Create `src/mcp_canada/modules/your_api/` with the 7-file pattern
-2. Add colocated `__tests__/` with unit tests
-3. Add integration tests in `tests/integration/test_tool_scenarios.py`
-4. Add a module doc in `docs/modules/` and update the Modules table in this README
-
-See [CLAUDE.md](CLAUDE.md) for coding conventions.
+Before submitting, run lint, type checks, unit tests with at least 95% coverage,
+and `uv run python scripts/generate_catalog.py --check`. See
+[PR automation](docs/pr-automation.md) for maintainer setup.
 
 ## Changelog
 

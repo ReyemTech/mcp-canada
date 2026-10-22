@@ -156,11 +156,19 @@ function renderUnavailable(reason, sha, url) {
   return `## PR Review\n\n**Manual review required** · Revision \`${sha.slice(0, 7)}\`\n\n${reasons[reason] || reasons.failed}\n\nThis is not a passing review. [Workflow details](${url})`;
 }
 
-async function upsertComment(github, repo, number, marker, body, runId) {
+async function findBotComment(github, repo, number, marker) {
   const comments = await github.paginate(github.rest.issues.listComments, { ...repo, issue_number: number, per_page: 100 });
-  const existing = comments.find(comment => comment.user?.login === 'github-actions[bot]' && comment.body?.startsWith(marker));
+  return comments.find(comment => comment.user?.login === 'github-actions[bot]' && comment.body?.startsWith(marker));
+}
+
+function superseded(existing, runId) {
   const previousRun = Number(existing?.body?.match(/<!-- feedback-run: (\d+) -->/)?.[1] || 0);
-  if (runId && previousRun > runId) return;
+  return Boolean(runId && previousRun > runId);
+}
+
+async function upsertComment(github, repo, number, marker, body, runId) {
+  const existing = await findBotComment(github, repo, number, marker);
+  if (superseded(existing, runId)) return;
   const stamp = runId ? `<!-- feedback-run: ${runId} -->\n` : '';
   const content = `${marker}\n${stamp}${body}`;
   if (existing) {
@@ -279,6 +287,8 @@ async function publish({ github, context, core }, { number, sha, raw, reason, ma
   const current = (await github.rest.pulls.get({ ...context.repo, pull_number: pr.number })).data;
   if (!isCurrent(current, sha, repository, context.eventName === 'workflow_dispatch')) return;
   if (decision === 'ready') {
+    const existing = await findBotComment(github, context.repo, pr.number, '<!-- pr-review -->');
+    if (superseded(existing, context.runId)) return;
     const note = await requestMaintainerReview({ github, context, core }, current, maintainer, sha);
     if (note) body += `\n\n${note}`;
     // A reviewer API call may race with a new contributor revision.

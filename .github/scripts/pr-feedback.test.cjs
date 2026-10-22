@@ -363,3 +363,19 @@ test('ambiguous commit associations cannot send feedback to the wrong PR', async
   fixture.github.rest.repos.listPullRequestsAssociatedWithCommit = async () => [{ number: 9 }, { number: 10 }];
   assert.equal(await feedback.resolvePull(fixture.github, fixture.context), null);
 });
+
+test('an older ready result cannot request review after a newer blocking comment', async () => {
+  const fixture = apiFixture({ comments: [{ id: 1, user: { login: 'github-actions[bot]' },
+    body: '<!-- pr-review -->\n<!-- feedback-run: 200 -->\nChanges requested' }] });
+  fixture.github.rest.actions.listWorkflowRuns = async () => [{ id: 21, head_sha: sha,
+    head_branch: pr.head.ref, head_repository: pr.head.repo, pull_requests: [{ number: 9, base: { ref: 'main' } }],
+    status: 'completed', conclusion: 'success', html_url: 'run' }];
+  fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
+  fixture.github.rest.pulls.listReviews = async () => [];
+  const requested = [];
+  fixture.github.rest.pulls.requestReviewers = async args => { requested.push(args); };
+  await feedback.publish({ ...fixture, core: { warning() {} } },
+    { number: 9, sha, raw: JSON.stringify(report()), maintainer: 'mariomeyer' });
+  assert.equal(requested.length, 0);
+  assert.match(fixture.store.comments[0].body, /Changes requested/);
+});

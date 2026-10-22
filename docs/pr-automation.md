@@ -14,15 +14,24 @@ still identify the dependencies used; this is not a mechanism for hiding provena
    contributors who are new to GitHub**. Established accounts can run CI without a
    per-PR approval. New accounts may still require approval. CI uses read-only
    permissions and never receives repository secrets.
-3. Add an API key as the repository Actions secret `OPENAI_API_KEY`. Use a dedicated
-   project with an appropriate spend limit. Never put the key in an issue or PR.
-   The provider action and setup are documented at
-   [the official action guide](https://learn.chatgpt.com/docs/github-action).
-4. Optionally set the Actions variable `PR_REVIEW_MODEL` to a supported model
-   available to that project. An empty value uses the action's default. Reasoning
+3. Use the dedicated **mcp-canada** Mantle project in **us-east-1**. Authentication
+   uses GitHub OIDC and temporary AWS credentials; no OpenAI or Bedrock API key is
+   stored in GitHub. The CloudFormation template at `.github/aws/pr-review.yml`
+   creates a role restricted to this repository's `main` branch, the project, and
+   the selected model. See the deployment command below.
+4. Set these repository Actions **variables**, not secrets:
+
+   | Variable | Value |
+   | --- | --- |
+   | `PR_REVIEW_ROLE_ARN` | Role ARN from the CloudFormation stack output |
+   | `PR_REVIEW_AWS_REGION` | `us-east-1` |
+   | `PR_REVIEW_PROJECT_ID` | Dedicated Mantle project ID |
+   | `PR_REVIEW_MODEL` | `openai.gpt-6-sol` |
+
+   Changing the model or region also requires updating the role's policy. Reasoning
    effort is `medium`; each review job has a 15-minute timeout and a 400 KB diff cap.
 5. Disable built-in automatic reviews for this repository in
-[review settings](https://chatgpt.com/settings/code-review), and do not use
+   [review settings](https://chatgpt.com/settings/code-review), and do not use
    its comment triggers. That integration adds its own app name and badge, which
    cannot be removed by changing a comment's text. If posting manually, use the
    maintainer's personal GitHub CLI authentication rather than the connector.
@@ -33,13 +42,42 @@ Optional hard enforcement: use a GitHub ruleset to require the three CI matrix j
 and maintainer approval. Automated findings remain advisory; the workflow never
 merges, changes contributor branches, or submits approval/request-changes reviews.
 
+## AWS deployment
+
+Create the Mantle project through the
+[Projects API](https://docs.aws.amazon.com/bedrock/latest/userguide/projects.html)
+and tag it with `Application=mcp-canada` and `Purpose=pull-request-review`.
+The stack does not create or delete the project, so replacing the role cannot
+delete inference history. Deploy the scoped role with:
+
+```bash
+aws cloudformation deploy --region us-east-1 \
+  --stack-name mcp-canada-pr-review \
+  --template-file .github/aws/pr-review.yml \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides MantleProjectId=YOUR_PROJECT_ID VerificationBranch=
+```
+
+For a new stack in an account with an existing GitHub OIDC provider, also pass its
+ARN as `ExistingOidcProviderArn`. Leave that parameter unchanged on stack updates.
+The optional `VerificationBranch` allows a specific maintainer-owned branch during
+setup; reset it to empty immediately after verification. Normal role trust permits
+only `repo:ReyemTech/mcp-canada:ref:refs/heads/main`, never fork PR refs.
+
+The role permits `bedrock-mantle:CreateInference` only on the dedicated project,
+conditioned on the configured model and region, plus `GetProject` on that project.
+Requests include an explicit `OpenAI-Project` header. Inference in the default
+project, another project, or another model is not authorized by this role.
+Sessions last 15 minutes. Tag-based cost reporting may require activation in AWS
+Billing and can take time to appear; project separation is not a spending cap.
+
 ## Execution and permissions
 
 | Stage | Inputs | Permissions |
 | --- | --- | --- |
 | `CI` | PR checkout; lint/type/unit/catalog checks | `contents: read`, no secrets |
 | `PR Feedback / Publish CI feedback` | Current GitHub run/job metadata | Read actions/content; write PR comments |
-| `PR Feedback / Assess PR changes` | Trusted default-branch prompt plus PR diff and git objects | Read content/PR; provider API through a protected proxy |
+| `PR Feedback / Assess PR changes` | Trusted default-branch prompt plus PR diff and git objects | Read content/PR; OIDC; inference in one Mantle project |
 | `PR Feedback / Publish review` | Validated JSON report or failure status | Read content; write PR comments; no provider secret |
 
 CI runs once per pull-request event, not on branch pushes separately. A push to an
@@ -53,16 +91,18 @@ via GitHub's commit-to-PR API when the event does not include them.
 
 The reviewer fetches PR git objects but never checks out or executes proposed code,
 installs its dependencies, or loads its configuration. Its prompt and JSON schema
-are trusted default-branch files. It runs with read-only permissions and dropped
-sudo privileges. PR text, including proposed agent instructions, is untrusted data.
-The API key is not provided to the agent environment as an executable shell secret.
-No untrusted workflow artifacts are downloaded into a privileged publisher.
+are trusted default-branch files. A pinned CLI runs under the separate `pr-reviewer`
+OS account with a read-only sandbox and no sudo rights. PR text, including proposed
+agent instructions, is untrusted data. The provider process receives temporary,
+project-scoped AWS credentials; its shell tools inherit no AWS or GitHub tokens.
+The provider environment excludes bearer keys, OpenAI keys, AWS profiles, and runner
+tokens. No untrusted workflow artifacts are downloaded into a privileged publisher.
 
 The publisher validates report structure, priorities, changed file paths, and positive
 line numbers, escapes displayed text, and prevents user mentions. It rechecks the head
 SHA before publishing. It updates only its own marked bot comments, never comments
 with a matching marker written by a contributor. A timeout, bad output, missing
-key, or oversized diff produces **Manual review required**, not a clean review.
+configuration, failed AWS authentication, or oversized diff produces **Manual review required**, not a clean review.
 
 ## Reproduction and maintenance
 
@@ -76,7 +116,8 @@ actionable medium-priority findings, invalid reports, mention/HTML handling,
 and updating bot comments without overwriting contributor text.
 
 Use Actions → PR Feedback → Run workflow with a PR number to rerun only the review
-without executing PR tests. Automatic reviews follow CI completion; the next push
+without executing PR tests. A manual dispatch can review a draft; automatic runs
+skip drafts. Automatic reviews follow CI completion; the next push
 restarts the checks and review. Review jobs for a newer run cancel older feedback
 jobs on the same source branch. Any legacy push-triggered CI completions use a
 separate group and cannot cancel PR feedback. Automatic and manual publishers serialize per PR,

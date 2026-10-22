@@ -53,6 +53,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      id-token: write
     outputs:
       report: ${{ steps.assess.outputs.final-message }}
       configured: ${{ steps.config.outputs.available }}
@@ -66,9 +67,12 @@ jobs:
       - name: Check reviewer configuration
         id: config
         env:
-          REVIEW_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ROLE_ARN: ${{ vars.PR_REVIEW_ROLE_ARN }}
+          MANTLE_REGION: ${{ vars.PR_REVIEW_AWS_REGION }}
+          MANTLE_PROJECT: ${{ vars.PR_REVIEW_PROJECT_ID }}
+          REVIEW_MODEL: ${{ vars.PR_REVIEW_MODEL }}
         run: |
-          if [ -n "$REVIEW_KEY" ]; then
+          if [ -n "$ROLE_ARN" ] && [ -n "$MANTLE_REGION" ] && [ -n "$MANTLE_PROJECT" ] && [ -n "$REVIEW_MODEL" ]; then
             echo 'available=true' >> "$GITHUB_OUTPUT"
           else
             echo 'available=false' >> "$GITHUB_OUTPUT"
@@ -103,22 +107,31 @@ jobs:
           else
             echo 'size=ok' >> "$GITHUB_OUTPUT"
           fi
-      # No fork checkout, dependency installation, tests, or PR-supplied scripts here.
+      - name: Install reviewer runtime
+        if: ${{ steps.diff.outputs.size == 'ok' }}
+        run: npm install --global @openai/codex@0.163.0
+      - name: Isolate reviewer from runner credentials
+        if: ${{ steps.diff.outputs.size == 'ok' }}
+        run: bash .github/scripts/isolate-reviewer.sh
+      - name: Obtain temporary project-scoped AWS credentials
+        if: ${{ steps.diff.outputs.size == 'ok' }}
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
+        with:
+          role-to-assume: ${{ vars.PR_REVIEW_ROLE_ARN }}
+          aws-region: ${{ vars.PR_REVIEW_AWS_REGION }}
+          role-session-name: pr-review-${{ github.run_id }}
+          role-duration-seconds: 900
+          unset-current-credentials: true
+      # No fork checkout, project dependency installation, tests, or PR-supplied scripts here.
       # Run the agent last; its result is parsed in a separate, trusted publisher job.
       - name: Assess changes
         id: assess
         if: ${{ steps.diff.outputs.size == 'ok' }}
-        uses: openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675 # v1
-        with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          prompt-file: .github/review/prompt.md
-          output-schema-file: .github/review/schema.json
-          permission-profile: ':read-only'
-          safety-strategy: drop-sudo
-          allow-users: '*'
-          allow-bots: true
-          model: ${{ vars.PR_REVIEW_MODEL }}
-          effort: medium
+        env:
+          PR_REVIEW_PROJECT_ID: ${{ vars.PR_REVIEW_PROJECT_ID }}
+          PR_REVIEW_MODEL: ${{ vars.PR_REVIEW_MODEL }}
+          PR_REVIEW_UNPRIVILEGED_USER: pr-reviewer
+        run: python3 .github/scripts/run_review.py
 
   publish:
     name: Publish review

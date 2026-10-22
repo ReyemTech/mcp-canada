@@ -10,6 +10,7 @@ test('a completed run cannot publish feedback on a newer PR revision', () => {
   assert.equal(feedback.isCurrent(pr, 'b'.repeat(40), 'ReyemTech/mcp-canada'), false);
   assert.equal(feedback.isCurrent(pr, sha, 'ReyemTech/mcp-canada'), true);
   assert.equal(feedback.isCurrent({ ...pr, draft: true }, sha, 'ReyemTech/mcp-canada'), false);
+  assert.equal(feedback.isCurrent({ ...pr, draft: true }, sha, 'ReyemTech/mcp-canada', true), true);
   assert.equal(feedback.isCurrent({ ...pr, state: 'closed' }, sha, 'ReyemTech/mcp-canada'), false);
   assert.equal(feedback.isCurrent(pr, sha, 'other/repo'), false);
 });

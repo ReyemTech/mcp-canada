@@ -14,8 +14,8 @@ function text(value) {
     .replace(/[\\`*_{}\[\]()#!|]/g, '\\$&');
 }
 
-function isCurrent(pr, sha, repository) {
-  return pr.state === 'open' && !pr.draft && /^[a-f0-9]{40}$/.test(sha)
+function isCurrent(pr, sha, repository, allowDraft = false) {
+  return pr.state === 'open' && (allowDraft || !pr.draft) && /^[a-f0-9]{40}$/.test(sha)
     && pr.head.sha === sha && pr.base.repo.full_name === repository;
 }
 
@@ -118,7 +118,7 @@ async function resolvePull(github, context) {
   }
   for (const candidate of candidates) {
     const pr = (await github.rest.pulls.get({ ...repo, pull_number: candidate.number })).data;
-    if (isCurrent(pr, run?.head_sha || pr.head.sha, `${repo.owner}/${repo.repo}`)) {
+    if (isCurrent(pr, run?.head_sha || pr.head.sha, `${repo.owner}/${repo.repo}`, context.eventName === 'workflow_dispatch')) {
       if (run && pr.head.repo?.full_name !== run.head_repository?.full_name) continue;
       return { pr, run };
     }
@@ -138,7 +138,7 @@ async function prepare({ github, context, core }) {
       { ...context.repo, run_id: run.id, filter: 'latest', per_page: 100 });
     // Recheck after API reads so an obsolete run cannot overwrite current feedback.
     const current = (await github.rest.pulls.get({ ...context.repo, pull_number: pr.number })).data;
-    if (!isCurrent(current, pr.head.sha, `${context.repo.owner}/${context.repo.repo}`)) return;
+    if (!isCurrent(current, pr.head.sha, `${context.repo.owner}/${context.repo.repo}`, context.eventName === 'workflow_dispatch')) return;
     await upsertComment(github, context.repo, pr.number, '<!-- pr-checks -->', renderChecks(run, jobs), context.runId);
   }
 }
@@ -146,7 +146,7 @@ async function prepare({ github, context, core }) {
 async function prepareReview({ github, context, core }, number, sha, directory) {
   const fs = require('node:fs');
   const pr = (await github.rest.pulls.get({ ...context.repo, pull_number: Number(number) })).data;
-  if (!isCurrent(pr, sha, `${context.repo.owner}/${context.repo.repo}`)) return;
+  if (!isCurrent(pr, sha, `${context.repo.owner}/${context.repo.repo}`, context.eventName === 'workflow_dispatch')) return;
   const files = await github.paginate(github.rest.pulls.listFiles, { ...context.repo, pull_number: pr.number, per_page: 100 });
   fs.mkdirSync(directory, { recursive: true });
   fs.writeFileSync(`${directory}/pr.json`, JSON.stringify({ number: pr.number, title: pr.title, body: pr.body,
@@ -157,7 +157,7 @@ async function prepareReview({ github, context, core }, number, sha, directory) 
 async function publish({ github, context, core }, { number, sha, raw, reason }) {
   const repository = `${context.repo.owner}/${context.repo.repo}`;
   const pr = (await github.rest.pulls.get({ ...context.repo, pull_number: Number(number) })).data;
-  if (!isCurrent(pr, sha, repository)) return;
+  if (!isCurrent(pr, sha, repository, context.eventName === 'workflow_dispatch')) return;
   const url = `https://github.com/${repository}/actions/runs/${context.runId}`;
   let body = renderUnavailable(reason || 'failed', sha, url);
   if (raw && !reason) {
@@ -170,7 +170,7 @@ async function publish({ github, context, core }, { number, sha, raw, reason }) 
   }
   // Discard results if a new commit arrived while rendering.
   const current = (await github.rest.pulls.get({ ...context.repo, pull_number: pr.number })).data;
-  if (!isCurrent(current, sha, repository)) return;
+  if (!isCurrent(current, sha, repository, context.eventName === 'workflow_dispatch')) return;
   await upsertComment(github, context.repo, pr.number, '<!-- pr-review -->', body, context.runId);
 }
 

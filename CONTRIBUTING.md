@@ -132,9 +132,9 @@ changes do not replace a human-written module guide.
 4. The maintainer decides whether to merge. Passing checks and an automated review
    do not merge or approve the PR automatically.
 
-Reviews run for ready, open PRs after CI; drafts are skipped. Pushing a new revision
+Automatic reviews run for ready, open PRs after CI; drafts are skipped. Pushing a new revision
 reruns checks and invalidates older review results. Maintainers can rerun review
-from the **PR Feedback** workflow with a PR number. Feedback workflows must be on
+from the **PR Feedback** workflow with a PR number, including drafts. Feedback workflows must be on
 the default branch before they can run automatically.
 
 ## Commit messages and PR descriptions

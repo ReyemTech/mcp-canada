@@ -14,7 +14,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: pr-feedback-${{ github.event.workflow_run.event || 'manual' }}-${{ github.event.workflow_run.head_repository.full_name || github.repository }}-${{ github.event.workflow_run.head_branch || inputs.pr_number }}
+  group: pr-feedback-${{ github.repository }}-${{ github.event.workflow_run.id || format('manual-{0}', inputs.pr_number) }}
   cancel-in-progress: true
 
 jobs:

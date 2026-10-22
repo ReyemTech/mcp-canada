@@ -431,3 +431,10 @@ test('an immutable CI snapshot identifies fork runs without PR associations', as
   assert.equal((await feedback.latestCI(fixture.github, fixture.context.repo, pr)).state, 'passed');
   assert.equal((await feedback.resolvePull(fixture.github, fixture.context)).pr.number, 9);
 });
+
+test('comparison operators and ampersands are escaped once without changing their visible meaning', () => {
+  const body = feedback.renderReview(report({ summary: 'a < b & c > d' }),
+    'ReyemTech/mcp-canada', sha, [], passingCI);
+  assert.match(body, /a &lt; b &amp; c &gt; d/);
+  assert.doesNotMatch(body, /&amp;lt;|&amp;gt;|&amp;amp;/);
+});

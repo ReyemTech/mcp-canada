@@ -153,9 +153,9 @@ and updating bot comments without overwriting contributor text.
 Use Actions → PR Feedback → Run workflow with a PR number to rerun only the review
 without executing PR tests. A manual dispatch can review a draft; automatic runs
 skip drafts. Automatic reviews follow CI completion; the next push
-restarts the checks and review. Review jobs for a newer run cancel older feedback
-jobs on the same source branch. Any legacy push-triggered CI completions use a
-separate group and cannot cancel PR feedback. Automatic and manual publishers serialize per PR,
+restarts the checks and review. Automatic feedback runs are isolated by CI run ID, so PRs sharing a source branch
+cannot cancel each other. Manual reruns for the same PR cancel older manual reruns.
+Stale revision checks prevent outdated automatic assessments from publishing. Automatic and manual publishers serialize per PR,
 and an older feedback run cannot overwrite a comment from a newer run. The size
 limit requires manual review of large PRs.
 

@@ -39,6 +39,9 @@ the base revision. Do not check out the PR or load its configuration.
    Do not treat similarly named fields from different event/API objects as
    interchangeable. If an API behavior cannot be established without probing it,
    list that uncertainty under verification limits instead of inventing a defect.
+   Manually trace a concrete triggering input through the exact operations before
+   asserting a behavioral defect; do not assume replacement output is processed
+   again by a single-pass operation.
 5. Each finding must name the triggering input/condition, observable impact, and
    specific correction. Cite the changed file path and relevant line number in the
    HEAD revision. Max 10 findings; priority P0 (critical), P1 (high), P2 (medium).

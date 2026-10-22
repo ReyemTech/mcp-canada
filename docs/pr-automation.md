@@ -42,6 +42,10 @@ merges, changes contributor branches, or submits approval/request-changes review
 | `PR Feedback / Assess PR changes` | Trusted default-branch prompt plus PR diff and git objects | Read content/PR; provider API through a protected proxy |
 | `PR Feedback / Publish review` | Validated JSON report or failure status | Read content; write PR comments; no provider secret |
 
+CI runs once per pull-request event, not on branch pushes separately. A push to an
+open PR triggers its `synchronize` event and runs the three Python versions once.
+Manual CI dispatch remains available for branches without an open PR.
+
 Feedback is triggered by a completed **CI** run for a pull request. The workflow
 re-fetches the run and PR metadata, validates the repository and head revision,
 and skips closed, draft, or outdated revisions. Fork PR associations are resolved
@@ -74,8 +78,8 @@ and updating bot comments without overwriting contributor text.
 Use Actions → PR Feedback → Run workflow with a PR number to rerun only the review
 without executing PR tests. Automatic reviews follow CI completion; the next push
 restarts the checks and review. Review jobs for a newer run cancel older feedback
-jobs on the same source branch. Push-triggered CI completions use a separate group
-and cannot cancel PR feedback. Automatic and manual publishers serialize per PR,
+jobs on the same source branch. Any legacy push-triggered CI completions use a
+separate group and cannot cancel PR feedback. Automatic and manual publishers serialize per PR,
 and an older feedback run cannot overwrite a comment from a newer run. The size
 limit requires manual review of large PRs.
 

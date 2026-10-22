@@ -12,7 +12,7 @@ const jobs = () => ['3.12', '3.13', '3.14'].map(version => ({
   name: `Test (Python ${version})`, conclusion: 'success', html_url: 'job', steps: [],
 }));
 const pr = { number: 9, user: { login: 'contributor' }, requested_reviewers: [], state: 'open', draft: false, head: { sha, ref: 'feature', repo: { full_name: 'ReyemTech/mcp-canada' } },
-  base: { ref: 'main', repo: { full_name: 'ReyemTech/mcp-canada' } } };
+  base: { sha: 'c'.repeat(40), ref: 'main', repo: { full_name: 'ReyemTech/mcp-canada' } } };
 
 test('a completed run cannot publish feedback on a newer PR revision', () => {
   assert.equal(feedback.isCurrent(pr, 'b'.repeat(40), 'ReyemTech/mcp-canada'), false);
@@ -229,8 +229,8 @@ test('latest CI lookup never falls back to an older passing run', async () => {
   const fixture = apiFixture();
   fixture.github.paginate = async method => method();
   fixture.github.rest.actions.listWorkflowRuns = async () => [
-    { id: 20, head_sha: sha, head_branch: pr.head.ref, head_repository: pr.head.repo, pull_requests: [{ number: 9, base: { ref: 'main' } }], status: 'completed', conclusion: 'success', html_url: 'older' },
-    { id: 21, head_sha: sha, head_branch: pr.head.ref, head_repository: pr.head.repo, pull_requests: [{ number: 9, base: { ref: 'main' } }], status: 'in_progress', conclusion: null, html_url: 'newer' },
+    { id: 20, head_sha: sha, head_branch: pr.head.ref, head_repository: pr.head.repo, display_title: `CI PR#9 BASE:${pr.base.sha} REF:main`, pull_requests: [{ number: 9, base: { ref: 'main', sha: pr.base.sha } }], status: 'completed', conclusion: 'success', html_url: 'older' },
+    { id: 21, head_sha: sha, head_branch: pr.head.ref, head_repository: pr.head.repo, display_title: `CI PR#9 BASE:${pr.base.sha} REF:main`, pull_requests: [{ number: 9, base: { ref: 'main', sha: pr.base.sha } }], status: 'in_progress', conclusion: null, html_url: 'newer' },
   ];
   fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
   const status = await feedback.latestCI(fixture.github, fixture.context.repo, pr);
@@ -241,7 +241,7 @@ test('latest CI lookup never falls back to an older passing run', async () => {
 test('publisher checks live CI independently of the model report', async () => {
   const fixture = apiFixture();
   fixture.github.rest.actions.listWorkflowRuns = async () => [
-    { id: 21, head_sha: sha, head_branch: pr.head.ref, head_repository: pr.head.repo, pull_requests: [{ number: 9, base: { ref: 'main' } }], status: 'completed', conclusion: 'failure', html_url: 'run' },
+    { id: 21, head_sha: sha, head_branch: pr.head.ref, head_repository: pr.head.repo, display_title: `CI PR#9 BASE:${pr.base.sha} REF:main`, pull_requests: [{ number: 9, base: { ref: 'main', sha: pr.base.sha } }], status: 'completed', conclusion: 'failure', html_url: 'run' },
   ];
   fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
   await feedback.publish({ ...fixture, core: { warning() {} } }, { number: 9, sha, raw: JSON.stringify(report()) });
@@ -252,9 +252,9 @@ test('publisher checks live CI independently of the model report', async () => {
 test('a passing run from another PR with the same head cannot approve this PR', async () => {
   const fixture = apiFixture();
   fixture.github.rest.actions.listWorkflowRuns = async () => [
-    { id: 20, head_sha: sha, head_branch: pr.head.ref, head_repository: pr.head.repo,
-      pull_requests: [{ number: 9, base: { ref: 'main' } }], status: 'completed', conclusion: 'failure', html_url: 'ours' },
-    { id: 21, head_sha: sha, head_branch: pr.head.ref, head_repository: pr.head.repo,
+    { id: 20, head_sha: sha, head_branch: pr.head.ref, head_repository: pr.head.repo, display_title: `CI PR#9 BASE:${pr.base.sha} REF:main`,
+      pull_requests: [{ number: 9, base: { ref: 'main', sha: pr.base.sha } }], status: 'completed', conclusion: 'failure', html_url: 'ours' },
+    { id: 21, head_sha: sha, head_branch: pr.head.ref, head_repository: pr.head.repo, display_title: `CI PR#10 BASE:${pr.base.sha} REF:release`,
       pull_requests: [{ number: 10, base: { ref: 'release' } }], status: 'completed', conclusion: 'success', html_url: 'other' },
   ];
   fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
@@ -263,7 +263,7 @@ test('a passing run from another PR with the same head cannot approve this PR', 
   assert.equal(status.url, 'ours');
 });
 
-test('missing run associations withhold a merge signal even for a unique current PR', async () => {
+test('missing run snapshot withholds a merge signal despite current PR associations', async () => {
   const fixture = apiFixture();
   fixture.github.rest.actions.listWorkflowRuns = async () => [
     { id: 21, head_sha: sha, head_branch: pr.head.ref, head_repository: pr.head.repo,
@@ -290,7 +290,7 @@ test('large escaped reports fall back to manual review instead of exceeding GitH
 test('ready reviews tag the maintainer and request their review', async () => {
   const fixture = apiFixture();
   fixture.github.rest.actions.listWorkflowRuns = async () => [{ id: 21, head_sha: sha,
-    head_branch: pr.head.ref, head_repository: pr.head.repo, pull_requests: [{ number: 9, base: { ref: 'main' } }],
+    head_branch: pr.head.ref, head_repository: pr.head.repo, display_title: `CI PR#9 BASE:${pr.base.sha} REF:main`, pull_requests: [{ number: 9, base: { ref: 'main', sha: pr.base.sha } }],
     status: 'completed', conclusion: 'success', html_url: 'run' }];
   fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
   fixture.github.rest.pulls.listReviews = async () => [];
@@ -316,7 +316,7 @@ test('blocking findings tag only the actual PR author, not names from the report
 test('a maintainer who authored the PR is mentioned without an invalid self-review request', async () => {
   const fixture = apiFixture({ pull: { ...pr, user: { login: 'mariomeyer' } } });
   fixture.github.rest.actions.listWorkflowRuns = async () => [{ id: 21, head_sha: sha,
-    head_branch: pr.head.ref, head_repository: pr.head.repo, pull_requests: [{ number: 9, base: { ref: 'main' } }],
+    head_branch: pr.head.ref, head_repository: pr.head.repo, display_title: `CI PR#9 BASE:${pr.base.sha} REF:main`, pull_requests: [{ number: 9, base: { ref: 'main', sha: pr.base.sha } }],
     status: 'completed', conclusion: 'success', html_url: 'run' }];
   fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
   fixture.github.rest.pulls.requestReviewers = async () => { throw new Error('Self request attempted'); };
@@ -330,7 +330,7 @@ test('a pending review request or completed review is not requested again', asyn
   for (const alreadyRequested of [true, false]) {
     const fixture = apiFixture({ pull: { ...pr, requested_reviewers: alreadyRequested ? [{ login: 'mariomeyer' }] : [] } });
     fixture.github.rest.actions.listWorkflowRuns = async () => [{ id: 21, head_sha: sha,
-      head_branch: pr.head.ref, head_repository: pr.head.repo, pull_requests: [{ number: 9, base: { ref: 'main' } }],
+      head_branch: pr.head.ref, head_repository: pr.head.repo, display_title: `CI PR#9 BASE:${pr.base.sha} REF:main`, pull_requests: [{ number: 9, base: { ref: 'main', sha: pr.base.sha } }],
       status: 'completed', conclusion: 'success', html_url: 'run' }];
     fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
     fixture.github.rest.pulls.listReviews = async () => [{ user: { login: 'mariomeyer' }, commit_id: sha, state: 'APPROVED' }];
@@ -346,7 +346,7 @@ test('a pending review request or completed review is not requested again', asyn
 test('failed reviewer assignment is visible in the comment', async () => {
   const fixture = apiFixture();
   fixture.github.rest.actions.listWorkflowRuns = async () => [{ id: 21, head_sha: sha,
-    head_branch: pr.head.ref, head_repository: pr.head.repo, pull_requests: [{ number: 9, base: { ref: 'main' } }],
+    head_branch: pr.head.ref, head_repository: pr.head.repo, display_title: `CI PR#9 BASE:${pr.base.sha} REF:main`, pull_requests: [{ number: 9, base: { ref: 'main', sha: pr.base.sha } }],
     status: 'completed', conclusion: 'success', html_url: 'run' }];
   fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
   fixture.github.rest.pulls.listReviews = async () => [];
@@ -368,7 +368,7 @@ test('an older ready result cannot request review after a newer blocking comment
   const fixture = apiFixture({ comments: [{ id: 1, user: { login: 'github-actions[bot]' },
     body: '<!-- pr-review -->\n<!-- feedback-run: 200 -->\nChanges requested' }] });
   fixture.github.rest.actions.listWorkflowRuns = async () => [{ id: 21, head_sha: sha,
-    head_branch: pr.head.ref, head_repository: pr.head.repo, pull_requests: [{ number: 9, base: { ref: 'main' } }],
+    head_branch: pr.head.ref, head_repository: pr.head.repo, display_title: `CI PR#9 BASE:${pr.base.sha} REF:main`, pull_requests: [{ number: 9, base: { ref: 'main', sha: pr.base.sha } }],
     status: 'completed', conclusion: 'success', html_url: 'run' }];
   fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
   fixture.github.rest.pulls.listReviews = async () => [];
@@ -378,4 +378,56 @@ test('an older ready result cannot request review after a newer blocking comment
     { number: 9, sha, raw: JSON.stringify(report()), maintainer: 'mariomeyer' });
   assert.equal(requested.length, 0);
   assert.match(fixture.store.comments[0].body, /Changes requested/);
+});
+
+test('base changes invalidate an assessment even when the head stays unchanged', () => {
+  const base = { sha: pr.base.sha, ref: pr.base.ref };
+  assert.equal(feedback.isCurrent(pr, sha, 'ReyemTech/mcp-canada', false, base), true);
+  assert.equal(feedback.isCurrent({ ...pr, base: { ...pr.base, sha: 'd'.repeat(40) } }, sha,
+    'ReyemTech/mcp-canada', false, base), false);
+  assert.equal(feedback.isCurrent({ ...pr, base: { ...pr.base, ref: 'release' } }, sha,
+    'ReyemTech/mcp-canada', false, base), false);
+});
+
+test('a passing CI run for an older base cannot recommend merging', async () => {
+  const fixture = apiFixture();
+  fixture.github.rest.actions.listWorkflowRuns = async () => [{ id: 21, head_sha: sha,
+    head_branch: pr.head.ref, head_repository: pr.head.repo, display_title: `CI PR#9 BASE:${'d'.repeat(40)} REF:main`,
+    pull_requests: [{ number: 9, base: { ref: 'main', sha: pr.base.sha } }],
+    status: 'completed', conclusion: 'success', html_url: 'old-base' }];
+  fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
+  assert.equal((await feedback.latestCI(fixture.github, fixture.context.repo, pr)).state, 'unavailable');
+});
+
+test('a base changed after assessment cannot publish or request review', async () => {
+  const fixture = apiFixture({ pull: { ...pr, base: { ...pr.base, sha: 'd'.repeat(40) } } });
+  const requested = [];
+  fixture.github.rest.pulls.requestReviewers = async args => { requested.push(args); };
+  await feedback.publish({ ...fixture, core: { warning() {} } }, { number: 9, sha,
+    base: { sha: pr.base.sha, ref: pr.base.ref }, raw: JSON.stringify(report()), maintainer: 'mariomeyer' });
+  assert.equal(requested.length, 0);
+  assert.equal(fixture.store.comments.length, 0);
+});
+
+test('checks from an older base are explicitly stale rather than all passing', async () => {
+  const fixture = apiFixture({ run: { event: 'pull_request', path: '.github/workflows/ci.yml',
+    status: 'completed', conclusion: 'success', head_sha: sha, html_url: 'old-base',
+    head_repository: pr.head.repo, display_title: `CI PR#9 BASE:${'d'.repeat(40)} REF:main`, pull_requests: [{ number: 9, base: { ref: 'main', sha: pr.base.sha } }] } });
+  fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
+  await feedback.prepare({ ...fixture, core: { setOutput() {} } });
+  assert.equal(fixture.store.comments.length, 1);
+  assert.doesNotMatch(fixture.store.comments[0].body, /All checks passed/);
+  assert.match(fixture.store.comments[0].body, /older or unverified base/);
+});
+
+test('an immutable CI snapshot identifies fork runs without PR associations', async () => {
+  const fixture = apiFixture({ run: { event: 'pull_request', path: '.github/workflows/ci.yml',
+    status: 'completed', conclusion: 'success', head_sha: sha, head_branch: pr.head.ref,
+    head_repository: pr.head.repo, display_title: `CI PR#9 BASE:${pr.base.sha} REF:main`, pull_requests: [] } });
+  fixture.github.rest.actions.listWorkflowRuns = async () => [{ ...fixture.context.payload.workflow_run,
+    id: 21, head_sha: sha, head_branch: pr.head.ref, head_repository: pr.head.repo,
+    display_title: `CI PR#9 BASE:${pr.base.sha} REF:main`, pull_requests: [], status: 'completed', conclusion: 'success' }];
+  fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
+  assert.equal((await feedback.latestCI(fixture.github, fixture.context.repo, pr)).state, 'passed');
+  assert.equal((await feedback.resolvePull(fixture.github, fixture.context)).pr.number, 9);
 });

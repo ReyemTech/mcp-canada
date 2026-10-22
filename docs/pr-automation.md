@@ -21,11 +21,23 @@ a merge recommendation. Blocking comments tag the PR author; merge recommendatio
 tag the configured maintainer and request their review. Existing requests and
 completed reviews for the same revision are not requested again. GitHub forbids
 self-review requests, and requests for drafts are deferred until ready for review.
-If the request API fails, the comment explains that a manual request is needed. Unverified checklist items stay unchecked; source inspection
-is distinguished from executing tests. The publisher independently reads the newest
-CI run for the same PR and head commit rather than relying on the review's test
-claims. If GitHub omits the run's PR association, the review is still published,
-but a positive merge recommendation is withheld because its target cannot be proven.
+If the request API fails, the comment explains that a manual request is needed.
+Unverified checklist items stay unchecked; source inspection is distinguished from
+executing tests.
+
+Each recommendation names its reviewed base branch and SHA, and is valid only for
+that head/base pair. A changed base invalidates in-progress assessments and stale
+CI results. Retargeting triggers fresh CI through the PR edited event; title/body
+edits also rerun CI. After the base branch advances, update/rebase the PR branch
+to obtain fresh checks and a fresh review before merging. A green comment for an
+older base does not authorize merging against a newer base.
+
+The publisher independently reads the newest CI run for the same PR and head/base
+commit pair rather than relying on the review's test
+claims. The CI run name records the triggering PR number and base ref/SHA at run
+creation; mutable PR associations are not proof of which base was tested. This
+also identifies fork runs with empty PR associations. Legacy runs without this
+snapshot require fresh checks before a merge recommendation can be given.
 
 ## Maintainer setup
 

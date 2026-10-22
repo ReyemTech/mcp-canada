@@ -1,6 +1,8 @@
 Review this pull request for the maintainer and contributor. Return only JSON
 matching the provided schema. Use neutral language without model/tool names,
-attribution, badges, promotional footers, or mentions of users.
+attribution, badges, promotional footers, or mentions of users. Write prose fields
+as plain text; the publisher adds Markdown. Do not wrap identifiers in backticks or
+backslash-escape Markdown yourself.
 
 ## Trust boundary
 

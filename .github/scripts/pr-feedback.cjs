@@ -14,9 +14,10 @@ function text(value) {
     .replace(/[\\`*_{}\[\]()#!|]/g, '\\$&');
 }
 
-function isCurrent(pr, sha, repository, allowDraft = false) {
+function isCurrent(pr, sha, repository, allowDraft = false, base) {
   return pr.state === 'open' && (allowDraft || !pr.draft) && /^[a-f0-9]{40}$/.test(sha)
-    && pr.head.sha === sha && pr.base.repo.full_name === repository;
+    && pr.head.sha === sha && pr.base.repo.full_name === repository
+    && (!base || (pr.base.sha === base.sha && pr.base.ref === base.ref));
 }
 
 const REQUIRED_JOBS = ['3.12', '3.13', '3.14'].map(version => `Test (Python ${version})`);
@@ -32,6 +33,16 @@ function ciStatus(run, jobs, sha) {
   return { state: passed ? 'passed' : failed ? 'failed' : 'unavailable', url };
 }
 
+function ciSnapshot(run) {
+  const match = run.display_title?.match(/^CI PR#(\d+) BASE:([a-f0-9]{40}) REF:(.+)$/);
+  return match ? { number: Number(match[1]), sha: match[2], ref: match[3] } : null;
+}
+
+function runMatchesBase(run, pr) {
+  const base = ciSnapshot(run);
+  return Boolean(base && base.number === pr.number && base.sha === pr.base.sha && base.ref === pr.base.ref);
+}
+
 async function latestCI(github, repo, pr) {
   const sha = pr.head.sha;
   const runs = await github.paginate(github.rest.actions.listWorkflowRuns,
@@ -40,13 +51,12 @@ async function latestCI(github, repo, pr) {
     && item.head_repository?.full_name === pr.head.repo?.full_name).sort((a, b) => b.id - a.id);
   let run;
   for (const candidate of candidates) {
-    if (candidate.pull_requests?.length) {
-      if (!candidate.pull_requests.some(item => item.number === pr.number && item.base?.ref === pr.base.ref)) continue;
-    } else {
-      // A current commit-to-PR match cannot establish which historical PR/base
-      // triggered a run. Never infer a positive merge signal from a missing link.
-      return { state: 'unavailable', url: candidate.html_url };
-    }
+    const snapshot = ciSnapshot(candidate);
+    // The workflow run name snapshots the triggering PR/base. The pull_requests
+    // association is mutable and can describe a different base after retargeting.
+    if (!snapshot) return { state: 'unavailable', url: candidate.html_url };
+    if (snapshot.number !== pr.number) continue;
+    if (!runMatchesBase(candidate, pr)) return { state: 'unavailable', url: candidate.html_url };
     run = candidate;
     break;
   }
@@ -57,10 +67,11 @@ async function latestCI(github, repo, pr) {
   return ciStatus(run, jobs, sha);
 }
 
-function renderChecks(run, jobs) {
-  const passed = ciStatus(run, jobs, run.head_sha).state === 'passed';
+function renderChecks(run, jobs, verifiedBase = true) {
+  const passed = verifiedBase && ciStatus(run, jobs, run.head_sha).state === 'passed';
   const lines = ['## PR Checks', '', `**${passed ? 'All checks passed' : 'Changes needed or checks incomplete'}**`,
     '', `Revision: \`${run.head_sha.slice(0, 7)}\` · [CI run](${run.html_url})`, ''];
+  if (!verifiedBase) lines.push('CI ran against an older or unverified base. Push an update to the PR branch for fresh checks; these results do not establish CI for the current target.', '');
   if (!jobs.length) {
     lines.push('No test jobs ran. A maintainer should check workflow approval and runner availability, then restart CI. This is not a passing result.');
   }
@@ -115,6 +126,7 @@ function renderReview(report, repository, sha, files, ci = { state: 'unavailable
   const lines = ['## PR Review', '', `**${verdict}** · Revision \`${sha.slice(0, 7)}\``];
   if (blocked && validLogin(routing.author)) lines.push('', `@${routing.author} please address the blocking issues or failed checks and push an update.`);
   if (ready && validLogin(routing.maintainer)) lines.push('', `@${routing.maintainer} merge recommended — please review and decide whether to merge.`);
+  if (routing.base) lines.push('', `Reviewed against: \`${text(routing.base.ref)}@${routing.base.sha.slice(0, 7)}\`. Recommendation applies to this head/base pair.`);
   lines.push('', text(report.summary));
   const ciLabels = { passed: 'All three CI jobs passed for this revision.', failed: 'CI failed or required jobs did not pass.',
     pending: 'CI is still running for this revision.', unavailable: 'Passing CI could not be verified for this revision.' };
@@ -189,7 +201,8 @@ async function resolvePull(github, context) {
   } else {
     run = (await github.rest.actions.getWorkflowRun({ ...repo, run_id: context.payload.workflow_run.id })).data;
     if (run.event !== 'pull_request' || run.path !== '.github/workflows/ci.yml' || run.status !== 'completed') return null;
-    candidates = run.pull_requests || [];
+    const snapshot = ciSnapshot(run);
+    candidates = snapshot ? [{ number: snapshot.number }] : run.pull_requests || [];
     // GitHub sometimes omits fork PR associations on workflow_run events.
     if (!candidates.length) {
       candidates = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit,
@@ -201,7 +214,8 @@ async function resolvePull(github, context) {
   for (const candidate of candidates) {
     const pr = (await github.rest.pulls.get({ ...repo, pull_number: candidate.number })).data;
     if (isCurrent(pr, run?.head_sha || pr.head.sha, `${repo.owner}/${repo.repo}`, context.eventName === 'workflow_dispatch')) {
-      if (run && pr.head.repo?.full_name !== run.head_repository?.full_name) continue;
+      if (run && (pr.head.repo?.full_name !== run.head_repository?.full_name
+        || (run.head_branch && run.head_branch !== pr.head.ref))) continue;
       return { pr, run };
     }
   }
@@ -215,24 +229,27 @@ async function prepare({ github, context, core }) {
   core.setOutput('pr_number', pr.number);
   core.setOutput('head_sha', pr.head.sha);
   core.setOutput('base_sha', pr.base.sha);
+  core.setOutput('base_ref', pr.base.ref);
   if (run) {
     const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun,
       { ...context.repo, run_id: run.id, filter: 'latest', per_page: 100 });
     // Recheck after API reads so an obsolete run cannot overwrite current feedback.
     const current = (await github.rest.pulls.get({ ...context.repo, pull_number: pr.number })).data;
-    if (!isCurrent(current, pr.head.sha, `${context.repo.owner}/${context.repo.repo}`, context.eventName === 'workflow_dispatch')) return;
-    await upsertComment(github, context.repo, pr.number, '<!-- pr-checks -->', renderChecks(run, jobs), context.runId);
+    if (!isCurrent(current, pr.head.sha, `${context.repo.owner}/${context.repo.repo}`, context.eventName === 'workflow_dispatch', pr.base)) return;
+    await upsertComment(github, context.repo, pr.number, '<!-- pr-checks -->', renderChecks(run, jobs, runMatchesBase(run, pr)), context.runId);
   }
 }
 
-async function prepareReview({ github, context, core }, number, sha, directory) {
+async function prepareReview({ github, context, core }, number, sha, directory, base) {
   const fs = require('node:fs');
   const pr = (await github.rest.pulls.get({ ...context.repo, pull_number: Number(number) })).data;
-  if (!isCurrent(pr, sha, `${context.repo.owner}/${context.repo.repo}`, context.eventName === 'workflow_dispatch')) return;
+  if (!isCurrent(pr, sha, `${context.repo.owner}/${context.repo.repo}`, context.eventName === 'workflow_dispatch', base)) return;
   const files = await github.paginate(github.rest.pulls.listFiles, { ...context.repo, pull_number: pr.number, per_page: 100 });
   fs.mkdirSync(directory, { recursive: true });
   fs.writeFileSync(`${directory}/pr.json`, JSON.stringify({ number: pr.number, title: pr.title, body: pr.body,
-    head_sha: sha, base_sha: pr.base.sha, files: files.map(file => ({ path: file.filename, status: file.status })) }, null, 2));
+    head_sha: sha, base_sha: pr.base.sha, base_ref: pr.base.ref, files: files.map(file => ({ path: file.filename, status: file.status })) }, null, 2));
+  core.setOutput('base_sha', pr.base.sha);
+  core.setOutput('base_ref', pr.base.ref);
   core.setOutput('current', 'true');
 }
 
@@ -255,10 +272,10 @@ async function requestMaintainerReview({ github, context, core }, pr, maintainer
   }
 }
 
-async function publish({ github, context, core }, { number, sha, raw, reason, maintainer }) {
+async function publish({ github, context, core }, { number, sha, raw, reason, maintainer, base }) {
   const repository = `${context.repo.owner}/${context.repo.repo}`;
   const pr = (await github.rest.pulls.get({ ...context.repo, pull_number: Number(number) })).data;
-  if (!isCurrent(pr, sha, repository, context.eventName === 'workflow_dispatch')) return;
+  if (!isCurrent(pr, sha, repository, context.eventName === 'workflow_dispatch', base)) return;
   const url = `https://github.com/${repository}/actions/runs/${context.runId}`;
   let body = renderUnavailable(reason || 'failed', sha, url);
   let decision;
@@ -273,7 +290,7 @@ async function publish({ github, context, core }, { number, sha, raw, reason, ma
         ci = { state: 'unavailable' };
       }
       const report = JSON.parse(raw);
-      body = renderReview(report, repository, sha, files.map(file => file.filename), ci, { author: pr.user?.login, maintainer });
+      body = renderReview(report, repository, sha, files.map(file => file.filename), ci, { author: pr.user?.login, maintainer, base });
       decision = reviewDecision(report, ci);
       if (decision === 'ready' && !validLogin(maintainer)) {
         body = renderUnavailable('not_configured', sha, url);
@@ -285,7 +302,7 @@ async function publish({ github, context, core }, { number, sha, raw, reason, ma
   }
   // Discard results if a new commit arrived while rendering.
   const current = (await github.rest.pulls.get({ ...context.repo, pull_number: pr.number })).data;
-  if (!isCurrent(current, sha, repository, context.eventName === 'workflow_dispatch')) return;
+  if (!isCurrent(current, sha, repository, context.eventName === 'workflow_dispatch', base)) return;
   if (decision === 'ready') {
     const existing = await findBotComment(github, context.repo, pr.number, '<!-- pr-review -->');
     if (superseded(existing, context.runId)) return;
@@ -293,7 +310,7 @@ async function publish({ github, context, core }, { number, sha, raw, reason, ma
     if (note) body += `\n\n${note}`;
     // A reviewer API call may race with a new contributor revision.
     const latest = (await github.rest.pulls.get({ ...context.repo, pull_number: pr.number })).data;
-    if (!isCurrent(latest, sha, repository, context.eventName === 'workflow_dispatch')) return;
+    if (!isCurrent(latest, sha, repository, context.eventName === 'workflow_dispatch', base)) return;
   }
   await upsertComment(github, context.repo, pr.number, '<!-- pr-review -->', body, context.runId);
 }

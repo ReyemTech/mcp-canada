@@ -31,6 +31,7 @@ jobs:
       pr_number: ${{ steps.target.outputs.pr_number }}
       head_sha: ${{ steps.target.outputs.head_sha }}
       base_sha: ${{ steps.target.outputs.base_sha }}
+      base_ref: ${{ steps.target.outputs.base_ref }}
     steps:
       # Only trusted default-branch code runs with comment permissions.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -84,10 +85,13 @@ jobs:
         env:
           PR_NUMBER: ${{ needs.checks.outputs.pr_number }}
           HEAD_SHA: ${{ needs.checks.outputs.head_sha }}
+          BASE_SHA: ${{ needs.checks.outputs.base_sha }}
+          BASE_REF: ${{ needs.checks.outputs.base_ref }}
         with:
           script: |
             await require('./.github/scripts/pr-feedback.cjs').prepareReview(
-              { github, context, core }, process.env.PR_NUMBER, process.env.HEAD_SHA, 'review-input');
+              { github, context, core }, process.env.PR_NUMBER, process.env.HEAD_SHA, 'review-input',
+              { sha: process.env.BASE_SHA, ref: process.env.BASE_REF });
       - name: Fetch revision as data and bound review size
         id: diff
         if: ${{ steps.metadata.outputs.current == 'true' }}
@@ -156,6 +160,8 @@ jobs:
         env:
           PR_NUMBER: ${{ needs.checks.outputs.pr_number }}
           HEAD_SHA: ${{ needs.checks.outputs.head_sha }}
+          BASE_SHA: ${{ needs.checks.outputs.base_sha }}
+          BASE_REF: ${{ needs.checks.outputs.base_ref }}
           REVIEW_MAINTAINER: ${{ vars.PR_REVIEW_MAINTAINER }}
           REVIEW_REPORT: ${{ needs.review.outputs.report }}
           REVIEW_CONFIGURED: ${{ needs.review.outputs.configured }}
@@ -169,4 +175,5 @@ jobs:
             await require('./.github/scripts/pr-feedback.cjs').publish({ github, context, core }, {
               number: process.env.PR_NUMBER, sha: process.env.HEAD_SHA,
               raw: process.env.REVIEW_REPORT, reason, maintainer: process.env.REVIEW_MAINTAINER,
+              base: { sha: process.env.BASE_SHA, ref: process.env.BASE_REF },
             });

@@ -1,9 +1,10 @@
 name: CI
+run-name: "CI PR#${{ github.event.pull_request.number || 0 }} BASE:${{ github.event.pull_request.base.sha || github.sha }} REF:${{ github.event.pull_request.base.ref || github.ref_name }}"
 
 on:
   workflow_dispatch:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
 
 permissions:
   contents: read

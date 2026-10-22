@@ -638,15 +638,19 @@ class TestManitobaGetDroughtStatus:
         from .conftest import SAMPLE_DROUGHT_FEATURES
 
         with patch(
-            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            "mcp_canada.modules.manitoba.client.api_get",
             new_callable=AsyncMock,
-            return_value=SAMPLE_DROUGHT_FEATURES,
+            return_value={
+                "features": [{"attributes": row} for row in SAMPLE_DROUGHT_FEATURES[0]],
+                "exceededTransferLimit": SAMPLE_DROUGHT_FEATURES[1],
+            },
         ):
             data, cached = await fetch_drought_status()
         assert "features" in data
         assert "count" in data
         assert "truncated" in data
         assert data["count"] == len(data["features"])
+        assert data["features"] == SAMPLE_DROUGHT_FEATURES[0]
 
     @pytest.mark.asyncio
     async def test_filter_province_applies_bbox_geometry(self):
@@ -702,14 +706,18 @@ class TestManitobaGetDroughtStatus:
         from .conftest import SAMPLE_DROUGHT_FEATURES
 
         with patch(
-            "mcp_canada.modules.manitoba.client.arcgis_hub.query_feature_service",
+            "mcp_canada.modules.manitoba.client.api_get",
             new_callable=AsyncMock,
-            return_value=SAMPLE_DROUGHT_FEATURES,
+            return_value={
+                "features": [{"attributes": row} for row in SAMPLE_DROUGHT_FEATURES[0]],
+                "exceededTransferLimit": SAMPLE_DROUGHT_FEATURES[1],
+            },
         ):
             data, _ = await fetch_drought_status()
-        if data["features"]:
-            feat = data["features"][0]
-            assert "DM" in feat or "dm" in feat or "OBS_DATE" in feat
+        assert data["features"]
+        feat = data["features"][0]
+        assert "DM" in feat
+        assert "OBS_DATE" in feat
 
 
 class TestManitobaGetAgWeatherStations:

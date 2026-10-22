@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Project-scoped Mantle access for trusted mcp-canada PR review workflows
+
+Parameters:
+  GitHubRepository:
+    Type: String
+    Default: ReyemTech/mcp-canada
+    AllowedPattern: '[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+'
+  TrustedBranch:
+    Type: String
+    Default: main
+  VerificationBranch:
+    Type: String
+    Default: ''
+    AllowedPattern: '[A-Za-z0-9/_.-]*'
+    Description: Optional temporary maintainer branch for setup verification; leave empty normally
+  ExistingOidcProviderArn:
+    Type: String
+    Default: ''
+    Description: Reuse the account's GitHub OIDC provider when one already exists
+  MantleRegion:
+    Type: String
+    Default: us-east-1
+  MantleProjectId:
+    Type: String
+    AllowedPattern: 'proj_[a-z0-9]+'
+  ReviewModel:
+    Type: String
+    Default: openai.gpt-6-sol
+
+Conditions:
+  CreateOidcProvider: !Equals [!Ref ExistingOidcProviderArn, '']
+  AllowVerificationBranch: !Not [!Equals [!Ref VerificationBranch, '']]
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateOidcProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+      Tags:
+        - Key: Application
+          Value: mcp-canada
+
+  ReviewRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref AWS::StackName
+      Description: Invoke one Mantle model in the dedicated mcp-canada project
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If [CreateOidcProvider, !Ref GitHubOidcProvider, !Ref ExistingOidcProviderArn]
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !If
+                  - AllowVerificationBranch
+                  - - !Sub 'repo:${GitHubRepository}:ref:refs/heads/${TrustedBranch}'
+                    - !Sub 'repo:${GitHubRepository}:ref:refs/heads/${VerificationBranch}'
+                  - !Sub 'repo:${GitHubRepository}:ref:refs/heads/${TrustedBranch}'
+      Policies:
+        - PolicyName: MantleProjectInference
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: InvokeSelectedModel
+                Effect: Allow
+                Action: bedrock-mantle:CreateInference
+                Resource: !Sub 'arn:${AWS::Partition}:bedrock-mantle:${MantleRegion}:${AWS::AccountId}:project/${MantleProjectId}'
+                Condition:
+                  StringEquals:
+                    bedrock-mantle:Model: !Ref ReviewModel
+                    aws:RequestedRegion: !Ref MantleRegion
+              - Sid: ReadSelectedProject
+                Effect: Allow
+                Action: bedrock-mantle:GetProject
+                Resource: !Sub 'arn:${AWS::Partition}:bedrock-mantle:${MantleRegion}:${AWS::AccountId}:project/${MantleProjectId}'
+      Tags:
+        - Key: Application
+          Value: mcp-canada
+        - Key: Purpose
+          Value: pull-request-review
+
+Outputs:
+  ReviewRoleArn:
+    Value: !GetAtt ReviewRole.Arn
+  MantleProjectArn:
+    Value: !Sub 'arn:${AWS::Partition}:bedrock-mantle:${MantleRegion}:${AWS::AccountId}:project/${MantleProjectId}'

@@ -1,0 +1,207 @@
+name: PR Feedback
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review again
+        required: true
+        type: number
+
+permissions: {}
+
+concurrency:
+  group: pr-feedback-${{ github.repository }}-${{ github.event.workflow_run.id || format('manual-{0}', inputs.pr_number) }}
+  cancel-in-progress: true
+
+jobs:
+  target:
+    name: Locate current PR
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      pr_number: ${{ steps.target.outputs.pr_number }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Resolve PR before acquiring the comment lock
+        id: target
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const target = await require('./.github/scripts/pr-feedback.cjs').resolvePull(github, context);
+            if (target) core.setOutput('pr_number', target.pr.number);
+
+  checks:
+    name: Publish CI feedback
+    needs: target
+    if: ${{ needs.target.outputs.pr_number != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: pr-checks-publish-${{ needs.target.outputs.pr_number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    outputs:
+      pr_number: ${{ steps.target.outputs.pr_number }}
+      head_sha: ${{ steps.target.outputs.head_sha }}
+      base_sha: ${{ steps.target.outputs.base_sha }}
+      base_ref: ${{ steps.target.outputs.base_ref }}
+    steps:
+      # Only trusted default-branch code runs with comment permissions.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Locate current PR and update check results
+        id: target
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            await require('./.github/scripts/pr-feedback.cjs').prepare({ github, context, core });
+
+  review:
+    name: Assess PR changes
+    needs: checks
+    if: ${{ needs.checks.outputs.pr_number != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
+    outputs:
+      report: ${{ steps.assess.outputs.final-message }}
+      configured: ${{ steps.config.outputs.available }}
+      size: ${{ steps.diff.outputs.size }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check reviewer configuration
+        id: config
+        env:
+          ROLE_ARN: ${{ vars.PR_REVIEW_ROLE_ARN }}
+          MANTLE_REGION: ${{ vars.PR_REVIEW_AWS_REGION }}
+          MANTLE_PROJECT: ${{ vars.PR_REVIEW_PROJECT_ID }}
+          REVIEW_MODEL: ${{ vars.PR_REVIEW_MODEL }}
+        run: |
+          if [ -n "$ROLE_ARN" ] && [ -n "$MANTLE_REGION" ] && [ -n "$MANTLE_PROJECT" ] && [ -n "$REVIEW_MODEL" ]; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Read current PR metadata
+        id: metadata
+        if: ${{ steps.config.outputs.available == 'true' }}
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          PR_NUMBER: ${{ needs.checks.outputs.pr_number }}
+          HEAD_SHA: ${{ needs.checks.outputs.head_sha }}
+          BASE_SHA: ${{ needs.checks.outputs.base_sha }}
+          BASE_REF: ${{ needs.checks.outputs.base_ref }}
+        with:
+          script: |
+            await require('./.github/scripts/pr-feedback.cjs').prepareReview(
+              { github, context, core }, process.env.PR_NUMBER, process.env.HEAD_SHA, 'review-input',
+              { sha: process.env.BASE_SHA, ref: process.env.BASE_REF });
+      - name: Fetch revision as data and bound review size
+        id: diff
+        if: ${{ steps.metadata.outputs.current == 'true' }}
+        env:
+          PR_NUMBER: ${{ needs.checks.outputs.pr_number }}
+          HEAD_SHA: ${{ needs.checks.outputs.head_sha }}
+          BASE_SHA: ${{ needs.checks.outputs.base_sha }}
+        run: |
+          [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]
+          [[ "$HEAD_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$BASE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          git -c core.hooksPath=/dev/null fetch --no-tags origin "refs/pull/$PR_NUMBER/head:refs/review/head" "$BASE_SHA"
+          test "$(git rev-parse refs/review/head)" = "$HEAD_SHA"
+          git --no-pager diff --no-ext-diff --no-textconv "$BASE_SHA...$HEAD_SHA" > review-input/diff.patch
+          if [ "$(wc -c < review-input/diff.patch)" -gt 400000 ]; then
+            echo 'size=too_large' >> "$GITHUB_OUTPUT"
+          else
+            echo 'size=ok' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install reviewer runtime
+        if: ${{ steps.diff.outputs.size == 'ok' }}
+        run: npm install --global @openai/codex@0.163.0
+      - name: Isolate reviewer from runner credentials
+        if: ${{ steps.diff.outputs.size == 'ok' }}
+        run: bash .github/scripts/isolate-reviewer.sh
+      - name: Obtain temporary project-scoped AWS credentials
+        if: ${{ steps.diff.outputs.size == 'ok' }}
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
+        with:
+          role-to-assume: ${{ vars.PR_REVIEW_ROLE_ARN }}
+          aws-region: ${{ vars.PR_REVIEW_AWS_REGION }}
+          role-session-name: pr-review-${{ github.run_id }}
+          role-duration-seconds: 900
+          unset-current-credentials: true
+      # No fork checkout, project dependency installation, tests, or PR-supplied scripts here.
+      # Run the agent last; its result is parsed in a separate, trusted publisher job.
+      - name: Assess changes
+        id: assess
+        if: ${{ steps.diff.outputs.size == 'ok' }}
+        env:
+          PR_REVIEW_PROJECT_ID: ${{ vars.PR_REVIEW_PROJECT_ID }}
+          PR_REVIEW_MODEL: ${{ vars.PR_REVIEW_MODEL }}
+          PR_REVIEW_UNPRIVILEGED_USER: pr-reviewer
+        run: python3 .github/scripts/run_review.py
+
+  publish:
+    name: Publish review
+    needs: [checks, review]
+    if: ${{ always() && !cancelled() && needs.checks.outputs.pr_number != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: pr-review-publish-${{ needs.checks.outputs.pr_number }}
+      cancel-in-progress: false
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Update PR review comment
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          PR_NUMBER: ${{ needs.checks.outputs.pr_number }}
+          HEAD_SHA: ${{ needs.checks.outputs.head_sha }}
+          BASE_SHA: ${{ needs.checks.outputs.base_sha }}
+          BASE_REF: ${{ needs.checks.outputs.base_ref }}
+          REVIEW_MAINTAINER: ${{ vars.PR_REVIEW_MAINTAINER }}
+          REVIEW_REPORT: ${{ needs.review.outputs.report }}
+          REVIEW_CONFIGURED: ${{ needs.review.outputs.configured }}
+          REVIEW_SIZE: ${{ needs.review.outputs.size }}
+          REVIEW_RESULT: ${{ needs.review.result }}
+        with:
+          script: |
+            const reason = process.env.REVIEW_CONFIGURED === 'false' ? 'not_configured'
+              : process.env.REVIEW_SIZE === 'too_large' ? 'too_large'
+              : process.env.REVIEW_RESULT !== 'success' ? 'failed' : undefined;
+            await require('./.github/scripts/pr-feedback.cjs').publish({ github, context, core }, {
+              number: process.env.PR_NUMBER, sha: process.env.HEAD_SHA,
+              raw: process.env.REVIEW_REPORT, reason, maintainer: process.env.REVIEW_MAINTAINER,
+              base: { sha: process.env.BASE_SHA, ref: process.env.BASE_REF },
+            });

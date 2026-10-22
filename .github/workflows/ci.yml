@@ -1,22 +1,35 @@
 name: CI
+run-name: "CI PR#${{ github.event.pull_request.number || 0 }} BASE:${{ github.event.pull_request.base.sha || github.sha }} REF:${{ github.event.pull_request.base.ref || github.ref_name }}"
 
 on:
   workflow_dispatch:
   pull_request:
-  push:
-    branches-ignore:
-      - main
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.12", "3.13", "3.14"]
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Test PR feedback helpers
+        run: node --test .github/scripts/*.test.cjs
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -25,16 +38,21 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
+        id: install
         run: uv sync --locked --dev
 
       - name: Lint (ruff)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: uv run ruff check src/ tests/
 
       - name: Type check (pyright)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: uv run pyright
 
       - name: Run unit tests with coverage
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: uv run pytest --cov=src/mcp_canada
 
       - name: Check catalog freshness
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: uv run python scripts/generate_catalog.py --check

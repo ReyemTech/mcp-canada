@@ -79,7 +79,16 @@ function renderChecks(run, jobs) {
   return lines.join('\n');
 }
 
-function renderReview(report, repository, sha, files, ci = { state: 'unavailable' }) {
+function validLogin(login) {
+  return typeof login === 'string' && /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/i.test(login);
+}
+
+function reviewDecision(report, ci) {
+  if (report.findings.length || ci.state === 'failed') return 'changes_requested';
+  return report.verdict === 'ready' && ci.state === 'passed' ? 'ready' : 'needs_human_review';
+}
+
+function renderReview(report, repository, sha, files, ci = { state: 'unavailable' }, routing = {}) {
   const validText = (value, limit) => typeof value === 'string' && value.trim() && value.length <= limit;
   const textList = (value, count, length) => Array.isArray(value) && value.length <= count
     && value.every(item => validText(item, length));
@@ -99,10 +108,14 @@ function renderReview(report, repository, sha, files, ci = { state: 'unavailable
     || (report.verdict === 'ready' && report.checklist.some(item => item.status === 'failed'))) {
     throw new Error('Invalid review report');
   }
-  const blocked = report.findings.length > 0 || ci.state === 'failed';
-  const ready = !blocked && report.verdict === 'ready' && ci.state === 'passed';
+  const decision = reviewDecision(report, ci);
+  const blocked = decision === 'changes_requested';
+  const ready = decision === 'ready';
   const verdict = blocked ? '🔴 Changes requested' : ready ? '🟢 Merge recommended' : '🟠 Manual review required';
-  const lines = ['## PR Review', '', `**${verdict}** · Revision \`${sha.slice(0, 7)}\``, '', text(report.summary)];
+  const lines = ['## PR Review', '', `**${verdict}** · Revision \`${sha.slice(0, 7)}\``];
+  if (blocked && validLogin(routing.author)) lines.push('', `@${routing.author} please address the blocking issues or failed checks and push an update.`);
+  if (ready && validLogin(routing.maintainer)) lines.push('', `@${routing.maintainer} merge recommended — please review and decide whether to merge.`);
+  lines.push('', text(report.summary));
   const ciLabels = { passed: 'All three CI jobs passed for this revision.', failed: 'CI failed or required jobs did not pass.',
     pending: 'CI is still running for this revision.', unavailable: 'Passing CI could not be verified for this revision.' };
   lines.push('', `**CI:** ${ciLabels[ci.state] || ciLabels.unavailable}${ci.url ? ` [View CI](${ci.url})` : ''}`);
@@ -173,6 +186,8 @@ async function resolvePull(github, context) {
     if (!candidates.length) {
       candidates = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit,
         { ...repo, commit_sha: run.head_sha, per_page: 100 });
+      // Commit associations do not identify a run when several PRs share it.
+      if (candidates.length !== 1) return null;
     }
   }
   for (const candidate of candidates) {
@@ -213,12 +228,32 @@ async function prepareReview({ github, context, core }, number, sha, directory) 
   core.setOutput('current', 'true');
 }
 
-async function publish({ github, context, core }, { number, sha, raw, reason }) {
+async function requestMaintainerReview({ github, context, core }, pr, maintainer, sha) {
+  if (pr.user?.login.toLowerCase() === maintainer.toLowerCase()) {
+    return 'GitHub does not allow an author to review their own PR; the maintainer was tagged instead.';
+  }
+  if (pr.draft) return 'Review requests are deferred until this draft is marked ready for review.';
+  if (pr.requested_reviewers?.some(user => user.login.toLowerCase() === maintainer.toLowerCase())) return '';
+  try {
+    const reviews = await github.paginate(github.rest.pulls.listReviews,
+      { ...context.repo, pull_number: pr.number, per_page: 100 });
+    if (reviews.some(review => review.user?.login.toLowerCase() === maintainer.toLowerCase()
+      && review.commit_id === sha && ['APPROVED', 'CHANGES_REQUESTED'].includes(review.state))) return '';
+    await github.rest.pulls.requestReviewers({ ...context.repo, pull_number: pr.number, reviewers: [maintainer] });
+    return '';
+  } catch (error) {
+    core.warning('Could not automatically request the maintainer review');
+    return 'Could not automatically request the maintainer review. Please request it manually; the maintainer has been tagged above.';
+  }
+}
+
+async function publish({ github, context, core }, { number, sha, raw, reason, maintainer }) {
   const repository = `${context.repo.owner}/${context.repo.repo}`;
   const pr = (await github.rest.pulls.get({ ...context.repo, pull_number: Number(number) })).data;
   if (!isCurrent(pr, sha, repository, context.eventName === 'workflow_dispatch')) return;
   const url = `https://github.com/${repository}/actions/runs/${context.runId}`;
   let body = renderUnavailable(reason || 'failed', sha, url);
+  let decision;
   if (raw && !reason) {
     try {
       const files = await github.paginate(github.rest.pulls.listFiles, { ...context.repo, pull_number: pr.number, per_page: 100 });
@@ -229,7 +264,13 @@ async function publish({ github, context, core }, { number, sha, raw, reason }) 
         core.warning('Current CI status could not be verified');
         ci = { state: 'unavailable' };
       }
-      body = renderReview(JSON.parse(raw), repository, sha, files.map(file => file.filename), ci);
+      const report = JSON.parse(raw);
+      body = renderReview(report, repository, sha, files.map(file => file.filename), ci, { author: pr.user?.login, maintainer });
+      decision = reviewDecision(report, ci);
+      if (decision === 'ready' && !validLogin(maintainer)) {
+        body = renderUnavailable('not_configured', sha, url);
+        decision = undefined;
+      }
     } catch (error) {
       core.warning(`Review report rejected: ${error.message}`);
     }
@@ -237,6 +278,13 @@ async function publish({ github, context, core }, { number, sha, raw, reason }) 
   // Discard results if a new commit arrived while rendering.
   const current = (await github.rest.pulls.get({ ...context.repo, pull_number: pr.number })).data;
   if (!isCurrent(current, sha, repository, context.eventName === 'workflow_dispatch')) return;
+  if (decision === 'ready') {
+    const note = await requestMaintainerReview({ github, context, core }, current, maintainer, sha);
+    if (note) body += `\n\n${note}`;
+    // A reviewer API call may race with a new contributor revision.
+    const latest = (await github.rest.pulls.get({ ...context.repo, pull_number: pr.number })).data;
+    if (!isCurrent(latest, sha, repository, context.eventName === 'workflow_dispatch')) return;
+  }
   await upsertComment(github, context.repo, pr.number, '<!-- pr-review -->', body, context.runId);
 }
 

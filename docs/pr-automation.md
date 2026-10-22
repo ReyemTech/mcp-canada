@@ -17,7 +17,11 @@ The review comment opens with one of three recommendations:
 Each completed review explains what is solid with specific evidence, separates
 blocking issues from expandable non-blocking suggestions, and includes a checklist
 with evidence and explicit verification limits. Optional suggestions do not prevent
-a merge recommendation. Unverified checklist items stay unchecked; source inspection
+a merge recommendation. Blocking comments tag the PR author; merge recommendations
+tag the configured maintainer and request their review. Existing requests and
+completed reviews for the same revision are not requested again. GitHub forbids
+self-review requests, and requests for drafts are deferred until ready for review.
+If the request API fails, the comment explains that a manual request is needed. Unverified checklist items stay unchecked; source inspection
 is distinguished from executing tests. The publisher independently reads the newest
 CI run for the same PR and head commit rather than relying on the review's test
 claims. If GitHub omits the run's PR association, the review is still published,
@@ -44,6 +48,7 @@ but a positive merge recommendation is withheld because its target cannot be pro
    | `PR_REVIEW_AWS_REGION` | `us-east-1` |
    | `PR_REVIEW_PROJECT_ID` | Dedicated Mantle project ID |
    | `PR_REVIEW_MODEL` | `openai.gpt-6-sol` |
+   | `PR_REVIEW_MAINTAINER` | `mariomeyer` |
 
    Changing the model or region also requires updating the role's policy. Reasoning
    effort is `medium`; each review job has a 15-minute timeout and a 400 KB diff cap.
@@ -116,7 +121,8 @@ The provider environment excludes bearer keys, OpenAI keys, AWS profiles, and ru
 tokens. No untrusted workflow artifacts are downloaded into a privileged publisher.
 
 The publisher validates report structure, priorities, changed file paths, and positive
-line numbers, escapes displayed text, and prevents user mentions. It rechecks the head
+line numbers, escapes displayed text and model-supplied mentions. Only trusted publisher logic
+adds the PR author or configured maintainer mention. It rechecks the head
 SHA before publishing. It updates only its own marked bot comments, never comments
 with a matching marker written by a contributor. A timeout, bad output, missing
 configuration, failed AWS authentication, or oversized diff produces **Manual review required**, not a clean review.

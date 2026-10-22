@@ -11,7 +11,7 @@ const report = (overrides = {}) => ({ verdict: 'ready', summary: 'The change fit
 const jobs = () => ['3.12', '3.13', '3.14'].map(version => ({
   name: `Test (Python ${version})`, conclusion: 'success', html_url: 'job', steps: [],
 }));
-const pr = { number: 9, state: 'open', draft: false, head: { sha, ref: 'feature', repo: { full_name: 'ReyemTech/mcp-canada' } },
+const pr = { number: 9, user: { login: 'contributor' }, requested_reviewers: [], state: 'open', draft: false, head: { sha, ref: 'feature', repo: { full_name: 'ReyemTech/mcp-canada' } },
   base: { ref: 'main', repo: { full_name: 'ReyemTech/mcp-canada' } } };
 
 test('a completed run cannot publish feedback on a newer PR revision', () => {
@@ -285,4 +285,81 @@ test('large escaped reports fall back to manual review instead of exceeding GitH
   await feedback.publish({ ...fixture, core: { warning() {} } }, { number: 9, sha, raw: JSON.stringify(oversized) });
   assert.match(fixture.store.comments[0].body, /Manual review required/);
   assert.ok(fixture.store.comments[0].body.length < 65000);
+});
+
+test('ready reviews tag the maintainer and request their review', async () => {
+  const fixture = apiFixture();
+  fixture.github.rest.actions.listWorkflowRuns = async () => [{ id: 21, head_sha: sha,
+    head_branch: pr.head.ref, head_repository: pr.head.repo, pull_requests: [{ number: 9, base: { ref: 'main' } }],
+    status: 'completed', conclusion: 'success', html_url: 'run' }];
+  fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
+  fixture.github.rest.pulls.listReviews = async () => [];
+  const requested = [];
+  fixture.github.rest.pulls.requestReviewers = async args => requested.push(args);
+  await feedback.publish({ ...fixture, core: { warning() {} } },
+    { number: 9, sha, raw: JSON.stringify(report()), maintainer: 'mariomeyer' });
+  assert.match(fixture.store.comments[0].body, /@mariomeyer.*merge/i);
+  assert.equal(requested.length, 1);
+  assert.deepEqual(requested[0].reviewers, ['mariomeyer']);
+});
+
+test('blocking findings tag only the actual PR author, not names from the report', async () => {
+  const fixture = apiFixture();
+  const blocking = report({ verdict: 'changes_requested', findings: [{ priority: 'P2', title: 'Fix paging',
+    body: '@untrusted please fix this', path: 'src/client.py', line: 1 }] });
+  await feedback.publish({ ...fixture, core: { warning() {} } },
+    { number: 9, sha, raw: JSON.stringify(blocking), maintainer: 'mariomeyer' });
+  assert.match(fixture.store.comments[0].body, /@contributor.*address/i);
+  assert.doesNotMatch(fixture.store.comments[0].body, /@mariomeyer|@untrusted/);
+});
+
+test('a maintainer who authored the PR is mentioned without an invalid self-review request', async () => {
+  const fixture = apiFixture({ pull: { ...pr, user: { login: 'mariomeyer' } } });
+  fixture.github.rest.actions.listWorkflowRuns = async () => [{ id: 21, head_sha: sha,
+    head_branch: pr.head.ref, head_repository: pr.head.repo, pull_requests: [{ number: 9, base: { ref: 'main' } }],
+    status: 'completed', conclusion: 'success', html_url: 'run' }];
+  fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
+  fixture.github.rest.pulls.requestReviewers = async () => { throw new Error('Self request attempted'); };
+  await feedback.publish({ ...fixture, core: { warning() {} } },
+    { number: 9, sha, raw: JSON.stringify(report()), maintainer: 'mariomeyer' });
+  assert.match(fixture.store.comments[0].body, /@mariomeyer/);
+  assert.match(fixture.store.comments[0].body, /author.*own PR|own PR.*review/i);
+});
+
+test('a pending review request or completed review is not requested again', async () => {
+  for (const alreadyRequested of [true, false]) {
+    const fixture = apiFixture({ pull: { ...pr, requested_reviewers: alreadyRequested ? [{ login: 'mariomeyer' }] : [] } });
+    fixture.github.rest.actions.listWorkflowRuns = async () => [{ id: 21, head_sha: sha,
+      head_branch: pr.head.ref, head_repository: pr.head.repo, pull_requests: [{ number: 9, base: { ref: 'main' } }],
+      status: 'completed', conclusion: 'success', html_url: 'run' }];
+    fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
+    fixture.github.rest.pulls.listReviews = async () => [{ user: { login: 'mariomeyer' }, commit_id: sha, state: 'APPROVED' }];
+    const requested = [];
+    fixture.github.rest.pulls.requestReviewers = async args => { requested.push(args); };
+    await feedback.publish({ ...fixture, core: { warning() {} } },
+      { number: 9, sha, raw: JSON.stringify(report()), maintainer: 'mariomeyer' });
+    assert.match(fixture.store.comments[0].body, /Merge recommended/);
+    assert.equal(requested.length, 0);
+  }
+});
+
+test('failed reviewer assignment is visible in the comment', async () => {
+  const fixture = apiFixture();
+  fixture.github.rest.actions.listWorkflowRuns = async () => [{ id: 21, head_sha: sha,
+    head_branch: pr.head.ref, head_repository: pr.head.repo, pull_requests: [{ number: 9, base: { ref: 'main' } }],
+    status: 'completed', conclusion: 'success', html_url: 'run' }];
+  fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
+  fixture.github.rest.pulls.listReviews = async () => [];
+  fixture.github.rest.pulls.requestReviewers = async () => { throw new Error('API unavailable'); };
+  await feedback.publish({ ...fixture, core: { warning() {} } },
+    { number: 9, sha, raw: JSON.stringify(report()), maintainer: 'mariomeyer' });
+  assert.match(fixture.store.comments[0].body, /could not.*request.*review/i);
+});
+
+test('ambiguous commit associations cannot send feedback to the wrong PR', async () => {
+  const fixture = apiFixture({ pull: { ...pr, head: { ...pr.head, repo: { full_name: 'contributor/fork' } } },
+    run: { event: 'pull_request', path: '.github/workflows/ci.yml', status: 'completed', head_sha: sha,
+      head_repository: { full_name: 'contributor/fork' }, pull_requests: [] } });
+  fixture.github.rest.repos.listPullRequestsAssociatedWithCommit = async () => [{ number: 9 }, { number: 10 }];
+  assert.equal(await feedback.resolvePull(fixture.github, fixture.context), null);
 });

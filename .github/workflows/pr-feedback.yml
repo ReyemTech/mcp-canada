@@ -156,6 +156,7 @@ jobs:
         env:
           PR_NUMBER: ${{ needs.checks.outputs.pr_number }}
           HEAD_SHA: ${{ needs.checks.outputs.head_sha }}
+          REVIEW_MAINTAINER: ${{ vars.PR_REVIEW_MAINTAINER }}
           REVIEW_REPORT: ${{ needs.review.outputs.report }}
           REVIEW_CONFIGURED: ${{ needs.review.outputs.configured }}
           REVIEW_SIZE: ${{ needs.review.outputs.size }}
@@ -167,5 +168,5 @@ jobs:
               : process.env.REVIEW_RESULT !== 'success' ? 'failed' : undefined;
             await require('./.github/scripts/pr-feedback.cjs').publish({ github, context, core }, {
               number: process.env.PR_NUMBER, sha: process.env.HEAD_SHA,
-              raw: process.env.REVIEW_REPORT, reason,
+              raw: process.env.REVIEW_REPORT, reason, maintainer: process.env.REVIEW_MAINTAINER,
             });

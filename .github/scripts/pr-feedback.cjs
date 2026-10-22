@@ -102,9 +102,9 @@ function validLogin(login) {
   return typeof login === 'string' && /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/i.test(login);
 }
 
-function reviewDecision(report, ci) {
+function reviewDecision(report, ci, draft = false) {
   if (report.findings.length || ci.state === 'failed') return 'changes_requested';
-  return report.verdict === 'ready' && ci.state === 'passed' ? 'ready' : 'needs_human_review';
+  return !draft && report.verdict === 'ready' && ci.state === 'passed' ? 'ready' : 'needs_human_review';
 }
 
 function renderReview(report, repository, sha, files, ci = { state: 'unavailable' }, routing = {}) {
@@ -127,11 +127,12 @@ function renderReview(report, repository, sha, files, ci = { state: 'unavailable
     || (report.verdict === 'ready' && report.checklist.some(item => item.status === 'failed'))) {
     throw new Error('Invalid review report');
   }
-  const decision = reviewDecision(report, ci);
+  const decision = reviewDecision(report, ci, routing.draft);
   const blocked = decision === 'changes_requested';
   const ready = decision === 'ready';
   const verdict = blocked ? '🔴 Changes requested' : ready ? '🟢 Merge recommended' : '🟠 Manual review required';
   const lines = ['## PR Review', '', `**${verdict}** · Revision \`${sha.slice(0, 7)}\``];
+  if (routing.draft) lines.push('', 'This PR is a draft. Mark it ready for review before a merge recommendation or maintainer review request.');
   if (blocked && validLogin(routing.author)) lines.push('', `@${routing.author} please address the blocking issues or failed checks and push an update.`);
   if (ready && validLogin(routing.maintainer)) lines.push('', `@${routing.maintainer} merge recommended — please review and decide whether to merge.`);
   if (routing.base) lines.push('', baseMarker(routing.base), `Reviewed against: \`${text(routing.base.ref)}@${routing.base.sha.slice(0, 7)}\`. Recommendation applies to this head/base pair.`);
@@ -165,6 +166,27 @@ function renderReview(report, repository, sha, files, ci = { state: 'unavailable
   // Leave room for the marker/run stamp below GitHub's 65,536-character limit.
   if (body.length > 60000) throw new Error('Rendered review exceeds the comment limit');
   return body;
+}
+
+async function validateSourceLocations(github, repo, sha, files, report) {
+  const locations = [...report.findings, ...report.suggestions];
+  for (const path of new Set(locations.map(item => item.path))) {
+    const file = files.find(item => item.filename === path);
+    if (!file || file.status === 'removed') throw new Error('Source location is absent from the reviewed revision');
+    const { data } = await github.rest.repos.getContent({ ...repo, path, ref: sha });
+    if (!data || data.type !== 'file' || data.encoding !== 'base64' || typeof data.content !== 'string'
+      || !Number.isSafeInteger(data.size) || data.size < 0 || data.size > 1000000
+      || data.content.length > 1400000 || (file.sha && data.sha !== file.sha)) {
+      throw new Error('Review source cannot be verified');
+    }
+    const bytes = Buffer.from(data.content, 'base64');
+    if (bytes.length !== data.size || bytes.includes(0)) throw new Error('Review source is not text');
+    const source = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    const lines = source ? source.split('\n').length - Number(source.endsWith('\n')) : 0;
+    if (locations.some(item => item.path === path && item.line > lines)) {
+      throw new Error('Review source line does not exist');
+    }
+  }
 }
 
 function renderUnavailable(reason, sha, url) {
@@ -287,6 +309,7 @@ async function publish({ github, context, core }, { number, sha, raw, reason, ma
   const url = `https://github.com/${repository}/actions/runs/${context.runId}`;
   let body = renderUnavailable(reason || 'failed', sha, url);
   let decision;
+  let renderDraft;
   if (raw && !reason) {
     try {
       const files = await github.paginate(github.rest.pulls.listFiles, { ...context.repo, pull_number: pr.number, per_page: 100 });
@@ -298,8 +321,13 @@ async function publish({ github, context, core }, { number, sha, raw, reason, ma
         ci = { state: 'unavailable' };
       }
       const report = JSON.parse(raw);
-      body = renderReview(report, repository, sha, files.map(file => file.filename), ci, { author: pr.user?.login, maintainer, base });
-      decision = reviewDecision(report, ci);
+      const render = draft => renderReview(report, repository, sha, files.map(file => file.filename), ci,
+        { author: pr.user?.login, maintainer, base, draft });
+      const rendered = render(pr.draft);
+      await validateSourceLocations(github, context.repo, sha, files, report);
+      body = rendered;
+      renderDraft = () => render(true);
+      decision = reviewDecision(report, ci, pr.draft);
       if (decision === 'ready' && !validLogin(maintainer)) {
         body = renderUnavailable('not_configured', sha, url);
         decision = undefined;
@@ -311,6 +339,10 @@ async function publish({ github, context, core }, { number, sha, raw, reason, ma
   // Discard results if a new commit arrived while rendering.
   const current = (await github.rest.pulls.get({ ...context.repo, pull_number: pr.number })).data;
   if (!isCurrent(current, sha, repository, context.eventName === 'workflow_dispatch', base)) return;
+  if (current.draft && decision === 'ready') {
+    body = renderDraft();
+    decision = 'needs_human_review';
+  }
   if (decision === 'ready') {
     const existing = await findBotComment(github, context.repo, pr.number, '<!-- pr-review -->');
     if (superseded(existing, context.runId)) return;
@@ -321,6 +353,7 @@ async function publish({ github, context, core }, { number, sha, raw, reason, ma
     // A reviewer API call may race with a new contributor revision.
     const latest = (await github.rest.pulls.get({ ...context.repo, pull_number: pr.number })).data;
     if (!isCurrent(latest, sha, repository, context.eventName === 'workflow_dispatch', base)) return;
+    if (latest.draft) body = renderDraft();
   }
   await upsertComment(github, context.repo, pr.number, '<!-- pr-review -->', body, context.runId);
 }

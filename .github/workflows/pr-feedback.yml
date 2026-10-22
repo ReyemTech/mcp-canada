@@ -18,11 +18,39 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checks:
-    name: Publish CI feedback
+  target:
+    name: Locate current PR
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      pr_number: ${{ steps.target.outputs.pr_number }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Resolve PR before acquiring the comment lock
+        id: target
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const target = await require('./.github/scripts/pr-feedback.cjs').resolvePull(github, context);
+            if (target) core.setOutput('pr_number', target.pr.number);
+
+  checks:
+    name: Publish CI feedback
+    needs: target
+    if: ${{ needs.target.outputs.pr_number != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: pr-checks-publish-${{ needs.target.outputs.pr_number }}
+      cancel-in-progress: false
     permissions:
       contents: read
       actions: read

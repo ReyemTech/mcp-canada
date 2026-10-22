@@ -108,7 +108,10 @@ function apiFixture({ pull = pr, run = {}, comments = [] } = {}) {
     paginate: async (method) => method(),
     rest: {
       actions: { getWorkflowRun: async () => ({ data: run }) },
-      repos: { listPullRequestsAssociatedWithCommit: async () => [{ number: 9 }] },
+      repos: { listPullRequestsAssociatedWithCommit: async () => [{ number: 9 }],
+        getContent: async () => ({ data: { type: 'file', encoding: 'base64', size: 200,
+          content: Buffer.from('a\n'.repeat(100)).toString('base64') } }),
+      },
       pulls: { get: async () => { store.reads++; return { data: pull }; }, listFiles: async () => [{ filename: 'src/client.py' }] },
       issues: {
         listComments: async () => store.comments,
@@ -454,4 +457,92 @@ test('a completed review for an older base does not suppress a fresh request', a
     base: { sha: pr.base.sha, ref: pr.base.ref }, raw: JSON.stringify(report()), maintainer: 'mariomeyer' });
   assert.equal(requested.length, 1);
   assert.match(fixture.store.comments[0].body, new RegExp(`reviewed-base: ${pr.base.sha}:main`));
+});
+
+function passingFixture(options) {
+  const fixture = apiFixture(options);
+  fixture.github.rest.actions.listWorkflowRuns = async () => [{ id: 21, head_sha: sha,
+    head_branch: pr.head.ref, head_repository: pr.head.repo,
+    display_title: `CI PR#9 BASE:${pr.base.sha} REF:main`,
+    status: 'completed', conclusion: 'success', html_url: 'run' }];
+  fixture.github.rest.actions.listJobsForWorkflowRun = async () => jobs();
+  fixture.github.rest.pulls.listReviews = async () => [];
+  fixture.store.requests = [];
+  fixture.github.rest.pulls.requestReviewers = async args => fixture.store.requests.push(args);
+  fixture.store.contentReads = [];
+  fixture.github.rest.repos.getContent = async args => {
+    fixture.store.contentReads.push(args);
+    return { data: { type: 'file', encoding: 'base64', size: 4, content: Buffer.from('a\nb\n').toString('base64') } };
+  };
+  return fixture;
+}
+
+const publishReport = (fixture, value) => feedback.publish({ ...fixture, core: { warning() {} } },
+  { number: 9, sha, raw: JSON.stringify(value), maintainer: 'mariomeyer' });
+const locatedReport = (line, field = 'findings') => report({
+  verdict: field === 'findings' ? 'changes_requested' : 'ready',
+  [field]: [{ priority: 'P2', title: 'Check this behavior', body: 'Concrete triggering condition.', path: 'src/client.py', line }],
+});
+
+test('manual draft assessments never recommend merging or tag/request the maintainer', async () => {
+  const fixture = passingFixture({ pull: { ...pr, draft: true } });
+  fixture.context.eventName = 'workflow_dispatch';
+  await publishReport(fixture, report());
+  assert.match(fixture.store.comments[0].body, /Manual review required/);
+  assert.match(fixture.store.comments[0].body, /draft/i);
+  assert.doesNotMatch(fixture.store.comments[0].body, /Merge recommended|@mariomeyer/);
+  assert.equal(fixture.store.requests.length, 0);
+});
+
+test('a PR changed to draft during manual assessment cannot receive a merge recommendation', async () => {
+  const fixture = passingFixture();
+  fixture.context.eventName = 'workflow_dispatch';
+  fixture.github.rest.pulls.get = async () => ({ data: ++fixture.store.reads === 1 ? pr : { ...pr, draft: true } });
+  await publishReport(fixture, report());
+  assert.equal(fixture.store.comments.length, 1);
+  assert.match(fixture.store.comments[0].body, /Manual review required/);
+  assert.doesNotMatch(fixture.store.comments[0].body, /Merge recommended|@mariomeyer/);
+  assert.equal(fixture.store.requests.length, 0);
+});
+
+test('source locations are checked against the exact reviewed revision and last real line', async () => {
+  const fixture = passingFixture();
+  await publishReport(fixture, locatedReport(2));
+  assert.match(fixture.store.comments[0].body, new RegExp(`/blob/${sha}/src/client.py#L2`));
+  assert.equal(fixture.store.contentReads.length, 1);
+  assert.equal(fixture.store.contentReads[0].ref, sha);
+  for (const field of ['findings', 'suggestions']) {
+    for (const line of [3, 999999]) {
+      const invalid = passingFixture();
+      await publishReport(invalid, locatedReport(line, field));
+      assert.match(invalid.store.comments[0].body, /Manual review required/);
+      assert.doesNotMatch(invalid.store.comments[0].body, /#L|Merge recommended|@mariomeyer/);
+      assert.equal(invalid.store.requests.length, 0);
+    }
+  }
+});
+
+test('deleted files cannot produce broken links at the head revision', async () => {
+  const fixture = passingFixture();
+  fixture.github.rest.pulls.listFiles = async () => [{ filename: 'src/client.py', status: 'removed' }];
+  await publishReport(fixture, locatedReport(1));
+  assert.match(fixture.store.comments[0].body, /Manual review required/);
+  assert.doesNotMatch(fixture.store.comments[0].body, /#L/);
+  assert.equal(fixture.store.contentReads.length, 0);
+});
+
+test('unavailable, oversized, empty and nontext source files require manual review', async () => {
+  for (const data of [null, { type: 'dir' },
+    { type: 'file', encoding: 'none', size: 1000001, content: '' },
+    { type: 'file', encoding: 'base64', size: 0, content: '' },
+    { type: 'file', encoding: 'base64', size: 1, content: Buffer.from([0xff]).toString('base64') }]) {
+    const fixture = passingFixture();
+    fixture.github.rest.repos.getContent = async () => {
+      if (data === null) throw new Error('404');
+      return { data };
+    };
+    await publishReport(fixture, locatedReport(1, 'suggestions'));
+    assert.match(fixture.store.comments[0].body, /Manual review required/);
+    assert.doesNotMatch(fixture.store.comments[0].body, /Merge recommended|@mariomeyer/);
+  }
 });

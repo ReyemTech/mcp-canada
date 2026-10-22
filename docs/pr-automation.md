@@ -111,6 +111,7 @@ Billing and can take time to appear; project separation is not a spending cap.
 | Stage | Inputs | Permissions |
 | --- | --- | --- |
 | `CI` | PR checkout; lint/type/unit/catalog checks | `contents: read`, no secrets |
+| `PR Feedback / Locate current PR` | Current PR and triggering run metadata | Read actions/content/PR; no writes |
 | `PR Feedback / Publish CI feedback` | Current GitHub run/job metadata | Read actions/content; write PR comments |
 | `PR Feedback / Assess PR changes` | Trusted default-branch prompt plus PR diff and git objects | Read content/PR; OIDC; inference in one Mantle project |
 | `PR Feedback / Publish review` | Validated JSON report plus current CI status | Read content/actions; write PR comments; no provider secret |
@@ -133,8 +134,11 @@ project-scoped AWS credentials; its shell tools inherit no AWS or GitHub tokens.
 The provider environment excludes bearer keys, OpenAI keys, AWS profiles, and runner
 tokens. No untrusted workflow artifacts are downloaded into a privileged publisher.
 
-The publisher validates report structure, priorities, changed file paths, and positive
-line numbers, escapes displayed text and model-supplied mentions. Only trusted publisher logic
+The publisher validates report structure, priorities, changed file paths, and source
+line numbers against the exact reviewed head SHA. It fetches each cited file once
+and rejects deleted files, nonexistent lines, unavailable content, and files beyond
+the 1 MB text-validation limit. An invalid location requires manual review instead
+of publishing a broken link. It escapes displayed text and model-supplied mentions. Only trusted publisher logic
 adds the PR author or configured maintainer mention. It rechecks the head
 SHA before publishing. It updates only its own marked bot comments, never comments
 with a matching marker written by a contributor. A timeout, bad output, missing
@@ -148,15 +152,20 @@ uv run python scripts/generate_catalog.py --check
 ```
 
 The feedback tests cover stale revisions, missing/failed checks, CI recovery,
-actionable medium-priority findings, invalid reports, mention/HTML handling,
-and updating bot comments without overwriting contributor text.
+actionable medium-priority findings, invalid reports and source links, draft merge
+recommendations, mention/HTML handling, and updating bot comments without
+overwriting contributor text. A workflow regression checks the per-PR checks lock.
 
 Use Actions → PR Feedback → Run workflow with a PR number to rerun only the review
-without executing PR tests. A manual dispatch can review a draft; automatic runs
-skip drafts. Automatic reviews follow CI completion; the next push
+without executing PR tests. A manual dispatch can assess a draft, but cannot
+recommend merging, tag the maintainer for merging, or request their review until
+the PR is marked ready. Automatic runs skip drafts. Automatic reviews follow CI completion; the next push
 restarts the checks and review. Automatic feedback runs are isolated by CI run ID, so PRs sharing a source branch
 cannot cancel each other. Manual reruns for the same PR cancel older manual reruns.
-Stale revision checks prevent outdated automatic assessments from publishing. Automatic and manual publishers serialize per PR,
+Stale revision checks prevent outdated automatic assessments from publishing. A
+read-only target job resolves the PR number before the entire checks job acquires
+its per-PR lock, including the comment read and write. Review publishers use a
+separate per-PR lock. Automatic and manual publishers serialize per PR,
 and an older feedback run cannot overwrite a comment from a newer run. The size
 limit requires manual review of large PRs.
 

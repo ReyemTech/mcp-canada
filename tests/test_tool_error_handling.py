@@ -45,7 +45,7 @@ def _uncovered_tools() -> list[tuple[str, str]]:
     offenders: list[tuple[str, str]] = []
 
     for path in sorted(MODULES_DIR.rglob("tools.py")):
-        tree = ast.parse(path.read_text())
+        tree = ast.parse(path.read_text(encoding="utf-8"))
         module = str(path.parent.relative_to(MODULES_DIR))
 
         # Module-level helpers that themselves handle broad failures. A tool that
